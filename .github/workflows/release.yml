@@ -36,8 +36,17 @@ jobs:
       - name: Restore
         run: dotnet restore Mokaterm.slnx
 
+      # The Windows head needs the win-x64 runtime pack, which a solution restore does not
+      # fetch on a clean runner: MAUI settles the runtime identifier as the build runs, and
+      # --no-restore then leaves the build unable to go and get it (NETSDK1112). Restoring the
+      # host with the RID downloads it, and the build restores as well rather than being told
+      # not to. Only this project takes the RID: forcing one on the solution would move every
+      # test project's output and break the --no-build test run below.
+      - name: Restore the desktop host for win-x64
+        run: dotnet restore src/Hosts/Mokaterm.Maui/Mokaterm.Maui.csproj -r win-x64
+
       - name: Build
-        run: dotnet build Mokaterm.slnx --no-restore --configuration Release
+        run: dotnet build Mokaterm.slnx --configuration Release
 
       # A tag on a commit that does not pass is not a release.
       - name: Test
