@@ -1,0 +1,38 @@
+@* The frame the vault list pages share: the locked state instead of the list, and a load failure above it. A page that
+   forgets the alert would show an empty list where the document could not be read. *@
+
+<SettingsPage Title="@Title">
+	@if (IsUnlocked)
+	{
+		@if (LoadError is not null)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@LoadError</MokaAlert>
+		}
+		@ChildContent
+	}
+	else
+	{
+		<MokaEmptyState Icon="MokatermIcons.Lock" Title="The vault is locked" Description="@LockedDescription" />
+	}
+</SettingsPage>
+
+@code {
+	/// <summary>The page's name, for the settings frame.</summary>
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = "";
+
+	/// <summary>What the page would show, in the words of the page: "Unlock the vault to see and manage ...".</summary>
+	[Parameter, EditorRequired]
+	public string LockedDescription { get; set; } = "";
+
+	[Parameter]
+	public bool IsUnlocked { get; set; }
+
+	/// <summary>Set when the load failed for a reason other than the vault locking.</summary>
+	[Parameter]
+	public string? LoadError { get; set; }
+
+	/// <summary>The list itself, shown while the vault is unlocked.</summary>
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+}

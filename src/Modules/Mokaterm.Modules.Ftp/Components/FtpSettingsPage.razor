@@ -1,0 +1,46 @@
+@inherits SettingsSectionBase<FtpSettings>
+
+@{
+	FtpSettings settings = Settings;
+}
+
+<SettingsPage Title="FTP" OnReset="ResetAsync">
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Connect timeout" Description="How long to wait for the server to accept a connection.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="FtpSettings.MinTimeoutSeconds"
+						   Max="FtpSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Data timeout" Description="How long to wait for a reply or for file data before giving up.">
+			<NumberSetting TValue="int"
+						   Value="settings.DataTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { DataTimeoutSeconds = value })"
+						   Min="FtpSettings.MinTimeoutSeconds"
+						   Max="FtpSettings.MaxDataTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Data timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Keepalive"
+					 Description="Sends NOOP after this much idle time so servers and routers keep the connection. 0 turns it off.">
+			<NumberSetting TValue="int"
+						   Value="settings.KeepAliveSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { KeepAliveSeconds = value })"
+						   Min="0"
+						   Max="FtpSettings.MaxKeepAliveSeconds"
+						   Suffix="s"
+						   AriaLabel="Keepalive interval in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Login attempts" Description="Password prompts, the first one included, before a rejected login gives up.">
+			<NumberSetting TValue="int"
+						   Value="settings.AuthenticationAttempts"
+						   ValueChanged="value => SaveAsync(s => s with { AuthenticationAttempts = value })"
+						   Min="1"
+						   Max="FtpSettings.MaxAuthenticationAttempts"
+						   AriaLabel="Login attempts" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

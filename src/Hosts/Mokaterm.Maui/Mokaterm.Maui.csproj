@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+		<!-- Windows today. Mac Catalyst joins by adding net10.0-maccatalyst here plus Platforms/MacCatalyst service implementations. -->
+		<TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>Mokaterm.Maui</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<EnableDefaultCssItems>false</EnableDefaultCssItems>
+
+		<ApplicationTitle>Mokaterm</ApplicationTitle>
+		<ApplicationId>com.moka.mokaterm</ApplicationId>
+		<!--
+			VersionPrefix, not Version: Version is only worked out after this file, and it may carry a prerelease label that a
+			Windows version cannot. ApplicationVersion only reaches MAUI's AppInfo, which the app does not display.
+		-->
+		<ApplicationDisplayVersion>$(VersionPrefix)</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- MAUI's WinUI targets set Version to ApplicationDisplayVersion, which drops the label; the version the app shows keeps it. -->
+		<InformationalVersion Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</InformationalVersion>
+
+		<!-- Unpackaged: runs with dotnet run / F5 without MSIX signing. -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!--
+		Platforms/Windows/Program.cs replaces the entry point the XAML compiler generates, so the installer's hooks and the
+		single instance check run before WinUI starts.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+	</PropertyGroup>
+
+	<!--
+		MAUI's generated icon holds one 64x64 image, which Explorer draws small inside an empty square at desktop and Start
+		menu sizes. build/make-app-icon.ps1 draws this one at every size; MAUI only fills ApplicationIcon when it is empty.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<ApplicationIcon>Platforms\Windows\mokaterm.ico</ApplicationIcon>
+	</PropertyGroup>
+
+	<!--
+		Microsoft's workaround for a Windows App SDK publishing bug (microsoft/WindowsAppSDK#3337): the runtime identifier
+		arrives as RuntimeIdentifierOverride. .NET 10 accepts only portable ones, so build/package-windows.ps1 passes win-x64.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' and '$(RuntimeIdentifierOverride)' != ''">
+		<RuntimeIdentifier>$(RuntimeIdentifierOverride)</RuntimeIdentifier>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#060608" />
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#060608" BaseSize="128,128" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" />
+		<PackageReference Include="Velopack" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Mokaterm.Core\Mokaterm.Core.csproj" />
+		<ProjectReference Include="..\..\Mokaterm.Sessions\Mokaterm.Sessions.csproj" />
+		<ProjectReference Include="..\..\UI\Mokaterm.UI\Mokaterm.UI.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Ssh\Mokaterm.Modules.Ssh.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Ftp\Mokaterm.Modules.Ftp.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Vnc\Mokaterm.Modules.Vnc.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Rdp\Mokaterm.Modules.Rdp.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Telnet\Mokaterm.Modules.Telnet.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Mqtt\Mokaterm.Modules.Mqtt.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Serial\Mokaterm.Modules.Serial.csproj" />
+	</ItemGroup>
+
+</Project>

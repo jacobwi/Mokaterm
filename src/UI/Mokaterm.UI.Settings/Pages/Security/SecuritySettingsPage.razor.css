@@ -1,0 +1,6 @@
+.policy-option {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	padding: var(--moka-spacing-xxs) 0;
+}

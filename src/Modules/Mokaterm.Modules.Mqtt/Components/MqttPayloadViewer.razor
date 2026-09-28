@@ -1,0 +1,55 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<div class="mt-mqtt-payload">
+	@if (Message is null)
+	{
+		<div class="mt-mqtt-payload-empty">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				Pick a message to see its payload.
+			</MokaText>
+		</div>
+	}
+	else
+	{
+		<div class="mt-mqtt-payload-head">
+			<MokaSegmentedControl AriaLabel="Payload format" Value="@_format.ToString()" ValueChanged="OnFormatChanged" Size="MokaSize.Xs">
+				<MokaSegment Value="@nameof(MqttPayloadFormat.Text)" Text="TEXT" />
+				<MokaSegment Value="@nameof(MqttPayloadFormat.Json)" Text="JSON" Disabled="@(!HasJson)" />
+				<MokaSegment Value="@nameof(MqttPayloadFormat.Hex)" Text="HEX" />
+			</MokaSegmentedControl>
+
+			<span class="mt-mqtt-payload-spacer"></span>
+
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-payload-meta">@SizeText</MokaText>
+			@if (Message.ContentType is { Length: > 0 } contentType)
+			{
+				<MokaTag Text="@contentType" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+			}
+			@if (Message.IsTruncated)
+			{
+				<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" title="@TruncatedTitle" />
+			}
+
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Content.Copy"
+						OnClick="CopyAsync"
+						title="Copy what this panel shows"
+						aria-label="Copy the payload" />
+		</div>
+
+		@if (Message.PayloadLength == 0)
+		{
+			<div class="mt-mqtt-payload-empty">
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+					An empty payload. On a retained topic that is how a value is cleared.
+				</MokaText>
+			</div>
+		}
+		else
+		{
+			<pre class="mt-mqtt-payload-body">@Rendered</pre>
+		}
+	}
+</div>

@@ -1,0 +1,37 @@
+.mt-ssh-tunnels {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-ssh-tunnel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-ssh-tunnel-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-ssh-tunnel-text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mt-ssh-tunnel-form {
+	padding-top: var(--moka-spacing-xs);
+	border-top: 1px solid var(--moka-color-outline-variant);
+}

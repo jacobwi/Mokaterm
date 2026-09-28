@@ -1,0 +1,72 @@
+@namespace Mokaterm.Modules.Ssh.Components
+
+<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Sm">
+	<MokaFieldWrapper Label="Direction" HelperText="@KindHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Direction" Value="@Tunnel.Kind.ToString()" ValueChanged="SetKindAsync" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegment Value="@nameof(SshTunnelKind.Local)" Text="LOCAL" />
+			<MokaSegment Value="@nameof(SshTunnelKind.Remote)" Text="REMOTE" />
+			<MokaSegment Value="@nameof(SshTunnelKind.Dynamic)" Text="SOCKS" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaTextField Label="Name"
+				   Value="@(Tunnel.Name ?? "")"
+				   ValueChanged="SetNameAsync"
+				   Placeholder="Database"
+				   HelperText="Optional label for the list."
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   spellcheck="false" />
+
+	<MokaTextField Label="@ListenHostLabel"
+				   Value="@_listenHost.Show(Tunnel.ListenHost)"
+				   ValueChanged="SetListenHostAsync"
+				   ErrorText="@_listenHost.Error"
+				   Placeholder="@SshTunnelDefinition.DefaultListenHost"
+				   HelperText="@ListenHostHelp"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   spellcheck="false" />
+
+	<MokaTextField Label="Listen port"
+				   InputType="number"
+				   Value="@_listenPort.Show(PortText(Tunnel.ListenPort))"
+				   ValueChanged="SetListenPortAsync"
+				   ErrorText="@_listenPort.Error"
+				   Placeholder="8080"
+				   HelperText="@ListenPortHelp"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm" />
+
+	@if (Tunnel.HasDestination)
+	{
+		<MokaTextField Label="Destination host"
+					   Value="@_destinationHost.Show(Tunnel.DestinationHost)"
+					   ValueChanged="SetDestinationHostAsync"
+					   ErrorText="@_destinationHost.Error"
+					   Placeholder="localhost"
+					   HelperText="@DestinationHelp"
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false" />
+
+		<MokaTextField Label="Destination port"
+					   InputType="number"
+					   Value="@_destinationPort.Show(PortText(Tunnel.DestinationPort))"
+					   ValueChanged="SetDestinationPortAsync"
+					   ErrorText="@_destinationPort.Error"
+					   Placeholder="5432"
+					   HelperText="Where the other end connects."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm" />
+	}
+
+	@if (ShowOpenWithSession)
+	{
+		<MokaSwitch Label="Open with the session"
+					Value="@Tunnel.OpenWithSession"
+					ValueChanged="SetOpenWithSessionAsync"
+					HelperText="Off leaves the tunnel closed until it is opened from the tunnels panel."
+					Disabled="Disabled" />
+	}
+</MokaGrid>

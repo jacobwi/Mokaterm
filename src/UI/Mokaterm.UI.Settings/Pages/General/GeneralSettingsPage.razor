@@ -1,0 +1,53 @@
+@inherits SettingsSectionBase<GeneralSettings>
+
+@{
+	GeneralSettings settings = Settings;
+}
+
+<SettingsPage Title="General"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put every general setting back to its default?">
+	<SettingsSection Title="Sessions">
+		<SettingsRow Label="Confirm closing connected sessions"
+					 Description="Ask before closing a tab while its session is still connected. The prompt can turn this off itself.">
+			<MokaSwitch Value="settings.ConfirmCloseConnectedSessions"
+						ValueChanged="value => SaveAsync(s => s with { ConfirmCloseConnectedSessions = value })"
+						aria-label="Confirm closing connected sessions" />
+		</SettingsRow>
+		<SettingsRow Label="Reconnect automatically"
+					 Description="Try again when a connection drops on its own. Sessions you close yourself stay closed.">
+			<MokaSwitch Value="settings.AutoReconnect"
+						ValueChanged="value => SaveAsync(s => s with { AutoReconnect = value })"
+						aria-label="Reconnect automatically" />
+		</SettingsRow>
+		<SettingsRow Label="Reopen at start"
+					 Description="What to do with the tabs that were open when Mokaterm last closed. Quick-connect tabs are never reopened.">
+			<EnumSegmentedControl TEnum="SessionRestoreMode"
+								  Value="settings.RestoreSessions"
+								  ValueChanged="value => SaveAsync(s => s with { RestoreSessions = value })"
+								  Options="RestoreOptions"
+								  AriaLabel="Reopen sessions at start" />
+		</SettingsRow>
+		<SettingsRow Label="Reconnect delay" Description="Seconds to wait before each reconnect attempt.">
+			<NumberSetting TValue="int"
+						   Value="settings.AutoReconnectDelaySeconds"
+						   ValueChanged="value => SaveAsync(s => s with { AutoReconnectDelaySeconds = value })"
+						   Min="GeneralSettings.MinAutoReconnectDelaySeconds"
+						   Max="GeneralSettings.MaxAutoReconnectDelaySeconds"
+						   Suffix="s"
+						   Disabled="!settings.AutoReconnect"
+						   AriaLabel="Reconnect delay in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Recent connections" Description="How many recently used connections to list. 0 hides the list.">
+			<NumberSetting TValue="int"
+						   Value="settings.RecentConnectionsLimit"
+						   ValueChanged="value => SaveAsync(s => s with { RecentConnectionsLimit = value })"
+						   Min="GeneralSettings.MinRecentConnectionsLimit"
+						   Max="GeneralSettings.MaxRecentConnectionsLimit"
+						   AriaLabel="Number of recent connections" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

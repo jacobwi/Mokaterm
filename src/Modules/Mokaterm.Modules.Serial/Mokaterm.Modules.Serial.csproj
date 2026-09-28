@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		A serial console over System.IO.Ports: the port is the terminal channel, so sessions get the built-in terminal
+		view. Only a host with real ports registers it, which today means the desktop app and the workbench.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Serial</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Serial.Tests" />
+		<InternalsVisibleTo Include="Mokaterm.DevHost" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="System.IO.Ports" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

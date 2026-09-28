@@ -1,0 +1,33 @@
+.mt-vault {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding: var(--moka-spacing-lg);
+	overflow: auto;
+	background: var(--moka-color-background);
+}
+
+.mt-vault-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-lg);
+	width: 100%;
+	max-width: 420px;
+	padding: var(--moka-spacing-xl);
+	background: var(--moka-color-surface);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-lg);
+}
+
+.mt-vault-brand {
+	display: flex;
+	align-items: baseline;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-vault-card ::deep .mt-vault-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+}

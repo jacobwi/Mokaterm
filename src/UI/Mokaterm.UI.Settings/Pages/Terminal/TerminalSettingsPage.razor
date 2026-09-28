@@ -1,0 +1,271 @@
+@using Mokaterm.Abstractions.Terminal
+@using Mokaterm.UI.Terminal
+@inherits SettingsSectionBase<TerminalSettings>
+
+@{
+	TerminalSettings settings = Settings;
+	string activeThemeId = ThemeCatalog.Get(settings.ThemeId).Id;
+}
+
+<SettingsPage Title="Terminal"
+			  OnReset="ResetKeepingCustomThemesAsync"
+			  ResetMessage="Put every terminal setting back to its default? Your custom themes are kept.">
+	<SettingsSection Title="Theme" Description="Pick a color scheme. Duplicate any theme to create your own." Flush>
+		<Actions>
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Upload" OnClick="() => _importOpen = true">
+				Import
+			</MokaButton>
+		</Actions>
+		<ChildContent>
+		<div class="theme-grid">
+			@foreach (TerminalTheme theme in ThemeCatalog.Themes.DistinctBy(candidate => candidate.Id))
+			{
+				bool selected = theme.Id == activeThemeId;
+				<MokaCard @key="theme.Id" Outlined NoPadding Class="@(selected ? "theme-card theme-card--selected" : "theme-card")">
+					<button type="button"
+							class="theme-card__select"
+							aria-pressed="@(selected ? "true" : "false")"
+							aria-label="@($"Use the {theme.Name} theme")"
+							@onclick="() => SelectThemeAsync(theme.Id)">
+						<TerminalThemePreview Theme="theme" FontFamily="@settings.FontFamily" FontSize="11" />
+						<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Medium" Truncate>@theme.Name</MokaText>
+					</button>
+					<div class="theme-card__footer">
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+							<MokaTag Text="@(theme.IsDark ? "Dark" : "Light")" Size="MokaSize.Xs" />
+							@if (theme.IsCustom)
+							{
+								<MokaTag Text="Custom" Size="MokaSize.Xs" Color="MokaColor.Primary" />
+							}
+						</MokaFlexbox>
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+							<MokaButton Variant="MokaVariant.Text"
+										Size="MokaSize.Xs"
+										StartIcon="MokaIcons.Content.Copy"
+										OnClick="() => DuplicateTheme(theme)"
+										title="Duplicate as custom theme"
+										aria-label="@($"Duplicate {theme.Name} as a custom theme")" />
+							<MokaButton Variant="MokaVariant.Text"
+										Size="MokaSize.Xs"
+										StartIcon="MokaIcons.Action.Download"
+										OnClick="() => CopyThemeAsync(theme)"
+										title="Copy as a Windows Terminal scheme"
+										aria-label="@($"Copy {theme.Name} as a Windows Terminal scheme")" />
+							@if (theme.IsCustom)
+							{
+								<MokaButton Variant="MokaVariant.Text"
+											Size="MokaSize.Xs"
+											StartIcon="MokaIcons.Action.Edit"
+											OnClick="() => EditTheme(theme)"
+											title="Edit theme"
+											aria-label="@($"Edit {theme.Name}")" />
+								<MokaButton Variant="MokaVariant.Text"
+											Size="MokaSize.Xs"
+											Color="MokaColor.Error"
+											StartIcon="MokaIcons.Action.Delete"
+											OnClick="() => DeleteThemeAsync(theme)"
+											title="Delete theme"
+											aria-label="@($"Delete {theme.Name}")" />
+							}
+						</MokaFlexbox>
+					</div>
+				</MokaCard>
+			}
+		</div>
+		</ChildContent>
+	</SettingsSection>
+
+	<SettingsSection Title="Environments"
+					 Description="Give sessions on tagged hosts their own colors, so a production window is recognizable at a glance.">
+		<SettingsRow Label="Production" Description="Used unless the connection sets its own theme." ControlWidth="240px">
+			<MokaSelect TValue="string"
+						Items="ThemeChoices"
+						Value="@ChoiceOf(settings.ProductionThemeId)"
+						ValueChanged="value => SaveAsync(s => s with { ProductionThemeId = ThemeIdOf(value) })"
+						ValueSelector="ThemeChoiceLabel"
+						Size="MokaSize.Sm"
+						aria-label="Theme for production hosts" />
+		</SettingsRow>
+		<SettingsRow Label="Staging" ControlWidth="240px">
+			<MokaSelect TValue="string"
+						Items="ThemeChoices"
+						Value="@ChoiceOf(settings.StagingThemeId)"
+						ValueChanged="value => SaveAsync(s => s with { StagingThemeId = ThemeIdOf(value) })"
+						ValueSelector="ThemeChoiceLabel"
+						Size="MokaSize.Sm"
+						aria-label="Theme for staging hosts" />
+		</SettingsRow>
+		<SettingsRow Label="Development" ControlWidth="240px">
+			<MokaSelect TValue="string"
+						Items="ThemeChoices"
+						Value="@ChoiceOf(settings.DevelopmentThemeId)"
+						ValueChanged="value => SaveAsync(s => s with { DevelopmentThemeId = ThemeIdOf(value) })"
+						ValueSelector="ThemeChoiceLabel"
+						Size="MokaSize.Sm"
+						aria-label="Theme for development hosts" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Text">
+		<SettingsRow Label="Font family"
+					 Description="A CSS font list, tried in order. Fonts must be installed on the device showing the terminal."
+					 ControlWidth="340px">
+			<TextSetting Value="@settings.FontFamily"
+						 ValueChanged="value => SaveAsync(s => s with { FontFamily = value })"
+						 Suggestions="FontSuggestions"
+						 Validate="ValidateFontFamily"
+						 EmptyError="Enter at least one font."
+						 AriaLabel="Font family" />
+		</SettingsRow>
+		<SettingsRow Label="Font size" Description="In pixels.">
+			<NumberSetting TValue="double"
+						   Value="settings.FontSize"
+						   ValueChanged="value => SaveAsync(s => s with { FontSize = value })"
+						   Min="TerminalSettings.MinFontSize"
+						   Max="TerminalSettings.MaxFontSize"
+						   Suffix="px"
+						   AriaLabel="Font size in pixels" />
+		</SettingsRow>
+		<SettingsRow Label="Line height" Description="Row height as a multiple of the font size." ControlWidth="240px">
+			<MokaSlider Value="settings.LineHeight"
+						ValueChanged="SetLineHeightAsync"
+						Min="TerminalSettings.MinLineHeight"
+						Max="TerminalSettings.MaxLineHeight"
+						Step="LineHeightStep"
+						ValueFormat="0.00"
+						aria-label="Line height" />
+		</SettingsRow>
+		<SettingsRow Label="Minimum contrast"
+					 Description="Lightens or darkens text that would be hard to read on its background. 1 keeps the theme's colors."
+					 ControlWidth="240px">
+			<MokaSlider Value="settings.MinimumContrastRatio"
+						ValueChanged="SetMinimumContrastAsync"
+						Min="TerminalSettings.MinContrastRatio"
+						Max="TerminalSettings.MaxContrastRatio"
+						Step="0.5"
+						ValueFormat="0.0"
+						aria-label="Minimum contrast ratio" />
+		</SettingsRow>
+		<SettingsRow Label="Bold in bright colors" Description="Draw bold text in the bright version of its color, as most terminals do.">
+			<MokaSwitch Value="settings.DrawBoldTextInBrightColors"
+						ValueChanged="value => SaveAsync(s => s with { DrawBoldTextInBrightColors = value })"
+						aria-label="Bold text in bright colors" />
+		</SettingsRow>
+		<SettingsRow Label="Prompt colors"
+					 Description="Tells the user, the machine and the folder of a user@host prompt apart: the machine in its own color, the folder in blue and root in red. Plain only leaves a prompt the server colors itself alone.">
+			<EnumSegmentedControl TEnum="TerminalPromptColors"
+								  Value="settings.PromptColors"
+								  ValueChanged="value => SaveAsync(s => s with { PromptColors = value })"
+								  Options="PromptColorOptions"
+								  AriaLabel="Prompt colors" />
+		</SettingsRow>
+		<SettingsRow Label="Letter spacing" Description="Extra whole pixels between characters." ControlWidth="240px">
+			<MokaSlider Value="settings.LetterSpacing"
+						ValueChanged="SetLetterSpacingAsync"
+						Min="TerminalSettings.MinLetterSpacing"
+						Max="TerminalSettings.MaxLetterSpacing"
+						Step="1"
+						ValueFormat="0' px'"
+						aria-label="Letter spacing" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Cursor">
+		<SettingsRow Label="Style">
+			<EnumSegmentedControl TEnum="TerminalCursorStyle"
+								  Value="settings.CursorStyle"
+								  ValueChanged="value => SaveAsync(s => s with { CursorStyle = value })"
+								  Options="CursorStyleOptions"
+								  AriaLabel="Cursor style" />
+		</SettingsRow>
+		<SettingsRow Label="Blink" Description="Blink the cursor while the terminal has focus.">
+			<MokaSwitch Value="settings.CursorBlink"
+						ValueChanged="value => SaveAsync(s => s with { CursorBlink = value })"
+						aria-label="Blinking cursor" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Input and clipboard">
+		<SettingsRow Label="Copy on select" Description="Copy text to the clipboard as soon as you select it.">
+			<MokaSwitch Value="settings.CopyOnSelect"
+						ValueChanged="value => SaveAsync(s => s with { CopyOnSelect = value })"
+						aria-label="Copy on select" />
+		</SettingsRow>
+		<SettingsRow Label="Right-click" Description="What a right-click inside the terminal does.">
+			<EnumSegmentedControl TEnum="TerminalRightClickAction"
+								  Value="settings.RightClickAction"
+								  ValueChanged="value => SaveAsync(s => s with { RightClickAction = value })"
+								  Options="RightClickOptions"
+								  AriaLabel="Right-click action" />
+		</SettingsRow>
+		<SettingsRow Label="Confirm multi-line paste"
+					 Description="Ask before pasting text with line breaks, since each line runs as a command.">
+			<MokaSwitch Value="settings.ConfirmMultiLinePaste"
+						ValueChanged="value => SaveAsync(s => s with { ConfirmMultiLinePaste = value })"
+						aria-label="Confirm multi-line paste" />
+		</SettingsRow>
+		<SettingsRow Label="Remote clipboard access"
+					 Description="Let programs on the server, such as tmux and Neovim, copy to your clipboard (OSC 52). They can never read it.">
+			<MokaSwitch Value="settings.AllowRemoteClipboardWrite"
+						ValueChanged="value => SaveAsync(s => s with { AllowRemoteClipboardWrite = value })"
+						aria-label="Let remote programs copy to the clipboard" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Output">
+		<SettingsRow Label="Scrollback" Description="Lines kept above the screen. Large values use more memory per session.">
+			<NumberSetting TValue="int"
+						   Value="settings.Scrollback"
+						   ValueChanged="value => SaveAsync(s => s with { Scrollback = value })"
+						   Min="TerminalSettings.MinScrollback"
+						   Max="TerminalSettings.MaxScrollback"
+						   Suffix="lines"
+						   Width="104px"
+						   AriaLabel="Scrollback lines" />
+		</SettingsRow>
+		<SettingsRow Label="Bell" Description="How the terminal reacts when a program rings the bell.">
+			<EnumSegmentedControl TEnum="TerminalBellStyle"
+								  Value="settings.Bell"
+								  ValueChanged="value => SaveAsync(s => s with { Bell = value })"
+								  Options="BellOptions"
+								  AriaLabel="Bell" />
+		</SettingsRow>
+		<SettingsRow Label="WebGL renderer"
+					 Description="Draws with the GPU for smoother output. Falls back to the DOM renderer where WebGL is missing.">
+			<MokaSwitch Value="settings.UseWebGl"
+						ValueChanged="value => SaveAsync(s => s with { UseWebGl = value })"
+						aria-label="Use the WebGL renderer" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Sessions">
+		<SettingsRow Label="Terminal type"
+					 Description="Sent as TERM when a session opens a terminal. Applies to sessions opened afterwards."
+					 ControlWidth="340px">
+			<TextSetting Value="@settings.TerminalType"
+						 ValueChanged="value => SaveAsync(s => s with { TerminalType = value })"
+						 Suggestions="TerminalTypeSuggestions"
+						 Validate="ValidateTerminalType"
+						 EmptyError="Enter a terminal type such as xterm-256color."
+						 AriaLabel="Terminal type" />
+		</SettingsRow>
+		<SettingsRow Label="Replay buffer"
+					 Description="Output kept per session so a terminal can redraw when you switch back to its tab.">
+			<NumberSetting TValue="int"
+						   Value="settings.ReplayBufferKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { ReplayBufferKilobytes = value })"
+						   Min="TerminalSettings.MinReplayBufferKilobytes"
+						   Max="TerminalSettings.MaxReplayBufferKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Replay buffer size in kilobytes" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>
+
+<TerminalThemeImportDialog @bind-Open="_importOpen" FontFamily="@settings.FontFamily" OnImport="ImportThemeAsync" />
+
+<TerminalThemeEditorDialog @bind-Open="_editorOpen"
+						   Theme="_editorTheme"
+						   IsNew="_editorIsNew"
+						   FontFamily="@settings.FontFamily"
+						   OnSave="SaveCustomThemeAsync" />

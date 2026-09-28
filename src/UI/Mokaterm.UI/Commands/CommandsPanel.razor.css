@@ -1,0 +1,65 @@
+/* The dock panel body is a flex column with hidden overflow, so the list is the only part that scrolls. */
+.mt-commands {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-height: 0;
+	padding: var(--moka-spacing-xs);
+}
+
+.mt-commands-search {
+	flex-shrink: 0;
+}
+
+.mt-commands-list {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.mt-commands-message {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+	padding: var(--moka-spacing-md) var(--moka-spacing-sm);
+}
+
+.mt-commands-row {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+
+.mt-commands-name,
+.mt-commands-command {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-commands-command {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+/* The only line in its row, so it reads as the name it stands in for. */
+.mt-commands-lead {
+	font-size: var(--moka-font-size-sm);
+	color: inherit;
+}
+
+.mt-commands-hint,
+.mt-commands-actions {
+	flex-shrink: 0;
+}
+
+.mt-commands-actions {
+	display: flex;
+	justify-content: flex-end;
+	border-top: 1px solid var(--moka-color-outline-variant);
+	padding-top: var(--moka-spacing-xxs);
+}

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		MQTT through MQTTnet: a session is a broker connection rather than a terminal, so the module brings its own
+		session view (topic tree, payloads, publishing) instead of using the built-in terminal or file browser.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Mqtt</RootNamespace>
+	</PropertyGroup>
+
+	<!-- The tests and the workbench both need a broker, which reuses the client options built here. -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Mqtt.Tests" />
+		<InternalsVisibleTo Include="Mokaterm.DevHost" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MQTTnet" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

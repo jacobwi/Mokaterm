@@ -1,0 +1,96 @@
+/* The session body is a plain block, so the view takes its height rather than its own content's. */
+.mt-mqtt {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	background: var(--moka-color-background);
+}
+
+.mt-mqtt-toolbar {
+	container-type: inline-size;
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	height: var(--moka-height-toolbar-dense);
+	padding: 0 var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	background: var(--moka-color-surface);
+}
+
+.mt-mqtt-spacer {
+	flex: 1;
+}
+
+/* A class on a child component needs ::deep to be reached from scoped CSS. */
+.mt-mqtt-toolbar ::deep .mt-mqtt-meta {
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-mqtt-toolbar ::deep .mt-mqtt-client {
+	flex-shrink: 1;
+	min-width: 0;
+	max-width: 20ch;
+}
+
+/* The meta text drops out as the session gets narrower, newest first to go. */
+@container (max-width: 620px) {
+	.mt-mqtt-toolbar ::deep .mt-mqtt-counts {
+		display: none;
+	}
+}
+
+@container (max-width: 480px) {
+	.mt-mqtt-toolbar ::deep .mt-mqtt-client {
+		display: none;
+	}
+}
+
+@container (max-width: 380px) {
+	.mt-mqtt-toolbar ::deep .mt-mqtt-subs-count {
+		display: none;
+	}
+}
+
+.mt-mqtt-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.mt-mqtt-notice {
+	flex-shrink: 0;
+	padding: var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-mqtt-body ::deep .mt-mqtt-split {
+	flex: 1;
+	min-height: 0;
+}
+
+.mt-mqtt-right {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.mt-mqtt-right-messages {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+/* The payload panel takes the lower half at most, and never less than a few lines. */
+.mt-mqtt-right-payload {
+	display: flex;
+	flex-shrink: 0;
+	min-height: 120px;
+	max-height: 50%;
+	border-top: 1px solid var(--moka-color-outline-variant);
+}

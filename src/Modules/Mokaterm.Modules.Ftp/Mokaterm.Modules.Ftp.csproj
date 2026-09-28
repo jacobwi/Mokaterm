@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!-- FTP and FTPS file systems (FluentFTP), including certificate trust. -->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Ftp</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Ftp.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="FluentFTP" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

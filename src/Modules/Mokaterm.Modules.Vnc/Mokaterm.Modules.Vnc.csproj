@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		VNC (RFB) remote desktop. .NET owns the socket and the whole RFB handshake; the page only paints,
+		with noVNC vendored in wwwroot/lib/novnc.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Vnc</RootNamespace>
+	</PropertyGroup>
+
+	<!-- The tests and the workbench both need an RFB server, which reuses the protocol pieces here. -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Vnc.Tests" />
+		<InternalsVisibleTo Include="Mokaterm.DevHost" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

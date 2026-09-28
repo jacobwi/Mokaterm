@@ -1,0 +1,121 @@
+@using Mokaterm.Abstractions.Credentials
+@inherits VaultListPageBase<CredentialInfo>
+
+<VaultListFrame Title="Keychain"
+				LockedDescription="Unlock the vault to see and manage shared credentials."
+				IsUnlocked="IsUnlocked"
+				LoadError="@LoadError">
+	<MokaTable TItem="CredentialInfo"
+			   Items="Items"
+			   ItemKey="credential => credential.Id"
+			   Title="Shared credentials"
+			   Searchable
+			   SearchPlaceholder="Filter credentials"
+			   ShowPagination="false"
+			   SortColumn="Name"
+			   SortDirection="MokaSortDirection.Ascending"
+			   OnRowClick="EditCredential"
+			   ActionsColumnTitle=""
+			   ActionsColumnWidth="96px">
+		<ToolbarContent>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokatermIcons.Lock"
+						OnClick="() => AddCredential(CredentialKind.Password)">
+				Add password
+			</MokaButton>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokatermIcons.Key"
+						OnClick="() => AddCredential(CredentialKind.PrivateKey)">
+				Add key
+			</MokaButton>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Add"
+						OnClick="GenerateKey">
+				Generate key
+			</MokaButton>
+		</ToolbarContent>
+		<ChildContent>
+			<MokaColumn Title="Name" Field="credential => credential.Name" />
+			<MokaColumn Title="Kind" Field="credential => KindText(credential.Kind)">
+				<CellTemplate Context="credential">
+					<MokaTag Text="@KindText(credential.Kind)" Icon="KindIcon(credential.Kind)" Size="MokaSize.Xs" />
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Username" Field="credential => credential.Username">
+				<CellTemplate Context="credential">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono>@credential.Username</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Algorithm" Field="credential => credential.KeyAlgorithm">
+				<CellTemplate Context="credential">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono>@credential.KeyAlgorithm</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Fingerprint" Field="credential => credential.KeyFingerprint">
+				<CellTemplate Context="credential">
+					<MokaText Element="span"
+							  Size="MokaSize.Xs"
+							  Mono
+							  Truncate
+							  Style="@TextStyles.TruncateBox"
+							  title="@credential.KeyFingerprint">@credential.KeyFingerprint</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Updated" Field="credential => credential.UpdatedAt">
+				<CellTemplate Context="credential">
+					<MokaText Element="span"
+							  Size="MokaSize.Xs"
+							  Mono
+							  title="@DisplayFormat.Timestamp(credential.UpdatedAt)">@DisplayFormat.Relative(credential.UpdatedAt, Time.GetUtcNow())</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+		</ChildContent>
+		<RowActions Context="credential">
+			@if (credential.Kind == CredentialKind.Password)
+			{
+				<MokaButton Variant="MokaVariant.Text"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Content.Copy"
+							OnClick="() => CopyPasswordAsync(credential)"
+							title="Copy password"
+							aria-label="@($"Copy the password of {credential.Name}")" />
+			}
+			else
+			{
+				<MokaButton Variant="MokaVariant.Text"
+							Size="MokaSize.Xs"
+							StartIcon="MokatermIcons.ShieldCheck"
+							OnClick="() => CopyPublicKeyAsync(credential)"
+							title="Copy public key"
+							aria-label="@($"Copy the public key of {credential.Name}")" />
+			}
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Edit"
+						OnClick="() => EditCredential(credential)"
+						title="Edit"
+						aria-label="@($"Edit {credential.Name}")" />
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Xs"
+						Color="MokaColor.Error"
+						StartIcon="MokaIcons.Action.Delete"
+						OnClick="() => DeleteAsync(credential)"
+						title="Delete"
+						aria-label="@($"Delete {credential.Name}")" />
+		</RowActions>
+		<EmptyContent>
+			@if (IsLoaded)
+			{
+				<MokaEmptyState Icon="MokatermIcons.Key"
+								Title="No shared credentials"
+								Description="Add a password or a private key here to reuse it across logins." />
+			}
+		</EmptyContent>
+	</MokaTable>
+</VaultListFrame>
+
+<CredentialEditorDialog @bind-Open="_editorOpen" Credential="_editing" Kind="_newKind" />
+<GenerateKeyDialog @bind-Open="_generateOpen" />

@@ -1,0 +1,21 @@
+.mt-prompt {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	outline: none;
+}
+
+/* Section labels inside editors and prompts. */
+.mt-prompt ::deep .mt-section {
+	margin-top: var(--moka-spacing-xs);
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+/* Fingerprints, paths and hex certificate hashes are long unbroken strings. */
+.mt-prompt ::deep .mt-break {
+	overflow-wrap: anywhere;
+}

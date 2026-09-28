@@ -1,0 +1,27 @@
+@namespace Mokaterm.UI.Shell
+
+@*
+	Page chrome for Blazor Server hosts, rendered statically in their App.razor next to blazor.web.js and
+	_content/Mokaterm.UI/js/reconnect.js. Blazor finds the dialog by id and sets classes on it while the circuit
+	reconnects; without it Blazor draws its own white dialog. The script wires the buttons, since the hosts' CSP allows
+	no inline handlers.
+*@
+<div id="components-reconnect-modal" class="mokaterm-reconnect" role="alertdialog" aria-modal="true" aria-labelledby="mokaterm-reconnect-title">
+	<div class="mokaterm-reconnect-card">
+		<div class="mokaterm-reconnect-header">
+			<span class="mokaterm-reconnect-pulse"></span>
+			<span id="mokaterm-reconnect-title">server connection</span>
+		</div>
+		<p class="mokaterm-reconnect-message mokaterm-reconnect-message--show">Connection lost. Reconnecting...</p>
+		<p class="mokaterm-reconnect-message mokaterm-reconnect-message--retrying">
+			Reconnecting, attempt <span id="components-reconnect-current-attempt"></span> of <span id="components-reconnect-max-retries"></span>.
+			Next try in <span id="components-seconds-to-next-attempt"></span>s.
+		</p>
+		<p class="mokaterm-reconnect-message mokaterm-reconnect-message--failed">The server cannot be reached. Open sessions stay on the server for a few minutes.</p>
+		<p class="mokaterm-reconnect-message mokaterm-reconnect-message--rejected">The server no longer has this window, and its sessions have closed. Reload to start again.</p>
+		<div class="mokaterm-reconnect-actions">
+			<button type="button" class="mokaterm-reconnect-button" data-reconnect-action="retry">Retry</button>
+			<button type="button" class="mokaterm-reconnect-button" data-reconnect-action="reload">Reload</button>
+		</div>
+	</div>
+</div>

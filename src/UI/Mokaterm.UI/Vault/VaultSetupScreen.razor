@@ -1,0 +1,50 @@
+<VaultFrame>
+	<div class="mt-vault-form" @ref="_form">
+		<div>
+			<MokaText Element="h1" SizeValue="17px" Weight="MokaFontWeight.Semibold">Create your vault</MokaText>
+			<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">
+				Hosts, logins, passwords, keys and trusted host keys are encrypted with a master password.
+			</MokaText>
+		</div>
+
+		<MokaPasswordField Label="Master password"
+						   @bind-Value="_password"
+						   HelperText="@VaultPasswordPolicy.Requirement"
+						   Disabled="_busy"
+						   autocomplete="new-password"
+						   data-autofocus="true" />
+		<MokaPasswordStrength Password="@_password" MinLength="VaultPasswordPolicy.MinimumLength" />
+		<MokaPasswordField Label="Confirm master password"
+						   @bind-Value="_confirmation"
+						   ErrorText="@ConfirmationError"
+						   Disabled="_busy"
+						   autocomplete="new-password" />
+
+		<MokaCallout Type="MokaCalloutType.Warning" Title="There is no recovery">
+			Mokaterm cannot recover a forgotten master password. The only way back in is resetting the vault, which deletes
+			every saved host, login, password and key.
+		</MokaCallout>
+
+		@if (Vault.IsDeviceUnlockAvailable)
+		{
+			<MokaSwitch Label="Unlock with this device"
+						@bind-Value="_deviceUnlock"
+						HelperText="Also protects the vault key with your operating system account, so this device can open the vault without the password."
+						Disabled="_busy" />
+		}
+
+		@if (_error is not null)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+		}
+
+		<MokaButton FullWidth
+					StartIcon="MokatermIcons.ShieldCheck"
+					Loading="_busy"
+					Disabled="@(!CanCreate)"
+					data-primary="true"
+					OnClick="CreateAsync">
+			Create vault
+		</MokaButton>
+	</div>
+</VaultFrame>

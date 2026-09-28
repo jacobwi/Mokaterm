@@ -1,0 +1,86 @@
+@using System.Runtime.InteropServices
+@using Mokaterm.Abstractions.Modules
+@using Mokaterm.Abstractions.Protocols
+
+<SettingsPage Title="About">
+	<SettingsSection Title="Mokaterm">
+		<SettingsRow Label="Version" Description="SSH, SFTP and FTP client.">
+			<MokaText Element="span" Size="MokaSize.Sm" Mono>@AppEnvironment.AppVersion</MokaText>
+		</SettingsRow>
+		<SettingsRow Label="Platform" Description="@HostDescription">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+				<MokaTag Text="@(IsDesktop ? "Desktop" : "Web")"
+						 Icon="@(IsDesktop ? MokatermIcons.Monitor : MokatermIcons.Globe)"
+						 Size="MokaSize.Xs" />
+				<MokaText Element="span" Size="MokaSize.Sm">@AppEnvironment.PlatformName</MokaText>
+			</MokaFlexbox>
+		</SettingsRow>
+		<SettingsRow Label=".NET runtime" Description="@RuntimeDescription">
+			<MokaText Element="span" Size="MokaSize.Sm" Mono>@RuntimeInformation.FrameworkDescription</MokaText>
+		</SettingsRow>
+		@if (IsDesktop)
+		{
+			<SettingsRow Label="Data folder" Description="Holds settings, the vault header and the encrypted documents.">
+				<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+					<MokaText Element="span"
+							  Size="MokaSize.Xs"
+							  Mono
+							  Truncate
+							  Style="@TextStyles.TruncateBox"
+							  title="@AppEnvironment.DataDirectory">@AppEnvironment.DataDirectory</MokaText>
+					<CopyButton Text="@AppEnvironment.DataDirectory" Label="Copy folder path" />
+				</MokaFlexbox>
+			</SettingsRow>
+		}
+	</SettingsSection>
+
+	<SettingsSection Title="Modules">
+		@if (_modules.Count == 0)
+		{
+			<SettingsRow Label="No modules loaded" Description="Protocols come from modules the host registers at startup." />
+		}
+		@foreach (ModuleInfo module in _modules)
+		{
+			<SettingsRow Label="@module.Name" Description="@module.Description">
+				<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@module.Id</MokaText>
+					<MokaTag Text="@module.Version" Size="MokaSize.Xs" />
+				</MokaFlexbox>
+			</SettingsRow>
+		}
+	</SettingsSection>
+
+	<SettingsSection Title="Protocols">
+		@if (ProtocolRegistry.Protocols.Count == 0)
+		{
+			<SettingsRow Label="No protocols registered" Description="Load a protocol module such as SSH or FTP to open connections." />
+		}
+		@foreach (ProtocolDescriptor protocol in ProtocolRegistry.Protocols)
+		{
+			<SettingsRow Label="@protocol.DisplayName" Description="@ProtocolDescription(protocol)">
+				<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Justify="MokaJustify.End" Gap="MokaSpacingScale.Xxs" Wrap>
+					@foreach (string capability in CapabilityNames(protocol))
+					{
+						<MokaTag Text="@capability" Size="MokaSize.Xs" />
+					}
+				</MokaFlexbox>
+			</SettingsRow>
+		}
+	</SettingsSection>
+
+	<SettingsSection Title="Credits">
+		@foreach (Credit credit in Credits)
+		{
+			<SettingsRow Label="@credit.Name" Description="@credit.Description">
+				<MokaButton Variant="MokaVariant.Text"
+							Size="MokaSize.Sm"
+							EndIcon="MokaIcons.Content.ExternalLink"
+							Href="@credit.Link"
+							Target="_blank"
+							rel="noopener noreferrer">
+					Source
+				</MokaButton>
+			</SettingsRow>
+		}
+	</SettingsSection>
+</SettingsPage>

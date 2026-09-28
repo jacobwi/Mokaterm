@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		Telnet over TCP with the option negotiation from RFC 854 and friends. The whole protocol is written here:
+		nothing but the socket is outside this project, and sessions expose a terminal channel like SSH does.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Telnet</RootNamespace>
+	</PropertyGroup>
+
+	<!-- The tests and the workbench both need a telnet server, which reuses the wire constants here. -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Telnet.Tests" />
+		<InternalsVisibleTo Include="Mokaterm.DevHost" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

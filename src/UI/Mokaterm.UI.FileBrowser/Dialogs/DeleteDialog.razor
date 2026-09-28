@@ -1,0 +1,36 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<DialogFrame>
+	<ChildContent>
+		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+			<MokaText Size="MokaSize.Sm">@Summary</MokaText>
+			<MokaScrollArea Height="180px">
+				<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xxs">
+					@foreach (RemoteFileEntry entry in Entries.Take(MaxListed))
+					{
+						<MokaFlexbox @key="entry.Path" Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+							<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Size="MokaSize.Xs" Color="@EntryVisuals.ColorFor(entry)" />
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate>@entry.Name</MokaText>
+						</MokaFlexbox>
+					}
+					@if (Entries.Count > MaxListed)
+					{
+						<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">@MoreText</MokaText>
+					}
+				</MokaFlexbox>
+			</MokaScrollArea>
+			@if (Recursive)
+			{
+				<MokaCallout Type="MokaCalloutType.Warning" Title="Recursive">Folders are deleted with everything inside them.</MokaCallout>
+			}
+			@if (AsRoot)
+			{
+				<MokaTag Text="Deleting as root" Icon="MokatermIcons.Root" Color="MokaColor.Error" />
+			}
+		</MokaFlexbox>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+		<MokaButton Color="MokaColor.Error" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Delete" OnClick="Confirm" data-dialog-default="true">Delete</MokaButton>
+	</Actions>
+</DialogFrame>

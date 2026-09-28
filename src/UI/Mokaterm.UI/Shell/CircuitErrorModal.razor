@@ -1,0 +1,27 @@
+@namespace Mokaterm.UI.Shell
+
+@*
+	Page chrome for Blazor Server hosts, rendered statically in their App.razor next to ReconnectModal. Blazor looks for
+	#blazor-error-ui when the circuit fails for good, sets display: block on it and makes every .reload inside reload the
+	page. Without it such a failure leaves a page that looks alive and ignores every click.
+*@
+<div id="blazor-error-ui"
+	 class="mokaterm-circuit-error"
+	 role="alertdialog"
+	 aria-modal="true"
+	 aria-labelledby="mokaterm-circuit-error-title"
+	 aria-describedby="mokaterm-circuit-error-message">
+	<div class="mokaterm-circuit-error-card">
+		<div class="mokaterm-circuit-error-header">
+			<span class="mokaterm-circuit-error-dot"></span>
+			<span id="mokaterm-circuit-error-title">window stopped</span>
+		</div>
+		<p id="mokaterm-circuit-error-message" class="mokaterm-circuit-error-message">
+			An unexpected error stopped this window, and the server closed its sessions. The details are in the server log.
+			Reload to start again.
+		</p>
+		<div class="mokaterm-circuit-error-actions">
+			<button type="button" class="reload mokaterm-circuit-error-button">Reload</button>
+		</div>
+	</div>
+</div>

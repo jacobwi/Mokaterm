@@ -1,0 +1,87 @@
+@using Mokaterm.Abstractions.Platform
+@inherits SettingsSectionBase<FileTransferSettings>
+
+@{
+	FileTransferSettings settings = Settings;
+}
+
+<SettingsPage Title="@PageTitle"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put every file and transfer setting back to its default?">
+	<SettingsSection Title="File browser">
+		<SettingsRow Label="Open with the terminal"
+					 Description="Show the file browser next to the terminal for sessions that have both, such as SSH.">
+			<MokaSwitch Value="settings.OpenWithTerminal"
+						ValueChanged="value => SaveAsync(s => s with { OpenWithTerminal = value })"
+						aria-label="Open the file browser with the terminal" />
+		</SettingsRow>
+		<SettingsRow Label="Position" Description="Which side of the terminal the file browser sits on.">
+			<EnumSegmentedControl TEnum="FileBrowserPlacement"
+								  Value="settings.Placement"
+								  ValueChanged="value => SaveAsync(s => s with { Placement = value })"
+								  Options="PlacementOptions"
+								  AriaLabel="File browser position" />
+		</SettingsRow>
+		<SettingsRow Label="Show hidden files" Description="List files and folders whose names start with a dot.">
+			<MokaSwitch Value="settings.ShowHiddenFiles"
+						ValueChanged="value => SaveAsync(s => s with { ShowHiddenFiles = value })"
+						aria-label="Show hidden files" />
+		</SettingsRow>
+		<SettingsRow Label="Folders first" Description="Sort folders above files.">
+			<MokaSwitch Value="settings.FoldersFirst"
+						ValueChanged="value => SaveAsync(s => s with { FoldersFirst = value })"
+						aria-label="Sort folders first" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Confirmations">
+		<SettingsRow Label="Confirm dropped files"
+					 Description="Before uploading a drop, show the target folder and the user the files are written as.">
+			<MokaSwitch Value="settings.ConfirmDrop"
+						ValueChanged="value => SaveAsync(s => s with { ConfirmDrop = value })"
+						aria-label="Confirm dropped files" />
+		</SettingsRow>
+		<SettingsRow Label="Confirm deletes" Description="Ask before deleting remote files and folders.">
+			<MokaSwitch Value="settings.ConfirmDelete"
+						ValueChanged="value => SaveAsync(s => s with { ConfirmDelete = value })"
+						aria-label="Confirm deletes" />
+		</SettingsRow>
+		<SettingsRow Label="When a file already exists" Description="Ask each time, or always overwrite or skip the file.">
+			<EnumSegmentedControl TEnum="OverwriteBehavior"
+								  Value="settings.Overwrite"
+								  ValueChanged="value => SaveAsync(s => s with { Overwrite = value })"
+								  Options="OverwriteOptions"
+								  AriaLabel="When a file already exists" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Transfers">
+		<SettingsRow Label="Preserve timestamps" Description="Keep the original modification time on copied files.">
+			<MokaSwitch Value="settings.PreserveTimestamps"
+						ValueChanged="value => SaveAsync(s => s with { PreserveTimestamps = value })"
+						aria-label="Preserve timestamps" />
+		</SettingsRow>
+		<SettingsRow Label="Parallel transfers" Description="How many files move at the same time." ControlWidth="200px">
+			<MokaSlider Value="settings.MaxConcurrentTransfers"
+						ValueChanged="SetMaxConcurrentTransfersAsync"
+						Min="FileTransferSettings.MinParallelTransfers"
+						Max="FileTransferSettings.MaxParallelTransfers"
+						Step="1"
+						ValueFormat="0"
+						aria-label="Parallel transfers" />
+		</SettingsRow>
+		@if (AppEnvironment.Kind == HostKind.Desktop)
+		{
+			<SettingsRow Label="Download folder"
+						 Description="Where downloads are saved. Leave empty to choose a location for every download."
+						 ControlWidth="340px">
+				<TextSetting Value="@(settings.DownloadDirectory ?? "")"
+							 ValueChanged="SetDownloadDirectoryAsync"
+							 AllowEmpty
+							 Validate="ValidateDirectory"
+							 Placeholder="Ask every time"
+							 AriaLabel="Download folder" />
+			</SettingsRow>
+		}
+	</SettingsSection>
+</SettingsPage>

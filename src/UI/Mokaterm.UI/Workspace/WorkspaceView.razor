@@ -1,0 +1,75 @@
+<div class="mt-workspace">
+	<div class="mt-workspace-body">
+		<div class="mt-workspace-sessions" style="@(Shell.SettingsOpen ? "display:none" : null)">
+			@if (_split)
+			{
+				<MokaSplitPane Orientation="MokaSplitOrientation.Horizontal" InitialSize="50%" MinSize="260px" Class="mt-workspace-split">
+					<FirstContent>@Pane(0)</FirstContent>
+					<SecondContent>@Pane(1)</SecondContent>
+				</MokaSplitPane>
+			}
+			else
+			{
+				@Pane(0)
+			}
+		</div>
+
+		@if (Shell.SettingsOpen)
+		{
+			<SettingsView />
+		}
+	</div>
+</div>
+
+@code {
+	private RenderFragment Pane(int pane) =>
+		@<div class="@PaneClass(pane)" @onfocusin="() => Workspace.FocusPane(pane)" @onpointerdown="() => Workspace.FocusPane(pane)">
+			<div class="mt-workspace-tabs">
+				@if (_tabs[pane].Count > 0)
+				{
+					<MokaTabStrip TValue="Guid"
+								  Tabs="_tabs[pane]"
+								  ActiveTabId="@ActiveTabId(pane)"
+								  OnTabActivated="OnTabActivated"
+								  OnTabClosed="OnTabClosedAsync"
+								  OnTabReordered="OnTabReordered"
+								  ShowPinButton="false"
+								  OnTabContextMenu="ShowTabMenu"
+								  IconProvider="IconProvider" />
+				}
+			</div>
+
+			<div class="mt-workspace-pane-body">
+				@foreach (ISessionHandle session in _views[pane])
+				{
+					bool active = session.Id == _activeIds[pane] && !Shell.SettingsOpen;
+					<div @key="session.Id" class="mt-workspace-session" style="@(active ? null : "display:none")">
+						@* A terminal, file browser or remote desktop that fails takes only its own tab down. *@
+						<ViewBoundary Name="This tab" Fill Hint="The connection may still be open. Try again reloads the view.">
+							<ChildContent>
+								<SessionView Session="session" IsActive="active" />
+							</ChildContent>
+							<Actions>
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="() => CloseTabAsync(session.Id)">
+									Close tab
+								</MokaButton>
+							</Actions>
+						</ViewBoundary>
+					</div>
+				}
+
+				@if (_views[pane].Count == 0)
+				{
+					<WelcomeView />
+				}
+			</div>
+		</div>;
+
+	@* The strip takes a plain string for its title, so the whole label rides in the icon slot and the title stays empty. *@
+	private static RenderFragment TabIcon(ISessionHandle session) =>
+		@<span class="mt-tab-icon">
+			<MokaStatusDot Size="MokaSize.Xs" Color="@SessionStateDisplay.Color(session.State)" Pulse="@(session.State == SessionState.Connecting)" />
+			<ProtocolIcon ProtocolId="@session.Protocol.Id" Size="MokaSize.Xs" />
+			<SessionLabel Session="session" Tooltip="" />
+		</span>;
+}

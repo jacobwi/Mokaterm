@@ -1,0 +1,99 @@
+<VaultFrame>
+	<div class="mt-vault-form" @ref="_form">
+		<div>
+			<MokaStatusDot Color="MokaColor.Warning" Size="MokaSize.Sm" Label="Vault locked" />
+			@if (LockReasonText is { } reason)
+			{
+				<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant);margin-top:var(--moka-spacing-xs)">@reason</MokaText>
+			}
+		</div>
+
+		<MokaPasswordField Label="Master password"
+						   @bind-Value="_password"
+						   ErrorText="@_error"
+						   Disabled="@(_busy || IsThrottled)"
+						   autocomplete="current-password"
+						   data-autofocus="true" />
+
+		@if (IsThrottled)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+				Too many attempts. Try again in <MokaText Element="span" Mono>@_retrySeconds s</MokaText>.
+			</MokaAlert>
+		}
+
+		<MokaButton FullWidth
+					StartIcon="MokatermIcons.Unlock"
+					Loading="_busy"
+					Disabled="@(IsThrottled || _password.Length == 0)"
+					data-primary="true"
+					OnClick="UnlockAsync">
+			Unlock
+		</MokaButton>
+
+		@if (Vault.IsDeviceUnlockEnabled)
+		{
+			<MokaButton FullWidth
+						Variant="MokaVariant.Outlined"
+						StartIcon="MokatermIcons.ShieldCheck"
+						Disabled="@(_busy || IsThrottled)"
+						OnClick="UnlockWithDeviceAsync">
+				Unlock with this device
+			</MokaButton>
+		}
+
+		<MokaFlexbox Direction="MokaDirection.Row" Justify="MokaJustify.SpaceBetween" Align="MokaAlign.Center">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">
+				@SessionsText
+			</MokaText>
+			@if (CanReset)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_busy" OnClick="OpenReset">
+					Forgot your password?
+				</MokaButton>
+			}
+		</MokaFlexbox>
+	</div>
+</VaultFrame>
+
+@* The web host refuses a reset from here: anyone who reaches the page sees this screen. *@
+@if (CanReset)
+{
+	<MokaDialog Open="_resetOpen"
+				Title="Reset vault"
+				DialogSize="MokaDialogSize.Small"
+				CloseOnBackdropClick="false"
+				CloseOnEscape="@(!_resetting)"
+				ShowCloseButton="@(!_resetting)"
+				OnClose="CloseReset">
+		<ChildContent>
+			<PromptBody @ref="_resetBody">
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="This cannot be undone">
+					Resetting deletes every saved host, login, password, private key and trusted host key, and closes open
+					sessions. Settings are kept.
+				</MokaAlert>
+				<MokaTextField Label="Type RESET to confirm"
+							   @bind-Value="_resetConfirmation"
+							   Disabled="_resetting"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus="true" />
+				@if (_resetError is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_resetError</MokaAlert>
+				}
+			</PromptBody>
+		</ChildContent>
+		<Actions>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_resetting" OnClick="CloseReset">Cancel</MokaButton>
+			<MokaButton Color="MokaColor.Error"
+						StartIcon="MokaIcons.Action.Delete"
+						Loading="_resetting"
+						Disabled="@(!ResetConfirmed)"
+						data-primary="true"
+						OnClick="ResetAsync">
+				Reset vault
+			</MokaButton>
+		</Actions>
+	</MokaDialog>
+}

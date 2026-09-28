@@ -1,0 +1,55 @@
+@namespace Mokaterm.UI
+
+<MokaThemeProvider Theme="_theme">
+	@if (_bootError is not null)
+	{
+		<MokaBootScreen Brand="mokaterm" StatusText="startup failed" ShowBar="false" ShowScanline="false">
+			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md" Align="MokaAlign.Center">
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="Mokaterm could not start">@_bootError</MokaAlert>
+				<MokaButton Variant="MokaVariant.Outlined" StartIcon="MokatermIcons.Reconnect" OnClick="BootAsync">Try again</MokaButton>
+			</MokaFlexbox>
+		</MokaBootScreen>
+	}
+	else if (!_booted)
+	{
+		<MokaBootScreen Brand="mokaterm" StatusText="@_bootStatus" ShowScanline="false" />
+	}
+	else
+	{
+		@* The last line of defence: a failure no inner boundary caught shows here instead of ending the circuit or the
+		   app. Keyed on the vault status, so locking or unlocking always starts from a fresh boundary. *@
+		<ViewBoundary @key="Vault.Status" Name="Mokaterm" Fill Hint="Open sessions keep running in the background.">
+			@switch (Vault.Status)
+			{
+				case VaultStatus.Uninitialized:
+					<VaultSetupScreen />
+					break;
+				case VaultStatus.Locked:
+					<VaultUnlockScreen />
+					break;
+				case VaultStatus.Unlocked:
+					<ShellLayout />
+					break;
+				default:
+					<MokaBootScreen Brand="mokaterm" StatusText="opening vault" ShowScanline="false" />
+					break;
+			}
+		</ViewBoundary>
+	}
+
+	<MokaToastHost />
+
+	@* Each overlay runs actions other parts of the app hand it (menu items, palette commands, the file browser's
+	   dialogs); one that throws is reported as a notice instead of ending the circuit. A dialog host that is recreated
+	   forgets the dialog it showed, so the service answers that dialog and any queued behind it as cancelled. *@
+	<ViewBoundary Name="A dialog" NotifyOnly OnFailed="CloseServiceDialogs">
+		<MokaDialogHost />
+	</ViewBoundary>
+	<ViewBoundary Name="A menu command" NotifyOnly>
+		<MokaContextMenuHost />
+	</ViewBoundary>
+	<ViewBoundary Name="A palette command" NotifyOnly>
+		<MokaCommandPalette Placeholder="Type a command or a host" />
+	</ViewBoundary>
+	<InteractionHost />
+</MokaThemeProvider>

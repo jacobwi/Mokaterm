@@ -1,0 +1,82 @@
+@inherits ConnectionOptionsEditorBase<MqttConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaFieldWrapper Label="Transport" HelperText="@TransportHelp" Disabled="Disabled">
+			<MokaSegmentedControl AriaLabel="Transport"
+								  Value="@Current.Transport.ToString()"
+								  ValueChanged="OnTransportChangedAsync"
+								  Disabled="Disabled"
+								  FullWidth>
+				<MokaSegment Value="@nameof(MqttTransport.Tcp)" Text="TCP" Disabled="Disabled" />
+				<MokaSegment Value="@nameof(MqttTransport.WebSocket)" Text="WebSocket" Disabled="Disabled" />
+			</MokaSegmentedControl>
+		</MokaFieldWrapper>
+
+		<MokaFieldWrapper Label="MQTT version" HelperText="@ProtocolHelp" Disabled="Disabled">
+			<MokaSegmentedControl AriaLabel="MQTT version"
+								  Value="@Current.Protocol.ToString()"
+								  ValueChanged="OnProtocolChangedAsync"
+								  Disabled="Disabled"
+								  FullWidth>
+				<MokaSegment Value="@nameof(MqttProtocolLevel.V500)" Text="5.0" Disabled="Disabled" />
+				<MokaSegment Value="@nameof(MqttProtocolLevel.V311)" Text="3.1.1" Disabled="Disabled" />
+				<MokaSegment Value="@nameof(MqttProtocolLevel.V310)" Text="3.1" Disabled="Disabled" />
+			</MokaSegmentedControl>
+		</MokaFieldWrapper>
+	</MokaGrid>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSwitch Label="TLS"
+					Value="@Current.UseTls"
+					ValueChanged="OnTlsChangedAsync"
+					HelperText="@TlsHelp"
+					Disabled="Disabled" />
+
+		@if (Current.Transport == MqttTransport.WebSocket)
+		{
+			<MokaTextField Label="WebSocket path"
+						   Value="@_path.Show(Current.Path)"
+						   ValueChanged="OnPathChangedAsync"
+						   ErrorText="@_path.Error"
+						   Placeholder="@MqttConnectionOptions.DefaultPath"
+						   HelperText="The path the broker publishes its WebSocket listener on."
+						   Disabled="Disabled"
+						   spellcheck="false" />
+		}
+	</MokaGrid>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="Client id"
+					   Value="@_clientId.Show(Current.ClientId ?? "")"
+					   ValueChanged="OnClientIdChangedAsync"
+					   ErrorText="@_clientId.Error"
+					   Placeholder="a new one per session"
+					   HelperText="@ClientIdHelp"
+					   Disabled="Disabled"
+					   spellcheck="false" />
+
+		<MokaNumericField TValue="int"
+						  Label="Keep-alive (seconds)"
+						  Value="@Current.KeepAliveSeconds"
+						  ValueChanged="OnKeepAliveChangedAsync"
+						  HelperText="@KeepAliveHelp"
+						  Disabled="Disabled" />
+	</MokaGrid>
+
+	<MokaSwitch Label="Start a clean session"
+				Value="@Current.CleanStart"
+				ValueChanged="OnCleanStartChangedAsync"
+				HelperText="@CleanStartHelp"
+				Disabled="Disabled" />
+
+	<MokaFieldWrapper Label="Subscriptions" HelperText="@SubscriptionsHelp" Disabled="Disabled">
+		<MqttSubscriptionList Subscriptions="Current.Subscriptions" SubscriptionsChanged="OnSubscriptionsChangedAsync" Disabled="Disabled" />
+	</MokaFieldWrapper>
+
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		Brokers that need a login read a user name and password from the CONNECT packet, so set the authentication
+		above to Password for those and to No password for a broker with open access. With TLS off, both travel in
+		clear text.
+	</MokaText>
+</MokaFlexbox>

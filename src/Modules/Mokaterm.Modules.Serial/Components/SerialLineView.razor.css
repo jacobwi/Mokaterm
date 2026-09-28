@@ -1,0 +1,51 @@
+.mt-serial {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-serial-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-serial-spacer {
+	flex: 1;
+}
+
+.mt-serial-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-serial-row,
+.mt-serial-pins {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-serial-pin {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-serial-switches {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}

@@ -1,0 +1,46 @@
+@* An icon-only button with a tooltip, used in the app bar, panel headers and the session toolbar. *@
+
+<MokaTooltip Text="@TooltipText" Position="TooltipPosition">
+	<MokaButton Variant="MokaVariant.Text"
+				Color="@(Active ? MokaColor.Primary : MokaColor.Surface)"
+				Size="Size"
+				StartIcon="Icon"
+				Disabled="Disabled"
+				OnClick="OnClick"
+				aria-label="@Title"
+				aria-pressed="@(Active ? "true" : null)" />
+</MokaTooltip>
+
+@code {
+	[Parameter, EditorRequired]
+	public MokaIconDefinition Icon { get; set; }
+
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = "";
+
+	/// <summary>Shown after the title, for example <c>Ctrl+Shift+L</c>.</summary>
+	[Parameter]
+	public string? Shortcut { get; set; }
+
+	[Parameter]
+	public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+	[Parameter]
+	public bool Disabled { get; set; }
+
+	/// <summary>Colors the icon with the accent, for toggles that are on.</summary>
+	[Parameter]
+	public bool Active { get; set; }
+
+	[Parameter]
+	public MokaSize Size { get; set; } = MokaSize.Sm;
+
+	/// <summary>
+	/// Tooltips are laid out even while hidden, so near a scrolling container's right edge use Left to avoid a
+	/// horizontal scrollbar.
+	/// </summary>
+	[Parameter]
+	public MokaTooltipPosition TooltipPosition { get; set; } = MokaTooltipPosition.Bottom;
+
+	private string TooltipText => Shortcut is null ? Title : $"{Title} ({Shortcut})";
+}

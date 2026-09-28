@@ -1,0 +1,132 @@
+.mt-terminal {
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	/* The fit addon measures the screen element, so padding lives here and never on the screen. */
+	padding: var(--moka-spacing-sm) 0 var(--moka-spacing-xs) var(--moka-spacing-md);
+	/* Keeps xterm.js z-indexes (up to 11 for its scrollbar) local to the view. */
+	isolation: isolate;
+	/* xterm.js paints a black shadow under its scrollbar by default. */
+	--vscode-scrollbar-shadow: transparent;
+}
+
+.mt-terminal-screen {
+	width: 100%;
+	height: 100%;
+}
+
+.mt-terminal-error {
+	position: absolute;
+	inset: 0;
+	z-index: 13;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--moka-spacing-lg);
+	overflow: auto;
+	background: var(--moka-color-background);
+}
+
+.mt-terminal-find {
+	position: absolute;
+	top: var(--moka-spacing-xs);
+	/* Clears the scrollbar width set in terminal.js. */
+	right: calc(var(--moka-spacing-md) + 10px);
+	z-index: 13;
+	max-width: calc(100% - var(--moka-spacing-lg) - 10px);
+}
+
+/* Aa, ab and .* are the labels; the button style would uppercase them. */
+.mt-terminal-find ::deep .mt-find-option {
+	min-width: 28px;
+	padding-inline: var(--moka-spacing-xs);
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+/* The grid size while resizing, or the font size while zooming, for a moment. */
+.mt-terminal-badge {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	z-index: 13;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-md);
+	background: color-mix(in srgb, var(--moka-color-surface) 92%, transparent);
+	box-shadow: 0 0 16px var(--moka-color-primary-glow);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	white-space: pre;
+	pointer-events: none;
+	opacity: 0;
+	transform: translate(-50%, -50%);
+	transition: opacity var(--moka-transition-slow);
+}
+
+.mt-terminal-badge--visible {
+	opacity: 1;
+	transition: none;
+}
+
+/*
+	Save buttons over the hovered row. The strip itself lets clicks through so selecting text still works; only the
+	buttons take the pointer, and they stay clear of the scrollbar width set in terminal.js.
+*/
+.mt-terminal-row-actions {
+	position: absolute;
+	right: calc(10px + var(--moka-spacing-xxs));
+	z-index: 13;
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	pointer-events: none;
+}
+
+.mt-terminal-row-actions ::deep .moka-btn {
+	background: color-mix(in srgb, var(--moka-color-surface) 92%, transparent);
+	pointer-events: auto;
+}
+
+.mt-terminal-jump {
+	position: absolute;
+	right: calc(var(--moka-spacing-lg) + 10px);
+	bottom: var(--moka-spacing-lg);
+	z-index: 13;
+}
+
+.mt-terminal-hint {
+	position: absolute;
+	bottom: var(--moka-spacing-lg);
+	left: 50%;
+	z-index: 13;
+	transform: translateX(-50%);
+	white-space: nowrap;
+}
+
+.mt-terminal-hint ::deep .moka-btn {
+	background: var(--moka-color-surface);
+	text-transform: none;
+}
+
+.mt-terminal::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 12;
+	pointer-events: none;
+	opacity: 0;
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 24px var(--moka-color-primary-glow-md);
+	transition: opacity var(--moka-transition-slow);
+}
+
+.mt-terminal.mt-terminal-bell::after {
+	opacity: 1;
+	transition: none;
+}

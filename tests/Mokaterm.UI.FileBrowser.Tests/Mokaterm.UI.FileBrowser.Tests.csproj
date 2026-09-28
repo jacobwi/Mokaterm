@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<!-- The dialogs are rendered for real with Blazor's static HtmlRenderer. -->
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.Logging" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\UI\Mokaterm.UI.FileBrowser\Mokaterm.UI.FileBrowser.csproj" />
+	</ItemGroup>
+
+	<!-- StaticRender: Blazor's static renderer, which needs Components.Web and the logging package. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\Rendering\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+</Project>

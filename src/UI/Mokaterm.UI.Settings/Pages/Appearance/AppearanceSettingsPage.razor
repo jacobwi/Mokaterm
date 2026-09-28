@@ -1,0 +1,75 @@
+@using Mokaterm.Abstractions.Presentation
+@inherits SettingsSectionBase<AppearanceSettings>
+
+@{
+	AppearanceSettings settings = Settings;
+}
+
+<SettingsPage Title="Appearance"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put the theme, accent color, density, font scale and status bar back to their defaults?">
+	<SettingsSection Title="Theme">
+		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms.">
+			<EnumSegmentedControl TEnum="ThemeMode"
+								  Value="settings.Mode"
+								  ValueChanged="value => UpdateAsync(s => s with { Mode = value })"
+								  Options="ModeOptions"
+								  AriaLabel="Theme mode" />
+		</SettingsRow>
+		<SettingsRow Label="Accent color" Description="@AccentHelp">
+			<div class="accent-picker">
+				<MokaColorSwatch Colors="AccentPresets"
+								 SelectedColor="@SelectedPreset(settings.AccentColor)"
+								 SelectedColorChanged="SelectPresetAsync"
+								 Columns="AccentPresets.Length"
+								 SwatchSize="20px" />
+				<ColorSetting Value="@settings.AccentColor"
+							  ValueChanged="value => SaveAsync(s => s with { AccentColor = value })"
+							  Forms="HexColorForms.Accent"
+							  Placeholder="@AppearanceSettings.DefaultAccentColor"
+							  Width="132px"
+							  AriaLabel="Accent color" />
+			</div>
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Layout">
+		<SettingsRow Label="Density" Description="Spacing around controls, lists and tables.">
+			<EnumSegmentedControl TEnum="UiDensity"
+								  Value="settings.Density"
+								  ValueChanged="value => UpdateAsync(s => s with { Density = value })"
+								  Options="DensityOptions"
+								  AriaLabel="Density" />
+		</SettingsRow>
+		<SettingsRow Label="Font scale" Description="Scales every font in the app. 100% is the Moka default." ControlWidth="240px">
+			<MokaSlider Value="settings.FontScale"
+						ValueChanged="SetFontScaleAsync"
+						Min="AppearanceSettings.MinFontScale"
+						Max="AppearanceSettings.MaxFontScale"
+						Step="FontScaleStep"
+						ValueFormat="P0"
+						aria-label="Font scale" />
+		</SettingsRow>
+		<SettingsRow Label="Status bar" Description="Show the bar with session and transfer status along the bottom of the window.">
+			<MokaSwitch Value="settings.ShowStatusBar"
+						ValueChanged="value => UpdateAsync(s => s with { ShowStatusBar = value })"
+						aria-label="Show status bar" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Preview" Description="Follows the settings above as you change them.">
+		<div class="appearance-preview">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm" Wrap>
+				<MokaStatusDot Label="Connected" Color="MokaColor.Success" />
+				<MokaChip Text="production" Size="MokaSize.Sm" Color="MokaColor.Primary" Selected />
+				<MokaTag Text="ssh-ed25519" Size="MokaSize.Xs" />
+			</MokaFlexbox>
+			<MokaTextField @bind-Value="_previewHost" Label="Host" Placeholder="user@host:22" Size="MokaSize.Sm" />
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm" Wrap>
+				<MokaButton Size="MokaSize.Sm" StartIcon="MokatermIcons.Connect">Connect</MokaButton>
+				<MokaButton Size="MokaSize.Sm" Variant="MokaVariant.Outlined">Edit</MokaButton>
+				<MokaButton Size="MokaSize.Sm" Variant="MokaVariant.Text">Cancel</MokaButton>
+			</MokaFlexbox>
+		</div>
+	</SettingsSection>
+</SettingsPage>

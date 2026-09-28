@@ -1,0 +1,67 @@
+<Project>
+
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+	</PropertyGroup>
+
+	<!-- Framework-aligned packages: the servicing line .NET 10 ships with. -->
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.101" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
+		<PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.101" />
+		<PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+	</ItemGroup>
+
+	<!-- UI -->
+	<ItemGroup>
+		<PackageVersion Include="Moka.Red" Version="0.1.13" />
+	</ItemGroup>
+
+	<!-- Protocols -->
+	<ItemGroup>
+		<PackageVersion Include="SSH.NET" Version="2026.0.0" />
+		<PackageVersion Include="FluentFTP" Version="54.2.1" />
+		<PackageVersion Include="Devolutions.IronRdp" Version="2025.12.4" />
+		<PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
+		<!-- The broker half of MQTTnet 5 is a package of its own; only the DevHost's demo server needs it. -->
+		<PackageVersion Include="MQTTnet.Server" Version="5.2.0.1603" />
+		<PackageVersion Include="System.IO.Ports" Version="10.0.12" />
+	</ItemGroup>
+
+	<!--
+		Security: Argon2id for the vault's key derivation (memory-hard, unlike PBKDF2).
+		BouncyCastle for ed25519 key generation: .NET 10 has no Ed25519 API, and the
+		alternatives are either unmaintained or need a native libsodium next to the app.
+	-->
+	<ItemGroup>
+		<PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+		<!-- 2.7.0 or newer: SSH.NET 2026.0.0 needs it, and central transitive pinning would otherwise downgrade it. -->
+		<PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
+	</ItemGroup>
+
+	<!--
+		Windows installer and, later, updates. Keep the vpk tool in .config/dotnet-tools.json at the same version: vpk checks
+		the app's Velopack against its own.
+	-->
+	<ItemGroup>
+		<PackageVersion Include="Velopack" Version="1.2.0" />
+	</ItemGroup>
+
+	<!-- Tests -->
+	<ItemGroup>
+		<PackageVersion Include="xunit.v3" Version="4.0.1" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+		<PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.1" />
+		<PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+		<PackageVersion Include="bunit" Version="2.11.3" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,4 @@
+/* The static splash lives outside the interactive root, so hide it once the app has rendered. */
+body:has(.moka-root) .mokaterm-static-boot {
+	display: none;
+}

@@ -1,0 +1,21 @@
+@* The settings screen already shows the page title and description from its descriptor; this frame adds the actions and the sections. *@
+
+<div class="settings-page">
+	@if (Actions is not null || OnReset.HasDelegate)
+	{
+		<div class="settings-page__actions">
+			@Actions
+			@if (OnReset.HasDelegate)
+			{
+				<MokaButton Variant="MokaVariant.Text"
+							Size="MokaSize.Sm"
+							StartIcon="MokaIcons.Action.Refresh"
+							Loading="_resetting"
+							OnClick="ConfirmResetAsync">
+					Reset to defaults
+				</MokaButton>
+			}
+		</div>
+	}
+	@ChildContent
+</div>

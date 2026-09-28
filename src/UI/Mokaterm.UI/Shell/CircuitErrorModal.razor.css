@@ -1,0 +1,84 @@
+/*
+	Fatal circuit error, in the look of ReconnectModal. Blazor shows it by setting an inline display: block, which beats
+	any display set here, so the card is centred without flex. The theme tokens may not exist if the first render
+	failed, so every token has a fallback.
+*/
+.mokaterm-circuit-error {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 10001;
+	padding: 16px;
+	background: rgba(6, 6, 8, 0.85);
+	backdrop-filter: blur(8px);
+	overflow: auto;
+}
+
+.mokaterm-circuit-error-card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	width: min(380px, 100%);
+	margin: 20vh auto 0;
+	padding: 20px;
+	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
+	border-radius: 12px;
+	background: var(--moka-color-surface, #0c0c10);
+	box-shadow: 0 0 32px var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
+	color: var(--moka-color-on-surface, #e8e8ec);
+	font-family: var(--moka-font-family, 'Inter', 'Segoe UI', sans-serif);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.mokaterm-circuit-error-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--moka-color-on-surface-tertiary, #6a6a74);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mokaterm-circuit-error-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #ef5350;
+	box-shadow: 0 0 8px #ef5350;
+}
+
+.mokaterm-circuit-error-message {
+	margin: 0;
+}
+
+.mokaterm-circuit-error-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.mokaterm-circuit-error-button {
+	padding: 6px 12px;
+	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
+	border-radius: 8px;
+	background: transparent;
+	color: var(--moka-color-primary, #ef5350);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background 0.12s ease;
+}
+
+.mokaterm-circuit-error-button:hover {
+	background: var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
+}
+
+.mokaterm-circuit-error-button:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow-md, rgba(239, 83, 80, 0.15));
+}

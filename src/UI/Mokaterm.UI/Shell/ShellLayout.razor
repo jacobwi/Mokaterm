@@ -1,0 +1,79 @@
+<div class="mt-shell">
+	@if (_chrome is null)
+	{
+		<ShellAppBar />
+	}
+	else
+	{
+		@* The window has no title bar of its own: the bar keeps the window's buttons clear and reports where it can be
+		   dragged. *@
+		<div class="mt-shell-top" style="@_chromeStyle" @ref="_topBar">
+			<ShellAppBar />
+		</div>
+	}
+
+	<MokaDockLayout Class="mt-shell-body">
+		<MokaDockPanel Dock="MokaDockPosition.Left"
+					   Title="CONNECTIONS"
+					   Size="@Px(UiState.Current.ConnectionsPanelWidth ?? 280)"
+					   MinSize="200px"
+					   MaxSize="640px"
+					   Collapsible
+					   Collapsed="@Shell.ConnectionsPanelCollapsed"
+					   CollapsedChanged="Shell.SetConnectionsPanelCollapsed"
+					   SizeChanged="OnConnectionsPanelResized"
+					   Scrollable="false">
+			<Actions>
+				<IconAction Icon="MokatermIcons.Server"
+							Title="New host"
+							Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.NewHost)"
+							Size="MokaSize.Xs"
+							TooltipPosition="MokaTooltipPosition.Left"
+							OnClick="() => Actions.NewHost()" />
+				<IconAction Icon="MokatermIcons.FolderPlus"
+							Title="New folder"
+							Size="MokaSize.Xs"
+							TooltipPosition="MokaTooltipPosition.Left"
+							OnClick="() => Actions.NewFolder()" />
+				<IconAction Icon="MokatermIcons.FileUpload"
+							Title="Import saved hosts"
+							Size="MokaSize.Xs"
+							TooltipPosition="MokaTooltipPosition.Left"
+							OnClick="() => Actions.ImportConnections()" />
+			</Actions>
+			<ChildContent>
+				<ConnectionExplorer />
+			</ChildContent>
+		</MokaDockPanel>
+
+		<MokaDockPanel Dock="MokaDockPosition.Bottom"
+					   Title="TRANSFERS"
+					   Size="@Px(UiState.Current.TransfersPanelHeight ?? 180)"
+					   MinSize="96px"
+					   MaxSize="640px"
+					   Collapsible
+					   Collapsed="@Shell.TransfersPanelCollapsed"
+					   CollapsedChanged="Shell.SetTransfersPanelCollapsed"
+					   SizeChanged="OnTransfersPanelResized"
+					   Scrollable="false">
+			<TransferQueueView Compact="true" ShowTitle="false" />
+		</MokaDockPanel>
+
+		<MokaDockContent Scrollable="false">
+			<WorkspaceView />
+		</MokaDockContent>
+	</MokaDockLayout>
+
+	@if (_showStatusBar)
+	{
+		<ShellStatusBar />
+	}
+
+	<HostEditor />
+	<ConnectionEditor />
+	<FolderEditor />
+	<ImportWizard />
+	<ExportDialog />
+	<CommandSnippetEditor />
+	<MokaCheatsheet Open="@Shell.ShortcutsOpen" OpenChanged="Shell.SetShortcutsOpen" Groups="Commands.CheatsheetGroups" />
+</div>

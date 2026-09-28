@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!-- Built-in settings pages (general, appearance, terminal, files, security, known hosts, keychain, about), registered as descriptors. -->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.UI.Settings</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.UI.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+		<ProjectReference Include="..\Mokaterm.UI.Terminal\Mokaterm.UI.Terminal.csproj" />
+	</ItemGroup>
+
+</Project>

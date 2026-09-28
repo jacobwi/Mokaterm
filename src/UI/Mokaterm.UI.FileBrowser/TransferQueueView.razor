@@ -1,0 +1,133 @@
+@namespace Mokaterm.UI.FileBrowser
+
+@{
+	QueueSnapshot snapshot = TakeSnapshot();
+
+	RenderFragment Actions(ITransferItem item) =>
+		@<div class="tq-actions">
+			@if (item.State is TransferState.Queued or TransferState.Running)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
+							OnClick="() => Cancel(item.Id)" title="Cancel" aria-label="Cancel" />
+			}
+			@if (item.State is TransferState.Failed or TransferState.Canceled)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+							OnClick="() => Retry(item.Id)" title="Retry" aria-label="Retry" />
+			}
+			@if (item.State != TransferState.Running)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Remove"
+							OnClick="() => Remove(item.Id)" title="Remove from the list" aria-label="Remove" />
+			}
+		</div>;
+
+	RenderFragment CompactRow(ITransferItem item) =>
+		@<div @key="item.Id" class="tq-row tq-row--compact" title="@Tooltip(item)">
+			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
+			<span class="tq-name">@item.Name</span>
+			@if (item.Elevated)
+			{
+				<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
+			}
+			<span class="tq-route">@Route(item)</span>
+			<div class="tq-progress">
+				<MokaProgress Value="@ProgressValue(item)" />
+			</div>
+			<span class="tq-meta">@BytesText(item)</span>
+			<span class="tq-meta tq-rate">@RateText(item)</span>
+			<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
+			@Actions(item)
+		</div>;
+
+	RenderFragment FullRow(ITransferItem item) =>
+		@<div @key="item.Id" class="tq-row" title="@Tooltip(item)">
+			<div class="tq-line">
+				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)" />
+				<span class="tq-name">@item.Name</span>
+				@if (item.Elevated)
+				{
+					<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
+				}
+				<span class="tq-grow"></span>
+				<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
+				@Actions(item)
+			</div>
+			<div class="tq-route">@Route(item)</div>
+			<div class="tq-line">
+				<div class="tq-progress">
+					<MokaProgress Value="@ProgressValue(item)" />
+				</div>
+				<span class="tq-meta">@BytesText(item)</span>
+				<span class="tq-meta tq-rate">@RateText(item)</span>
+			</div>
+			@if (item.State == TransferState.Failed && !string.IsNullOrEmpty(item.Error))
+			{
+				<div class="tq-error">@item.Error</div>
+			}
+		</div>;
+}
+
+<div class="@RootClass" style="@Style">
+	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="border-bottom:1px solid var(--moka-color-outline-variant)">
+		@if (ShowTitle)
+		{
+			<MokaIcon Icon="MokatermIcons.Transfers" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
+			<span class="tq-title">Transfers</span>
+		}
+		@if (snapshot.Running > 0)
+		{
+			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Primary" Pulse Label="@CountLabel(snapshot.Running, "running")" />
+		}
+		@if (snapshot.Queued > 0)
+		{
+			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Info" Label="@CountLabel(snapshot.Queued, "queued")" />
+		}
+		@if (snapshot.Failed > 0)
+		{
+			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Error" Label="@CountLabel(snapshot.Failed, "failed")" />
+		}
+		@if (snapshot.Completed > 0)
+		{
+			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Label="@CountLabel(snapshot.Completed, "done")" />
+		}
+		<MokaSpacer />
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Eraser"
+					Disabled="@(snapshot.Finished == 0)" OnClick="ClearFinished">Clear finished</MokaButton>
+	</MokaToolbar>
+
+	@if (snapshot.Items.Count == 0)
+	{
+		@if (Compact)
+		{
+			<div class="tq-empty">
+				<MokaIcon Icon="MokatermIcons.Transfers" Size="MokaSize.Sm" />
+				<span>No transfers yet. Uploads and downloads from the file browser are listed here with their progress and speed.</span>
+			</div>
+		}
+		else
+		{
+			<div class="tq-state">
+				<MokaEmptyState Icon="MokatermIcons.Transfers" Title="No transfers" Description="Uploads and downloads show up here." />
+			</div>
+		}
+	}
+	else
+	{
+		<div class="tq-list moka-thin-scrollbar">
+			@if (snapshot.Items.Count > VirtualizeThreshold)
+			{
+				<Virtualize Items="snapshot.Items" Context="item" ItemSize="@(Compact ? CompactRowHeight : RowHeight)" OverscanCount="6">
+					@(Compact ? CompactRow(item) : FullRow(item))
+				</Virtualize>
+			}
+			else
+			{
+				@foreach (ITransferItem item in snapshot.Items)
+				{
+					@(Compact ? CompactRow(item) : FullRow(item))
+				}
+			}
+		</div>
+	}
+</div>

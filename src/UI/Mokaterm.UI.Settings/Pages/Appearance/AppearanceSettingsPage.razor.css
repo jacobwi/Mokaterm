@@ -1,0 +1,20 @@
+.accent-picker {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-md);
+}
+
+/* MokaColorSwatch repeats the selected hex under the swatches; the field beside it already shows the value. */
+.accent-picker ::deep .moka-color-swatch-preview {
+	display: none;
+}
+
+.appearance-preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	max-width: 360px;
+	padding: var(--moka-spacing-lg);
+}

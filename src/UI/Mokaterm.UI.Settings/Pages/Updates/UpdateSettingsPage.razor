@@ -1,0 +1,86 @@
+@using Mokaterm.Abstractions.Platform
+@inherits SettingsSectionBase<UpdateSettings>
+
+@{
+	UpdateSettings settings = Settings;
+	AppUpdateState? state = State;
+}
+
+<SettingsPage Title="@PageTitle"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put the update settings back to their defaults? The feed is cleared, which turns updates off.">
+	<SettingsSection Title="Version">
+		<SettingsRow Label="Running now" Description="The version of Mokaterm this window belongs to.">
+			<MokaText Element="span" Size="MokaSize.Sm" Mono>@AppEnvironment.AppVersion</MokaText>
+		</SettingsRow>
+		<SettingsRow Label="Status" Description="@StatusDescription">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+				@if (state?.AvailableVersion is { Length: > 0 } offered)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@offered</MokaText>
+				}
+				<MokaStatusDot Label="@StatusLabel" Color="StatusColor" Pulse="Busy" />
+			</MokaFlexbox>
+		</SettingsRow>
+		@if (state is not null)
+		{
+			<SettingsRow Label="Check for a new version" Description="Reads the feed now. Nothing is downloaded until you ask for it.">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Reconnect"
+							Disabled="!CanCheck"
+							Loading="state.Stage == UpdateStage.Checking"
+							OnClick="CheckAsync">
+					Check now
+				</MokaButton>
+			</SettingsRow>
+		}
+		@if (state is { Stage: UpdateStage.Available })
+		{
+			<SettingsRow Label="Download" Description="Fetches the new version into the install. Open sessions keep running.">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Download"
+							Disabled="Busy"
+							OnClick="DownloadAsync">
+					Download now
+				</MokaButton>
+			</SettingsRow>
+		}
+		@if (state is { Stage: UpdateStage.Downloading })
+		{
+			<SettingsRow Label="Download" Description="Downloading the new version." ControlWidth="260px">
+				<MokaProgress Value="state.DownloadPercent" ShowValue />
+			</SettingsRow>
+		}
+		@if (state is { Stage: UpdateStage.ReadyToRestart })
+		{
+			<SettingsRow Label="Restart and update" Description="Closes every open session, replaces the app and starts it again.">
+				<MokaButton Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Power"
+							Disabled="Busy"
+							OnClick="RestartAsync">
+					Restart and update
+				</MokaButton>
+			</SettingsRow>
+		}
+	</SettingsSection>
+
+	<SettingsSection Title="Feed">
+		<SettingsRow Label="Feed location"
+					 Description="An https address or a full path to a folder with the release files. Leave it empty to turn updates off."
+					 ControlWidth="340px">
+			<TextSetting Value="@settings.Feed"
+						 ValueChanged="SetFeedAsync"
+						 AllowEmpty
+						 Validate="ValidateFeed"
+						 Placeholder="Updates are off"
+						 AriaLabel="Update feed location" />
+		</SettingsRow>
+		<SettingsRow Label="Check at startup" Description="Look for a new version shortly after the app starts and show a notice when there is one.">
+			<MokaSwitch Value="settings.CheckAtStartup"
+						ValueChanged="value => UpdateAsync(s => s with { CheckAtStartup = value })"
+						aria-label="Check for updates at startup" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

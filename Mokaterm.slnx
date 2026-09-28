@@ -1,0 +1,53 @@
+<Solution>
+	<Folder Name="/Solution Items/">
+		<File Path=".editorconfig" />
+		<File Path=".gitignore" />
+		<File Path="Directory.Build.props" />
+		<File Path="Directory.Packages.props" />
+		<File Path="global.json" />
+	</Folder>
+	<Folder Name="/src/">
+		<Project Path="src/Mokaterm.Abstractions/Mokaterm.Abstractions.csproj" />
+		<Project Path="src/Mokaterm.Core/Mokaterm.Core.csproj" />
+		<Project Path="src/Mokaterm.Sessions/Mokaterm.Sessions.csproj" />
+	</Folder>
+	<Folder Name="/src/UI/">
+		<Project Path="src/UI/Mokaterm.UI.Common/Mokaterm.UI.Common.csproj" />
+		<Project Path="src/UI/Mokaterm.UI.Terminal/Mokaterm.UI.Terminal.csproj" />
+		<Project Path="src/UI/Mokaterm.UI.FileBrowser/Mokaterm.UI.FileBrowser.csproj" />
+		<Project Path="src/UI/Mokaterm.UI.Settings/Mokaterm.UI.Settings.csproj" />
+		<Project Path="src/UI/Mokaterm.UI/Mokaterm.UI.csproj" />
+	</Folder>
+	<Folder Name="/src/Modules/">
+		<Project Path="src/Modules/Mokaterm.Modules.Ssh/Mokaterm.Modules.Ssh.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Ftp/Mokaterm.Modules.Ftp.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Vnc/Mokaterm.Modules.Vnc.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Rdp/Mokaterm.Modules.Rdp.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Telnet/Mokaterm.Modules.Telnet.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Mqtt/Mokaterm.Modules.Mqtt.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Serial/Mokaterm.Modules.Serial.csproj" />
+	</Folder>
+	<Folder Name="/src/Hosts/">
+		<Project Path="src/Hosts/Mokaterm.Maui/Mokaterm.Maui.csproj">
+			<Deploy />
+		</Project>
+		<Project Path="src/Hosts/Mokaterm.Web/Mokaterm.Web.csproj" />
+	</Folder>
+	<Folder Name="/samples/">
+		<Project Path="samples/Mokaterm.DevHost/Mokaterm.DevHost.csproj" />
+	</Folder>
+	<Folder Name="/tests/">
+		<File Path="tests/Directory.Build.props" />
+		<Project Path="tests/Mokaterm.Core.Tests/Mokaterm.Core.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Sessions.Tests/Mokaterm.Sessions.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Ssh.Tests/Mokaterm.Modules.Ssh.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Ftp.Tests/Mokaterm.Modules.Ftp.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Vnc.Tests/Mokaterm.Modules.Vnc.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Rdp.Tests/Mokaterm.Modules.Rdp.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Telnet.Tests/Mokaterm.Modules.Telnet.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Mqtt.Tests/Mokaterm.Modules.Mqtt.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Serial.Tests/Mokaterm.Modules.Serial.Tests.csproj" />
+		<Project Path="tests/Mokaterm.UI.FileBrowser.Tests/Mokaterm.UI.FileBrowser.Tests.csproj" />
+		<Project Path="tests/Mokaterm.UI.Tests/Mokaterm.UI.Tests.csproj" />
+	</Folder>
+</Solution>

@@ -1,0 +1,19 @@
+.mt-serial-port {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* The field takes the row; the two buttons sit beside it and keep their own width. */
+.mt-serial-port > :first-child {
+	flex: 1;
+	min-width: 0;
+}
+
+.mt-serial-port-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	padding-top: 1.35rem;
+}

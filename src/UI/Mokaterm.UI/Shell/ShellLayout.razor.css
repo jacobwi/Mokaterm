@@ -1,0 +1,27 @@
+.mt-shell {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+/*
+	A desktop window without a system title bar: the window's own buttons are drawn over one end of the top bar. The
+	shell puts their size in these properties; the bar keeps that stretch empty and grows to their height, so its
+	controls line up with them.
+*/
+.mt-shell-top {
+	flex-shrink: 0;
+}
+
+.mt-shell-top ::deep .moka-appbar {
+	min-height: var(--mt-chrome-height, 0px);
+	padding-left: calc(var(--moka-spacing-lg) + var(--mt-chrome-left, 0px));
+	padding-right: calc(var(--moka-spacing-sm) + var(--mt-chrome-right, 0px));
+}
+
+/* MokaDockLayout needs a definite height; it takes whatever the app bar and status bar leave. */
+.mt-shell ::deep .mt-shell-body {
+	flex: 1;
+	min-height: 0;
+}

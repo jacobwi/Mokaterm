@@ -1,0 +1,10 @@
+@namespace Mokaterm.UI.Commands
+@using Mokaterm.UI.Settings.Pages.Commands
+@inherits ShellEditorBase<CommandSnippetEditorRequest>
+
+@* The dialog itself lives with the settings pages so both places edit a command the same way. *@
+<CommandSnippetEditorDialog Open="@(Request is not null)"
+						   OpenChanged="OnOpenChanged"
+						   Snippet="@Request?.Snippet"
+						   HostLabel="@Request?.HostLabel"
+						   ConnectionLabel="@Request?.ConnectionLabel" />

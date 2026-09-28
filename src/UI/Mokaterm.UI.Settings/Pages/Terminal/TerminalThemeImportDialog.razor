@@ -1,0 +1,63 @@
+@using Mokaterm.Abstractions.Terminal
+@using Mokaterm.UI.Terminal
+
+<MokaDialog Open="Open"
+			OpenChanged="OpenChanged"
+			Title="Import a color scheme"
+			DialogSize="MokaDialogSize.Medium"
+			CloseOnBackdropClick="false">
+	<ChildContent>
+		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				Paste a scheme from Windows Terminal, iTerm2, Alacritty, VS Code or X resources, or pick a file.
+			</MokaText>
+
+			<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Align="MokaAlign.Center">
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Upload" OnClick="PickFileAsync">
+					Choose file
+				</MokaButton>
+				@if (_fileName is { Length: > 0 })
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="min-width:0">@_fileName</MokaText>
+				}
+			</MokaFlexbox>
+
+			<MokaTextArea Value="@_text"
+						  ValueChanged="OnTextChangedAsync"
+						  Rows="8"
+						  Placeholder="Paste the scheme here"
+						  spellcheck="false"
+						  autocomplete="off"
+						  aria-label="Scheme text"
+						  data-autofocus="true" />
+
+			@if (_import?.Theme is { } theme)
+			{
+				<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Md" Align="MokaAlign.Center" Wrap>
+					<TerminalThemePreview Theme="@Named(theme)" FontFamily="@FontFamily" FontSize="12" />
+					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Sm" Style="flex:1;min-width:200px">
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xs">
+							<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">Read as</MokaText>
+							<MokaTag Text="@FormatLabel(_import.Format)" Size="MokaSize.Xs" Color="MokaColor.Primary" />
+						</MokaFlexbox>
+						<MokaTextField Label="Name"
+									   Value="@_name"
+									   ValueChanged="SetName"
+									   Size="MokaSize.Sm"
+									   Required
+									   ErrorText="@(_name.Trim().Length == 0 ? "Give the theme a name." : null)"
+									   autocomplete="off" />
+					</MokaFlexbox>
+				</MokaFlexbox>
+			}
+			else if (_import?.Error is { } error)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Dense>@error</MokaAlert>
+			}
+		</MokaFlexbox>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CancelAsync">Cancel</MokaButton>
+		<MokaButton StartIcon="MokatermIcons.Palette" Disabled="@(!CanImport)" OnClick="ImportAsync">Add theme</MokaButton>
+	</Actions>
+</MokaDialog>

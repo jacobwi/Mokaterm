@@ -1,0 +1,170 @@
+@* The workspace's home screen. A vault with no host in it is led through getting started, a filled one gets its
+   favorites and recent logins back, and every action carries the keys in force for it. *@
+
+<div class="mt-welcome">
+	<div class="mt-welcome-inner">
+		@if (!Catalog.IsLoaded)
+		{
+			@* Leading with "nothing saved yet" before the catalog is read would be wrong for everyone who has hosts. *@
+			<div class="mt-welcome-loading">
+				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+			</div>
+		}
+		else
+		{
+			<div class="mt-welcome-head">
+				<span class="mt-welcome-mark" aria-hidden="true">&gt;_</span>
+				<h2 class="mt-welcome-title">@(_hasHosts ? "Ready to connect" : "Nothing saved yet")</h2>
+				<p class="mt-welcome-lede">@Lede</p>
+			</div>
+
+			@if (_restoreCount > 0)
+			{
+				<MokaCallout Type="MokaCalloutType.Note" Title="Where you left off">
+					@RestoreText
+					<div class="mt-welcome-restore-actions">
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="ReopenAsync">
+							Reopen
+						</MokaButton>
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="DismissRestore">
+							Not now
+						</MokaButton>
+					</div>
+				</MokaCallout>
+			}
+
+			@if (_hasHosts)
+			{
+				@if (_favorites.Count == 0 && _recent.Count == 0)
+				{
+					<MokaCallout Type="MokaCalloutType.Note" Title="Your hosts are in the connections panel">
+						A login joins Recent once you have connected to it, and a favorite stays here for good: right-click a
+						login and pick Favorite.
+						@* The sentence only makes sense while the panel has a shortcut, which the user can take away. *@
+						@if (Keys(ShellCommandIds.ToggleConnections) is { } panelKeys)
+						{
+							<span>Hide that panel, or bring it back, with @panelKeys.</span>
+						}
+					</MokaCallout>
+				}
+
+				<div class="mt-welcome-lists">
+					@if (_favorites.Count > 0)
+					{
+						<section class="mt-welcome-section">
+							<h3 class="mt-welcome-label">Favorites</h3>
+							<MokaList Bordered>
+								@foreach ((HostProfile host, ConnectionProfile login) in _favorites)
+								{
+									@LoginRow(host, login, null)
+								}
+							</MokaList>
+						</section>
+					}
+
+					@if (_recent.Count > 0)
+					{
+						<section class="mt-welcome-section">
+							<h3 class="mt-welcome-label">Recent</h3>
+							<MokaList Bordered>
+								@foreach ((HostProfile host, ConnectionProfile login) in _recent)
+								{
+									@LoginRow(host, login, login.LastConnectedAt)
+								}
+							</MokaList>
+						</section>
+					}
+
+					@* The same actions as the empty screen, without the explanations: this user has been here before. *@
+					<section class="mt-welcome-section">
+						<h3 class="mt-welcome-label">Actions</h3>
+						<MokaList Bordered>
+							@ActionRow(MokatermIcons.Server, "New host", null, ShellCommandIds.NewHost, () => Connections.NewHost())
+							@ActionRow(MokatermIcons.QuickConnect, "Quick connect", null, ShellCommandIds.QuickConnect, Shell.FocusQuickConnect)
+							@ActionRow(MokatermIcons.FileUpload, "Import hosts", null, ShellCommandIds.ImportConnections, () => Connections.ImportConnections())
+							@ActionRow(MokatermIcons.Keyboard, "Keyboard shortcuts", null, ShellCommandIds.Shortcuts, () => Shell.SetShortcutsOpen(true))
+						</MokaList>
+					</section>
+				</div>
+			}
+			else
+			{
+				<section class="mt-welcome-section">
+					<h3 class="mt-welcome-label">Start here</h3>
+					<MokaList Bordered>
+						@ActionRow(
+							MokatermIcons.Server,
+							"Add a host",
+							"An address, a user and a protocol, kept in the vault.",
+							ShellCommandIds.NewHost,
+							() => Connections.NewHost())
+						@ActionRow(
+							MokatermIcons.FileUpload,
+							"Import from another client",
+							"Reads an OpenSSH config, PuTTY or WinSCP. Passwords stay where they are.",
+							ShellCommandIds.ImportConnections,
+							() => Connections.ImportConnections())
+						@ActionRow(
+							MokatermIcons.QuickConnect,
+							"Connect without saving",
+							"Puts the cursor in the quick connect box at the top. Type user@host; nothing is written to the vault.",
+							ShellCommandIds.QuickConnect,
+							Shell.FocusQuickConnect)
+						@ActionRow(
+							MokatermIcons.Keyboard,
+							"Keyboard shortcuts",
+							"Every command and the keys for it. Rebind them in Settings, Keyboard.",
+							ShellCommandIds.Shortcuts,
+							() => Shell.SetShortcutsOpen(true))
+					</MokaList>
+				</section>
+			}
+		}
+	</div>
+</div>
+
+@code {
+	private RenderFragment LoginRow(HostProfile host, ConnectionProfile login, DateTimeOffset? lastConnected) =>
+		@<MokaListItem @key="login.Id"
+					   Icon="@Contributions.GetProtocolIcon(login.ProtocolId)"
+					   Text="@login.GetTitle(host)"
+					   SecondaryText="@($"{Protocols.DisplayName(login.ProtocolId)} · {host.DisplayName}")"
+					   OnClick="() => Sessions.OpenAsync(login.Id, reuseExisting: true)"
+					   OnContextMenu="e => Menu.Show(e, Connections.LoginMenu(host, login))">
+			<EndContent>
+				@if (lastConnected is { } connectedAt)
+				{
+					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">
+						@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())
+					</MokaText>
+				}
+			</EndContent>
+		</MokaListItem>;
+
+	// The detail wraps rather than being cut, so the row carries its own text instead of the list's secondary line.
+	private RenderFragment ActionRow(MokaIconDefinition icon, string title, string? detail, string commandId, Action run) =>
+		@<MokaListItem Icon="icon" OnClick="run">
+			<div class="mt-welcome-action">
+				<span class="mt-welcome-action-text">
+					<span class="mt-welcome-action-title">@title</span>
+					@if (detail is not null)
+					{
+						<span class="mt-welcome-action-detail">@detail</span>
+					}
+				</span>
+				@Keys(commandId)
+			</div>
+		</MokaListItem>;
+
+	/// <summary>The keys a command answers to now, so a binding changed in settings shows here.</summary>
+	private static RenderFragment? Keys(string commandId) =>
+		ShellShortcuts.KeysFor(commandId) is { Count: > 0 } keys ? KeyCaps(keys) : null;
+
+	private static RenderFragment KeyCaps(IReadOnlyList<string> keys) =>
+		@<span class="mt-welcome-keys">
+			@foreach (string key in keys)
+			{
+				<MokaKbd>@key</MokaKbd>
+			}
+		</span>;
+}

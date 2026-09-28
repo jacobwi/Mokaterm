@@ -1,0 +1,99 @@
+/* Page frame for the Mokaterm shell. Everything else is styled by Moka.Red and scoped component CSS. */
+
+html,
+body,
+#app {
+	height: 100%;
+	margin: 0;
+	overflow: hidden;
+}
+
+/* The theme tokens live on .moka-root; body only resolves them when a host also emits them on :root. */
+body,
+.moka-root {
+	background: var(--moka-color-background);
+	color: var(--moka-color-on-background);
+	font-family: var(--moka-font-family);
+}
+
+.moka-root {
+	height: 100%;
+	color-scheme: light;
+}
+
+/*
+	One colour per machine, picked from the address in HostAccent, so a session is recognisable at a glance in the tab,
+	the toolbar and the status bar. Muted on purpose: these sit next to the red the app uses for its own accent.
+*/
+.moka-root {
+	--mt-host-1: #7fb2f0;
+	--mt-host-2: #6fcf97;
+	--mt-host-3: #f2b880;
+	--mt-host-4: #c79ae0;
+	--mt-host-5: #6ec9c4;
+	--mt-host-6: #e9a1b8;
+	--mt-host-7: #d6c26a;
+	--mt-host-8: #9aa7f0;
+}
+
+/* The same hues darkened for the light theme, where the pale ones wash out on white. */
+.moka-root:not(.moka-dark) {
+	--mt-host-1: #2f6fb8;
+	--mt-host-2: #1f8a5a;
+	--mt-host-3: #b26a1f;
+	--mt-host-4: #7d4aa0;
+	--mt-host-5: #1f7d78;
+	--mt-host-6: #b04a6a;
+	--mt-host-7: #8a7615;
+	--mt-host-8: #4a56b8;
+}
+
+/* Without it the WebView draws light native selects and date pickers on the dark theme. */
+.moka-root.moka-dark {
+	color-scheme: dark;
+}
+
+/*
+	Thin accent scrollbars without arrow buttons. Chromium (WebView2, Chrome, Edge) ignores these pseudo-elements on any
+	element that sets scrollbar-width or scrollbar-color, so the standard properties are only used where the
+	pseudo-elements do not exist (Firefox).
+*/
+.moka-root ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.moka-root ::-webkit-scrollbar-track,
+.moka-root ::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+.moka-root ::-webkit-scrollbar-button {
+	display: none;
+}
+
+/* The transparent border insets the thumb, so it reads thin but keeps a 10px target. */
+.moka-root ::-webkit-scrollbar-thumb {
+	border: 2px solid transparent;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--moka-color-primary) 26%, transparent) padding-box;
+}
+
+.moka-root ::-webkit-scrollbar-thumb:hover {
+	background-color: color-mix(in srgb, var(--moka-color-primary) 45%, transparent);
+}
+
+.moka-root ::-webkit-scrollbar-thumb:active {
+	background-color: color-mix(in srgb, var(--moka-color-primary) 60%, transparent);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+	.moka-root {
+		scrollbar-color: color-mix(in srgb, var(--moka-color-primary) 26%, transparent) transparent;
+	}
+
+	/* Zero specificity, so Moka.Red rules such as moka-hide-scrollbar still win. */
+	:where(.moka-root *) {
+		scrollbar-width: thin;
+	}
+}

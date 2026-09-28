@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Ftp\Mokaterm.Modules.Ftp.csproj" />
+	</ItemGroup>
+
+</Project>

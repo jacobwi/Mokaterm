@@ -1,0 +1,112 @@
+@using Moka.Red.Layout.Grid
+@using Mokaterm.Abstractions.Credentials
+@inherits DraftDialogBase
+
+<MokaDialog Open="Open"
+			OpenChanged="OnOpenChangedAsync"
+			Title="Generate key"
+			DialogSize="MokaDialogSize.Medium"
+			CloseOnBackdropClick="false"
+			CloseOnEscape="!IsBusy"
+			ShowCloseButton="!IsBusy">
+	<ChildContent>
+		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+			<MokaTextField Label="Name"
+						   Value="@_name"
+						   ValueChanged="SetName"
+						   Required
+						   ErrorText="@_nameError"
+						   Disabled="_busy"
+						   Placeholder="Deploy key"
+						   autocomplete="off"
+						   data-autofocus="true" />
+
+			<MokaRadioGroup TValue="SshKeyType" Value="_type" ValueChanged="SetType" Label="Key type">
+				@foreach (KeyTypeOption option in Options)
+				{
+					<MokaRadioItem TValue="SshKeyType" @key="option.Value" Value="option.Value" Disabled="_busy">
+						<span class="key-option">
+							<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@option.Title</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@option.Description</MokaText>
+						</span>
+					</MokaRadioItem>
+				}
+			</MokaRadioGroup>
+
+			<MokaTextField Label="Comment"
+						   Value="@_comment"
+						   ValueChanged="SetComment"
+						   Disabled="_busy"
+						   Placeholder="you@machine"
+						   HelperText="Sits at the end of the public key so you can tell your keys apart."
+						   autocomplete="off"
+						   spellcheck="false" />
+
+			<MokaGrid Columns="2" Gap="MokaSpacingScale.Md">
+				<MokaPasswordField Label="Passphrase"
+								   Value="@_passphrase"
+								   ValueChanged="SetPassphrase"
+								   Disabled="_busy"
+								   HelperText="Optional. It protects the key file itself, wherever it ends up."
+								   autocomplete="new-password" />
+				<MokaPasswordField Label="Confirm passphrase"
+								   Value="@_passphraseAgain"
+								   ValueChanged="SetPassphraseAgain"
+								   Disabled="_busy"
+								   ErrorText="@_passphraseError"
+								   autocomplete="new-password" />
+			</MokaGrid>
+
+			@if (_generated is { } key)
+			{
+				<div class="key-result">
+					<div class="key-result__head">
+						<MokaTag Text="@key.PublicKey.Algorithm" Icon="MokatermIcons.Key" Size="MokaSize.Xs" />
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@TextStyles.TruncateBox" title="@key.PublicKey.Fingerprint">@key.PublicKey.Fingerprint</MokaText>
+						<CopyButton Text="@key.PublicKey.Fingerprint" Label="Copy fingerprint" />
+					</div>
+					<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+						Public key, ready for authorized_keys on the server.
+					</MokaText>
+					<div class="key-result__line">
+						<code>@key.PublicKey.AuthorizedKeysLine</code>
+						<CopyButton Text="@key.PublicKey.AuthorizedKeysLine" Label="Copy public key" />
+					</div>
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Align="MokaAlign.Center" Wrap>
+						@if (CanExport)
+						{
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Sm"
+										StartIcon="MokatermIcons.FileDownload"
+										Disabled="_busy"
+										OnClick="ExportAsync">
+								Export private key
+							</MokaButton>
+						}
+						<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+							@(key.HasPassphrase
+								? "The private key file is encrypted with your passphrase."
+								: "The private key has no passphrase, so anyone holding the file can use it.")
+						</MokaText>
+					</MokaFlexbox>
+				</div>
+			}
+
+			@if (_error is not null)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+			}
+		</MokaFlexbox>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_busy" OnClick="CloseAsync">Cancel</MokaButton>
+		@if (_generated is null)
+		{
+			<MokaButton StartIcon="MokatermIcons.Key" Loading="_busy" OnClick="GenerateAsync">Generate</MokaButton>
+		}
+		else
+		{
+			<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_busy" OnClick="SaveAsync">Save to keychain</MokaButton>
+		}
+	</Actions>
+</MokaDialog>

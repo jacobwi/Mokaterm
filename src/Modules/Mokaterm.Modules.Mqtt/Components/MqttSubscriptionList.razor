@@ -1,0 +1,71 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<div class="mt-mqtt-subs">
+	@if (Subscriptions.Count == 0)
+	{
+		<MokaText Element="p" Size="MokaSize.Xs" Style="margin:0;color:var(--moka-color-on-surface-variant)">
+			No subscriptions. A broker sends nothing until one asks for a topic, so add at least one filter.
+		</MokaText>
+	}
+
+	@foreach (MqttSubscription subscription in Subscriptions)
+	{
+		<div class="mt-mqtt-sub" @key="subscription.Id">
+			<div class="mt-mqtt-sub-row">
+				<MokaTag Text="@QosLabel(subscription.QualityOfService)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				<div class="mt-mqtt-sub-text">
+					<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate>@subscription.TopicFilter</MokaText>
+				</div>
+				@if (!subscription.SubscribeWithSession)
+				{
+					<MokaTag Text="MANUAL" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				}
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Edit"
+							Disabled="Disabled"
+							OnClick="@(() => Toggle(subscription.Id))"
+							aria-label="Edit subscription" />
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Delete"
+							Disabled="Disabled"
+							OnClick="@(() => RemoveAsync(subscription.Id))"
+							aria-label="Remove subscription" />
+			</div>
+
+			@if (_editing == subscription.Id)
+			{
+				<div class="mt-mqtt-sub-form">
+					<MqttSubscriptionForm Subscription="subscription" SubscriptionChanged="ReplaceAsync" Disabled="Disabled" />
+					@if (subscription.Validate() is { } error)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@error</MokaAlert>
+					}
+				</div>
+			}
+		</div>
+	}
+
+	<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Wrap>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Action.Add"
+					Disabled="@(Disabled || IsFull)"
+					OnClick="@(() => AddAsync(MqttTopicFilters.Everything))">
+			Everything
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Action.Add"
+					Disabled="@(Disabled || IsFull)"
+					OnClick="@(() => AddAsync(BrokerTopics))"
+					title="The topics a broker publishes about itself, which a subscription to # never reaches">
+			Broker topics
+		</MokaButton>
+	</MokaFlexbox>
+</div>

@@ -1,0 +1,62 @@
+/* The page list gives up width before the page does, so settings stay usable in a narrow window. */
+.mt-settings {
+	display: grid;
+	flex: 1;
+	grid-template-columns: clamp(170px, 26%, 240px) minmax(0, 1fr);
+	min-height: 0;
+	background: var(--moka-color-background);
+}
+
+.mt-settings-nav {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border-right: 1px solid var(--moka-color-outline-variant);
+	background: var(--moka-color-surface);
+}
+
+.mt-settings-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm) var(--moka-spacing-xs) var(--moka-spacing-md);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-settings-label,
+.mt-settings-group {
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-settings-group {
+	padding: var(--moka-spacing-md) var(--moka-spacing-md) 0;
+}
+
+.mt-settings-search {
+	padding: var(--moka-spacing-sm);
+}
+
+.mt-settings-pages {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.mt-settings-content {
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--moka-spacing-xl);
+}
+
+/* Same width as the page content below it, so a long description does not run the whole window. */
+.mt-settings-page-header {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	max-width: 960px;
+	margin-bottom: var(--moka-spacing-lg);
+}

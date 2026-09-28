@@ -1,0 +1,71 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<div class="mt-mqtt-topics">
+	<div class="mt-mqtt-topics-head">
+		<MokaSearchInput Value="@Search"
+						 ValueChanged="OnSearchChanged"
+						 Placeholder="Filter topics"
+						 Debounce="200"
+						 aria-label="Filter topics" />
+	</div>
+
+	@if (Rows.Count == 0)
+	{
+		<div class="mt-mqtt-topics-empty">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				@EmptyText
+			</MokaText>
+		</div>
+	}
+	else
+	{
+		<div class="mt-mqtt-topics-list" role="tree" aria-label="Topics">
+			@foreach (MqttTopicRow row in Rows)
+			{
+				<div class="@RowClass(row)"
+					 role="treeitem"
+					 aria-level="@(row.Depth + 1)"
+					 aria-selected="@(row.Path == SelectedTopic ? "true" : "false")"
+					 aria-expanded="@AriaExpanded(row)"
+					 tabindex="0"
+					 @key="row.Path"
+					 @onclick="@(() => OnRowClick(row))"
+					 @onkeydown="@(args => OnRowKeyDown(args, row))">
+					<span class="mt-mqtt-topics-indent" style="@IndentStyle(row)"></span>
+
+					@if (row.HasChildren)
+					{
+						<MokaIcon Icon="@(row.IsExpanded ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronRight)"
+								  Size="MokaSize.Xs"
+								  Class="mt-mqtt-topics-chevron" />
+					}
+					else
+					{
+						<span class="mt-mqtt-topics-chevron"></span>
+					}
+
+					<div class="mt-mqtt-topics-text">
+						<div class="mt-mqtt-topics-line">
+							<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate>@row.Segment</MokaText>
+							@if (row.HasRetained)
+							{
+								<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" title="A retained message arrived on this topic" />
+							}
+						</div>
+						@if (row.Preview is { Length: > 0 } preview)
+						{
+							<MokaText Element="span"
+									  Size="MokaSize.Xs"
+									  Mono
+									  Truncate
+									  Style="color:var(--moka-color-on-surface-variant)"
+									  title="@preview">@preview</MokaText>
+						}
+					</div>
+
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-topics-count" title="@CountTitle(row)">@CountText(row)</MokaText>
+				</div>
+			}
+		</div>
+	}
+</div>

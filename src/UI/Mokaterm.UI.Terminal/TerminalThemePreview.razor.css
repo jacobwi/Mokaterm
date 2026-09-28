@@ -1,0 +1,64 @@
+.mt-theme-preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	overflow: hidden;
+	line-height: 1.3;
+	color: var(--mt-fg, var(--moka-color-on-surface));
+	background-color: var(--mt-bg, var(--moka-color-surface));
+	user-select: none;
+}
+
+.mt-theme-preview-line {
+	overflow: hidden;
+	white-space: pre;
+}
+
+.mt-theme-preview-bold {
+	font-weight: bold;
+}
+
+.mt-bright-red {
+	color: var(--mt-bright-red);
+}
+
+.mt-bright-green {
+	color: var(--mt-bright-green);
+}
+
+.mt-bright-blue {
+	color: var(--mt-bright-blue);
+}
+
+.mt-bright-magenta {
+	color: var(--mt-bright-magenta);
+}
+
+.mt-bright-cyan {
+	color: var(--mt-bright-cyan);
+}
+
+.mt-theme-preview-selection {
+	color: var(--mt-selection-fg, currentcolor);
+	background-color: var(--mt-selection);
+}
+
+.mt-theme-preview-cursor {
+	color: var(--mt-cursor-accent);
+	background-color: var(--mt-cursor);
+}
+
+.mt-theme-preview-swatches {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: var(--moka-spacing-xxs);
+	margin-top: var(--moka-spacing-xs);
+}
+
+.mt-theme-preview-swatch {
+	height: 0.8em;
+	border-radius: var(--moka-radius-sm);
+}

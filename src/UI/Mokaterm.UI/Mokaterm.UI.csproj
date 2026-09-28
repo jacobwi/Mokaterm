@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		The application shell shared by every host: layout, vault screens, connection manager, session tabs,
+		settings, command palette and dialogs. Hosts render MokatermApp and add platform services.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.UI</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.UI.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+		<ProjectReference Include="..\Mokaterm.UI.Terminal\Mokaterm.UI.Terminal.csproj" />
+		<ProjectReference Include="..\Mokaterm.UI.FileBrowser\Mokaterm.UI.FileBrowser.csproj" />
+		<ProjectReference Include="..\Mokaterm.UI.Settings\Mokaterm.UI.Settings.csproj" />
+	</ItemGroup>
+
+</Project>

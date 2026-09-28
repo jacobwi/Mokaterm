@@ -1,0 +1,108 @@
+@namespace Mokaterm.UI.Terminal
+
+<div @ref="_host" class="@HostClass" style="@_hostStyle">
+	@* xterm.js renders into this element, so Blazor must never give it child content. *@
+	<div @ref="_screen" class="mt-terminal-screen"></div>
+
+	@* terminal.js sets the text and toggles visibility; Blazor renders it once and leaves it alone. *@
+	<div class="mt-terminal-badge" aria-hidden="true"></div>
+
+	@if (_hoverCommand is not null)
+	{
+		<div class="mt-terminal-row-actions" style="@_hoverStyle">
+			@if (OnCommandSaved.HasDelegate)
+			{
+				<MokaButton Variant="MokaVariant.Soft"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Save"
+							OnClick="() => SaveHoveredCommandAsync(false)"
+							title="@($"Save \"{_hoverCommand}\" for this connection")"
+							aria-label="@($"Save the command {_hoverCommand} for this connection")" />
+			}
+			@if (OnCommandSavedWithDetails.HasDelegate)
+			{
+				<MokaButton Variant="MokaVariant.Soft"
+							Size="MokaSize.Xs"
+							StartIcon="MokatermIcons.Tag"
+							OnClick="() => SaveHoveredCommandAsync(true)"
+							title="Save with a name, tags and a scope"
+							aria-label="@($"Save the command {_hoverCommand} with a name, tags and a scope")" />
+			}
+		</div>
+	}
+
+	@if (_scrolledUp && _startError is null)
+	{
+		<div class="mt-terminal-jump">
+			<MokaButton Variant="MokaVariant.Soft"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Navigation.ArrowDown"
+						OnClick="ScrollToBottomAsync"
+						title="Scroll to the end (Ctrl+Shift+End)"
+						aria-label="Scroll to the end" />
+		</div>
+	}
+
+	@if (ShowReconnectHint)
+	{
+		<div class="mt-terminal-hint">
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="RequestReconnectAsync">
+				<MokaKbd>Enter</MokaKbd>&nbsp;to reconnect
+			</MokaButton>
+		</div>
+	}
+
+	@if (_startError is not null)
+	{
+		<div class="mt-terminal-error">
+			<MokaEmptyState Icon="MokatermIcons.Terminal" Title="The terminal could not start" Description="@_startError" />
+		</div>
+	}
+
+	@if (_findOpen)
+	{
+		<div class="mt-terminal-find">
+			<MokaToolbar Dense Bordered>
+				<MokaTextField Value="@_findTerm"
+							   ValueChanged="OnFindTermChangedAsync"
+							   Placeholder="@(_findRegex ? "Find (regex)" : "Find")"
+							   Size="MokaSize.Sm"
+							   StartIcon="MokaIcons.Action.Search"
+							   Style="width:14rem"
+							   spellcheck="false"
+							   autocomplete="off"
+							   @onkeydown="OnFindKeyDownAsync"
+							   aria-label="Find in terminal"
+							   data-terminal-find="" />
+				<MokaButton Variant="@OptionVariant(_findCaseSensitive)"
+							Color="@OptionColor(_findCaseSensitive)"
+							Size="MokaSize.Sm"
+							Class="mt-find-option"
+							OnClick="ToggleCaseSensitiveAsync"
+							title="Match case (Alt+C)"
+							aria-label="Match case"
+							aria-pressed="@AriaPressed(_findCaseSensitive)">Aa</MokaButton>
+				<MokaButton Variant="@OptionVariant(_findWholeWord)"
+							Color="@OptionColor(_findWholeWord)"
+							Size="MokaSize.Sm"
+							Class="mt-find-option"
+							OnClick="ToggleWholeWordAsync"
+							title="Match whole word (Alt+W)"
+							aria-label="Match whole word"
+							aria-pressed="@AriaPressed(_findWholeWord)">ab</MokaButton>
+				<MokaButton Variant="@OptionVariant(_findRegex)"
+							Color="@OptionColor(_findRegex)"
+							Size="MokaSize.Sm"
+							Class="mt-find-option"
+							OnClick="ToggleRegexAsync"
+							title="Use regular expression (Alt+R)"
+							aria-label="Use regular expression"
+							aria-pressed="@AriaPressed(_findRegex)">.*</MokaButton>
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Style="min-width:4.5rem;color:var(--moka-color-on-surface-variant)">@_findStatus</MokaText>
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ChevronUp" OnClick="FindPreviousAsync" title="Previous match (Shift+Enter)" aria-label="Previous match" />
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ChevronDown" OnClick="FindNextAsync" title="Next match (Enter)" aria-label="Next match" />
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.Close" OnClick="CloseFindAsync" title="Close (Escape)" aria-label="Close find" />
+			</MokaToolbar>
+		</div>
+	}
+</div>

@@ -1,0 +1,32 @@
+@using Moka.Red.Forms.TextField
+@using Moka.Red.Primitives.Chip
+@inherits DraftSettingBase<string>
+
+<div class="text-setting">
+	<MokaTextField Value="@Text"
+				   ValueChanged="OnTextChangedAsync"
+				   OnBlur="OnBlur"
+				   Label="@Label"
+				   ErrorText="@Error"
+				   Placeholder="@Placeholder"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   Style="@WidthStyle"
+				   spellcheck="false"
+				   autocomplete="off"
+				   aria-label="@AriaLabel" />
+	@if (Suggestions is { Count: > 0 } suggestions)
+	{
+		<div class="text-setting__suggestions">
+			@foreach (SettingSuggestion suggestion in suggestions)
+			{
+				<MokaChip @key="suggestion.Value"
+						  Text="@suggestion.Label"
+						  Size="MokaSize.Xs"
+						  Selected="IsCommitted(suggestion.Value)"
+						  Disabled="Disabled"
+						  OnClick="() => SelectAsync(suggestion.Value)" />
+			}
+		</div>
+	}
+</div>

@@ -1,0 +1,15 @@
+@using Moka.Red.Primitives.Typography
+
+<div class="@RowClass">
+	<div class="settings-row__text">
+		<MokaText Element="div" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@Label</MokaText>
+		@if (Description is not null)
+		{
+			<MokaText Element="div" Size="MokaSize.Xs" Style="@TextStyles.Muted">@Description</MokaText>
+		}
+	</div>
+	@if (ChildContent is not null)
+	{
+		<div class="@ControlClass" style="@ControlStyle">@ChildContent</div>
+	}
+</div>

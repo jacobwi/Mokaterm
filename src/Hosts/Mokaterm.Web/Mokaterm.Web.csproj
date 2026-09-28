@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<!--
+		Blazor Server host. SSH and FTP connections run on this server, so deploy it only behind HTTPS and treat
+		access to it like shell access to every saved host.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Web</RootNamespace>
+		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Mokaterm.Core\Mokaterm.Core.csproj" />
+		<ProjectReference Include="..\..\Mokaterm.Sessions\Mokaterm.Sessions.csproj" />
+		<ProjectReference Include="..\..\UI\Mokaterm.UI\Mokaterm.UI.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Ssh\Mokaterm.Modules.Ssh.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Ftp\Mokaterm.Modules.Ftp.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Vnc\Mokaterm.Modules.Vnc.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Rdp\Mokaterm.Modules.Rdp.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Telnet\Mokaterm.Modules.Telnet.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Mqtt\Mokaterm.Modules.Mqtt.csproj" />
+	</ItemGroup>
+
+</Project>

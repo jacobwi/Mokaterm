@@ -1,0 +1,16 @@
+@* Dialog body layout shared by prompts and editors. Exposes its element so the shell script can find the dialog. *@
+
+<div class="mt-prompt" tabindex="-1" data-autofocus="@(AutofocusSelf ? "true" : null)" @ref="Element">
+	@ChildContent
+</div>
+
+@code {
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	/// <summary>Focus the body itself, for prompts without a text field, so Enter reaches the primary button.</summary>
+	[Parameter]
+	public bool AutofocusSelf { get; set; }
+
+	public ElementReference Element { get; private set; }
+}

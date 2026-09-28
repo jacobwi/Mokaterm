@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<!-- The container verifies AddMokatermSessions resolves; the library itself only needs the abstractions. -->
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Mokaterm.Sessions\Mokaterm.Sessions.csproj" />
+	</ItemGroup>
+
+	<!-- Eventually.AdvanceUntilAsync: only the projects that drive a FakeTimeProvider reference TimeProvider.Testing. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+</Project>

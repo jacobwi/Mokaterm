@@ -1,0 +1,120 @@
+@using Mokaterm.Abstractions.Commands
+@inherits VaultListPageBase<CommandSnippet>
+
+<VaultListFrame Title="Saved commands"
+				LockedDescription="Unlock the vault to see and manage saved commands."
+				IsUnlocked="IsUnlocked"
+				LoadError="@LoadError">
+	<MokaTable TItem="CommandSnippet"
+			   Items="Rows"
+			   ItemKey="snippet => snippet.Id"
+			   Title="Commands"
+			   ShowPagination="false"
+			   OnRowClick="Edit"
+			   ActionsColumnTitle=""
+			   ActionsColumnWidth="72px">
+		<ToolbarContent>
+			<MokaSearchInput Value="@_query"
+							 ValueChanged="OnQueryChanged"
+							 Placeholder="Filter by name, command or tag"
+							 Size="MokaSize.Sm"
+							 Debounce="0"
+							 Style="min-width:16rem" />
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" OnClick="AddCommand">
+				New command
+			</MokaButton>
+		</ToolbarContent>
+		<ChildContent>
+			<MokaColumn Title="Name" Field="snippet => snippet.Name" Width="22%">
+				<CellTemplate Context="snippet">
+					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xxs">
+						<MokaText Element="span" Size="MokaSize.Sm" Truncate Style="@TextStyles.TruncateBox">@snippet.Name</MokaText>
+						@if (snippet.Tags.Count > 0)
+						{
+							<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Xxs" Wrap>
+								@foreach (string tag in snippet.Tags)
+								{
+									<MokaTag Text="@tag" Size="MokaSize.Xs" Icon="MokatermIcons.Tag" />
+								}
+							</MokaFlexbox>
+						}
+					</MokaFlexbox>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Command" Field="snippet => snippet.Command" Width="34%">
+				<CellTemplate Context="snippet">
+					<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+						<MokaText Element="span"
+								  Size="MokaSize.Xs"
+								  Mono
+								  Truncate
+								  Style="@TextStyles.TruncateBox"
+								  title="@snippet.Command">@snippet.Command</MokaText>
+						<CopyButton Text="@snippet.Command" Label="Copy command" />
+					</MokaFlexbox>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Applies to" Field="snippet => CommandSnippetSearch.ScopeName(snippet.Scope)">
+				<CellTemplate Context="snippet">
+					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xxs">
+						<MokaTag Text="@CommandSnippetSearch.ScopeName(snippet.Scope)" Size="MokaSize.Xs" Color="@ScopeColor(snippet.Scope)" />
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@TextStyles.TruncateBox" title="@ScopeDetail(snippet)">
+							@ScopeDetail(snippet)
+						</MokaText>
+					</MokaFlexbox>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="On pick" Field="snippet => snippet.RunImmediately">
+				<CellTemplate Context="snippet">
+					<MokaTag Text="@(snippet.RunImmediately ? "Runs" : "Types")"
+							 Size="MokaSize.Xs"
+							 Icon="@(snippet.RunImmediately ? MokatermIcons.Connect : MokatermIcons.Keyboard)"
+							 Color="@(snippet.RunImmediately ? MokaColor.Warning : MokaColor.Surface)" />
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Used" Field="snippet => snippet.UseCount">
+				<CellTemplate Context="snippet">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono title="@UsedTitle(snippet)">@UsedText(snippet)</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+		</ChildContent>
+		<RowActions Context="snippet">
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Edit"
+						OnClick="() => Edit(snippet)"
+						title="Edit"
+						aria-label="@($"Edit {snippet.Name}")" />
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Xs"
+						Color="MokaColor.Error"
+						StartIcon="MokaIcons.Action.Delete"
+						OnClick="() => DeleteAsync(snippet)"
+						title="Delete"
+						aria-label="@($"Delete {snippet.Name}")" />
+		</RowActions>
+		<EmptyContent>
+			@if (IsLoaded && _query.Trim().Length > 0)
+			{
+				<MokaEmptyState Icon="MokaIcons.Action.Search"
+								Title="Nothing matches the filter"
+								Description="@($"No saved command contains \"{_query.Trim()}\".")" />
+			}
+			else if (IsLoaded)
+			{
+				<MokaEmptyState Icon="MokatermIcons.Command"
+								Title="No saved commands"
+								Description="Hover a command in a terminal and use the save button, or add one here.">
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" OnClick="AddCommand">
+						New command
+					</MokaButton>
+				</MokaEmptyState>
+			}
+		</EmptyContent>
+	</MokaTable>
+</VaultListFrame>
+
+<CommandSnippetEditorDialog @bind-Open="_editorOpen"
+							Snippet="_editing"
+							HostLabel="@_editingHostLabel"
+							ConnectionLabel="@_editingConnectionLabel" />

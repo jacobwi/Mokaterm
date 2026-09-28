@@ -1,0 +1,18 @@
+.settings-page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxl);
+	max-width: 960px;
+	padding-bottom: var(--moka-spacing-xl);
+}
+
+.settings-page__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-xs);
+	/* Sits with the page header above it instead of a section gap away from it. */
+	margin-top: calc(0px - var(--moka-spacing-lg));
+	margin-bottom: calc(0px - var(--moka-spacing-lg));
+}

@@ -1,0 +1,39 @@
+<MokaAppBar Dense Bordered Elevated="false" Style="height:40px;flex-shrink:0">
+	<StartContent>
+		<IconAction Icon="MokatermIcons.PanelLeft"
+					Title="Connections panel"
+					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.ToggleConnections)"
+					Active="@(!Shell.ConnectionsPanelCollapsed)"
+					TooltipPosition="MokaTooltipPosition.Right"
+					OnClick="Shell.ToggleConnectionsPanel" />
+		<MokaText Element="span" Mono Weight="MokaFontWeight.Semibold" Size="MokaSize.Md" Style="white-space:nowrap">
+			<MokaText Element="span" Mono Color="MokaColor.Primary">&gt;_</MokaText> mokaterm
+		</MokaText>
+	</StartContent>
+	<ChildContent>
+		<QuickConnectBox />
+	</ChildContent>
+	<EndContent>
+		<IconAction Icon="MokatermIcons.Command"
+					Title="Command palette"
+					Shortcut="Ctrl+K"
+					OnClick="Palette.Open" />
+		<MokaBadge Content="@_activeTransfers.ToString(CultureInfo.CurrentCulture)" Visible="@(_activeTransfers > 0)">
+			<IconAction Icon="MokatermIcons.Transfers"
+						Title="Transfers"
+						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.ToggleTransfers)"
+						Active="@(!Shell.TransfersPanelCollapsed)"
+						OnClick="Shell.ToggleTransfersPanel" />
+		</MokaBadge>
+		<IconAction Icon="MokatermIcons.Lock"
+					Title="Lock vault"
+					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.LockVault)"
+					OnClick="LockVault" />
+		<IconAction Icon="MokaIcons.Action.Settings"
+					Title="Settings"
+					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Settings)"
+					Active="Shell.SettingsOpen"
+					TooltipPosition="MokaTooltipPosition.Left"
+					OnClick="ToggleSettings" />
+	</EndContent>
+</MokaAppBar>

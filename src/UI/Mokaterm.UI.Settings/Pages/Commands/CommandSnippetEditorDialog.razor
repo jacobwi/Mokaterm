@@ -1,0 +1,67 @@
+@using Mokaterm.Abstractions.Commands
+@inherits DraftDialogBase
+
+<MokaDialog Open="Open"
+			OpenChanged="OnOpenChangedAsync"
+			Title="@DialogTitle"
+			DialogSize="MokaDialogSize.Medium"
+			CloseOnBackdropClick="false"
+			CloseOnEscape="!IsBusy"
+			ShowCloseButton="!IsBusy">
+	<ChildContent>
+		<form id="@FormId" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+				<MokaTextField Label="Command"
+							   @bind-Value="_command"
+							   Required
+							   ErrorText="@_commandError"
+							   Disabled="_saving"
+							   Placeholder="systemctl status nginx"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus="true" />
+				<MokaTextField Label="Name"
+							   @bind-Value="_name"
+							   Disabled="_saving"
+							   HelperText="Shown in the picker. Left blank, the command names itself."
+							   Placeholder="@CommandSnippetName.Derive(_command)"
+							   autocomplete="off" />
+				<MokaTagInput Label="Tags"
+							  @bind-Values="_tags"
+							  Placeholder="Type a tag and press Enter"
+							  HelperText="Searched along with the name and the command."
+							  Disabled="_saving" />
+
+				<div>
+					<MokaFieldWrapper Label="Where it applies" HelperText="@ScopeHelp">
+						<MokaSegmentedControl AriaLabel="Where it applies" Value="@_scope.ToString()" ValueChanged="OnScopeChanged" Size="MokaSize.Sm" FullWidth>
+							<MokaSegment Value="@nameof(CommandSnippetScope.Connection)" Text="This login" Disabled="@(_saving || ConnectionLabel is null)" />
+							<MokaSegment Value="@nameof(CommandSnippetScope.Host)" Text="This machine" Disabled="@(_saving || HostLabel is null)" />
+							<MokaSegment Value="@nameof(CommandSnippetScope.Global)" Text="Everywhere" Disabled="_saving" />
+						</MokaSegmentedControl>
+					</MokaFieldWrapper>
+				</div>
+
+				<MokaRadioGroup TValue="bool" Value="_run" ValueChanged="OnRunChanged" Label="When you pick it">
+					<MokaRadioItem TValue="bool" Value="false" Label="Type it at the prompt" Disabled="_saving" />
+					<MokaRadioItem TValue="bool" Value="true" Label="Run it right away" Disabled="_saving" />
+				</MokaRadioGroup>
+				@if (_run)
+				{
+					<MokaCallout Type="MokaCalloutType.Warning" Title="This command runs on its own">
+						Picking it sends the line break too, so it runs without another look. Keep it off for anything that deletes or restarts.
+					</MokaCallout>
+				}
+
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+			</MokaFlexbox>
+		</form>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="CloseAsync">Cancel</MokaButton>
+		<MokaButton Type="submit" form="@FormId" StartIcon="MokaIcons.Action.Save" Loading="_saving" data-primary="true">Save</MokaButton>
+	</Actions>
+</MokaDialog>

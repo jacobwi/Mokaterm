@@ -1,0 +1,121 @@
+/*
+	Reconnect dialog. Blazor adds components-reconnect-show while it reconnects, -retrying between attempts, -failed
+	when it gave up, -rejected when the server dropped the circuit, and in .NET 10 -paused and -resume-failed. The theme
+	tokens may not exist yet if the first connection fails, so every token has a fallback.
+*/
+.mokaterm-reconnect {
+	display: none;
+}
+
+.mokaterm-reconnect.components-reconnect-show,
+.mokaterm-reconnect.components-reconnect-retrying,
+.mokaterm-reconnect.components-reconnect-failed,
+.mokaterm-reconnect.components-reconnect-rejected,
+.mokaterm-reconnect.components-reconnect-paused,
+.mokaterm-reconnect.components-reconnect-resume-failed {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	background: rgba(6, 6, 8, 0.85);
+	backdrop-filter: blur(8px);
+}
+
+.mokaterm-reconnect-card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	width: min(380px, 100%);
+	padding: 20px;
+	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
+	border-radius: 12px;
+	background: var(--moka-color-surface, #0c0c10);
+	box-shadow: 0 0 32px var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
+	color: var(--moka-color-on-surface, #e8e8ec);
+	font-family: var(--moka-font-family, 'Inter', 'Segoe UI', sans-serif);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.mokaterm-reconnect-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--moka-color-on-surface-tertiary, #6a6a74);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mokaterm-reconnect-pulse {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #ffab40;
+	box-shadow: 0 0 8px #ffab40;
+	animation: moka-boot-pulse 1.4s ease-in-out infinite;
+}
+
+.components-reconnect-failed .mokaterm-reconnect-pulse,
+.components-reconnect-rejected .mokaterm-reconnect-pulse,
+.components-reconnect-resume-failed .mokaterm-reconnect-pulse {
+	background: #ef5350;
+	box-shadow: 0 0 8px #ef5350;
+	animation: none;
+}
+
+.mokaterm-reconnect-message,
+.mokaterm-reconnect-actions {
+	display: none;
+	margin: 0;
+}
+
+.components-reconnect-show:not(.components-reconnect-retrying) .mokaterm-reconnect-message--show,
+.components-reconnect-retrying .mokaterm-reconnect-message--retrying,
+.components-reconnect-failed .mokaterm-reconnect-message--failed,
+.components-reconnect-paused .mokaterm-reconnect-message--failed,
+.components-reconnect-resume-failed .mokaterm-reconnect-message--failed,
+.components-reconnect-rejected .mokaterm-reconnect-message--rejected {
+	display: block;
+}
+
+.components-reconnect-failed .mokaterm-reconnect-actions,
+.components-reconnect-paused .mokaterm-reconnect-actions,
+.components-reconnect-resume-failed .mokaterm-reconnect-actions,
+.components-reconnect-rejected .mokaterm-reconnect-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.components-reconnect-rejected [data-reconnect-action="retry"] {
+	display: none;
+}
+
+.mokaterm-reconnect-button {
+	padding: 6px 12px;
+	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
+	border-radius: 8px;
+	background: transparent;
+	color: var(--moka-color-primary, #ef5350);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background 0.12s ease;
+}
+
+.mokaterm-reconnect-button:hover {
+	background: var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
+}
+
+.mokaterm-reconnect-button:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow-md, rgba(239, 83, 80, 0.15));
+}

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		Shared UI building blocks for the shell, the terminal and file browser libraries, and protocol modules:
+		icons, UI contribution descriptors, editor base classes, the settings fields and rows every settings page is
+		built from, JS interop helpers and platform UI contracts.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.UI.Common</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.UI.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+		<PackageReference Include="Moka.Red" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Mokaterm.Abstractions\Mokaterm.Abstractions.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,32 @@
+<MokaStatusBar Style="position:static;flex-shrink:0">
+	<StartContent>
+		<MokaStatusBarItem Tooltip="Open sessions">
+			<MokaText Element="span" Mono Size="MokaSize.Xs">@_sessionCount</MokaText>
+			<span>@(_sessionCount == 1 ? "SESSION" : "SESSIONS")</span>
+		</MokaStatusBarItem>
+
+		@if (_active is { } active)
+		{
+			<MokaStatusBarItem Tooltip="Active session">
+				<MokaText Element="span" Mono Size="MokaSize.Xs" Style="margin-inline-end:var(--moka-spacing-xs)">@active.Protocol.DisplayName.ToUpperInvariant()</MokaText>
+				<SessionLabel Session="active" ShowPort Mono Tooltip="@EndpointFormat.Format(active)" />
+			</MokaStatusBarItem>
+
+			@if (HostEnvironmentDisplay.Tag(active.Host.Environment) is { } environment)
+			{
+				<MokaStatusBarItem Tooltip="Host environment">
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Color="@HostEnvironmentDisplay.Color(active.Host.Environment)">
+						@environment
+					</MokaText>
+				</MokaStatusBarItem>
+			}
+		}
+	</StartContent>
+	<EndContent>
+		<MokaStatusBarItem Icon="MokatermIcons.Transfers" Text="@TransfersText" Tooltip="Transfers panel" OnClick="Shell.ToggleTransfersPanel" />
+		<MokaStatusBarItem Icon="MokatermIcons.Unlock" Text="@VaultText" Tooltip="Lock vault" OnClick="LockVault" />
+		<MokaStatusBarItem Tooltip="@Environment.PlatformName">
+			<MokaText Element="span" Mono Size="MokaSize.Xs">v@(Environment.AppVersion)</MokaText>
+		</MokaStatusBarItem>
+	</EndContent>
+</MokaStatusBar>

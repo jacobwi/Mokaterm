@@ -1,0 +1,10 @@
+.number-setting {
+	display: flex;
+	align-items: baseline;
+	gap: var(--moka-spacing-xs);
+}
+
+/* An error wider than the input widens the field; right-aligning keeps the input beside its unit. */
+.number-setting ::deep .moka-field {
+	align-items: flex-end;
+}

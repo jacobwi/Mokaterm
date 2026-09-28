@@ -1,0 +1,83 @@
+@using Mokaterm.Abstractions.Security
+@inherits VaultListPageBase<KnownHost>
+
+<VaultListFrame Title="Known hosts"
+				LockedDescription="Unlock the vault to see and manage trusted servers."
+				IsUnlocked="IsUnlocked"
+				LoadError="@LoadError">
+	<MokaTable TItem="KnownHost"
+			   Items="Items"
+			   ItemKey="IdentityKey"
+			   Title="Trusted servers"
+			   Searchable
+			   SearchPlaceholder="Filter by host, algorithm or fingerprint"
+			   ShowPagination="false"
+			   SortColumn="Host"
+			   SortDirection="MokaSortDirection.Ascending"
+			   ActionsColumnTitle=""
+			   ActionsColumnWidth="40px">
+		<ChildContent>
+			<MokaColumn Title="Host" Field="host => Endpoint(host)">
+				<CellTemplate Context="host">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono>@Endpoint(host)</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Kind" Field="host => KindText(host.Kind)">
+				<CellTemplate Context="host">
+					<MokaTag Text="@KindText(host.Kind)" Icon="KindIcon(host.Kind)" Size="MokaSize.Xs" />
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Algorithm" Field="host => host.Algorithm">
+				<CellTemplate Context="host">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono>@host.Algorithm</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Fingerprint" Field="host => host.Fingerprint" Sortable="false">
+				<CellTemplate Context="host">
+					<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+						<MokaText Element="span"
+								  Size="MokaSize.Xs"
+								  Mono
+								  Truncate
+								  Style="@TextStyles.TruncateBox"
+								  title="@host.Fingerprint">@host.Fingerprint</MokaText>
+						<CopyButton Text="@host.Fingerprint" Label="Copy fingerprint" />
+					</MokaFlexbox>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Added" Field="host => host.AddedAt">
+				<CellTemplate Context="host">
+					<MokaText Element="span"
+							  Size="MokaSize.Xs"
+							  Mono
+							  title="@DisplayFormat.Timestamp(host.AddedAt)">@DisplayFormat.Relative(host.AddedAt, Time.GetUtcNow())</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn Title="Last seen" Field="host => host.LastSeenAt">
+				<CellTemplate Context="host">
+					<MokaText Element="span"
+							  Size="MokaSize.Xs"
+							  Mono
+							  title="@DisplayFormat.Timestamp(host.LastSeenAt)">@LastSeenText(host)</MokaText>
+				</CellTemplate>
+			</MokaColumn>
+		</ChildContent>
+		<RowActions Context="host">
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Xs"
+						Color="MokaColor.Error"
+						StartIcon="MokaIcons.Action.Delete"
+						OnClick="() => RemoveAsync(host)"
+						title="Remove"
+						aria-label="@($"Stop trusting {Endpoint(host)}")" />
+		</RowActions>
+		<EmptyContent>
+			@if (IsLoaded)
+			{
+				<MokaEmptyState Icon="MokatermIcons.ShieldCheck"
+								Title="No known hosts"
+								Description="Servers appear here after you trust their host key or certificate while connecting." />
+			}
+		</EmptyContent>
+	</MokaTable>
+</VaultListFrame>

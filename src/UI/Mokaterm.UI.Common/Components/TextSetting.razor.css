@@ -1,0 +1,12 @@
+.text-setting {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	width: 100%;
+}
+
+.text-setting__suggestions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xxs);
+}

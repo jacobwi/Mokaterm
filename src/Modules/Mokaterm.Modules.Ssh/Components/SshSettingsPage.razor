@@ -1,0 +1,82 @@
+@inherits SettingsSectionBase<SshSettings>
+
+@{
+	SshSettings settings = Settings;
+}
+
+<SettingsPage Title="SSH" OnReset="ResetAsync">
+	<SettingsSection Title="Connection">
+		<SettingsRow Label="Keepalive interval"
+					 Description="Keeps idle connections open through NAT and firewalls. 0 turns keepalives off.">
+			<NumberSetting TValue="int"
+						   Value="settings.KeepAliveSeconds"
+						   ValueChanged="value => UpdateAsync(s => s with { KeepAliveSeconds = value })"
+						   Min="0"
+						   Max="SshSettings.MaxKeepAliveSeconds"
+						   Suffix="s"
+						   AriaLabel="Keepalive interval in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Connect timeout" Description="How long each step of connecting may wait for the server.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => UpdateAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="SshSettings.MinConnectTimeoutSeconds"
+						   Max="SshSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Login attempts"
+					 Description="Tries before giving up when the server rejects a password or key, counting the first.">
+			<NumberSetting TValue="int"
+						   Value="settings.AuthenticationAttempts"
+						   ValueChanged="value => UpdateAsync(s => s with { AuthenticationAttempts = value })"
+						   Min="SshSettings.MinAuthenticationAttempts"
+						   Max="SshSettings.MaxAuthenticationAttempts"
+						   AriaLabel="Login attempts" />
+		</SettingsRow>
+		<SettingsRow Label="Prompt timeout"
+					 Description="How long a server question, such as a one-time code, may wait for an answer.">
+			<NumberSetting TValue="int"
+						   Value="settings.PromptTimeoutSeconds"
+						   ValueChanged="value => UpdateAsync(s => s with { PromptTimeoutSeconds = value })"
+						   Min="SshSettings.MinPromptTimeoutSeconds"
+						   Max="SshSettings.MaxPromptTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Prompt timeout in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="SSH agent">
+		<SettingsRow Label="Agent endpoint" Description="@AgentHelp" ControlWidth="340px">
+			<TextSetting Value="@settings.AgentEndpoint"
+						 ValueChanged="value => UpdateAsync(s => s with { AgentEndpoint = value })"
+						 AllowEmpty
+						 Validate="ValidateAgentEndpoint"
+						 Placeholder="@AgentPlaceholder"
+						 AriaLabel="Agent endpoint" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Run as root">
+		<SettingsRow Label="sudo command"
+					 Description="Runs file operations as root. The password is sent on stdin, never on the command line."
+					 ControlWidth="240px">
+			<TextSetting Value="@settings.SudoCommand"
+						 ValueChanged="value => UpdateAsync(s => s with { SudoCommand = value })"
+						 Validate="ValidateSudoCommand"
+						 EmptyError="@SudoCommandError"
+						 Placeholder="sudo"
+						 AriaLabel="sudo command" />
+		</SettingsRow>
+		<SettingsRow Label="Upload staging directory"
+					 Description="Root uploads land here first as a private file, then move into place."
+					 ControlWidth="240px">
+			<TextSetting Value="@settings.StagingDirectory"
+						 ValueChanged="value => UpdateAsync(s => s with { StagingDirectory = value })"
+						 Validate="ValidateStagingDirectory"
+						 EmptyError="@StagingDirectoryError"
+						 Placeholder="/tmp"
+						 AriaLabel="Upload staging directory" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

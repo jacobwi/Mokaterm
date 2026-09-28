@@ -1,0 +1,23 @@
+@using Moka.Red.Forms.TextField
+@using Moka.Red.Primitives.Typography
+@typeparam TValue where TValue : struct, System.Numerics.INumber<TValue>
+@inherits DraftSettingBase<TValue>
+
+<div class="number-setting">
+	<MokaTextField Value="@Text"
+				   ValueChanged="OnTextChangedAsync"
+				   OnBlur="OnBlur"
+				   Label="@Label"
+				   ErrorText="@Error"
+				   Placeholder="@Placeholder"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   Style="@(WidthStyle ?? DefaultWidthStyle)"
+				   inputmode="@InputMode"
+				   autocomplete="off"
+				   aria-label="@AriaLabel" />
+	@if (Suffix is not null)
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@Suffix</MokaText>
+	}
+</div>

@@ -1,0 +1,137 @@
+@namespace Mokaterm.Modules.Rdp.Components
+@inherits SessionViewBase
+
+<div class="mt-rdp" @ref="_root">
+	<div class="mt-rdp-toolbar">
+		<MokaSegmentedControl AriaLabel="Scaling" Value="@_scaling" ValueChanged="OnScalingChangedAsync" Size="MokaSize.Sm">
+			<MokaSegment Value="fit" Text="FIT" title="Scale the whole desktop into the view" />
+			<MokaSegment Value="actual" Text="1:1" title="One remote pixel per pixel, with scrollbars" />
+			<MokaSegment Value="remote" Text="SERVER" title="Ask the server to resize its desktop to this view" />
+		</MokaSegmentedControl>
+
+		<MokaButton Variant="@ToggleVariant(_viewOnly)"
+					Color="@ToggleColor(_viewOnly)"
+					Size="MokaSize.Sm"
+					StartIcon="@(_viewOnly ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
+					Disabled="@(!IsRunning)"
+					OnClick="ToggleViewOnlyAsync"
+					title="@(_viewOnly ? "View only: keys and mouse stay here" : "Keys and mouse go to the session")"
+					aria-label="View only"
+					aria-pressed="@Pressed(_viewOnly)" />
+
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					Class="mt-rdp-wide"
+					StartIcon="MokatermIcons.Keyboard"
+					Disabled="@(!IsRunning || _viewOnly)"
+					OnClick="ShowKeysMenu"
+					title="Send a key combination this machine would swallow"
+					aria-label="Send keys" />
+
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					Class="mt-rdp-wide"
+					StartIcon="MokaIcons.Action.Download"
+					Disabled="@(!IsRunning)"
+					OnClick="SaveScreenshotAsync"
+					title="Save a picture of the desktop"
+					aria-label="Save a picture of the desktop" />
+
+		<MokaButton Variant="@ToggleVariant(_fullscreen)"
+					Color="@ToggleColor(_fullscreen)"
+					Size="MokaSize.Sm"
+					Class="mt-rdp-wide"
+					StartIcon="MokatermIcons.Maximize"
+					Disabled="@(!IsRunning)"
+					OnClick="ToggleFullscreenAsync"
+					title="Full screen"
+					aria-label="Full screen"
+					aria-pressed="@Pressed(_fullscreen)" />
+
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					Class="mt-rdp-compact"
+					StartIcon="MokaIcons.Navigation.MoreHorizontal"
+					Disabled="@(!IsRunning)"
+					OnClick="ShowActionsMenu"
+					title="Keys, screenshot and full screen"
+					aria-label="More actions"
+					aria-haspopup="menu" />
+
+		<span class="mt-rdp-spacer"></span>
+
+		@if (_info is not null)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mt-rdp-meta mt-rdp-name" title="@Session.Title">@Session.Title</MokaText>
+			@if (ScreenSizeText.Length > 0)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-rdp-meta mt-rdp-size">@ScreenSizeText</MokaText>
+			}
+
+			@if (_info.IdentityVerified)
+			{
+				<MokaTag Text="TLS" Icon="MokatermIcons.ShieldCheck" Color="MokaColor.Success" Size="MokaSize.Xs" title="@SecurityText" />
+			}
+			else
+			{
+				<MokaTag Text="TLS, UNVERIFIED"
+						 Icon="MokatermIcons.Shield"
+						 Color="MokaColor.Warning"
+						 Size="MokaSize.Xs"
+						 title="@SecurityText" />
+			}
+		}
+	</div>
+
+	<div class="mt-rdp-body">
+		@* rdp.js builds the canvas inside this element, so Blazor must never give it child content. *@
+		<div class="mt-rdp-screen" @ref="_screen"></div>
+
+		@if (IsRunning && _viewOnly)
+		{
+			@* The desktop looks live while it ignores every key, so it says so. *@
+			<div class="mt-rdp-badge">
+				<MokaTag Text="VIEW ONLY" Icon="MokaIcons.Toggle.EyeOff" Color="MokaColor.Warning" Size="MokaSize.Xs" />
+			</div>
+		}
+
+		@if (_state == ScreenState.Starting)
+		{
+			<div class="mt-rdp-overlay">
+				<MokaSpinner Label="Opening the remote desktop" />
+			</div>
+		}
+		else if (_state == ScreenState.Failed)
+		{
+			<div class="mt-rdp-overlay">
+				<div class="mt-rdp-card">
+					<MokaAlert Severity="MokaToastSeverity.Error" Title="The remote desktop stopped">
+						@(_error ?? "The desktop could not be shown.")
+					</MokaAlert>
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
+						<MokaButton Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="RetryAsync">Try again</MokaButton>
+					</MokaFlexbox>
+				</div>
+			</div>
+		}
+		else if (_state == ScreenState.Ended)
+		{
+			<div class="mt-rdp-overlay">
+				<MokaEmptyState Icon="RdpIcons.RemoteDesktop"
+								Title="The desktop was closed"
+								Description="The session ended it. Reconnect the session to see it again." />
+			</div>
+		}
+		else if (_state == ScreenState.Idle)
+		{
+			<div class="mt-rdp-overlay">
+				<MokaEmptyState Icon="RdpIcons.RemoteDesktop"
+								Title="Not connected"
+								Description="@IdleDescription" />
+			</div>
+		}
+	</div>
+</div>

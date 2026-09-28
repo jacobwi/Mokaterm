@@ -1,0 +1,68 @@
+@using Moka.Red.Core.Layout
+@using Moka.Red.Forms.Common
+@using Moka.Red.Forms.PasswordField
+@using Moka.Red.Forms.TextField
+@using Moka.Red.Layout.Flexbox
+@using Moka.Red.Layout.Grid
+@using Moka.Red.Primitives.SegmentedControl
+@using Mokaterm.Abstractions.Protocols
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaFieldWrapper Label="Proxy" HelperText="@KindHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Proxy" Value="@Proxy.Kind.ToString()" ValueChanged="OnKindChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(ProxyKind.None)" Text="Direct" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(ProxyKind.Http)" Text="HTTP CONNECT" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(ProxyKind.Socks4)" Text="SOCKS4" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(ProxyKind.Socks5)" Text="SOCKS5" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	@if (IsOn)
+	{
+		<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+			<MokaTextField Label="Proxy address"
+						   Required
+						   Value="@(Proxy.Host ?? "")"
+						   ValueChanged="OnHostChangedAsync"
+						   ErrorText="@HostError"
+						   Placeholder="proxy.example.com"
+						   HelperText="The proxy's own address, not the server's."
+						   Disabled="Disabled"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+
+			<MokaTextField Label="Proxy port"
+						   InputType="number"
+						   Value="@PortText"
+						   ValueChanged="OnPortChangedAsync"
+						   ErrorText="@_portError"
+						   Placeholder="@PortPlaceholder"
+						   HelperText="Empty uses the usual port for this kind of proxy."
+						   Disabled="Disabled"
+						   Size="MokaSize.Sm"
+						   autocomplete="off" />
+
+			<MokaTextField Label="Proxy user"
+						   Value="@(Proxy.User ?? "")"
+						   ValueChanged="OnUserChangedAsync"
+						   ErrorText="@UserError"
+						   Placeholder="Empty for a proxy that needs no login"
+						   HelperText="The proxy's own user, not the server's."
+						   Disabled="Disabled"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+
+			@* Typing here when the login keeps no credential would be dropped on save, so the field is closed instead. *@
+			<MokaPasswordField Label="Proxy password"
+							   Value="@ProxyPassword"
+							   ValueChanged="OnPasswordChangedAsync"
+							   Placeholder="@(HasProxyPassword ? "Saved" : "")"
+							   HelperText="@PasswordHelp"
+							   Disabled="@(Disabled || !CanSaveProxyPassword)"
+							   Size="MokaSize.Sm"
+							   autocomplete="new-password" />
+		</MokaGrid>
+	}
+</MokaFlexbox>

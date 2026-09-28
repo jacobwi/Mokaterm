@@ -1,0 +1,127 @@
+@using Mokaterm.Abstractions.Terminal
+@inherits SettingsSectionBase<SerialSettings>
+
+@{
+	SerialSettings settings = Settings;
+}
+
+<SettingsPage Title="Serial" OnReset="ResetAsync">
+	<SettingsSection Title="The line a new connection starts from"
+					 Description="Changing this changes new connections only: every saved one carries its own line, in its own options.">
+		<SettingsRow Label="Baud rate" Description="Bits per second a new connection starts at.">
+			<NumberSetting TValue="int"
+						   Value="settings.BaudRate"
+						   ValueChanged="value => SaveAsync(s => s with { BaudRate = value })"
+						   Min="SerialLineSettings.MinBaudRate"
+						   Max="SerialLineSettings.MaxBaudRate"
+						   Width="104px"
+						   AriaLabel="Baud rate" />
+		</SettingsRow>
+		<SettingsRow Label="Data bits">
+			<MokaSegmentedControl AriaLabel="Data bits" Size="MokaSize.Sm" Value="@DataBitsValue" ValueChanged="OnDataBitsChangedAsync">
+				<MokaSegment Value="5" Text="5" />
+				<MokaSegment Value="6" Text="6" />
+				<MokaSegment Value="7" Text="7" />
+				<MokaSegment Value="8" Text="8" />
+			</MokaSegmentedControl>
+		</SettingsRow>
+		<SettingsRow Label="Parity" Stacked>
+			<EnumSegmentedControl TEnum="SerialParity"
+								  Value="settings.Parity"
+								  ValueChanged="value => SaveAsync(s => s with { Parity = value })"
+								  Options="ParityOptions"
+								  AriaLabel="Parity" />
+		</SettingsRow>
+		<SettingsRow Label="Stop bits">
+			<EnumSegmentedControl TEnum="SerialStopBits"
+								  Value="settings.StopBits"
+								  ValueChanged="value => SaveAsync(s => s with { StopBits = value })"
+								  Options="StopBitsOptions"
+								  AriaLabel="Stop bits" />
+		</SettingsRow>
+		<SettingsRow Label="Flow control" Description="@FrameDescription" Stacked>
+			<EnumSegmentedControl TEnum="SerialFlowControl"
+								  Value="settings.FlowControl"
+								  ValueChanged="value => SaveAsync(s => s with { FlowControl = value })"
+								  Options="FlowControlOptions"
+								  AriaLabel="Flow control" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="What a new connection sends">
+		<SettingsRow Label="Enter sends">
+			<EnumSegmentedControl TEnum="SerialLineEnding"
+								  Value="settings.LineEnding"
+								  ValueChanged="value => SaveAsync(s => s with { LineEnding = value })"
+								  Options="LineEndingOptions"
+								  AriaLabel="Enter sends" />
+		</SettingsRow>
+		<SettingsRow Label="Character set" Description="utf-8, or a code page such as ibm437 for older hardware.">
+			<CharacterSetSetting Value="@settings.EncodingName"
+								 ValueChanged="value => SaveAsync(s => s with { EncodingName = value })"
+								 Default="@SerialEncodings.Default"
+								 TryGet="TerminalEncodings.TryGet"
+								 Size="MokaSize.Sm"
+								 Width="180px"
+								 AriaLabel="Character set" />
+		</SettingsRow>
+		<SettingsRow Label="Show what is typed"
+					 Description="A serial line has no echo of its own: a device either sends typed characters back or it does not.">
+			<MokaSwitch Value="settings.LocalEcho"
+						ValueChanged="value => SaveAsync(s => s with { LocalEcho = value })"
+						aria-label="Show what is typed" />
+		</SettingsRow>
+		<SettingsRow Label="Assert DTR" Description="Most USB adapters need it. It resets boards that wire DTR to reset.">
+			<MokaSwitch Value="settings.Dtr"
+						ValueChanged="value => SaveAsync(s => s with { Dtr = value })"
+						aria-label="Assert DTR" />
+		</SettingsRow>
+		<SettingsRow Label="Assert RTS" Description="Ignored when RTS/CTS flow control drives the pin.">
+			<MokaSwitch Value="settings.Rts"
+						ValueChanged="value => SaveAsync(s => s with { Rts = value })"
+						aria-label="Assert RTS" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Every port"
+					 Description="Serial ports belong to the machine this app runs on, so these sessions only exist in the desktop app. The web host does not offer the protocol at all: its ports would be the server's.">
+		<SettingsRow Label="Write timeout" Description="How long a write waits for the device to take the bytes.">
+			<NumberSetting TValue="int"
+						   Value="settings.WriteTimeoutMilliseconds"
+						   ValueChanged="value => SaveAsync(s => s with { WriteTimeoutMilliseconds = value })"
+						   Min="SerialSettings.MinWriteTimeoutMilliseconds"
+						   Max="SerialSettings.MaxWriteTimeoutMilliseconds"
+						   Suffix="ms"
+						   AriaLabel="Write timeout in milliseconds" />
+		</SettingsRow>
+		<SettingsRow Label="Read timeout"
+					 Description="How long one read waits. 0 waits forever, which is what a console wants. A read that times out is silence, not an error.">
+			<NumberSetting TValue="int"
+						   Value="settings.ReadTimeoutMilliseconds"
+						   ValueChanged="value => SaveAsync(s => s with { ReadTimeoutMilliseconds = value })"
+						   Min="0"
+						   Max="SerialSettings.MaxReadTimeoutMilliseconds"
+						   Suffix="ms"
+						   AriaLabel="Read timeout in milliseconds" />
+		</SettingsRow>
+		<SettingsRow Label="Check the device every"
+					 Description="How often the control pins are read, which is what notices an adapter being unplugged. 0 turns it off.">
+			<NumberSetting TValue="int"
+						   Value="settings.DeviceCheckSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { DeviceCheckSeconds = value })"
+						   Min="0"
+						   Max="SerialSettings.MaxDeviceCheckSeconds"
+						   Suffix="s"
+						   AriaLabel="Check the device every seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Break length" Description="How long the break sent from a session holds the line low.">
+			<NumberSetting TValue="int"
+						   Value="settings.BreakMilliseconds"
+						   ValueChanged="value => SaveAsync(s => s with { BreakMilliseconds = value })"
+						   Min="SerialSettings.MinBreakMilliseconds"
+						   Max="SerialSettings.MaxBreakMilliseconds"
+						   Suffix="ms"
+						   AriaLabel="Break length in milliseconds" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

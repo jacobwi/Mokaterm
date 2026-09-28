@@ -1,0 +1,18 @@
+.mt-quick-connect {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	width: 100%;
+	max-width: 520px;
+	margin: 0 auto;
+}
+
+/* The protocol picker keeps a fixed width; the target field takes the rest. */
+.mt-quick-connect ::deep .moka-field:first-child:not(:last-child) {
+	flex: 0 0 96px;
+}
+
+.mt-quick-connect ::deep .moka-field:last-child {
+	flex: 1;
+	min-width: 0;
+}

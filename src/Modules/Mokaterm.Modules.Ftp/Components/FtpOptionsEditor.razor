@@ -1,0 +1,46 @@
+@using Mokaterm.Modules.Ftp.Connection
+@inherits ConnectionOptionsEditorBase<FtpConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaFieldWrapper Label="Encryption" HelperText="@EncryptionHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Encryption" Value="@Current.Encryption.ToString()" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(FtpEncryption.None)" Text="None" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(FtpEncryption.Explicit)" Text="Explicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(FtpEncryption.Implicit)" Text="Implicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaFieldWrapper Label="Data connection" HelperText="@DataConnectionHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Data connection" Value="@Current.DataConnection.ToString()" ValueChanged="OnDataConnectionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(FtpDataConnectionMode.Passive)" Text="Passive" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(FtpDataConnectionMode.ExtendedPassive)" Text="Extended passive" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(FtpDataConnectionMode.Active)" Text="Active" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<CharacterSetSetting Value="@Current.EncodingName"
+							 ValueChanged="OnEncodingChangedAsync"
+							 Default="@FtpConnectionOptions.DefaultEncodingName"
+							 TryGet="FtpEncodings.TryGet"
+							 Label="Character set"
+							 HelperText="Used for commands and file names, for example utf-8, windows-1252 or shift_jis."
+							 Disabled="Disabled" />
+
+		<MokaTextField Label="Initial folder"
+					   Value="@(Current.InitialDirectory ?? "")"
+					   ValueChanged="OnInitialDirectoryChangedAsync"
+					   Placeholder="Login folder"
+					   HelperText="Where the file browser opens. Relative paths start at the login folder."
+					   Disabled="Disabled" />
+	</MokaGrid>
+
+	@* Data connections take the same route: FluentFTP opens each one with a clone of this client. *@
+	<ProxyFields Proxy="Current.Proxy"
+				 ProxyChanged="OnProxyChangedAsync"
+				 ProxyPassword="@ProxyPassword"
+				 ProxyPasswordChanged="ProxyPasswordChanged"
+				 HasProxyPassword="HasProxyPassword"
+				 CanSaveProxyPassword="CanSaveProxyPassword"
+				 Disabled="Disabled" />
+</MokaFlexbox>

@@ -1,0 +1,24 @@
+.theme-editor {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-lg);
+}
+
+.theme-editor__header {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	align-items: start;
+	gap: var(--moka-spacing-lg);
+}
+
+.theme-editor__group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.theme-editor__colors {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: var(--moka-spacing-sm) var(--moka-spacing-md);
+}

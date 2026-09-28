@@ -1,0 +1,23 @@
+@* Shows the head of the IUserInteraction queue. Rendered last in MokatermApp so its dialogs stack above everything. *@
+
+@switch (_request)
+{
+	case HostTrustRequest trust:
+		<HostTrustDialog @key="trust.Id" Prompt="trust.Prompt" OnDecision="decision => Service.Complete(trust, decision)" />
+		break;
+	case CredentialsRequest credentials:
+		<CredentialPromptDialog @key="credentials.Id" Prompt="credentials.Prompt" OnResult="result => Service.Complete(credentials, result)" />
+		break;
+	case SecretRequest secret:
+		<SecretPromptDialog @key="secret.Id" Prompt="secret.Prompt" OnResult="result => Service.Complete(secret, result)" />
+		break;
+	case KeyboardInteractiveRequest keyboard:
+		<KeyboardInteractiveDialog @key="keyboard.Id" Prompt="keyboard.Prompt" OnResult="answers => Service.Complete(keyboard, answers)" />
+		break;
+	case ConfirmRequest confirm:
+		<ConfirmPromptDialog @key="confirm.Id" Prompt="confirm.Prompt" OnResult="answer => Service.Complete(confirm, answer)" />
+		break;
+	case OverwriteRequest overwrite:
+		<OverwritePromptDialog @key="overwrite.Id" Prompt="overwrite.Prompt" OnDecision="decision => Service.Complete(overwrite, decision)" />
+		break;
+}

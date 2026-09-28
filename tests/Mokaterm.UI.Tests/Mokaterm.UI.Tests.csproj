@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		UI logic that can be tested without a browser: prompt parsing, searching, the snippets the shell builds, and
+		components rendered for real with Blazor's static HtmlRenderer.
+	-->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.Logging" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\UI\Mokaterm.UI\Mokaterm.UI.csproj" />
+	</ItemGroup>
+
+	<!-- StaticRender: Blazor's static renderer, which needs Components.Web and the logging package. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\Rendering\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+</Project>

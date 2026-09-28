@@ -1,0 +1,47 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<div class="ap" @onkeydown="OnKeyDownAsync" @onkeydown:stopPropagation="@ShowList">
+	<div class="ap-field">
+		<MokaTextField Label="@Label"
+					   Value="@Value"
+					   ValueChanged="OnInputAsync"
+					   Size="MokaSize.Sm"
+					   Placeholder="@Placeholder"
+					   ErrorText="@ErrorText"
+					   OnBlur="Close"
+					   spellcheck="false"
+					   autocomplete="off"
+					   role="combobox"
+					   aria-autocomplete="list"
+					   aria-expanded="@(ShowList ? "true" : "false")"
+					   aria-controls="@_listId"
+					   data-dialog-focus="@(Autofocus ? "true" : null)"
+					   @onclick="Toggle" />
+		@if (ShowList)
+		{
+			@* Keeping mousedown from moving focus stops the field's blur from closing the list before a click lands. *@
+			<div @ref="_listRef" class="ap-list" id="@_listId" role="listbox" @onmousedown:preventDefault="true">
+				@for (int index = 0; index < ShownCount; index++)
+				{
+					RemoteAccount account = _matches[index];
+					int position = index;
+					<div class="@OptionClass(position)"
+						 role="option"
+						 aria-selected="@(position == _highlight ? "true" : "false")"
+						 @onmousedown="() => PickAsync(account)">
+						<span class="ap-name">@account.Name</span>
+						<span class="ap-id">@IdLabel @account.Id</span>
+					</div>
+				}
+				@if (_matches.Count > ShownCount)
+				{
+					<div class="ap-more">@MoreText</div>
+				}
+			</div>
+		}
+	</div>
+	@if (HelperText is not null && ErrorText is null)
+	{
+		<MokaText Size="MokaSize.Xs" Style="@HelperStyle">@HelperText</MokaText>
+	}
+</div>

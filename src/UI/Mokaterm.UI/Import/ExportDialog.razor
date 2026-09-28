@@ -1,0 +1,68 @@
+@using Mokaterm.Abstractions.Import
+@inherits ShellEditorBase<ExportEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="Export saved hosts"
+				   DialogSize="MokaDialogSize.Medium"
+				   Busy="_busy"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			@* Enter saves the file, and the body itself takes the focus so it does: there is no field to put it in. *@
+			<PromptBody @ref="Body" AutofocusSelf="true">
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+
+				<MokaCallout Type="MokaCalloutType.Note" Title="Passwords stay here">
+					The file carries addresses, users, ports, folders, tags and protocol settings. Passwords, keys and
+					passphrases stay in this vault, so every login asks for its own again wherever the file is read.
+				</MokaCallout>
+
+				@if (_export is { } export)
+				{
+					<MokaList Bordered>
+						<MokaListItem Text="Hosts" SecondaryText="@HostsText(export)">
+							<EndContent>
+								<MokaText Element="span" Mono Size="MokaSize.Sm">@export.Hosts</MokaText>
+							</EndContent>
+						</MokaListItem>
+						<MokaListItem Text="Logins" SecondaryText="One per saved user and protocol">
+							<EndContent>
+								<MokaText Element="span" Mono Size="MokaSize.Sm">@export.Logins</MokaText>
+							</EndContent>
+						</MokaListItem>
+						<MokaListItem Text="Folders" SecondaryText="Rebuilt by name when the file is read back">
+							<EndContent>
+								<MokaText Element="span" Mono Size="MokaSize.Sm">@export.Folders</MokaText>
+							</EndContent>
+						</MokaListItem>
+					</MokaList>
+
+					<MokaText Element="p" Size="MokaSize.Xs" Style="@MutedStyle">
+						Saved as @export.FileName. Read it back with Import saved hosts, where it appears as Mokaterm export.
+					</MokaText>
+				}
+				else if (!_busy)
+				{
+					<MokaText Element="p" Size="MokaSize.Sm">Nothing is saved yet, so there is nothing to export.</MokaText>
+				}
+
+				@if (!CanSaveFiles)
+				{
+					<MokaText Element="p" Size="MokaSize.Xs" Style="@MutedStyle">
+						This host cannot save files.
+					</MokaText>
+				}
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_busy" OnClick="Close">Close</MokaButton>
+		<MokaButton data-primary="true" Loading="_busy" Disabled="@(_export is null || _export.Logins == 0 || !CanSaveFiles)" OnClick="SaveAsync">
+			Save file
+		</MokaButton>
+	</Actions>
+</ShellEditorDialog>

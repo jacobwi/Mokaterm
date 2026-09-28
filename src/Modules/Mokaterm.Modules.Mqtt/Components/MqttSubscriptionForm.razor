@@ -1,0 +1,35 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Sm">
+	<MokaTextField Label="Topic filter"
+				   Value="@_filter.Show(Subscription.TopicFilter)"
+				   ValueChanged="SetFilterAsync"
+				   ErrorText="@_filter.Error"
+				   Placeholder="@MqttTopicFilters.Everything"
+				   HelperText="@FilterHelp"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   spellcheck="false" />
+
+	<MokaFieldWrapper Label="Quality of service" HelperText="@QosHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Quality of service"
+							  Value="@Subscription.QualityOfService.ToString()"
+							  ValueChanged="SetQosAsync"
+							  Disabled="Disabled"
+							  Size="MokaSize.Sm"
+							  FullWidth>
+			<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="Disabled" title="At most once" />
+			<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="Disabled" title="At least once" />
+			<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="Disabled" title="Exactly once" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	@if (ShowSubscribeWithSession)
+	{
+		<MokaSwitch Label="Subscribe when the session opens"
+					Value="@Subscription.SubscribeWithSession"
+					ValueChanged="SetSubscribeWithSessionAsync"
+					HelperText="Off keeps the filter saved but sends nothing until the explorer subscribes."
+					Disabled="Disabled" />
+	}
+</MokaGrid>

@@ -1,0 +1,44 @@
+/* The parts run together as one address, so only the name is spaced off from it. */
+.mt-label {
+	display: inline-flex;
+	align-items: baseline;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.mt-label-mono {
+	font-family: var(--moka-font-family-mono);
+}
+
+.mt-label-name,
+.mt-label-user,
+.mt-label-host {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-label-name {
+	flex-shrink: 1;
+	margin-inline-end: 0.5em;
+	font-weight: var(--moka-font-weight-semibold);
+	color: var(--moka-color-on-surface);
+}
+
+/* The user reads as context for the machine next to it, so it gives way first when the space runs out. */
+.mt-label-user {
+	flex-shrink: 2;
+	min-width: 2ch;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-label-host {
+	flex-shrink: 1;
+	min-width: 3ch;
+}
+
+.mt-label-at,
+.mt-label-port {
+	flex-shrink: 0;
+	color: color-mix(in srgb, var(--moka-color-on-surface-variant) 60%, transparent);
+}

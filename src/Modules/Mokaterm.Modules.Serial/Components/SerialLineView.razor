@@ -1,0 +1,96 @@
+@namespace Mokaterm.Modules.Serial.Components
+@inherits SessionViewBase
+
+<div class="mt-serial">
+	@if (_status is not { } status)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Disconnect"
+						Title="The port is closed"
+						Description="The line settings and the control pins belong to an open serial session." />
+	}
+	else
+	{
+		<div class="mt-serial-head">
+			<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Mono>@status.PortName</MokaText>
+			<MokaTag Text="@status.Line.Frame" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+			<MokaTag Text="@FlowControlLabel(status.Line.FlowControl)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+			<span class="mt-serial-spacer"></span>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="@(_busy || !status.IsOpen)"
+						OnClick="RefreshAsync"
+						aria-label="Read the pins again" />
+		</div>
+
+		<div class="mt-serial-label">Input</div>
+		<div class="mt-serial-row">
+			<MokaText Element="span" Size="MokaSize.Xs" Mono>@InputSummary(status)</MokaText>
+		</div>
+
+		<div class="mt-serial-label">Pins</div>
+		@if (status.ReportsPins)
+		{
+			<div class="mt-serial-pins">
+				@foreach ((string Name, bool High) pin in Pins(status))
+				{
+					<div class="mt-serial-pin" @key="pin.Name">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@(pin.High ? MokaColor.Success : MokaColor.Surface)" />
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@pin.Name</MokaText>
+					</div>
+				}
+			</div>
+		}
+		else
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				This driver does not report CTS, DSR or CD.
+			</MokaText>
+		}
+
+		<div class="mt-serial-switches">
+			<MokaSwitch Label="DTR"
+						Value="@status.Signals.Dtr"
+						ValueChanged="SetDtrAsync"
+						HelperText="Lowering it is the reset line on boards that wire it that way."
+						Disabled="@(_busy || !status.IsOpen)" />
+
+			<MokaSwitch Label="RTS"
+						Value="@status.Signals.Rts"
+						ValueChanged="SetRtsAsync"
+						HelperText="@RtsHelp(status)"
+						Disabled="@(_busy || !status.IsOpen || !status.CanSetRts)" />
+		</div>
+
+		<div class="mt-serial-row">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						Disabled="@(_busy || !status.IsOpen)"
+						OnClick="SendBreakAsync">
+				Send break
+			</MokaButton>
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				Holds the line low. A Linux console takes it as SysRq, a bootloader as "stop".
+			</MokaText>
+		</div>
+
+		@if (status.WriteTimeouts > 0)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@WriteTimeoutText(status)</MokaAlert>
+		}
+
+		@if (!status.IsOpen)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+				The port is closed. Press Enter in the terminal to open it again.
+			</MokaAlert>
+		}
+
+		@if (_error is { } failure)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@failure</MokaAlert>
+		}
+	}
+</div>

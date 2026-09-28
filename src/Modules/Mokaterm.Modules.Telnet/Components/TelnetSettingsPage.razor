@@ -1,0 +1,50 @@
+@inherits SettingsSectionBase<TelnetSettings>
+
+@{
+	TelnetSettings settings = Settings;
+}
+
+<SettingsPage Title="Telnet" OnReset="ResetAsync">
+	<SettingsSection Title="Connections"
+					 Description="Telnet carries no encryption and no authentication. What a connection sends, the character set it uses and whether it types a saved login are set per connection, in the connection's own options.">
+		<SettingsRow Label="Connect timeout" Description="How long to wait for the device to accept the connection.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="TelnetSettings.MinConnectTimeoutSeconds"
+						   Max="TelnetSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Negotiation timeout"
+					 Description="How long a new session waits for the opening option negotiation. Devices that negotiate nothing use it up every time.">
+			<NumberSetting TValue="int"
+						   Value="settings.NegotiationTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { NegotiationTimeoutSeconds = value })"
+						   Min="TelnetSettings.MinNegotiationTimeoutSeconds"
+						   Max="TelnetSettings.MaxNegotiationTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Negotiation timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Automatic login timeout"
+					 Description="How long a connection with an automatic login watches for the login prompt.">
+			<NumberSetting TValue="int"
+						   Value="settings.AutoLoginTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { AutoLoginTimeoutSeconds = value })"
+						   Min="TelnetSettings.MinAutoLoginTimeoutSeconds"
+						   Max="TelnetSettings.MaxAutoLoginTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Automatic login timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Keepalive"
+					 Description="Sends a telnet NOP this often so a quiet session is not dropped by a firewall. 0 sends nothing.">
+			<NumberSetting TValue="int"
+						   Value="settings.KeepAliveSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { KeepAliveSeconds = value })"
+						   Min="0"
+						   Max="TelnetSettings.MaxKeepAliveSeconds"
+						   Suffix="s"
+						   AriaLabel="Keepalive interval in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

@@ -1,0 +1,33 @@
+.mt-ssh-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	margin-top: var(--moka-spacing-lg);
+}
+
+.mt-ssh-section ::deep .mt-ssh-heading {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-ssh-section ::deep .mt-ssh-hint {
+	margin: 0;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-ssh-hop {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-ssh-hop ::deep .mt-ssh-hop-index {
+	color: var(--moka-color-on-surface-variant);
+}

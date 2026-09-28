@@ -1,0 +1,58 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaTextField Label="Topic"
+				   Value="@_topic"
+				   ValueChanged="OnTopicChanged"
+				   ErrorText="@_topicError"
+				   Placeholder="home/lamp/set"
+				   HelperText="No + or # here: a message goes to one topic."
+				   Disabled="@Busy"
+				   spellcheck="false"
+				   data-autofocus />
+
+	<MokaTextArea Label="Payload"
+				  Value="@_payload"
+				  ValueChanged="OnPayloadChanged"
+				  Rows="6"
+				  Placeholder="{ &quot;on&quot;: true }"
+				  HelperText="@PayloadHelp"
+				  Disabled="@Busy"
+				  spellcheck="false" />
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaFieldWrapper Label="Quality of service" HelperText="@QosHelp" Disabled="@Busy">
+			<MokaSegmentedControl AriaLabel="Quality of service"
+								  Value="@_qos.ToString()"
+								  ValueChanged="OnQosChanged"
+								  Disabled="@Busy"
+								  FullWidth>
+				<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="@Busy" title="At most once" />
+				<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="@Busy" title="At least once" />
+				<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="@Busy" title="Exactly once" />
+			</MokaSegmentedControl>
+		</MokaFieldWrapper>
+
+		<MokaSwitch Label="Retain"
+					Value="@_retain"
+					ValueChanged="OnRetainChanged"
+					HelperText="@RetainHelp"
+					Disabled="@Busy" />
+	</MokaGrid>
+
+	@if (_result is { } result)
+	{
+		<MokaAlert Severity="@Severity(result)" Dense>@Describe(result)</MokaAlert>
+	}
+
+	<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
+		<MokaButton Size="MokaSize.Sm"
+					StartIcon="MqttIcons.Publish"
+					Loading="@Busy"
+					Disabled="@(Busy || !CanPublish)"
+					OnClick="PublishAsync"
+					data-primary>
+			Publish
+		</MokaButton>
+	</MokaFlexbox>
+</MokaFlexbox>

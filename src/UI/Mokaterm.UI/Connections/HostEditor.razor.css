@@ -1,0 +1,7 @@
+.mt-swatch {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+}

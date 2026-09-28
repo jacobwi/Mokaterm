@@ -1,0 +1,115 @@
+@using Mokaterm.Abstractions.Sessions
+@inherits SettingsSectionBase<SessionLogSettings>
+
+@{
+	SessionLogSettings settings = Settings;
+}
+
+<SettingsPage Title="@PageTitle"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put every session log setting back to its default? Recording goes off and the files already written are kept.">
+	<SettingsSection Title="Recording">
+		<MokaCallout Type="MokaCalloutType.Warning" Title="A log holds everything the server printed">
+			Command output, file listings, host names, and any password or token a program printed are all in the file, in
+			the clear and readable by anyone who can read your files. Nothing you type is ever recorded, so a password
+			typed at a prompt stays out of it. Recording is off until you ask for it.
+		</MokaCallout>
+		<SettingsRow Label="Record every session"
+					 Description="Sessions you open from now on are recorded. Use the record button in a session's toolbar for one that is already open.">
+			<MokaSwitch Value="settings.RecordEverySession"
+						ValueChanged="value => UpdateAsync(s => s with { RecordEverySession = value })"
+						aria-label="Record every session" />
+		</SettingsRow>
+		<SettingsRow Label="What to write"
+					 Description="Plain text drops colors and cursor moves, so the file reads like a transcript. Raw keeps every byte, which replays with cat.">
+			<EnumSegmentedControl TEnum="SessionLogFormat"
+								  Value="settings.Format"
+								  ValueChanged="value => UpdateAsync(s => s with { Format = value })"
+								  Options="FormatOptions"
+								  AriaLabel="What to write to the log file" />
+		</SettingsRow>
+		<SettingsRow Label="Size limit"
+					 Description="How much of one session reaches its file. Past this the file says so on its last line and takes nothing more.">
+			<NumberSetting TValue="int"
+						   Value="settings.SizeLimitKilobytes"
+						   ValueChanged="value => UpdateAsync(s => s with { SizeLimitKilobytes = value })"
+						   Min="SessionLogSettings.MinSizeLimitKilobytes"
+						   Max="SessionLogSettings.MaxSizeLimitKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Size limit per log file in kilobytes" />
+		</SettingsRow>
+		<SettingsRow Label="Folder"
+					 Description="@FolderDescription"
+					 ControlWidth="340px">
+			<TextSetting Value="@settings.Folder"
+						 ValueChanged="SetFolderAsync"
+						 AllowEmpty
+						 Validate="ValidateFolder"
+						 Placeholder="@Recorder.Folder"
+						 AriaLabel="Session log folder" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Files" Description="@FilesDescription" Flush>
+		<Actions>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Refresh"
+						OnClick="Reload">
+				Refresh
+			</MokaButton>
+		</Actions>
+		<ChildContent>
+			<MokaTable TItem="SessionLogFile"
+					   Items="_files"
+					   ItemKey="file => file.Name"
+					   Title="Written so far"
+					   Searchable
+					   SearchPlaceholder="Filter by file name"
+					   ShowPagination="false"
+					   SortColumn="Written"
+					   SortDirection="MokaSortDirection.Descending"
+					   ActionsColumnTitle=""
+					   ActionsColumnWidth="40px">
+				<ChildContent>
+					<MokaColumn Title="File" Field="file => file.Name">
+						<CellTemplate Context="file">
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@TextStyles.TruncateBox" title="@file.Name">@file.Name</MokaText>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn Title="Size" Field="file => file.Length">
+						<CellTemplate Context="file">
+							<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Bytes(file.Length)</MokaText>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn Title="Written" Field="file => file.WrittenAt">
+						<CellTemplate Context="file">
+							<MokaText Element="span"
+									  Size="MokaSize.Xs"
+									  Mono
+									  title="@DisplayFormat.Timestamp(file.WrittenAt)">@DisplayFormat.Relative(file.WrittenAt, Time.GetUtcNow())</MokaText>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+				<RowActions Context="file">
+					@if (CanSaveFiles)
+					{
+						<MokaButton Variant="MokaVariant.Text"
+									Size="MokaSize.Xs"
+									StartIcon="MokatermIcons.Download"
+									Disabled="_busy"
+									OnClick="() => SaveAsync(file)"
+									title="Save a copy"
+									aria-label="@($"Save a copy of {file.Name}")" />
+					}
+				</RowActions>
+				<EmptyContent>
+					<MokaEmptyState Icon="MokatermIcons.Record"
+									Title="No session logs yet"
+									Description="A file appears here once a recorded session prints something." />
+				</EmptyContent>
+			</MokaTable>
+		</ChildContent>
+	</SettingsSection>
+</SettingsPage>

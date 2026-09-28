@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Rdp\Mokaterm.Modules.Rdp.csproj" />
+	</ItemGroup>
+
+	<!-- FakeJsRuntime: Microsoft.JSInterop arrives with the module's UI.Common reference, which Core and Sessions tests have not. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\Interop\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<div @ref="_element">
+	<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Lg">
+		@ChildContent
+		<MokaFlexbox Direction="MokaDirection.Row" Justify="MokaJustify.End" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+			@Actions
+		</MokaFlexbox>
+	</MokaFlexbox>
+</div>

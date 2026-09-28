@@ -1,0 +1,45 @@
+@inherits SettingsSectionBase<ShortcutSettings>
+
+<SettingsPage Title="Keyboard" OnReset="ResetAllAsync" ResetMessage="Put every shortcut back to its default?">
+	<SettingsSection Title="Shortcuts">
+		<MokaCallout Type="MokaCalloutType.Note" Title="Ctrl and a letter belongs to the terminal">
+			A shortcut is Ctrl and a key, with Shift whenever that key is a letter, so that Ctrl+C and the rest keep
+			reaching the shell you are working in. On macOS the app uses Cmd instead of Ctrl.
+		</MokaCallout>
+
+		<MokaList Bordered>
+			@foreach (ShellCommandInfo command in Commands)
+			{
+				<MokaListItem @key="command.Id" Text="@command.Title" SecondaryText="@command.Group">
+					<EndContent>
+						<div class="mt-shortcut-row">
+							@* Not a Moka control: recording a gesture needs an element that takes the raw key event. *@
+							<button type="button"
+									class="@ButtonClass(command.Id)"
+									data-mt-shortcut="@command.Id"
+									@onfocus="() => StartRecordingAsync(command.Id)"
+									@onkeydown="e => OnKeyDownAsync(command.Id, e)"
+									@onkeydown:preventDefault="true"
+									@onkeydown:stopPropagation="true"
+									@onblur="StopRecordingAsync">
+								@ButtonText(command.Id)
+							</button>
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										Disabled="@(!IsChanged(command.Id))"
+										OnClick="() => ResetOneAsync(command.Id)">
+								Default
+							</MokaButton>
+						</div>
+					</EndContent>
+				</MokaListItem>
+			}
+		</MokaList>
+
+		@if (_message is { Length: > 0 } message)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@message</MokaAlert>
+		}
+	</SettingsSection>
+</SettingsPage>

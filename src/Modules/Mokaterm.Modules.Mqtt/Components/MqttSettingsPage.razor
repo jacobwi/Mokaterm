@@ -1,0 +1,97 @@
+@inherits SettingsSectionBase<MqttSettings>
+
+@{
+	MqttSettings settings = Settings;
+}
+
+<SettingsPage Title="MQTT" OnReset="ResetAsync">
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Connect timeout" Description="Covers the socket, TLS and the broker's answer.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="MqttSettings.MinConnectTimeoutSeconds"
+						   Max="MqttSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Login attempts"
+					 Description="A broker refuses the whole connection on a bad password, so each attempt reconnects.">
+			<NumberSetting TValue="int"
+						   Value="settings.AuthenticationAttempts"
+						   ValueChanged="value => SaveAsync(s => s with { AuthenticationAttempts = value })"
+						   Min="1"
+						   Max="MqttSettings.MaxAuthenticationAttempts"
+						   AriaLabel="Login attempts" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="What a session keeps" Description="@MemoryEstimate">
+		<MokaCallout Type="MokaCalloutType.Note" Title="Why there are limits at all">
+			A broker can publish faster than anyone can read. A session keeps only what these allow and counts the
+			rest, so watching a busy topic costs a fixed amount of memory instead of all of it.
+		</MokaCallout>
+		<SettingsRow Label="Messages per topic" Description="The oldest goes when a topic passes it.">
+			<NumberSetting TValue="int"
+						   Value="settings.MessagesPerTopic"
+						   ValueChanged="value => SaveAsync(s => s with { MessagesPerTopic = value })"
+						   Min="MqttSettings.MinMessagesPerTopic"
+						   Max="MqttSettings.MaxMessagesPerTopic"
+						   AriaLabel="Messages kept per topic" />
+		</SettingsRow>
+		<SettingsRow Label="Messages per session" Description="Across every topic of one session.">
+			<NumberSetting TValue="int"
+						   Value="settings.TotalMessages"
+						   ValueChanged="value => SaveAsync(s => s with { TotalMessages = value })"
+						   Min="MqttSettings.MinTotalMessages"
+						   Max="MqttSettings.MaxTotalMessages"
+						   AriaLabel="Messages kept per session" />
+		</SettingsRow>
+		<SettingsRow Label="Largest payload kept"
+					 Description="A larger payload is kept cut to this and marked, so its topic and time still show.">
+			<NumberSetting TValue="int"
+						   Value="settings.LargestPayloadKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { LargestPayloadKilobytes = value })"
+						   Min="MqttSettings.MinPayloadKilobytes"
+						   Max="MqttSettings.MaxPayloadKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Largest payload kept in kilobytes" />
+		</SettingsRow>
+		<SettingsRow Label="Payload memory per session"
+					 Description="This is the cap that bounds the memory: the oldest message goes until the session is under it.">
+			<NumberSetting TValue="int"
+						   Value="settings.TotalPayloadKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { TotalPayloadKilobytes = value })"
+						   Min="MqttSettings.MinTotalPayloadKilobytes"
+						   Max="MqttSettings.MaxTotalPayloadKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Payload memory per session in kilobytes" />
+		</SettingsRow>
+		<SettingsRow Label="Topics per session"
+					 Description="Past this, a message on a topic the tree has not seen is counted and dropped.">
+			<NumberSetting TValue="int"
+						   Value="settings.MaxTopicCount"
+						   ValueChanged="value => SaveAsync(s => s with { MaxTopicCount = value })"
+						   Min="MqttSettings.MinTopics"
+						   Max="MqttSettings.MaxTopics"
+						   AriaLabel="Topics kept per session" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="The explorer">
+		<SettingsRow Label="Quality of service for a new publish or subscription"
+					 Description="0, at most once, is what an explorer usually wants. 1 at least once and 2 exactly once ask the broker to make sure, which costs packets per message.">
+			<EnumSegmentedControl TEnum="MqttQos"
+								  Value="settings.DefaultQualityOfService"
+								  ValueChanged="value => SaveAsync(s => s with { DefaultQualityOfService = value })"
+								  Options="QosOptions"
+								  AriaLabel="Quality of service for a new publish or subscription" />
+		</SettingsRow>
+		<SettingsRow Label="Show the newest topics first"
+					 Description="Off orders the topic tree by name, which keeps a row where you left it while messages arrive.">
+			<MokaSwitch Value="settings.SortTopicsByTime"
+						ValueChanged="value => SaveAsync(s => s with { SortTopicsByTime = value })"
+						aria-label="Show the newest topics first" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

@@ -1,0 +1,52 @@
+@using Mokaterm.Abstractions.Terminal
+@inherits ConnectionOptionsEditorBase<TelnetConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="Terminal type"
+					   Value="@_terminalType.Show(Current.TerminalType ?? "")"
+					   ValueChanged="OnTerminalTypeChangedAsync"
+					   ErrorText="@_terminalType.Error"
+					   Placeholder="@DefaultTerminalType"
+					   HelperText="Answered to TERMINAL-TYPE. Empty uses the name the terminal settings send."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false" />
+
+		<CharacterSetSetting Value="@Current.EncodingName"
+							 ValueChanged="OnEncodingChangedAsync"
+							 Default="@TelnetEncodings.Default"
+							 TryGet="TerminalEncodings.TryGet"
+							 Label="Character set"
+							 HelperText="What the device speaks, for example utf-8, windows-1252 or ibm437."
+							 Disabled="Disabled"
+							 Size="MokaSize.Sm" />
+	</MokaGrid>
+
+	<MokaFieldWrapper Label="Enter sends" HelperText="@LineEndingHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Enter sends" Value="@Current.LineEnding.ToString()" ValueChanged="OnLineEndingChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(TelnetLineEnding.CrLf)" Text="CR LF" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(TelnetLineEnding.CrNul)" Text="CR NUL" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(TelnetLineEnding.Lf)" Text="LF" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaFieldWrapper Label="Local echo" HelperText="@EchoHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Local echo" Value="@Current.Echo.ToString()" ValueChanged="OnEchoChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(TelnetEchoMode.Auto)" Text="Follow the server" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(TelnetEchoMode.On)" Text="Always" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(TelnetEchoMode.Off)" Text="Never" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaSwitch Label="Type the saved login at the prompt"
+				Value="@Current.AutoLogin"
+				ValueChanged="OnAutoLoginChangedAsync"
+				HelperText="@AutoLoginHelp"
+				Disabled="Disabled" />
+
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		Telnet has no login of its own and no encryption: the prompt is part of the stream, and everything, the
+		password included, travels in clear text that anyone on the way can read. Use SSH wherever the device offers it.
+	</MokaText>
+</MokaFlexbox>

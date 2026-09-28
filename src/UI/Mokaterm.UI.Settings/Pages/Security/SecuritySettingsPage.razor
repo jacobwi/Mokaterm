@@ -1,0 +1,126 @@
+@using Mokaterm.Abstractions.Security
+@inherits SettingsSectionBase<SecuritySettings>
+
+@{
+	SecuritySettings settings = Settings;
+}
+
+<SettingsPage Title="Security"
+			  OnReset="ResetAsync"
+			  ResetMessage="Put the security settings back to their defaults? The vault, its master password and your saved data are not affected.">
+	<SettingsSection Title="Locking">
+		<SettingsRow Label="Auto-lock" Description="Lock the vault after this many minutes without input. 0 never locks.">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Justify="MokaJustify.End" Gap="MokaSpacingScale.Xs" Wrap>
+				@foreach (AutoLockPreset preset in AutoLockPresets)
+				{
+					<MokaChip @key="preset.Minutes"
+							  Text="@preset.Label"
+							  Size="MokaSize.Xs"
+							  Selected="settings.AutoLockMinutes == preset.Minutes"
+							  OnClick="() => SetAutoLockAsync(preset.Minutes)" />
+				}
+				<NumberSetting TValue="int"
+							   Value="settings.AutoLockMinutes"
+							   ValueChanged="SetAutoLockAsync"
+							   Min="SecuritySettings.MinAutoLockMinutes"
+							   Max="SecuritySettings.MaxAutoLockMinutes"
+							   Suffix="min"
+							   AriaLabel="Auto-lock after minutes" />
+			</MokaFlexbox>
+		</SettingsRow>
+		@if (IsDesktop)
+		{
+			<SettingsRow Label="Lock when hidden" Description="Lock as soon as the window is minimized or hidden.">
+				<MokaSwitch Value="settings.LockWhenHidden"
+							ValueChanged="value => SaveAsync(s => s with { LockWhenHidden = value })"
+							aria-label="Lock when hidden" />
+			</SettingsRow>
+		}
+		<SettingsRow Label="Clear copied passwords" Description="Seconds before a copied password is wiped from the clipboard. 0 leaves it there.">
+			<NumberSetting TValue="int"
+						   Value="settings.ClipboardClearSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ClipboardClearSeconds = value })"
+						   Min="SecuritySettings.MinClipboardClearSeconds"
+						   Max="SecuritySettings.MaxClipboardClearSeconds"
+						   Suffix="s"
+						   AriaLabel="Clear copied passwords after seconds" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Servers">
+		<SettingsRow Label="Host key policy"
+					 Description="What happens when a server presents a key or certificate. A changed identity is never accepted silently."
+					 Stacked>
+			<MokaRadioGroup TValue="HostKeyPolicy"
+							Value="settings.HostKeyPolicy"
+							ValueChanged="value => SaveAsync(s => s with { HostKeyPolicy = value })"
+							aria-label="Host key policy">
+				@foreach (PolicyOption option in HostKeyPolicies)
+				{
+					<MokaRadioItem TValue="HostKeyPolicy" @key="option.Value" Value="option.Value">
+						<span class="policy-option">
+							<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@option.Title</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@option.Description</MokaText>
+						</span>
+					</MokaRadioItem>
+				}
+			</MokaRadioGroup>
+		</SettingsRow>
+		<SettingsRow Label="Remember sudo password"
+					 Description="Keep a sudo password in memory for the rest of the session after the first prompt. It is never written to disk.">
+			<MokaSwitch Value="settings.RememberSudoPasswordForSession"
+						ValueChanged="value => SaveAsync(s => s with { RememberSudoPasswordForSession = value })"
+						aria-label="Remember sudo password for the session" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Vault">
+		<SettingsRow Label="Status" Description="@VaultStatusDescription">
+			<MokaStatusDot Label="@VaultStatusLabel" Color="VaultStatusColor" />
+		</SettingsRow>
+		<SettingsRow Label="Lock now" Description="Hide open sessions until the master password is entered. Connections keep running.">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokatermIcons.Lock"
+						Disabled="!IsUnlocked"
+						OnClick="LockNow">
+				Lock now
+			</MokaButton>
+		</SettingsRow>
+		<SettingsRow Label="Master password" Description="Change the password that unlocks the vault.">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokatermIcons.Key"
+						Disabled="!IsUnlocked"
+						OnClick="() => _changePasswordOpen = true">
+				Change master password
+			</MokaButton>
+		</SettingsRow>
+		@if (Vault.IsDeviceUnlockAvailable)
+		{
+			<SettingsRow Label="@DeviceUnlockLabel"
+						 Description="Unlock without typing the master password while you are signed in to this device.">
+				<MokaSwitch Value="Vault.IsDeviceUnlockEnabled"
+							ValueChanged="SetDeviceUnlockAsync"
+							Disabled="_deviceUnlockBusy || !IsUnlocked"
+							aria-label="@DeviceUnlockLabel" />
+			</SettingsRow>
+		}
+	</SettingsSection>
+
+	<SettingsSection Title="Danger zone">
+		<SettingsRow Label="Reset vault"
+					 Description="Deletes every saved connection, credential and known host together with the master password, and closes open sessions. Settings are kept. The only way back in after a forgotten master password.">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Error"
+						Size="MokaSize.Sm"
+						StartIcon="MokatermIcons.Eraser"
+						OnClick="() => _resetVaultOpen = true">
+				Reset vault
+			</MokaButton>
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>
+
+<ChangeMasterPasswordDialog @bind-Open="_changePasswordOpen" />
+<ResetVaultDialog @bind-Open="_resetVaultOpen" />

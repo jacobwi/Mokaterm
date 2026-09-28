@@ -1,0 +1,71 @@
+.mt-explorer {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.mt-explorer-search {
+	flex-shrink: 0;
+	padding: var(--moka-spacing-sm);
+}
+
+.mt-explorer-tree {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+	outline: none;
+}
+
+.mt-explorer-tree:focus-visible {
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border);
+}
+
+.mt-explorer-message {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-lg) var(--moka-spacing-md);
+}
+
+.mt-tree-line {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-tree-chevron {
+	display: inline-flex;
+	flex-shrink: 0;
+	justify-content: center;
+	width: 14px;
+	opacity: 0.7;
+}
+
+.mt-tree-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-tree-meta {
+	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-tree-item--drop ::deep .moka-list-item,
+.mt-tree-filler--drop {
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+/* Empty space below the rows: a drop target for "top level" and a right-click target for the empty-area menu. */
+.mt-tree-filler {
+	flex: 1;
+	min-height: var(--moka-spacing-xxl);
+}

@@ -1,0 +1,91 @@
+.mt-session {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.mt-session-toolbar,
+.mt-session-banner {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: 0 var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-session-toolbar {
+	height: var(--moka-height-toolbar-dense);
+	background: var(--moka-color-surface);
+}
+
+.mt-session-banner {
+	padding-block: var(--moka-spacing-xxs);
+	background: var(--moka-color-surface-2);
+}
+
+.mt-session-spacer {
+	flex: 1;
+}
+
+.mt-session-body {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	container-type: inline-size;
+}
+
+/*
+ * The terminal is the point of the session, so the file panel gives way once there is not enough width for both.
+ * The panel's own width is an inline grid track, which only !important can cap; dragging it stays free above these
+ * sizes. A collapsed panel keeps the width the dock layout gives it, and a session showing the commands panel too has
+ * a third track these two-track rules would break, so it is left alone.
+ */
+@container (max-width: 760px) {
+	.mt-session-body ::deep .mt-split-files:not(.mt-split-collapsed):not(.mt-split-commands) {
+		grid-template-columns: 280px 1fr !important;
+	}
+
+	.mt-session-body ::deep .mt-split-files.mt-split-right:not(.mt-split-collapsed):not(.mt-split-commands) {
+		grid-template-columns: 1fr 280px !important;
+	}
+}
+
+@container (max-width: 640px) {
+	.mt-session-body ::deep .mt-split-files:not(.mt-split-collapsed):not(.mt-split-commands) {
+		grid-template-columns: 220px 1fr !important;
+	}
+
+	.mt-session-body ::deep .mt-split-files.mt-split-right:not(.mt-split-collapsed):not(.mt-split-commands) {
+		grid-template-columns: 1fr 220px !important;
+	}
+}
+
+.mt-session-body ::deep .mt-fill {
+	height: 100%;
+}
+
+.mt-session-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in srgb, var(--moka-color-background) 88%, transparent);
+}
+
+.mt-session-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--moka-spacing-md);
+	padding: var(--moka-spacing-xl);
+}
+
+.mt-session-card--wide {
+	align-items: stretch;
+	width: min(480px, 100%);
+}

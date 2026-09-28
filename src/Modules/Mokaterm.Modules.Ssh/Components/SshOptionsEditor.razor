@@ -1,0 +1,154 @@
+@inherits ConnectionOptionsEditorBase<SshConnectionOptions>
+
+<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+	@if (IsTerminalProtocol)
+	{
+		<MokaTextField Label="Startup command"
+					   Value="@(Current.StartupCommand ?? "")"
+					   ValueChanged="SetStartupCommandAsync"
+					   Placeholder="tmux new -A -s main"
+					   HelperText="Typed into the shell once, right after it opens."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false" />
+
+		<MokaTextField Label="Terminal type"
+					   Value="@_terminalType.Show(Current.TerminalType ?? "")"
+					   ValueChanged="SetTerminalTypeAsync"
+					   ErrorText="@_terminalType.Error"
+					   Placeholder="@DefaultTerminalType"
+					   HelperText="Sent to the server as TERM. Empty uses the terminal settings."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false" />
+	}
+
+	<MokaTextField Label="Initial directory"
+				   Value="@(Current.InitialDirectory ?? "")"
+				   ValueChanged="SetInitialDirectoryAsync"
+				   Placeholder="~"
+				   HelperText="Where the file browser opens. Empty uses the home directory."
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   spellcheck="false" />
+
+	<MokaTextField Label="Keepalive interval (seconds)"
+				   InputType="number"
+				   Value="@_keepAlive.Show(KeepAliveText)"
+				   ValueChanged="SetKeepAliveAsync"
+				   ErrorText="@_keepAlive.Error"
+				   Placeholder="@DefaultKeepAlive"
+				   HelperText="Empty uses the SSH settings. 0 turns keepalives off for this connection."
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm" />
+
+	<MokaFieldWrapper Label="Run as root" HelperText="Offer sudo for files the login cannot change." Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Run as root" Value="@Current.Elevation.ToString()" ValueChanged="SetElevationAsync" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegment Value="@nameof(SshElevationMode.Auto)" Text="With sudo" />
+			<MokaSegment Value="@nameof(SshElevationMode.None)" Text="Never" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+</MokaGrid>
+
+<div class="mt-ssh-section">
+	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">Jump hosts</MokaText>
+	<MokaText Element="p" Size="MokaSize.Xs" Class="mt-ssh-hint">
+		Saved logins this connection reaches its target through, first hop first. Every hop verifies its own host key and
+		uses its own credentials.
+	</MokaText>
+
+	@foreach ((ConnectionChoice hop, int index) in SelectedJumpHosts.Select((hop, index) => (hop, index)))
+	{
+		<div class="mt-ssh-hop" @key="hop.Id">
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-ssh-hop-index">@(index + 1)</MokaText>
+			<MokaText Element="span" Size="MokaSize.Sm" Truncate Style="flex:1;min-width:0">@hop.Label</MokaText>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Navigation.ArrowUp"
+						Disabled="@(Disabled || index == 0)"
+						OnClick="@(() => MoveJumpHostAsync(index, -1))"
+						aria-label="Move up" />
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Navigation.ArrowDown"
+						Disabled="@(Disabled || index == SelectedJumpHosts.Count - 1)"
+						OnClick="@(() => MoveJumpHostAsync(index, 1))"
+						aria-label="Move down" />
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Error"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Delete"
+						Disabled="Disabled"
+						OnClick="@(() => RemoveJumpHostAsync(hop.Id))"
+						aria-label="Remove jump host" />
+		</div>
+	}
+
+	<MokaSelect TValue="ConnectionChoice"
+				Label="Add a jump host"
+				Items="AvailableJumpHosts"
+				Value="null"
+				ValueChanged="AddJumpHostAsync"
+				ValueSelector="@(choice => choice.Label)"
+				Placeholder="@JumpHostPlaceholder"
+				Searchable
+				Disabled="@(Disabled || AvailableJumpHosts.Count == 0)"
+				Size="MokaSize.Sm" />
+</div>
+
+<div class="mt-ssh-section">
+	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">SSH agent</MokaText>
+	<MokaText Element="p" Size="MokaSize.Xs" Class="mt-ssh-hint">
+		Used when this login authenticates with an agent. The private key never leaves the agent; only signatures come back.
+	</MokaText>
+
+	@if (_agentError is { } agentError)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Info" Dense>@agentError</MokaAlert>
+	}
+	else
+	{
+		<MokaSelect TValue="AgentChoice"
+					Label="Key"
+					Items="AgentChoices"
+					Value="SelectedAgentChoice"
+					ValueChanged="SetAgentIdentityAsync"
+					ValueSelector="@(choice => choice.Label)"
+					Placeholder="Any key the agent holds"
+					Disabled="Disabled"
+					Size="MokaSize.Sm"
+					HelperText="@AgentHelp" />
+	}
+
+	<MokaButton Variant="MokaVariant.Text"
+				Color="MokaColor.Surface"
+				Size="MokaSize.Xs"
+				StartIcon="MokaIcons.Action.Refresh"
+				Disabled="@(Disabled || _agentLoading)"
+				OnClick="ReadAgentAsync">
+		Read the agent again
+	</MokaButton>
+</div>
+
+<div class="mt-ssh-section">
+	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">Proxy</MokaText>
+	<MokaText Element="p" Size="MokaSize.Xs" Class="mt-ssh-hint">
+		Used when this login dials its target itself. Behind jump hosts the socket goes to the hop before it instead, so the
+		first hop's own proxy carries the whole chain and this one stays unused.
+	</MokaText>
+
+	<ProxyFields Proxy="Current.Proxy"
+				 ProxyChanged="SetProxyAsync"
+				 ProxyPassword="@ProxyPassword"
+				 ProxyPasswordChanged="ProxyPasswordChanged"
+				 HasProxyPassword="HasProxyPassword"
+				 CanSaveProxyPassword="CanSaveProxyPassword"
+				 Disabled="Disabled" />
+</div>
+
+<div class="mt-ssh-section">
+	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">Port forwarding</MokaText>
+	<SshTunnelList Tunnels="Current.Tunnels" TunnelsChanged="SetTunnelsAsync" Disabled="Disabled" />
+</div>

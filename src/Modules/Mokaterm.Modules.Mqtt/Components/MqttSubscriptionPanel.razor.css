@@ -1,0 +1,63 @@
+.mt-mqtt-live-subs {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.mt-mqtt-live-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-mqtt-live-spacer {
+	flex: 1;
+}
+
+.mt-mqtt-live-head ::deep .mt-mqtt-live-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-mqtt-live-draft,
+.mt-mqtt-live-row {
+	display: flex;
+	min-width: 0;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-mqtt-live-draft {
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-mqtt-live-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-mqtt-live-row {
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-mqtt-live-text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mt-mqtt-live-row ::deep .mt-mqtt-live-count {
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-variant);
+}

@@ -1,0 +1,42 @@
+.theme-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	gap: var(--moka-spacing-md);
+}
+
+.theme-grid ::deep .theme-card:hover {
+	border-color: var(--moka-color-primary-border);
+}
+
+.theme-grid ::deep .theme-card--selected {
+	border-color: var(--moka-color-primary-border);
+	box-shadow: var(--moka-selected-glow);
+}
+
+.theme-card__select {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	width: 100%;
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-sm) var(--moka-spacing-xs);
+	border: none;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.theme-card__select:focus-visible {
+	outline: none;
+	box-shadow: var(--moka-focus-ring);
+}
+
+.theme-card__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-xs);
+	padding: 0 var(--moka-spacing-xs) var(--moka-spacing-xs) var(--moka-spacing-sm);
+}

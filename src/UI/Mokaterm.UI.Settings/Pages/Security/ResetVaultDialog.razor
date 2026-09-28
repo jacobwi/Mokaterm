@@ -1,0 +1,43 @@
+@inherits DraftDialogBase
+
+<MokaDialog Open="Open"
+			OpenChanged="OnOpenChangedAsync"
+			Title="Reset vault"
+			DialogSize="MokaDialogSize.Small"
+			CloseOnBackdropClick="false"
+			CloseOnEscape="!IsBusy"
+			ShowCloseButton="!IsBusy">
+	<ChildContent>
+		<form id="@FormId" @onsubmit="ResetAsync" @onsubmit:preventDefault="true">
+			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="This cannot be undone">
+					Every saved connection, credential and known host is deleted, along with the master password, and open
+					sessions close. Settings are kept.
+				</MokaAlert>
+				<MokaText Size="MokaSize.Sm">Type <MokaKbd>@ConfirmationWord</MokaKbd> to confirm.</MokaText>
+				<MokaTextField @bind-Value="_typed"
+							   Placeholder="@ConfirmationWord"
+							   Disabled="_busy"
+							   autocomplete="off"
+							   spellcheck="false"
+							   aria-label="Type RESET to confirm"
+							   data-autofocus="true" />
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+			</MokaFlexbox>
+		</form>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Disabled="_busy" OnClick="CloseAsync">Cancel</MokaButton>
+		<MokaButton Type="submit"
+					form="@FormId"
+					Color="MokaColor.Error"
+					StartIcon="MokatermIcons.Eraser"
+					Disabled="!IsConfirmed"
+					Loading="_busy">
+			Reset vault
+		</MokaButton>
+	</Actions>
+</MokaDialog>

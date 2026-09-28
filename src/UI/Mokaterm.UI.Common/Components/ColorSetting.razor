@@ -1,0 +1,17 @@
+@using Moka.Red.Forms.ColorInput
+@inherits DraftSettingBase<string>
+
+<MokaColorInput Value="@Text"
+				ValueChanged="OnTextChangedAsync"
+				OnBlur="OnBlur"
+				Label="@Label"
+				ErrorText="@Error"
+				Placeholder="@Placeholder"
+				Disabled="Disabled"
+				Size="MokaSize.Sm"
+				Style="@WidthStyle"
+				ShowNativeInput="ShowNativeInput"
+				ShowPreview="!ShowNativeInput"
+				spellcheck="false"
+				autocomplete="off"
+				aria-label="@AriaLabel" />

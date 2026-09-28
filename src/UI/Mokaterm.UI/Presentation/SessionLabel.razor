@@ -1,0 +1,19 @@
+@namespace Mokaterm.UI.Presentation
+
+@* The user and the machine are told apart by colour: the machine carries the host's accent, the user stays quiet. *@
+<span class="mt-label @(Mono ? "mt-label-mono" : null)" title="@Tooltip">
+	@if (Name is { Length: > 0 } name)
+	{
+		<span class="mt-label-name">@name</span>
+	}
+	@if (Username is { Length: > 0 } user)
+	{
+		<span class="mt-label-user">@user</span>
+		<span class="mt-label-at">@@</span>
+	}
+	<span class="mt-label-host" style="color:@Accent">@Address</span>
+	@if (Port is { } port)
+	{
+		<span class="mt-label-port">:@port</span>
+	}
+</span>

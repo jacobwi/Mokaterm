@@ -1,0 +1,134 @@
+.tq {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	background: var(--moka-color-surface);
+	color: var(--moka-color-on-surface);
+}
+
+.tq-title {
+	margin-right: var(--moka-spacing-sm);
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.tq-list {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.tq-state {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* The docked panel is short, so the empty state is one centered line rather than a full empty state block. */
+.tq-empty {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--moka-spacing-xs);
+	padding: var(--moka-spacing-md);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+	text-align: center;
+	text-wrap: balance;
+}
+
+.tq-empty ::deep svg {
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.tq-row {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	font-size: var(--moka-font-size-xs);
+	transition: background var(--moka-transition-fast);
+}
+
+.tq-row:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.tq-row--compact {
+	flex-direction: row;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	height: 28px;
+	padding: 0 var(--moka-spacing-md);
+}
+
+.tq-line {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.tq-name,
+.tq-route {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+}
+
+.tq-row--compact .tq-name {
+	flex: 0 1 auto;
+	max-width: 30%;
+}
+
+.tq-route {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.tq-row--compact .tq-route {
+	flex: 1 1 0;
+}
+
+.tq-grow {
+	flex: 1;
+}
+
+.tq-progress {
+	flex: 1;
+	min-width: 60px;
+}
+
+.tq-row--compact .tq-progress {
+	flex: 0 0 120px;
+}
+
+.tq-meta {
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.tq-row--compact .tq-rate {
+	min-width: 72px;
+}
+
+.tq-error {
+	color: var(--moka-color-error);
+	overflow-wrap: anywhere;
+}
+
+.tq-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+}

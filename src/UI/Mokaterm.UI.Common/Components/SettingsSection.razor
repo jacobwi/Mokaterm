@@ -1,0 +1,32 @@
+@using Moka.Red.Layout.Card
+@using Moka.Red.Primitives.Typography
+
+<section class="settings-section">
+	<div class="settings-section__header">
+		<div class="settings-section__heading">
+			<MokaText Element="h2"
+					  SizeValue="10px"
+					  Weight="MokaFontWeight.Semibold"
+					  Transform="MokaTextTransform.Uppercase"
+					  Style="@TextStyles.MicroLabel">@Title</MokaText>
+			@if (Description is not null)
+			{
+				<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">@Description</MokaText>
+			}
+		</div>
+		@if (Actions is not null)
+		{
+			<div class="settings-section__actions">@Actions</div>
+		}
+	</div>
+	@if (Flush)
+	{
+		@ChildContent
+	}
+	else
+	{
+		<MokaCard Outlined NoPadding>
+			@ChildContent
+		</MokaCard>
+	}
+</section>

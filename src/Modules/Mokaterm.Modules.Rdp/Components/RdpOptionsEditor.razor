@@ -1,0 +1,99 @@
+@inherits ConnectionOptionsEditorBase<RdpConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSwitch Label="Network level authentication"
+					Value="@Current.NetworkLevelAuthentication"
+					ValueChanged="OnNlaChangedAsync"
+					HelperText="@NlaHelp"
+					Disabled="Disabled" />
+
+		<MokaTextField Label="Domain"
+					   Value="@Current.Domain"
+					   ValueChanged="OnDomainChangedAsync"
+					   Placeholder="CORP"
+					   HelperText="Leave empty for a local account or a name that already carries its domain."
+					   Disabled="Disabled" />
+	</MokaGrid>
+
+	<MokaFieldWrapper Label="Desktop size" HelperText="@DesktopSizeHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Desktop size" Value="@Current.DesktopSize.ToString()" ValueChanged="OnDesktopSizeChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(RdpDesktopSizeMode.Automatic)" Text="From the view" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(RdpDesktopSizeMode.Fixed)" Text="Fixed" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	@if (Current.DesktopSize == RdpDesktopSizeMode.Fixed)
+	{
+		<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+			<MokaNumericField TValue="int"
+							  Label="Width"
+							  Value="@Current.Width"
+							  ValueChanged="OnWidthChangedAsync"
+							  HelperText="@SizeHelp"
+							  Disabled="Disabled" />
+
+			<MokaNumericField TValue="int"
+							  Label="Height"
+							  Value="@Current.Height"
+							  ValueChanged="OnHeightChangedAsync"
+							  HelperText="@SizeHelp"
+							  Disabled="Disabled" />
+		</MokaGrid>
+	}
+
+	<MokaFieldWrapper Label="Scaling" HelperText="@ScalingHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Scaling" Value="@Current.Scaling.ToString()" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(RdpScalingMode.Fit)" Text="Fit to view" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(RdpScalingMode.Actual)" Text="1:1" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(RdpScalingMode.Remote)" Text="Resize the server" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSelect TValue="RdpKeyboardLayout"
+					Label="Keyboard layout"
+					Items="RdpKeyboardLayout.Common"
+					Value="@Layout"
+					ValueChanged="OnLayoutChangedAsync"
+					ValueSelector="@(layout => layout.Name)"
+					Searchable
+					HelperText="The layout the server loads for this session."
+					Disabled="Disabled" />
+
+		<MokaSwitch Label="Open in view only mode"
+					Value="@Current.ViewOnly"
+					ValueChanged="OnViewOnlyChangedAsync"
+					HelperText="Watch without sending keys or mouse. The session view can turn input back on."
+					Disabled="Disabled" />
+	</MokaGrid>
+
+	<MokaFieldWrapper Label="Desktop features" HelperText="@PerformanceHelp" Disabled="Disabled">
+		<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Sm">
+			<MokaCheckbox Label="Wallpaper"
+						  Value="@Current.Performance.Wallpaper"
+						  ValueChanged="OnWallpaperChangedAsync"
+						  Disabled="Disabled" />
+
+			<MokaCheckbox Label="Visual styles"
+						  Value="@Current.Performance.Themes"
+						  ValueChanged="OnThemesChangedAsync"
+						  Disabled="Disabled" />
+
+			<MokaCheckbox Label="Font smoothing"
+						  Value="@Current.Performance.FontSmoothing"
+						  ValueChanged="OnFontSmoothingChangedAsync"
+						  Disabled="Disabled" />
+
+			<MokaCheckbox Label="Show window contents while dragging"
+						  Value="@Current.Performance.FullWindowDrag"
+						  ValueChanged="OnFullWindowDragChangedAsync"
+						  Disabled="Disabled" />
+		</MokaGrid>
+	</MokaFieldWrapper>
+
+	<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+		Set the authentication above to Password for a normal login, and to No password when the server should ask
+		for the account itself on its own login screen, which also turns network level authentication off.
+	</MokaText>
+</MokaFlexbox>

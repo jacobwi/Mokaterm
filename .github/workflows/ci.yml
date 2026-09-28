@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    # The solution holds the MAUI desktop host, which builds on Windows only.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore
+        run: dotnet restore Mokaterm.slnx
+
+      # TreatWarningsAsErrors is on in Directory.Build.props, so a warning already fails this.
+      - name: Build
+        run: dotnet build Mokaterm.slnx --no-restore --configuration Release
+
+      # xunit v3 on Microsoft.Testing.Platform (global.json), so trx comes from MTP's report
+      # options and not the VSTest --logger syntax. No fixed filename: every project would
+      # write the same one and the artifact would keep only whichever finished last.
+      - name: Test
+        run: dotnet test --solution Mokaterm.slnx --no-build --configuration Release --report-trx
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: test-results
+          path: '**/*.trx'

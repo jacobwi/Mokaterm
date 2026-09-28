@@ -1,0 +1,60 @@
+@using Mokaterm.Abstractions.Terminal
+@using Mokaterm.UI.Terminal
+
+<MokaDialog Open="Open"
+			OpenChanged="OpenChanged"
+			Title="@(IsNew ? "New custom theme" : "Edit custom theme")"
+			DialogSize="MokaDialogSize.Large"
+			CloseOnBackdropClick="false">
+	<ChildContent>
+		@if (_draft is { } draft)
+		{
+			<div class="theme-editor">
+				<div class="theme-editor__header">
+					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+						<MokaTextField Label="Name"
+									   Value="@draft.Name"
+									   ValueChanged="SetName"
+									   ErrorText="@_nameError"
+									   Required
+									   Size="MokaSize.Sm"
+									   autocomplete="off"
+									   data-autofocus="true" />
+						<MokaSwitch Label="Dark theme"
+									Value="draft.IsDark"
+									ValueChanged="SetDark"
+									HelperText="Tags the theme as Dark or Light in the theme list." />
+					</MokaFlexbox>
+					<TerminalThemePreview Theme="draft" FontFamily="@FontFamily" FontSize="12" />
+				</div>
+				@foreach (ThemeColorGroup group in ThemeColorFields.Groups)
+				{
+					<div @key="group.Title" class="theme-editor__group">
+						<MokaText Element="h3"
+								  SizeValue="10px"
+								  Weight="MokaFontWeight.Semibold"
+								  Transform="MokaTextTransform.Uppercase"
+								  Style="@TextStyles.MicroLabel">@group.Title</MokaText>
+						<div class="theme-editor__colors">
+							@foreach (ThemeColorField field in group.Fields)
+							{
+								<ColorSetting @key="field.Label"
+											  Label="@field.Label"
+											  Value="@(field.Get(draft) ?? "")"
+											  ValueChanged="value => SetColor(field, value)"
+											  Forms="field.Forms"
+											  AllowEmpty="field.Optional"
+											  Placeholder="@(field.Optional ? "Default" : "#rrggbb")"
+											  Width="100%" />
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" OnClick="CancelAsync">Cancel</MokaButton>
+		<MokaButton StartIcon="MokaIcons.Action.Save" OnClick="SaveAsync">Save theme</MokaButton>
+	</Actions>
+</MokaDialog>

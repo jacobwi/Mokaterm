@@ -1,0 +1,127 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+@inherits SessionViewBase
+
+<div class="mt-mqtt">
+	<div class="mt-mqtt-toolbar">
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					StartIcon="MqttIcons.Publish"
+					Disabled="@(_connection is null)"
+					OnClick="OpenPublish"
+					title="Publish a message"
+					aria-label="Publish a message" />
+
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					StartIcon="MqttIcons.Topic"
+					Disabled="@(_connection is null)"
+					OnClick="OpenSubscriptions"
+					title="@SubscriptionsTitle"
+					aria-label="Subscriptions" />
+		<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-meta mt-mqtt-subs-count" title="@SubscriptionsTitle">@SubscriptionsText</MokaText>
+
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Sm"
+					StartIcon="MokatermIcons.Eraser"
+					Disabled="@(_connection is null)"
+					OnClick="ClearKept"
+					title="Forget every topic and message kept here"
+					aria-label="Clear what is kept" />
+
+		<span class="mt-mqtt-spacer"></span>
+
+		@if (_connection is { } connection)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-meta mt-mqtt-counts" title="@CountsTitle">@CountsText</MokaText>
+
+			@if (connection.State == MqttConnectionState.Closed)
+			{
+				<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Error" Label="CLOSED" />
+			}
+
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mt-mqtt-meta mt-mqtt-client" title="@ClientTitle">
+				@connection.Info.ClientId
+			</MokaText>
+
+			@if (connection.Info.IsEncrypted)
+			{
+				<MokaTag Text="TLS" Icon="MokatermIcons.Lock" Color="MokaColor.Success" Size="MokaSize.Xs" title="@TransportTitle" />
+			}
+			else
+			{
+				<MokaTag Text="NOT ENCRYPTED"
+						 Icon="MokatermIcons.Unlock"
+						 Color="MokaColor.Warning"
+						 Size="MokaSize.Xs"
+						 title="@($"{TransportTitle}. Anyone on the path can read the login and every payload.")" />
+			}
+		}
+	</div>
+
+	<div class="mt-mqtt-body">
+		@if (_connection is null)
+		{
+			<MokaEmptyState Icon="MqttIcons.Broker" Title="Not connected" Description="@IdleDescription" />
+		}
+		else
+		{
+			@if (_connection.State == MqttConnectionState.Closed && _connection.CloseReason is { } reason)
+			{
+				<div class="mt-mqtt-notice">
+					<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@reason</MokaAlert>
+				</div>
+			}
+			else if (_store is { TopicsAreFull: true })
+			{
+				<div class="mt-mqtt-notice">
+					<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@TopicsFullText</MokaAlert>
+				</div>
+			}
+
+			<MokaSplitPane Orientation="MokaSplitOrientation.Horizontal" InitialSize="34%" MinSize="180px" Class="mt-mqtt-split">
+				<FirstContent>
+					<MqttTopicPanel Rows="_rows"
+									SelectedTopic="@_selectedTopic"
+									SelectedTopicChanged="OnTopicSelected"
+									OnToggle="OnToggleTopic"
+									Search="@_search"
+									SearchChanged="OnSearchChanged"
+									HasMessages="@(_store?.Received > 0)" />
+				</FirstContent>
+				<SecondContent>
+					<div class="mt-mqtt-right">
+						<div class="mt-mqtt-right-messages">
+							<MqttMessageList Topic="@_selectedTopic"
+											 Messages="_messages"
+											 Received="@(_selectedRow?.Received ?? 0)"
+											 SelectedChanged="OnMessageSelected" />
+						</div>
+						<div class="mt-mqtt-right-payload">
+							<MqttPayloadViewer Message="_selectedMessage" />
+						</div>
+					</div>
+				</SecondContent>
+			</MokaSplitPane>
+		}
+	</div>
+</div>
+
+@if (_connection is { } publishTarget)
+{
+	<MokaDialog Open="_publishOpen"
+				OpenChanged="OnPublishOpenChanged"
+				Title="Publish"
+				DialogSize="MokaDialogSize.Medium">
+		<MqttPublishForm Connection="publishTarget" Topic="@_selectedTopic" DefaultQos="@DefaultQos" />
+	</MokaDialog>
+
+	<MokaDialog Open="_subscriptionsOpen"
+				OpenChanged="OnSubscriptionsOpenChanged"
+				Title="Subscriptions"
+				DialogSize="MokaDialogSize.Medium">
+		<MqttSubscriptionPanel Connection="publishTarget" Subscriptions="_subscriptions" DefaultQos="@DefaultQos" />
+	</MokaDialog>
+}

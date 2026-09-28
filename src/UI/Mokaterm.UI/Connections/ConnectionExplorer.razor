@@ -1,0 +1,138 @@
+<div class="mt-explorer">
+	<div class="mt-explorer-search">
+		<MokaSearchInput Value="@_query"
+						 ValueChanged="OnQueryChanged"
+						 Placeholder="Filter hosts, users, tags"
+						 Size="MokaSize.Sm"
+						 Debounce="0" />
+	</div>
+
+	<div class="mt-explorer-tree"
+		 tabindex="0"
+		 @ref="_tree"
+		 @onkeydown="OnKeyDownAsync"
+		 @oncontextmenu="OnEmptyAreaContextMenu"
+		 @oncontextmenu:preventDefault>
+		@if (!Catalog.IsLoaded)
+		{
+			<div class="mt-explorer-message">
+				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+			</div>
+		}
+		else if (_rows.Count == 0)
+		{
+			<div class="mt-explorer-message">
+				@if (_query.Trim().Length > 0)
+				{
+					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">Nothing matches the filter.</MokaText>
+				}
+				else
+				{
+					<MokaEmptyState Icon="MokatermIcons.Server" Title="No saved hosts" Description="Add a host, then give it one or more logins." Size="MokaSize.Sm">
+						@* The panel is narrow, so the two actions stack instead of running past its edges side by side. *@
+						<MokaFlexbox Direction="MokaDirection.Column" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xs">
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" OnClick="() => Actions.NewHost()">
+								New host
+							</MokaButton>
+							<MokaButton Variant="MokaVariant.Text"
+										Size="MokaSize.Sm"
+										StartIcon="MokatermIcons.FileUpload"
+										title="From OpenSSH, PuTTY or WinSCP"
+										OnClick="() => Actions.ImportConnections()">
+								Import hosts
+							</MokaButton>
+						</MokaFlexbox>
+					</MokaEmptyState>
+				}
+			</div>
+		}
+		else
+		{
+			<MokaList Dense>
+				@foreach (ConnectionTreeRow row in _rows)
+				{
+					<div @key="row.Key"
+						 class="@RowClass(row)"
+						 draggable="@(row.Kind == ConnectionTreeRowKind.Host ? "true" : "false")"
+						 data-mt-drag="@(row.Kind == ConnectionTreeRowKind.Host ? row.Key : null)"
+						 @onclick="() => Select(row)"
+						 @ondblclick="() => ActivateAsync(row)"
+						 @oncontextmenu="e => OnRowContextMenu(e, row)"
+						 @oncontextmenu:preventDefault
+						 @oncontextmenu:stopPropagation
+						 @ondragstart="() => OnDragStart(row)"
+						 @ondragend="OnDragEnd"
+						 @ondragenter="() => OnDragEnter(row.Key)"
+						 @ondragover:preventDefault
+						 @ondrop="() => OnDropAsync(row)"
+						 @ondrop:stopPropagation>
+						<MokaListItem Active="@(row.Key == _selectedKey)" Style="@IndentStyle(row.Depth)">
+							<ChildContent>
+								<span class="mt-tree-line">
+									<span class="mt-tree-chevron" @onclick="() => Toggle(row)" @onclick:stopPropagation @ondblclick:stopPropagation>
+										@if (row.Expandable)
+										{
+											<MokaIcon Icon="@(row.Expanded ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronRight)" SizeValue="12px" />
+										}
+									</span>
+									@switch (row)
+									{
+										case { Folder: { } folder }:
+											<MokaIcon Icon="@(row.Expanded ? MokatermIcons.FolderOpen : MokatermIcons.Folder)" Size="MokaSize.Xs" />
+											<span class="mt-tree-label">@folder.Name</span>
+											break;
+										case { Login: { } login }:
+											<ProtocolIcon ProtocolId="@login.ProtocolId" Size="MokaSize.Xs" />
+											<span class="mt-tree-label">@LoginLabel(login)</span>
+											<span class="mt-tree-meta">@Protocols.DisplayName(login.ProtocolId)</span>
+											break;
+										case { Host: { } host }:
+											<MokaIcon Icon="MokatermIcons.Server" Size="MokaSize.Xs" Style="@HostColorStyle(host)" />
+											<span class="mt-tree-label">@host.DisplayName</span>
+											if (!string.Equals(host.DisplayName, host.Address, StringComparison.Ordinal))
+											{
+												<span class="mt-tree-meta">@host.Address</span>
+											}
+											break;
+									}
+								</span>
+							</ChildContent>
+							<EndContent>
+								@switch (row)
+								{
+									case { Folder: not null }:
+										if (row.ChildCount > 0)
+										{
+											<MokaText Element="span" Mono Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">@row.ChildCount</MokaText>
+										}
+										break;
+									case { Login: { } login }:
+										if (login.IsFavorite)
+										{
+											<MokaIcon Icon="MokaIcons.Toggle.Star" SizeValue="12px" Style="color:var(--moka-color-warning)" />
+										}
+										if (_sessionStates.TryGetValue(login.Id, out SessionState state))
+										{
+											<MokaStatusDot Size="MokaSize.Xs" Color="@SessionStateDisplay.Color(state)" Pulse="@(state == SessionState.Connecting)" />
+										}
+										break;
+									case { Host: { } host }:
+										if (HostEnvironmentDisplay.Tag(host.Environment) is { } environment)
+										{
+											<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(host.Environment)" />
+										}
+										break;
+								}
+							</EndContent>
+						</MokaListItem>
+					</div>
+				}
+			</MokaList>
+		}
+
+		<div class="@(_dropTargetKey == RootDropKey ? "mt-tree-filler mt-tree-filler--drop" : "mt-tree-filler")"
+			 @ondragenter="() => OnDragEnter(RootDropKey)"
+			 @ondragover:preventDefault
+			 @ondrop="OnDropOnRootAsync"></div>
+	</div>
+</div>

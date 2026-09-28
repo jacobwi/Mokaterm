@@ -1,0 +1,32 @@
+@namespace Mokaterm.UI.Presentation
+@inherits ErrorBoundaryBase
+
+@* Until something fails the boundary adds no element of its own, so wrapping a view never changes its layout. *@
+@if (NotifyOnly || CurrentException is not { } failure)
+{
+	@ChildContent
+}
+else if (ErrorContent is not null)
+{
+	@ErrorContent(failure)
+}
+else
+{
+	<div class="mt-fault @(Fill ? "mt-fault--fill" : null)">
+		<div class="mt-fault-card">
+			<MokaAlert Severity="MokaToastSeverity.Error" Title="@Title">
+				<span class="mt-fault-line">@Describe(failure)</span>
+				@if (Hint is not null)
+				{
+					<span class="mt-fault-line mt-fault-hint">@Hint</span>
+				}
+			</MokaAlert>
+			<div class="mt-fault-actions">
+				@Actions
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="Recover">
+					Try again
+				</MokaButton>
+			</div>
+		</div>
+	</div>
+}

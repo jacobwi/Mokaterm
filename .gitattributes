@@ -1,0 +1,12 @@
+# The repo is CRLF (.editorconfig sets end_of_line = crlf). Normalizing here rather than
+# leaving it to each machine's core.autocrlf is what keeps a clone on CI byte-identical to
+# one on a workstation. text=auto still detects binaries, so the icon is left alone.
+* text=auto eol=crlf
+
+# Vendored third-party code ships exactly as it came: noVNC and xterm.js are LF, the
+# Mokaterm patches in them are tracked by hand, and normalizing would rewrite every file
+# and make the next upstream diff unreadable.
+src/Modules/Mokaterm.Modules.Vnc/wwwroot/lib/** -text
+src/UI/Mokaterm.UI.Terminal/wwwroot/lib/** -text
+
+*.ico binary

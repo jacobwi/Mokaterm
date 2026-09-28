@@ -1,0 +1,54 @@
+@inherits ConnectionOptionsEditorBase<VncConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaFieldWrapper Label="Encryption" HelperText="@EncryptionHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Encryption" Value="@Current.Encryption.ToString()" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(VncEncryptionMode.Preferred)" Text="Prefer TLS" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(VncEncryptionMode.Required)" Text="Require TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaFieldWrapper Label="Scaling" HelperText="@ScalingHelp" Disabled="Disabled">
+		<MokaSegmentedControl AriaLabel="Scaling" Value="@Current.Scaling.ToString()" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="@nameof(VncScalingMode.Fit)" Text="Fit to view" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(VncScalingMode.Actual)" Text="1:1" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(VncScalingMode.Remote)" Text="Resize the server" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaNumericField TValue="int"
+						  Label="Picture quality"
+						  Value="@Current.Quality"
+						  ValueChanged="OnQualityChangedAsync"
+						  HelperText="@QualityHelp"
+						  Disabled="Disabled" />
+
+		<MokaNumericField TValue="int"
+						  Label="Compression"
+						  Value="@Current.Compression"
+						  ValueChanged="OnCompressionChangedAsync"
+						  HelperText="@CompressionHelp"
+						  Disabled="Disabled" />
+	</MokaGrid>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSwitch Label="Let other viewers stay connected"
+					Value="@Current.Shared"
+					ValueChanged="OnSharedChangedAsync"
+					HelperText="@SharedHelp"
+					Disabled="Disabled" />
+
+		<MokaSwitch Label="Open in view only mode"
+					Value="@Current.ViewOnly"
+					ValueChanged="OnViewOnlyChangedAsync"
+					HelperText="Watch without sending keys or mouse. The session view can turn input back on."
+					Disabled="Disabled" />
+	</MokaGrid>
+
+	<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+		Classic VNC servers check a password of their own, at most eight characters, and ignore the user name; only
+		servers that ask for one (VeNCrypt Plain) read it. Set the authentication above to No password when the server
+		asks for the login itself, and to Password when it wants its VNC password.
+	</MokaText>
+</MokaFlexbox>

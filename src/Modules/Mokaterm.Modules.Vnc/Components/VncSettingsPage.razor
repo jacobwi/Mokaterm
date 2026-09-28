@@ -1,0 +1,46 @@
+@inherits SettingsSectionBase<VncSettings>
+
+@{
+	VncSettings settings = Settings;
+}
+
+<SettingsPage Title="VNC" OnReset="ResetAsync">
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Connect timeout"
+					 Description="Covers the connection and the RFB handshake, but not a prompt about a certificate.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="VncSettings.MinTimeoutSeconds"
+						   Max="VncSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Login attempts" Description="Password prompts, the first one included, before a rejected login gives up.">
+			<NumberSetting TValue="int"
+						   Value="settings.AuthenticationAttempts"
+						   ValueChanged="value => SaveAsync(s => s with { AuthenticationAttempts = value })"
+						   Min="1"
+						   Max="VncSettings.MaxAuthenticationAttempts"
+						   AriaLabel="Login attempts" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Screen">
+		<SettingsRow Label="Clipboard limit" Description="Largest text moved between a session and this machine.">
+			<NumberSetting TValue="int"
+						   Value="settings.ClipboardKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { ClipboardKilobytes = value })"
+						   Min="VncSettings.MinClipboardKilobytes"
+						   Max="VncSettings.MaxClipboardKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Clipboard limit in kilobytes" />
+		</SettingsRow>
+		<SettingsRow Label="Show a dot for the pointer"
+					 Description="Marks where the pointer is when the server draws no cursor of its own.">
+			<MokaSwitch Value="settings.ShowDotCursor"
+						ValueChanged="value => SaveAsync(s => s with { ShowDotCursor = value })"
+						aria-label="Show a dot for the pointer" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

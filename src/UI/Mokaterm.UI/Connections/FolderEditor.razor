@@ -1,0 +1,31 @@
+@inherits ShellEditorBase<FolderEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="@(_original is null ? "New folder" : "Rename folder")"
+				   DialogSize="MokaDialogSize.Small"
+				   Busy="_saving"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			<PromptBody @ref="Body">
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+				<MokaTextField Label="Name"
+							   @bind-Value="_name"
+							   HelperText="@ParentText"
+							   Disabled="_saving"
+							   autocomplete="off"
+							   data-autofocus="true" />
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="Close">Cancel</MokaButton>
+		<MokaButton Loading="_saving" Disabled="@(_name.Trim().Length == 0)" data-primary="true" OnClick="SaveAsync">
+			@(_original is null ? "Create" : "Rename")
+		</MokaButton>
+	</Actions>
+</ShellEditorDialog>

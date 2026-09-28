@@ -1,0 +1,154 @@
+@using Mokaterm.Abstractions.Terminal
+@inherits ConnectionOptionsEditorBase<SerialConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		A serial login has no network port: the machine's address <em>is</em> the port name, so a host called COM3 or
+		/dev/ttyUSB0 is what this connection opens. Pick another port below only when the same adapter shows up under a
+		different name on this machine.
+	</MokaText>
+
+	<div class="mt-serial-port">
+		@if (_typingPort)
+		{
+			<MokaTextField Label="Port"
+						   Value="@_portText"
+						   ValueChanged="OnPortChangedAsync"
+						   ErrorText="@_portError"
+						   Placeholder="@PortPlaceholder"
+						   HelperText="@PortHelp"
+						   Disabled="Disabled"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		}
+		else
+		{
+			<MokaSelect TValue="string"
+						Label="Port"
+						Items="_portChoices"
+						Value="@_portText"
+						ValueChanged="OnPortChangedAsync"
+						ValueSelector="PortLabel"
+						ErrorText="@_portError"
+						HelperText="@PortHelp"
+						Placeholder="@PortPlaceholder"
+						Disabled="Disabled"
+						Size="MokaSize.Sm" />
+		}
+
+		<div class="mt-serial-port-actions">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="Disabled"
+						OnClick="RefreshPorts"
+						aria-label="Look for serial ports again" />
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						Disabled="Disabled"
+						OnClick="TogglePortEntry">
+				@(_typingPort ? "Pick a port" : "Type a name")
+			</MokaButton>
+		</div>
+	</div>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSelect TValue="int"
+					Label="Baud rate"
+					Items="_baudRates"
+					Value="Current.Line.BaudRate"
+					ValueChanged="OnBaudRateChangedAsync"
+					HelperText="Bits per second. Most boards and bootloaders ship at 115200."
+					Disabled="Disabled"
+					Size="MokaSize.Sm" />
+
+		<CharacterSetSetting Value="@Current.EncodingName"
+							 ValueChanged="OnEncodingChangedAsync"
+							 Default="@SerialEncodings.Default"
+							 TryGet="TerminalEncodings.TryGet"
+							 Label="Character set"
+							 HelperText="What the device speaks, for example utf-8, ibm437 or windows-1252."
+							 Disabled="Disabled"
+							 Size="MokaSize.Sm" />
+	</MokaGrid>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaFieldWrapper Label="Data bits" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegmentedControl AriaLabel="Data bits" Value="@DataBitsValue" ValueChanged="OnDataBitsChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+				<MokaSegment Value="5" Text="5" Disabled="Disabled" />
+				<MokaSegment Value="6" Text="6" Disabled="Disabled" />
+				<MokaSegment Value="7" Text="7" Disabled="Disabled" />
+				<MokaSegment Value="8" Text="8" Disabled="Disabled" />
+			</MokaSegmentedControl>
+		</MokaFieldWrapper>
+
+		<MokaFieldWrapper Label="Stop bits" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegmentedControl AriaLabel="Stop bits" Value="@Current.Line.StopBits.ToString()" ValueChanged="OnStopBitsChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+				<MokaSegment Value="@nameof(SerialStopBits.One)" Text="1" Disabled="Disabled" />
+				<MokaSegment Value="@nameof(SerialStopBits.OnePointFive)" Text="1.5" Disabled="Disabled" />
+				<MokaSegment Value="@nameof(SerialStopBits.Two)" Text="2" Disabled="Disabled" />
+			</MokaSegmentedControl>
+		</MokaFieldWrapper>
+	</MokaGrid>
+
+	<MokaFieldWrapper Label="Parity" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Parity" Value="@Current.Line.Parity.ToString()" ValueChanged="OnParityChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(SerialParity.None)" Text="None" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialParity.Odd)" Text="Odd" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialParity.Even)" Text="Even" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialParity.Mark)" Text="Mark" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialParity.Space)" Text="Space" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaFieldWrapper Label="Flow control" HelperText="@FlowControlHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Flow control" Value="@Current.Line.FlowControl.ToString()" ValueChanged="OnFlowControlChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(SerialFlowControl.None)" Text="None" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialFlowControl.XOnXOff)" Text="XON/XOFF" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialFlowControl.RtsCts)" Text="RTS/CTS" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialFlowControl.RtsCtsXOnXOff)" Text="Both" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	@if (Current.Line.Validate() is { } invalidLine)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@invalidLine</MokaAlert>
+	}
+	else
+	{
+		<MokaText Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">
+			@Current.Line.Describe()
+		</MokaText>
+	}
+
+	<MokaFieldWrapper Label="Enter sends" HelperText="@LineEndingHelp" Disabled="Disabled" Size="MokaSize.Sm">
+		<MokaSegmentedControl AriaLabel="Enter sends" Value="@Current.LineEnding.ToString()" ValueChanged="OnLineEndingChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="@nameof(SerialLineEnding.Cr)" Text="CR" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialLineEnding.CrLf)" Text="CR LF" Disabled="Disabled" />
+			<MokaSegment Value="@nameof(SerialLineEnding.Lf)" Text="LF" Disabled="Disabled" />
+		</MokaSegmentedControl>
+	</MokaFieldWrapper>
+
+	<MokaSwitch Label="Show what is typed"
+				Value="@Current.LocalEcho"
+				ValueChanged="OnLocalEchoChangedAsync"
+				HelperText="Turn on for a device that echoes nothing, which is most bootloaders. Off when every character appears twice."
+				Disabled="Disabled" />
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaSwitch Label="Assert DTR"
+					Value="@Current.Dtr"
+					ValueChanged="OnDtrChangedAsync"
+					HelperText="Most USB adapters need it. It also resets boards that wire DTR to reset, an Arduino among them."
+					Disabled="Disabled" />
+
+		<MokaSwitch Label="Assert RTS"
+					Value="@RtsValue"
+					ValueChanged="OnRtsChangedAsync"
+					HelperText="@RtsHelp"
+					Disabled="@(Disabled || !Current.Line.CanSetRts)" />
+	</MokaGrid>
+</MokaFlexbox>

@@ -1,0 +1,263 @@
+@{
+	SessionLogStatus log = SessionLogs.StatusFor(Session.Id);
+}
+
+<div class="mt-session">
+	<div class="mt-session-toolbar">
+		<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
+		<SessionLabel Session="Session" ShowPort Tooltip="@Endpoint" />
+		@if (HostEnvironmentDisplay.Tag(Session.Host.Environment) is { } environment)
+		{
+			<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(Session.Host.Environment)" />
+		}
+		@* The tab above already carries a dot for a healthy session; the toolbar speaks up only while connecting or after a drop. *@
+		@if (Session.State != SessionState.Connected)
+		{
+			<MokaStatusDot Size="MokaSize.Xs"
+						   Color="@SessionStateDisplay.Color(Session.State)"
+						   Pulse="@(Session.State == SessionState.Connecting)"
+						   Label="@SessionStateDisplay.Label(Session.State)" />
+		}
+		@* A file of everything the server printed is not something to discover later: it says so beside the machine. *@
+		@if (log.IsOn)
+		{
+			<MokaStatusDot Size="MokaSize.Xs"
+						   Color="@LogColor(log)"
+						   Pulse="@(log.State == SessionLogState.Recording)"
+						   Label="@LogLabel(log)" />
+		}
+
+		<span class="mt-session-spacer"></span>
+
+		@if (Layout == SessionLayout.Split)
+		{
+			<IconAction Icon="MokatermIcons.SplitView"
+						Title="File browser"
+						Active="@(!_viewState.FilesCollapsed)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ToggleFiles" />
+		}
+		@if (HasTerminalView)
+		{
+			<IconAction Icon="MokatermIcons.Command"
+						Title="Saved commands"
+						Active="@_viewState.CommandsOpen"
+						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.SavedCommands)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ToggleCommands" />
+			<IconAction Icon="MokatermIcons.Broadcast"
+						Title="@BroadcastTitle"
+						Active="@TypesWithOthers"
+						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.BroadcastInput)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ToggleBroadcast" />
+			<IconAction Icon="MokatermIcons.Palette"
+						Title="Terminal theme"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ShowThemeMenu" />
+			<IconAction Icon="MokaIcons.Action.Search"
+						Title="Find"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="FindAsync" />
+			<IconAction Icon="MokatermIcons.Eraser"
+						Title="Clear terminal"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ClearAsync" />
+			<IconAction Icon="MokatermIcons.Record"
+						Title="@LogTitle(log)"
+						Active="@log.IsOn"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ToggleLog" />
+		}
+		@foreach (SessionToolDescriptor tool in Tools)
+		{
+			<IconAction Icon="tool.Icon"
+						Title="@tool.Title"
+						Active="@(OpenTool == tool)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="@(() => ToggleTool(tool))" />
+		}
+		@if (SessionStateDisplay.CanReconnect(Session.State))
+		{
+			<IconAction Icon="MokatermIcons.Reconnect"
+						Title="Reconnect"
+						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Reconnect)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="ReconnectAsync" />
+		}
+		<IconAction Icon="MokaIcons.Content.Copy"
+					Title="Duplicate session"
+					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Duplicate)"
+					Size="MokaSize.Xs"
+					TooltipPosition="MokaTooltipPosition.Left"
+					OnClick="DuplicateAsync" />
+		@if (Session.State is SessionState.Connecting or SessionState.Connected)
+		{
+			<IconAction Icon="MokatermIcons.Disconnect"
+						Title="Disconnect"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="DisconnectAsync" />
+		}
+		<IconAction Icon="MokatermIcons.Power"
+					Title="Disconnect and close"
+					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.CloseTab)"
+					Size="MokaSize.Xs"
+					TooltipPosition="MokaTooltipPosition.Left"
+					OnClick="CloseAsync" />
+	</div>
+
+	@if (ShowBanner)
+	{
+		<div class="mt-session-banner">
+			<MokaStatusDot Size="MokaSize.Xs" Color="@SessionStateDisplay.Color(Session.State)" />
+			<MokaText Element="span" Size="MokaSize.Xs" Truncate Style="min-width:0">@BannerText</MokaText>
+			<span class="mt-session-spacer"></span>
+			@if (Session.State == SessionState.Failed && !Session.IsTransient)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" OnClick="EditConnection">
+					Edit connection
+				</MokaButton>
+			}
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect" OnClick="ReconnectAsync">
+				Reconnect
+			</MokaButton>
+		</div>
+	}
+
+	<div class="mt-session-body">
+		@if (Session.ConnectedAt is not null)
+		{
+			@switch (Layout)
+			{
+				case SessionLayout.Split:
+				case SessionLayout.Terminal:
+					<MokaDockLayout @key="_placement" Class="@SplitClass">
+						@if (Layout == SessionLayout.Split)
+						{
+							<MokaDockPanel Dock="@(_placement == FileBrowserPlacement.Right ? MokaDockPosition.Right : MokaDockPosition.Left)"
+										   Title="FILES"
+										   Size="@FilesPanelSize"
+										   MinSize="220px"
+										   MaxSize="1200px"
+										   Collapsible
+										   Collapsed="@_viewState.FilesCollapsed"
+										   CollapsedChanged="SetFilesCollapsed"
+										   SizeChanged="OnFilesPanelResized"
+										   Scrollable="false">
+								<RemoteFileBrowser Session="Session" IsActive="@(IsActive && !_viewState.FilesCollapsed)" Class="mt-fill" />
+							</MokaDockPanel>
+						}
+						@if (_viewState.CommandsOpen && HasTerminalView)
+						{
+							<MokaDockPanel Dock="@CommandsDock"
+										   Title="COMMANDS"
+										   Size="@CommandsPanelSize"
+										   MinSize="220px"
+										   MaxSize="640px"
+										   SizeChanged="OnCommandsPanelResized"
+										   Scrollable="false">
+								<CommandsPanel @ref="_commands" Session="Session" OnClosed="CloseCommands" />
+							</MokaDockPanel>
+						}
+						<MokaDockContent Scrollable="false">
+							@TerminalContent
+						</MokaDockContent>
+					</MokaDockLayout>
+					break;
+				case SessionLayout.Files:
+					<RemoteFileBrowser Session="Session" IsActive="IsActive" Class="mt-fill" />
+					break;
+				case SessionLayout.Module:
+					@if (ModuleViewType is { } viewType)
+					{
+						<DynamicComponent Type="viewType" Parameters="ModuleParameters" />
+					}
+					break;
+				default:
+					<MokaEmptyState Icon="MokatermIcons.Modules"
+									Title="Nothing to show"
+									Description="No installed module provides a view for this protocol." />
+					break;
+			}
+		}
+
+		@if (Session.State == SessionState.Connecting)
+		{
+			<div class="mt-session-overlay">
+				<div class="mt-session-card">
+					<MokaSpinner Label="@(Session.StatusMessage ?? "Connecting")" />
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="color:var(--moka-color-on-surface-variant)">
+						@Endpoint
+					</MokaText>
+					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="DisconnectAsync">
+						Cancel
+					</MokaButton>
+				</div>
+			</div>
+		}
+		else if (Session.State == SessionState.Failed && Session.ConnectedAt is null)
+		{
+			<div class="mt-session-overlay">
+				<div class="mt-session-card mt-session-card--wide">
+					<MokaAlert Severity="MokaToastSeverity.Error" Title="@SessionStateDisplay.FailureTitle(Session.Failure)">
+						@(Session.StatusMessage ?? "The connection failed.")
+					</MokaAlert>
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CloseAsync">Close</MokaButton>
+						@if (!Session.IsTransient)
+						{
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Edit" OnClick="EditConnection">
+								Edit connection
+							</MokaButton>
+						}
+						<MokaButton Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="ReconnectAsync">Reconnect</MokaButton>
+					</MokaFlexbox>
+				</div>
+			</div>
+		}
+	</div>
+</div>
+
+@if (OpenTool is { } openTool)
+{
+	<MokaDialog Open="true"
+				OpenChanged="OnToolDialogOpenChanged"
+				Title="@openTool.Title"
+				DialogSize="MokaDialogSize.Large">
+		<ViewBoundary @key="openTool" Name="@openTool.Title">
+			<DynamicComponent Type="openTool.Component" Parameters="ModuleParameters" />
+		</ViewBoundary>
+	</MokaDialog>
+}
+
+@code {
+	private RenderFragment TerminalContent => @<text>
+		@if (TerminalStream is { } stream)
+		{
+			<TerminalView @ref="_terminal"
+						  Stream="stream"
+						  Settings="_terminalSettings"
+						  AccentColor="@HostAccent.For(Session.Host)"
+						  IsActive="IsActive"
+						  CanReconnect="@SessionStateDisplay.CanReconnect(Session.State)"
+						  OnReconnectRequested="ReconnectAsync"
+						  OnStopConfirmingPaste="StopConfirmingPasteAsync"
+						  OnTitleChanged="OnRemoteTitleChanged"
+						  ExtraMenuItems="TerminalMenuItems"
+						  ShowCommandActions="true"
+						  OnCommandSaved="SaveCommandAsync"
+						  OnCommandSavedWithDetails="SaveCommandWithDetails"
+						  Class="mt-fill" />
+		}
+	</text>;
+}

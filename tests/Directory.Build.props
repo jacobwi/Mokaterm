@@ -1,0 +1,44 @@
+<Project>
+
+	<Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+
+	<!--
+		CA1001: test classes own disposables that xunit disposes through IDisposable on the class.
+		CA1034: nested fakes read better next to the tests that use them.
+		CA1707: Method_Scenario_Expectation names.
+		CA2000: tests create and drop disposables freely.
+		CA5394: Random is fine for test data.
+	-->
+	<PropertyGroup>
+		<NoWarn>$(NoWarn);CA1001;CA1034;CA1707;CA2000;CA5394</NoWarn>
+	</PropertyGroup>
+
+	<!--
+		Fakes and helpers every test project would otherwise copy, compiled into each assembly as linked files rather
+		than shared through a project of their own: they stay internal, so InternalsVisibleTo stays per project, and a
+		file that needs a package only some projects reference is included by those projects instead (Shared\Interop,
+		Shared\Rendering, Shared\FakeTime).
+	-->
+	<ItemGroup>
+		<Compile Include="$(MSBuildThisFileDirectory)Shared\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+		<Using Include="Mokaterm.Tests.Shared" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="xunit.v3" />
+		<PackageReference Include="xunit.runner.visualstudio" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" />
+		<PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+	</ItemGroup>
+
+</Project>

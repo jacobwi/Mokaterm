@@ -1,0 +1,90 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<div class="mt-mqtt-live-subs">
+	<div class="mt-mqtt-live-head">
+		<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-mqtt-live-label">
+			@CountLabel
+		</MokaText>
+		<span class="mt-mqtt-live-spacer"></span>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="@(_draft is null ? MokaIcons.Action.Add : MokaIcons.Navigation.Close)"
+					Disabled="@_busy"
+					OnClick="ToggleDraft">
+			@(_draft is null ? "Add filter" : "Cancel")
+		</MokaButton>
+	</div>
+
+	@if (_draft is { } draft)
+	{
+		<div class="mt-mqtt-live-draft">
+			<MqttSubscriptionForm Subscription="draft" SubscriptionChanged="OnDraftChanged" ShowSubscribeWithSession="false" Disabled="@_busy" />
+			@if (draft.Validate() is { } invalid)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@invalid</MokaAlert>
+			}
+			<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
+				<MokaButton Size="MokaSize.Xs" Disabled="@(_busy || draft.Validate() is not null)" OnClick="AddAsync">
+					Subscribe for this session
+				</MokaButton>
+			</MokaFlexbox>
+		</div>
+	}
+
+	@if (Subscriptions.Count == 0)
+	{
+		<MokaEmptyState Icon="MqttIcons.Topic"
+						Title="No subscriptions"
+						Description="A broker sends nothing until one asks. Save filters with the connection, or add one here for this session." />
+	}
+	else
+	{
+		<div class="mt-mqtt-live-list">
+			@foreach (MqttSubscriptionStatus status in Subscriptions)
+			{
+				<div class="mt-mqtt-live-row" @key="status.Subscription.Id">
+					<MokaStatusDot Size="MokaSize.Xs"
+								   Color="@StateColor(status.State)"
+								   Pulse="@(status.State == MqttSubscriptionState.Subscribing)" />
+					<MokaTag Text="@MqttSubscriptionList.QosLabel(status.Subscription.QualityOfService)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+					<div class="mt-mqtt-live-text">
+						<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate title="@status.Subscription.TopicFilter">
+							@status.Subscription.TopicFilter
+						</MokaText>
+						<MokaText Element="span" Size="MokaSize.Xs" Truncate Style="@DescribeStyle(status)">@status.Describe()</MokaText>
+					</div>
+					@if (status.IsSessionOnly)
+					{
+						<MokaTag Text="SESSION" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+					}
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-live-count" title="Messages this filter matched">
+						@status.Matched
+					</MokaText>
+					@if (status.State is MqttSubscriptionState.Idle or MqttSubscriptionState.Failed)
+					{
+						<MokaButton Variant="MokaVariant.Text"
+									Color="MokaColor.Surface"
+									Size="MokaSize.Xs"
+									StartIcon="MokatermIcons.Connect"
+									Disabled="@_busy"
+									OnClick="@(() => SubscribeAsync(status.Subscription))"
+									aria-label="Subscribe" />
+					}
+					<MokaButton Variant="MokaVariant.Text"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@_busy"
+								OnClick="@(() => RemoveAsync(status.Subscription.Id))"
+								aria-label="@RemoveLabel(status)" />
+				</div>
+			}
+		</div>
+	}
+
+	<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+		Filters added here last until the session closes. Save them with the connection to have them sent on every
+		connect.
+	</MokaText>
+</div>

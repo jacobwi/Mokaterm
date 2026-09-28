@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    name: Package & Publish
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+
+      - name: Version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore Mokaterm.slnx
+
+      - name: Build
+        run: dotnet build Mokaterm.slnx --no-restore --configuration Release
+
+      # A tag on a commit that does not pass is not a release.
+      - name: Test
+        run: dotnet test --solution Mokaterm.slnx --no-build --configuration Release
+
+      # Publishes the desktop host and packs it with Velopack into artifacts/windows. The
+      # script targets Windows PowerShell, which is what the maintainer's machine has.
+      #
+      # Unsigned, so SmartScreen warns before Setup.exe runs. To sign later: add an
+      # azure/login step for the signing service principal, write metadata.json from a
+      # secret, and pass -AzureTrustedSignFile here. Give the script a --signExclude
+      # ".*\.dll$" passthrough first, or one release spends ~400 signatures of the
+      # monthly quota instead of the four exes that matter.
+      - name: Package
+        shell: powershell
+        run: >
+          ./build/package-windows.ps1
+          -Version ${{ steps.version.outputs.version }}
+          -GitHubRepoUrl ${{ github.server_url }}/${{ github.repository }}
+          -GitHubToken ${{ github.token }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: .github/release-body.md
+          generate_release_notes: true
+          files: |
+            artifacts/windows/Moka.Mokaterm-win-Setup.exe
+            artifacts/windows/Moka.Mokaterm-win-Portable.zip
+            artifacts/windows/*.nupkg
+            artifacts/windows/releases.win.json
+            artifacts/windows/assets.win.json
+            artifacts/windows/RELEASES

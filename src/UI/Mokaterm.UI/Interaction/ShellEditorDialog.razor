@@ -1,0 +1,43 @@
+@* The frame every shell editor opens in. Busy is the whole "cannot be closed while saving" rule: Escape, the close
+   button and the backdrop all go, which is what Moka.Red 0.1.13 made possible, and the editor's own Close still
+   refuses. *@
+
+<MokaDialog Open="Open"
+			Title="@Title"
+			DialogSize="DialogSize"
+			CloseOnBackdropClick="false"
+			CloseOnEscape="@(!Busy)"
+			ShowCloseButton="@(!Busy)"
+			OnClose="OnClose">
+	<ChildContent>
+		@ChildContent
+	</ChildContent>
+	<Actions>
+		@Actions
+	</Actions>
+</MokaDialog>
+
+@code {
+	[Parameter]
+	public bool Open { get; set; }
+
+	[Parameter]
+	public string? Title { get; set; }
+
+	[Parameter]
+	public MokaDialogSize DialogSize { get; set; } = MokaDialogSize.Medium;
+
+	/// <summary>True while the editor is saving, which is when the dialog stops offering every way out.</summary>
+	[Parameter]
+	public bool Busy { get; set; }
+
+	/// <summary>Raised when the dialog closes itself. The editor decides whether to let go of the request.</summary>
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+}

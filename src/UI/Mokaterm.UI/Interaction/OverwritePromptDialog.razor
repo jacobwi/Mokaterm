@@ -1,0 +1,58 @@
+@* Asks what to do when a transfer target already exists. *@
+@inherits PromptDialogBase
+
+<MokaDialog Open="true"
+			Title="File already exists"
+			DialogSize="MokaDialogSize.Medium"
+			CloseOnBackdropClick="false"
+			OnClose="() => AnswerAsync(OnDecision, OverwriteDecision.Cancel)">
+	<ChildContent>
+		<PromptBody @ref="Body" AutofocusSelf="true">
+			<MokaText Element="div" Mono Size="MokaSize.Sm" Class="mt-break">@Prompt.Path</MokaText>
+			<MokaKeyValue Label="EXISTING" LabelWidth="96px">
+				<MokaText Element="span" Mono Size="MokaSize.Sm">@Describe(Prompt.ExistingSize, Prompt.ExistingModified)</MokaText>
+			</MokaKeyValue>
+			<MokaKeyValue Label="INCOMING" LabelWidth="96px">
+				<MokaText Element="span" Mono Size="MokaSize.Sm">@Describe(Prompt.IncomingSize, Prompt.IncomingModified)</MokaText>
+			</MokaKeyValue>
+		</PromptBody>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="() => AnswerAsync(OnDecision, OverwriteDecision.Cancel)">
+			Cancel
+		</MokaButton>
+		@if (Prompt.IsBatch)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" OnClick="() => AnswerAsync(OnDecision, OverwriteDecision.SkipAll)">
+				Skip all
+			</MokaButton>
+		}
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" OnClick="() => AnswerAsync(OnDecision, OverwriteDecision.Skip)">
+			Skip
+		</MokaButton>
+		@if (Prompt.IsBatch)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" OnClick="() => AnswerAsync(OnDecision, OverwriteDecision.OverwriteAll)">
+				Overwrite all
+			</MokaButton>
+		}
+		<MokaButton Color="MokaColor.Error" data-primary="true" OnClick="() => AnswerAsync(OnDecision, OverwriteDecision.Overwrite)">
+			Overwrite
+		</MokaButton>
+	</Actions>
+</MokaDialog>
+
+@code {
+	[Parameter, EditorRequired]
+	public OverwritePrompt Prompt { get; set; } = default!;
+
+	/// <summary>Raised once with the decision; closing the dialog cancels.</summary>
+	[Parameter]
+	public EventCallback<OverwriteDecision> OnDecision { get; set; }
+
+	private static string Describe(long? size, DateTimeOffset? modified)
+	{
+		string sizeText = size is { } bytes ? DisplayFormat.Bytes(bytes) : "size unknown";
+		return modified is null ? sizeText : $"{sizeText}  {DisplayFormat.Timestamp(modified)}";
+	}
+}

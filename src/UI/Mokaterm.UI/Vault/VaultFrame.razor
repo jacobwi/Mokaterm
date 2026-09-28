@@ -1,0 +1,16 @@
+@* Centered card on the page background, shared by the vault setup and unlock screens. *@
+
+<div class="mt-vault">
+	<div class="mt-vault-card">
+		<div class="mt-vault-brand">
+			<MokaText Element="span" Mono Weight="MokaFontWeight.Semibold" Color="MokaColor.Primary" SizeValue="18px">&gt;_</MokaText>
+			<MokaText Element="span" Mono Weight="MokaFontWeight.Semibold" SizeValue="18px">mokaterm</MokaText>
+		</div>
+		@ChildContent
+	</div>
+</div>
+
+@code {
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+}

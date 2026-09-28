@@ -1,0 +1,85 @@
+@namespace Mokaterm.Modules.Mqtt.Components
+
+<div class="mt-mqtt-messages">
+	@if (Topic is null)
+	{
+		<div class="mt-mqtt-messages-empty">
+			<MokaEmptyState Icon="MqttIcons.Topic"
+							Title="No topic selected"
+							Description="Pick a topic on the left to see the messages that arrived on it." />
+		</div>
+	}
+	else
+	{
+		<div class="mt-mqtt-messages-head">
+			<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate Class="mt-mqtt-messages-topic" title="@Topic">@Topic</MokaText>
+			<span class="mt-mqtt-messages-spacer"></span>
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-messages-meta">@CountText</MokaText>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Content.Copy"
+						OnClick="CopyTopicAsync"
+						title="Copy the topic"
+						aria-label="Copy the topic" />
+		</div>
+
+		@if (Messages.Count == 0)
+		{
+			<div class="mt-mqtt-messages-empty">
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+					Nothing kept for this level. It may be a step in other topics rather than a topic of its own.
+				</MokaText>
+			</div>
+		}
+		else
+		{
+			<div class="mt-mqtt-messages-table">
+				<MokaTable TItem="MqttMessage"
+						   Items="Messages"
+						   ItemKey="@(message => message.Sequence)"
+						   ShowPagination="false"
+						   ShowToolbar="false"
+						   Dense
+						   OnRowClick="OnRowClick">
+					<ChildContent>
+						<MokaColumn Title="Time" Field="message => message.ReceivedAt" Width="90px">
+							<CellTemplate Context="message">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono title="@message.TimestampText">@message.TimeText</MokaText>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn Title="QoS" Field="message => message.QualityOfService" Width="56px">
+							<CellTemplate Context="message">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono>@QosText(message)</MokaText>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn Title="Flags" Field="message => message.Retain" Width="80px" Sortable="false">
+							<CellTemplate Context="message">
+								<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Xxs" Align="MokaAlign.Center">
+									@if (message.Retain)
+									{
+										<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" title="Retained by the broker" />
+									}
+									@if (message.IsTruncated)
+									{
+										<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Only the start of this payload was kept" />
+									}
+								</MokaFlexbox>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn Title="Size" Field="message => message.PayloadLength" Width="72px">
+							<CellTemplate Context="message">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono>@SizeText(message)</MokaText>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn Title="Payload" Field="message => message.Sequence" Sortable="false">
+							<CellTemplate Context="message">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate>@Preview(message)</MokaText>
+							</CellTemplate>
+						</MokaColumn>
+					</ChildContent>
+				</MokaTable>
+			</div>
+		}
+	}
+</div>

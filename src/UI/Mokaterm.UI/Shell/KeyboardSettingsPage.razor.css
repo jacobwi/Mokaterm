@@ -1,0 +1,32 @@
+.mt-shortcut-row {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}
+
+.mt-shortcut {
+	min-width: 132px;
+	padding: 4px 10px;
+	border: 1px solid var(--moka-color-border);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-mono);
+	font-size: var(--moka-font-size-xs);
+	cursor: pointer;
+}
+
+.mt-shortcut:hover {
+	border-color: var(--moka-color-primary-border);
+}
+
+.mt-shortcut:focus-visible {
+	outline: none;
+	border-color: var(--moka-color-primary-border);
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mt-shortcut--recording {
+	border-color: var(--moka-color-primary);
+	color: var(--moka-color-primary);
+}

@@ -1,0 +1,100 @@
+@* Asks whether to trust an unknown server identity, or warns loudly when a known one changed. *@
+@inherits PromptDialogBase
+
+<MokaDialog Open="true"
+			Title="@(IsChanged ? "Host identity changed" : "Unknown host")"
+			DialogSize="MokaDialogSize.Medium"
+			CloseOnBackdropClick="false"
+			OnClose="() => AnswerAsync(OnDecision, HostTrustDecision.Reject)">
+	<ChildContent>
+		<PromptBody @ref="Body" AutofocusSelf="@(!IsChanged)">
+			@if (IsChanged)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="Possible interception">
+					Host identity changed. This can mean someone is intercepting the connection.
+				</MokaAlert>
+			}
+			else
+			{
+				<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">
+					Mokaterm has not connected to this server before. Compare the fingerprint with one from a trusted source before continuing.
+				</MokaText>
+			}
+
+			<MokaKeyValue Label="HOST" LabelWidth="96px">
+				<MokaText Element="span" Mono Size="MokaSize.Sm">@EndpointFormat.Format(null, Identity.Host, Identity.Port)</MokaText>
+			</MokaKeyValue>
+			<MokaKeyValue Label="KEY TYPE" LabelWidth="96px">
+				<MokaText Element="span" Mono Size="MokaSize.Sm">@Identity.Algorithm</MokaText>
+			</MokaKeyValue>
+			@if (Prompt.Previous is { } previous)
+			{
+				<MokaKeyValue Label="TRUSTED" LabelWidth="96px" Value="@previous.Fingerprint" Copyable>
+					<MokaText Element="span" Mono Size="MokaSize.Sm" Class="mt-break">@previous.Fingerprint</MokaText>
+				</MokaKeyValue>
+			}
+			<MokaKeyValue Label="@(IsChanged ? "PRESENTED" : "FINGERPRINT")" LabelWidth="96px" Value="@Identity.Fingerprint" Copyable>
+				<MokaText Element="span" Mono Size="MokaSize.Sm" Class="mt-break">@Identity.Fingerprint</MokaText>
+			</MokaKeyValue>
+			@if (Identity.Subject is { } subject)
+			{
+				<MokaKeyValue Label="SUBJECT" LabelWidth="96px">
+					<MokaText Element="span" Mono Size="MokaSize.Xs" Class="mt-break">@subject</MokaText>
+				</MokaKeyValue>
+			}
+			@if (Identity.Issuer is { } issuer)
+			{
+				<MokaKeyValue Label="ISSUER" LabelWidth="96px">
+					<MokaText Element="span" Mono Size="MokaSize.Xs" Class="mt-break">@issuer</MokaText>
+				</MokaKeyValue>
+			}
+			@if (Identity.NotAfter is { } notAfter)
+			{
+				<MokaKeyValue Label="EXPIRES" LabelWidth="96px">
+					<MokaText Element="span" Mono Size="MokaSize.Xs">@DisplayFormat.Timestamp(notAfter)</MokaText>
+				</MokaKeyValue>
+			}
+			@if (Identity.ChainTrusted is { } chainTrusted)
+			{
+				<MokaKeyValue Label="CHAIN" LabelWidth="96px">
+					<MokaTag Text="@(chainTrusted ? "TRUSTED BY THE SYSTEM" : "NOT TRUSTED BY THE SYSTEM")"
+							 Color="@(chainTrusted ? MokaColor.Success : MokaColor.Warning)"
+							 Size="MokaSize.Xs" />
+				</MokaKeyValue>
+			}
+		</PromptBody>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="@(IsChanged ? MokaVariant.Filled : MokaVariant.Text)"
+					Color="@(IsChanged ? MokaColor.Primary : MokaColor.Surface)"
+					data-primary="@Flag(IsChanged)"
+					data-autofocus="@Flag(IsChanged)"
+					OnClick="() => AnswerAsync(OnDecision, HostTrustDecision.Reject)">
+			Reject
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					OnClick="() => AnswerAsync(OnDecision, HostTrustDecision.AcceptOnce)">
+			Accept once
+		</MokaButton>
+		<MokaButton Variant="@(IsChanged ? MokaVariant.Outlined : MokaVariant.Filled)"
+					Color="@(IsChanged ? MokaColor.Error : MokaColor.Primary)"
+					data-primary="@Flag(!IsChanged)"
+					OnClick="() => AnswerAsync(OnDecision, HostTrustDecision.AcceptAndSave)">
+			Trust and save
+		</MokaButton>
+	</Actions>
+</MokaDialog>
+
+@code {
+	[Parameter, EditorRequired]
+	public HostTrustPrompt Prompt { get; set; } = default!;
+
+	/// <summary>Raised once with the user's decision; closing the dialog rejects.</summary>
+	[Parameter]
+	public EventCallback<HostTrustDecision> OnDecision { get; set; }
+
+	private HostIdentity Identity => Prompt.Identity;
+
+	private bool IsChanged => Prompt.Match == HostIdentityMatch.Changed;
+}

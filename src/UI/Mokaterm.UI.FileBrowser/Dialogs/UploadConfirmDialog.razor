@@ -1,0 +1,50 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<DialogFrame>
+	<ChildContent>
+		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Md">
+				<MokaIcon Icon="MokatermIcons.FileUpload" Size="MokaSize.Lg" Color="MokaColor.Primary" />
+				<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xxs">
+					<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@CountText</MokaText>
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="color:var(--moka-color-on-surface-variant)">@SizeText</MokaText>
+				</MokaFlexbox>
+			</MokaFlexbox>
+
+			<MokaKeyValue Label="Destination" Orientation="MokaDirection.Column">
+				<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate title="@Destination">@Destination</MokaText>
+			</MokaKeyValue>
+
+			<MokaKeyValue Label="Upload as" Orientation="MokaDirection.Column">
+				@if (SupportsElevation)
+				{
+					<MokaSegmentedControl AriaLabel="Upload as" Size="MokaSize.Sm" Value="@RunAsValue" ValueChanged="OnRunAsChanged">
+						<MokaSegment Value="@UserValue" Text="@UserName" Icon="MokatermIcons.User" />
+						<MokaSegment Value="@RootValue" Text="root" Icon="MokatermIcons.Root" />
+					</MokaSegmentedControl>
+				}
+				else
+				{
+					<MokaText Element="span" Size="MokaSize.Sm" Mono>@UserName</MokaText>
+				}
+			</MokaKeyValue>
+
+			@if (_asRoot)
+			{
+				<MokaCallout Type="MokaCalloutType.Warning" Title="Root">
+					Files are written by root and owned by root. You may be asked for the sudo password first.
+				</MokaCallout>
+			}
+		</MokaFlexbox>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+		<MokaButton Size="MokaSize.Sm"
+					Color="@(_asRoot ? MokaColor.Error : MokaColor.Primary)"
+					StartIcon="@(_asRoot ? MokatermIcons.Root : MokatermIcons.FileUpload)"
+					OnClick="Confirm"
+					data-dialog-default="true">
+			@(_asRoot ? "Upload as root" : "Upload")
+		</MokaButton>
+	</Actions>
+</DialogFrame>

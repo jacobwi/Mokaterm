@@ -1,0 +1,18 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<DialogFrame SelectionStart="0" SelectionEnd="_selectionEnd">
+	<ChildContent>
+		<MokaTextField Value="@_name"
+					   ValueChanged="OnNameChanged"
+					   Label="@Label"
+					   Size="MokaSize.Sm"
+					   ErrorText="@Error"
+					   spellcheck="false"
+					   autocomplete="off"
+					   data-dialog-focus="true" />
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+		<MokaButton Size="MokaSize.Sm" Disabled="@(!IsValid)" OnClick="Confirm" data-dialog-default="true">@ConfirmText</MokaButton>
+	</Actions>
+</DialogFrame>

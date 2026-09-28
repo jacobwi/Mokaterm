@@ -1,0 +1,277 @@
+@namespace Mokaterm.UI.FileBrowser
+
+@{
+	RenderFragment TextCell(RemoteFileEntry entry, string text) =>
+		@<div class="fb-cell fb-mono" title="@text" draggable="true" @onclick="args => OnEntryClick(entry, args)" @ondblclick="() => OpenEntryAsync(entry)">@text</div>;
+}
+
+<div @ref="_root" class="@RootClass" style="@Style" tabindex="-1">
+	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="@ToolbarStyle">
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ArrowLeft"
+					Disabled="@(!CanBrowse || !_history.CanGoBack)" OnClick="GoBackAsync" title="Back (Alt+Left)" aria-label="Back" />
+		@if (!IsNarrow)
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ArrowRight"
+						Disabled="@(!CanBrowse || !_history.CanGoForward)" OnClick="GoForwardAsync" title="Forward (Alt+Right)" aria-label="Forward" />
+		}
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ArrowUp"
+					Disabled="@(!CanBrowse || RemotePath.IsRoot(_path))" OnClick="GoUpAsync" title="Up (Backspace)" aria-label="Up" />
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.Home"
+					Disabled="@(_fileSystem is null)" OnClick="GoHomeAsync" title="Home" aria-label="Home" />
+
+		<div class="fb-path">
+			@if (_editingPath)
+			{
+				<MokaTextField Value="@_pathText"
+							   ValueChanged="OnPathTextChanged"
+							   Size="MokaSize.Sm"
+							   Placeholder="/path/to/folder or ~"
+							   OnBlur="CancelPathEdit"
+							   Style="width:100%"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-path-editor="true"
+							   @onkeydown="OnPathKeyDownAsync" />
+			}
+			else if (_loaded)
+			{
+				<div class="fb-crumbs" @onclick="BeginPathEdit" title="@_path (click to type a path, Ctrl+L)">
+					<MokaBreadcrumb @key="_path" MaxItems="@(IsNarrow ? 3 : 6)">
+						<SeparatorContent>
+							<MokaIcon Icon="MokaIcons.Navigation.ChevronRight" SizeValue="12px" />
+						</SeparatorContent>
+						<ChildContent>
+							@foreach (RemotePathSegment segment in RemotePath.GetSegments(_path))
+							{
+								<MokaBreadcrumbItem>
+									<span class="fb-crumb" @onclick="() => NavigateAsync(segment.Path)" @onclick:stopPropagation="true">@segment.Name</span>
+								</MokaBreadcrumbItem>
+							}
+						</ChildContent>
+					</MokaBreadcrumb>
+				</div>
+			}
+		</div>
+
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Refresh"
+					Disabled="@(_fileSystem is null)" OnClick="() => RefreshAsync()" title="Refresh (F5)" aria-label="Refresh" />
+	</MokaToolbar>
+
+	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="@ToolbarStyle">
+		@if (!IsNarrow)
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokatermIcons.FolderPlus"
+						Disabled="@(!CanBrowse)" OnClick="CreateFolderAsync" title="New folder" aria-label="New folder" />
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokatermIcons.FileUpload"
+						Disabled="@(!CanBrowse)" OnClick="PickAndUploadFilesAsync" title="Upload files" aria-label="Upload files" />
+			@if (LocalFiles.CanPickFolders)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Upload"
+							Disabled="@(!CanBrowse)" OnClick="PickAndUploadFolderAsync" title="Upload folder" aria-label="Upload folder" />
+			}
+			<MokaToolbarDivider />
+		}
+		<div class="fb-filter">
+			<MokaTextField Value="@_filter"
+						   ValueChanged="OnFilterChanged"
+						   Size="MokaSize.Sm"
+						   Placeholder="Filter"
+						   StartIcon="MokaIcons.Content.Filter"
+						   Clearable
+						   DebounceDelay="150"
+						   Disabled="@(!CanBrowse)"
+						   Style="width:100%"
+						   spellcheck="false"
+						   autocomplete="off"
+						   data-filter="true"
+						   @onkeydown="OnFilterKeyDown" />
+		</div>
+		<MokaButton Variant="@(ShowHidden ? MokaVariant.Soft : MokaVariant.Text)"
+					Color="@(ShowHidden ? MokaColor.Primary : MokaColor.Surface)"
+					Size="MokaSize.Sm"
+					StartIcon="@(ShowHidden ? MokaIcons.Toggle.Eye : MokaIcons.Toggle.EyeOff)"
+					OnClick="ToggleHiddenAsync"
+					title="@(ShowHidden ? "Hide hidden files" : "Show hidden files")"
+					aria-label="Show hidden files"
+					aria-pressed="@(ShowHidden ? "true" : "false")" />
+		@if (IsNarrow)
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.MoreHorizontal"
+						Disabled="@(!CanBrowse)" OnClick="ShowActionsMenu" title="More actions" aria-label="More actions" aria-haspopup="menu" />
+			@if (CanElevate)
+			{
+				<MokaButton Variant="@(ModeValue == RootMode ? MokaVariant.Soft : MokaVariant.Text)"
+							Color="@(ModeValue == RootMode ? MokaColor.Error : MokaColor.Surface)"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Root"
+							Disabled="@(_switchingMode || _fileSystem is null)"
+							OnClick="() => OnModeChangedAsync(IsElevated ? UserMode : RootMode)"
+							title="Run as root"
+							aria-label="Run as root"
+							aria-pressed="@(IsElevated ? "true" : "false")" />
+			}
+		}
+		else if (CanElevate)
+		{
+			<MokaSpacer />
+			<MokaSegmentedControl Size="MokaSize.Xs" Style="padding:2px" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
+				<MokaSegment Value="@UserMode" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
+				<MokaSegment Value="@RootMode" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
+			</MokaSegmentedControl>
+		}
+	</MokaToolbar>
+
+	<div class="fb-progress">
+		@if (IsBusy)
+		{
+			<MokaProgress />
+		}
+	</div>
+
+	@if (_alert is { } alert)
+	{
+		<div class="fb-alert">
+			<MokaAlert @key="alert" Severity="MokaToastSeverity.Error" Title="@alert.Title" Dense Closable OnClose="() => DismissAlert(alert)">
+				<div class="fb-alert-body">
+					<span>@alert.Message</span>
+					@if (alert.RetryAsRoot is not null)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root"
+									OnClick="() => RetryAsRootAsync(alert)">Retry as root</MokaButton>
+					}
+				</div>
+			</MokaAlert>
+		</div>
+	}
+
+	<div class="fb-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
+		@if (!CanBrowse)
+		{
+			StateInfo state = DescribeState();
+			<div class="fb-state">
+				<MokaEmptyState Icon="@state.Icon" Title="@state.Title" Description="@state.Description">
+					@if (state.CanRetry)
+					{
+						<MokaButton Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="RetryOpenAsync">Try again</MokaButton>
+					}
+				</MokaEmptyState>
+			</div>
+		}
+		else
+		{
+			<MokaTable TItem="RemoteFileEntry"
+					   Items="_view.Entries"
+					   ItemKey="EntryKey"
+					   ShowToolbar="false"
+					   ShowPagination="false"
+					   Dense="true"
+					   FixedHeader="true"
+					   Height="100%"
+					   Style="border:none;border-radius:0;background:transparent"
+					   Virtualize="@(_view.Count > VirtualizeThreshold)"
+					   VirtualRowHeight="RowHeight"
+					   SelectedItems="_selectedItems"
+					   SortColumn="@_sortColumn"
+					   SortColumnChanged="OnSortColumnChanged"
+					   SortDirection="_sortDirection"
+					   SortDirectionChanged="OnSortDirectionChanged"
+					   OnRowClick="OnRowClick"
+					   OnRowContextMenu="ShowEntryMenu">
+				<ChildContent>
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.NameColumn" Field="NameField" SortComparer="CompareByName" MinWidth="120px">
+						<CellTemplate Context="entry">
+							<div class="fb-cell fb-name"
+								 draggable="true"
+								 data-entry-path="@entry.Path"
+								 data-entry-directory="@(entry.IsDirectoryLike ? "true" : "false")"
+								 @onclick="args => OnEntryClick(entry, args)"
+								 @ondblclick="() => OpenEntryAsync(entry)">
+								<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Size="MokaSize.Sm" Color="@EntryVisuals.ColorFor(entry)" />
+								<span class="fb-name-text" title="@entry.Name">@entry.Name</span>
+								@if (entry.LinkTarget is { Length: > 0 } target)
+								{
+									<span class="fb-link" title="@target">&rarr; @target</span>
+								}
+							</div>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.SizeColumn" Field="SizeField" SortComparer="CompareBySize" Width="84px" Align="MokaTextAlign.Right">
+						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.SizeText(entry))</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.ModifiedColumn" Field="ModifiedField" SortComparer="CompareByModified" Width="124px"
+								Visible="@(_width >= BrowserWidth.Medium)">
+						<CellTemplate Context="entry">@TextCell(entry, DisplayFormat.Timestamp(entry.LastModified))</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.PermissionsColumn" Field="PermissionsField" SortComparer="CompareByPermissions" Width="96px"
+								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Permissions))">
+						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.PermissionsText(entry))</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.OwnerColumn" Field="OwnerField" SortComparer="CompareByOwner" Width="112px"
+								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Ownership))">
+						<CellTemplate Context="entry">@TextCell(entry, EntryOrdering.OwnerLabel(entry))</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+				<EmptyContent>
+					@if (_filter.Trim().Length > 0)
+					{
+						<MokaEmptyState Icon="MokaIcons.Content.Filter" Title="No matches" Description="@NoMatchesText" />
+					}
+					else if (_entries.Count > 0)
+					{
+						<MokaEmptyState Icon="MokaIcons.Toggle.EyeOff" Title="Only hidden items" Description="@HiddenOnlyText">
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Toggle.Eye" OnClick="ToggleHiddenAsync">Show hidden files</MokaButton>
+						</MokaEmptyState>
+					}
+					else if (!_loading)
+					{
+						<MokaEmptyState Icon="MokatermIcons.FolderOpen" Title="Empty folder" Description="Drop files here to upload them." />
+					}
+				</EmptyContent>
+			</MokaTable>
+
+			@if (_dragOver)
+			{
+				<div class="fb-drop">
+					<MokaFlexbox Direction="MokaDirection.Column" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+						<MokaIcon Icon="MokatermIcons.FileUpload" SizeValue="32px" Color="MokaColor.Primary" />
+						<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">Drop to upload</MokaText>
+						<MokaText Element="span" Size="MokaSize.Sm" Mono>@_path</MokaText>
+						@if (IsElevated)
+						{
+							<MokaTag Text="as root" Icon="MokatermIcons.Root" Color="MokaColor.Error" />
+						}
+						else
+						{
+							<MokaTag Text="@DropAccountText" Icon="MokatermIcons.User" />
+						}
+					</MokaFlexbox>
+				</div>
+			}
+		}
+	</div>
+
+	<MokaStatusBar Style="position:static">
+		<StartContent>
+			@if (CanBrowse)
+			{
+				<MokaStatusBarItem Text="@ItemCountText" />
+				@if (_selection.Count > 0)
+				{
+					<MokaStatusBarItem Text="@SelectionText" />
+				}
+			}
+		</StartContent>
+		<EndContent>
+			@if (IsElevated)
+			{
+				<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
+			}
+			else if (_fileSystem is not null)
+			{
+				<MokaStatusBarItem Tooltip="Operations run as this account">
+					<span class="fb-account">@AccountLabel</span>
+				</MokaStatusBarItem>
+			}
+		</EndContent>
+	</MokaStatusBar>
+</div>

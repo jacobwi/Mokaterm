@@ -1,0 +1,17 @@
+/* A paste preview or a command line: kept as it came, wrapped rather than scrolled sideways. */
+.mt-confirm-details {
+	max-height: 200px;
+	margin: 0;
+	padding: var(--moka-spacing-sm);
+	overflow: auto;
+	border-left: 3px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	line-height: var(--moka-line-height-base);
+	color: var(--moka-color-on-surface-variant);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	tab-size: 4;
+}

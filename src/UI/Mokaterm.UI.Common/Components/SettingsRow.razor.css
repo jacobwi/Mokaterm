@@ -1,0 +1,45 @@
+.settings-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm) var(--moka-spacing-xl);
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+}
+
+.settings-row + .settings-row {
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+.settings-row__text {
+	display: flex;
+	flex: 1 1 240px;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}
+
+.settings-row__control {
+	display: flex;
+	flex: 0 1 auto;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	max-width: 100%;
+}
+
+.settings-row__control--fill {
+	display: block;
+}
+
+.settings-row--stacked {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.settings-row--stacked .settings-row__text,
+.settings-row--stacked .settings-row__control {
+	flex: none;
+}

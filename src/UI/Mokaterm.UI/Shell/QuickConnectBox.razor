@@ -1,0 +1,20 @@
+<div class="mt-quick-connect" @ref="_root">
+	@if (_protocolIds.Count > 0)
+	{
+		<MokaSelect TValue="string"
+					Items="_protocolIds"
+					@bind-Value="_protocolId"
+					ValueSelector="ProtocolLabel"
+					Size="MokaSize.Sm"
+					aria-label="Protocol" />
+	}
+	<MokaTextField @bind-Value="_target"
+				   Placeholder="user@host:port"
+				   Size="MokaSize.Sm"
+				   StartIcon="MokatermIcons.QuickConnect"
+				   spellcheck="false"
+				   autocomplete="off"
+				   aria-label="Quick connect"
+				   data-autofocus="true"
+				   @onkeydown="OnKeyDown" />
+</div>

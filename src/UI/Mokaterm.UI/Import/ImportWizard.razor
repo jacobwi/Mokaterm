@@ -1,0 +1,191 @@
+@using Moka.Red.Forms.Checkbox
+@using Mokaterm.Abstractions.Import
+@inherits ShellEditorBase<ImportEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="Import saved hosts"
+				   DialogSize="MokaDialogSize.Large"
+				   Busy="_busy"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			@* Enter presses the step's own primary button, and the body takes the focus so it does from the start. *@
+			<PromptBody @ref="Body" AutofocusSelf="true">
+				<div class="mt-import">
+					@if (_error is not null)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+					}
+
+					@switch (_step)
+					{
+						case ImportStep.Source:
+							<MokaCallout Type="MokaCalloutType.Note" Title="Passwords stay where they are">
+								Only addresses, users, ports and protocol settings come across. PuTTY never stores a password, and
+								WinSCP stores one that anyone holding the file can turn back into plain text, so copying it would
+								only spread it further.
+							</MokaCallout>
+
+							@if (_probing)
+							{
+								<div class="mt-import-busy">
+									<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+									<MokaText Element="span" Size="MokaSize.Xs">Looking for saved hosts on this machine</MokaText>
+								</div>
+							}
+							else
+							{
+								<div class="mt-import-sources">
+									@foreach (ImportSourceRow row in _sources)
+									{
+										<div class="@SourceClass(row)" @key="row.Info.Id">
+											<div class="mt-import-source__head">
+												<MokaIcon Icon="MokatermIcons.Server" Size="MokaSize.Xs" />
+												<span class="mt-import-source__name">@row.Info.DisplayName</span>
+												@if (row.Preview.Entries.Count > 0)
+												{
+													<MokaTag Text="@CountText(row.Preview.Entries.Count)" Size="MokaSize.Xs" Color="MokaColor.Success" />
+												}
+												else
+												{
+													<MokaTag Text="Nothing found" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+												}
+											</div>
+											<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@SourceDetail(row)</MokaText>
+											<div class="mt-import-source__actions">
+												@if (row.Preview.Entries.Count > 0)
+												{
+													<MokaButton Size="MokaSize.Xs" Disabled="_busy" OnClick="() => ChooseAsync(row)">Review</MokaButton>
+												}
+												@if (row.Info.AcceptsFile && CanPickFiles)
+												{
+													<MokaButton Variant="MokaVariant.Outlined"
+																Size="MokaSize.Xs"
+																StartIcon="MokatermIcons.FileUpload"
+																Disabled="_busy"
+																OnClick="() => PickAsync(row)">
+														@PickLabel(row.Info)
+													</MokaButton>
+												}
+											</div>
+										</div>
+									}
+								</div>
+							}
+							break;
+
+						case ImportStep.Preview when _preview is not null:
+							<div class="mt-import-head">
+								<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">
+									@SourceName from @(_preview.Location ?? "the picked file")
+								</MokaText>
+								<div class="mt-import-head__actions">
+									<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="_busy" OnClick="SelectAll">Select all</MokaButton>
+									<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="_busy" OnClick="SelectNone">Select none</MokaButton>
+								</div>
+							</div>
+
+							<div class="mt-import-list">
+								@foreach (ImportedEntry entry in _preview.Entries)
+								{
+									<div class="mt-import-row"
+										 @key="entry.Key"
+										 role="checkbox"
+										 tabindex="0"
+										 aria-checked="@(_selected.Contains(entry.Key) ? "true" : "false")"
+										 data-no-submit="true"
+										 @onclick="() => Toggle(entry.Key)"
+										 @onkeydown="e => OnRowKeyDown(e, entry.Key)">
+										@* The whole row is the control; the box only pictures its state. *@
+										<span class="mt-import-row__box">
+											<MokaCheckbox Value="@_selected.Contains(entry.Key)" Disabled="_busy" DisplayOnly />
+										</span>
+										<ProtocolIcon ProtocolId="@entry.ProtocolId" Size="MokaSize.Xs" />
+										<span class="mt-import-row__main">
+											<span class="mt-import-row__name">@EntryTitle(entry)</span>
+											<span class="mt-import-row__meta">@Endpoint(entry)</span>
+										</span>
+										@if (entry.IdentityFilePath is not null)
+										{
+											<MokaTag Text="Key file" Size="MokaSize.Xs" Icon="MokatermIcons.Key" />
+										}
+										@if (entry.AlreadyExists)
+										{
+											<MokaTag Text="Already saved" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+										}
+									</div>
+								}
+							</div>
+
+							<div class="mt-import-destination">
+								<MokaSelect TValue="Guid?"
+											Label="Put them in"
+											Items="_folderOptions"
+											@bind-Value="_folderId"
+											ValueSelector="FolderLabel"
+											Searchable="@(_folderOptions.Count > 8)"
+											Disabled="_busy" />
+								<MokaTextField Label="New folder"
+											   @bind-Value="_newFolderName"
+											   Placeholder="Optional"
+											   HelperText="Created inside the folder above."
+											   Disabled="_busy"
+											   autocomplete="off" />
+							</div>
+
+							@if (_preview.Skipped.Count > 0)
+							{
+								<div class="mt-import-skipped">
+									<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Medium">Not imported</MokaText>
+									@foreach (ImportSkip skip in _preview.Skipped)
+									{
+										<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@skip.Name: @skip.Reason</MokaText>
+									}
+								</div>
+							}
+							break;
+
+						case ImportStep.Done when _result is not null:
+							@if (_result.Error is { } failure)
+							{
+								<MokaAlert Severity="MokaToastSeverity.Error" Dense>@failure</MokaAlert>
+							}
+							<div class="mt-import-result">
+								<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@ResultHeadline(_result)</MokaText>
+								<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@ResultDetail(_result)</MokaText>
+							</div>
+							@if (_result.Skipped.Count > 0)
+							{
+								<div class="mt-import-skipped">
+									<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Medium">Not imported</MokaText>
+									@foreach (ImportSkip skip in _result.Skipped)
+									{
+										<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@skip.Name: @skip.Reason</MokaText>
+									}
+								</div>
+							}
+							break;
+					}
+				</div>
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		@switch (_step)
+		{
+			case ImportStep.Source:
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_busy" OnClick="Close">Close</MokaButton>
+				break;
+			case ImportStep.Preview:
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_busy" OnClick="BackToSources">Back</MokaButton>
+				<MokaButton data-primary="true" Loading="_busy" Disabled="@(_selected.Count == 0)" OnClick="ImportAsync">
+					@ImportLabel
+				</MokaButton>
+				break;
+			case ImportStep.Done:
+				<MokaButton data-primary="true" OnClick="Close">Done</MokaButton>
+				break;
+		}
+	</Actions>
+</ShellEditorDialog>

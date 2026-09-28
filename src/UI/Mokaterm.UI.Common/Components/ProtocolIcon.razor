@@ -1,0 +1,20 @@
+@inject IUiContributions Contributions
+
+<MokaIcon Icon="Contributions.GetProtocolIcon(ProtocolId)" Size="Size" SizeValue="@SizeValue" Color="Color" Class="@Class" />
+
+@code {
+	[Parameter, EditorRequired]
+	public string ProtocolId { get; set; } = "";
+
+	[Parameter]
+	public MokaSize Size { get; set; } = MokaSize.Sm;
+
+	[Parameter]
+	public string? SizeValue { get; set; }
+
+	[Parameter]
+	public MokaColor? Color { get; set; }
+
+	[Parameter]
+	public string? Class { get; set; }
+}

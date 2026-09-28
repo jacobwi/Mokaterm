@@ -1,0 +1,45 @@
+@* A yes or no question, styled as dangerous for deletes and overwrites. *@
+@inherits PromptDialogBase
+
+<MokaDialog Open="true"
+			Title="@Prompt.Title"
+			DialogSize="MokaDialogSize.Small"
+			CloseOnBackdropClick="false"
+			OnClose="() => AnswerAsync(OnResult, ConfirmResult.No)">
+	<ChildContent>
+		<PromptBody @ref="Body" AutofocusSelf="true">
+			<MokaText Size="MokaSize.Sm" Class="mt-break">@Prompt.Message</MokaText>
+			@if (Prompt.Details is { Length: > 0 } details)
+			{
+				<pre class="mt-confirm-details">@details</pre>
+			}
+			@if (Prompt.RememberText is { Length: > 0 } rememberText)
+			{
+				<MokaCheckbox Value="_remember" ValueChanged="value => _remember = value" Label="@rememberText" />
+			}
+		</PromptBody>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="() => AnswerAsync(OnResult, ConfirmResult.No)">
+			@Prompt.CancelText
+		</MokaButton>
+		<MokaButton Color="@(Prompt.Destructive ? MokaColor.Error : MokaColor.Primary)"
+					data-primary="true"
+					OnClick="() => AnswerAsync(OnResult, new ConfirmResult(true, _remember))">
+			@Prompt.ConfirmText
+		</MokaButton>
+	</Actions>
+</MokaDialog>
+
+@code {
+	// Only read when the prompt offered the check box, and only reported with a yes: cancelling answers nothing, so
+	// a prompt that was turned away cannot also turn itself off.
+	private bool _remember;
+
+	[Parameter, EditorRequired]
+	public ConfirmPrompt Prompt { get; set; } = default!;
+
+	/// <summary>Raised once: confirmed or not, plus whether the user asked not to be asked again.</summary>
+	[Parameter]
+	public EventCallback<ConfirmResult> OnResult { get; set; }
+}

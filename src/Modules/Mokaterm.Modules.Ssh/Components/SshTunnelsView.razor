@@ -1,0 +1,111 @@
+@namespace Mokaterm.Modules.Ssh.Components
+@inherits SessionViewBase
+
+<div class="mt-tunnels">
+	@if (_feature is null)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Disconnect"
+						Title="The session is not connected"
+						Description="Port forwarding needs a live SSH connection." />
+	}
+	else
+	{
+		<div class="mt-tunnels-head">
+			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-tunnels-label">
+				@CountLabel
+			</MokaText>
+			<span class="mt-tunnels-spacer"></span>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="@(_draft is null ? MokaIcons.Action.Add : MokaIcons.Navigation.Close)"
+						OnClick="ToggleDraft">
+				@(_draft is null ? "Add tunnel" : "Cancel")
+			</MokaButton>
+		</div>
+
+		@if (_draft is { } draft)
+		{
+			<div class="mt-tunnels-draft">
+				<SshTunnelForm Tunnel="draft" TunnelChanged="OnDraftChanged" ShowOpenWithSession="false" Disabled="_busy" />
+				@if (draft.Validate() is { } invalid)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@invalid</MokaAlert>
+				}
+				<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
+					<MokaButton Size="MokaSize.Xs" Disabled="@(_busy || draft.Validate() is not null)" OnClick="AddAsync">
+						Open for this session
+					</MokaButton>
+				</MokaFlexbox>
+			</div>
+		}
+
+		@if (_tunnels.Count == 0)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Connect"
+							Title="No tunnels"
+							Description="Save tunnels with the connection, or add one here for this session only." />
+		}
+		else
+		{
+			<div class="mt-tunnels-list">
+				@foreach (SshTunnelStatus status in _tunnels)
+				{
+					<div class="mt-tunnels-row" @key="status.Tunnel.Id">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(status.State)" Pulse="@(status.State == SshTunnelState.Opening)" />
+						<MokaTag Text="@SshTunnelList.KindLabel(status.Tunnel.Kind)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+						<div class="mt-tunnels-text">
+							<MokaText Element="span" Size="MokaSize.Sm" Truncate>@status.Tunnel.Display</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="color:var(--moka-color-on-surface-variant)">
+								@status.Describe()
+							</MokaText>
+							@if (status.Error is { } error)
+							{
+								<MokaText Element="span" Size="MokaSize.Xs" Truncate Style="color:var(--moka-color-error)">@error</MokaText>
+							}
+						</div>
+						@if (status.IsSessionOnly)
+						{
+							<MokaTag Text="SESSION" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+						}
+						@if (status.State == SshTunnelState.Open)
+						{
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										StartIcon="MokatermIcons.Disconnect"
+										Disabled="_busy"
+										OnClick="@(() => CloseAsync(status.Tunnel.Id))"
+										aria-label="Close tunnel" />
+						}
+						else
+						{
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										StartIcon="MokatermIcons.Connect"
+										Disabled="@(_busy || status.State == SshTunnelState.Opening)"
+										OnClick="@(() => OpenAsync(status.Tunnel.Id))"
+										aria-label="Open tunnel" />
+						}
+						@if (status.IsSessionOnly)
+						{
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Error"
+										Size="MokaSize.Xs"
+										StartIcon="MokaIcons.Action.Delete"
+										Disabled="_busy"
+										OnClick="@(() => RemoveAsync(status.Tunnel.Id))"
+										aria-label="Remove tunnel" />
+						}
+					</div>
+				}
+			</div>
+		}
+
+		@if (_error is { } failure)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@failure</MokaAlert>
+		}
+	}
+</div>

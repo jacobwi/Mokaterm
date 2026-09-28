@@ -1,0 +1,81 @@
+@namespace Mokaterm.Modules.Ssh.Components
+
+<div class="mt-ssh-tunnels">
+	@if (Tunnels.Count == 0)
+	{
+		<MokaText Element="p" Size="MokaSize.Xs" Style="margin:0;color:var(--moka-color-on-surface-variant)">
+			No port forwarding. Add a tunnel to reach a database or a web interface that only the server can see.
+		</MokaText>
+	}
+
+	@foreach (SshTunnelDefinition tunnel in Tunnels)
+	{
+		<div class="mt-ssh-tunnel" @key="tunnel.Id">
+			<div class="mt-ssh-tunnel-row">
+				<MokaTag Text="@KindLabel(tunnel.Kind)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				<div class="mt-ssh-tunnel-text">
+					<MokaText Element="span" Size="MokaSize.Sm" Truncate>@tunnel.Display</MokaText>
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="color:var(--moka-color-on-surface-variant)">
+						@tunnel.Describe()
+					</MokaText>
+				</div>
+				@if (!tunnel.OpenWithSession)
+				{
+					<MokaTag Text="MANUAL" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				}
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Edit"
+							Disabled="Disabled"
+							OnClick="@(() => Toggle(tunnel.Id))"
+							aria-label="Edit tunnel" />
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Delete"
+							Disabled="Disabled"
+							OnClick="@(() => RemoveAsync(tunnel.Id))"
+							aria-label="Remove tunnel" />
+			</div>
+
+			@if (_editing == tunnel.Id)
+			{
+				<div class="mt-ssh-tunnel-form">
+					<SshTunnelForm Tunnel="tunnel" TunnelChanged="ReplaceAsync" Disabled="Disabled" />
+					@if (tunnel.Validate() is { } error)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@error</MokaAlert>
+					}
+				</div>
+			}
+		</div>
+	}
+
+	<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Wrap>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Action.Add"
+					Disabled="@(Disabled || IsFull)"
+					OnClick="@(() => AddAsync(SshTunnelKind.Local))">
+			Local
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Action.Add"
+					Disabled="@(Disabled || IsFull)"
+					OnClick="@(() => AddAsync(SshTunnelKind.Remote))">
+			Remote
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Action.Add"
+					Disabled="@(Disabled || IsFull)"
+					OnClick="@(() => AddAsync(SshTunnelKind.Dynamic))">
+			SOCKS
+		</MokaButton>
+	</MokaFlexbox>
+</div>

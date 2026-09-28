@@ -1,0 +1,60 @@
+<div class="mt-settings">
+	<nav class="mt-settings-nav">
+		<div class="mt-settings-header">
+			<span class="mt-settings-label">Settings</span>
+			<IconAction Icon="MokaIcons.Navigation.Close"
+						Title="Close settings"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Right"
+						OnClick="Shell.CloseSettings" />
+		</div>
+		<div class="mt-settings-search">
+			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Search settings" Size="MokaSize.Sm" Debounce="0" />
+		</div>
+		<div class="mt-settings-pages">
+			@foreach (IGrouping<SettingsPageGroup, SettingsPageDescriptor> group in _visiblePages.GroupBy(page => page.Group))
+			{
+				<div class="mt-settings-group">@GroupName(group.Key)</div>
+				<MokaList Dense>
+					@foreach (SettingsPageDescriptor settingsPage in group)
+					{
+						bool current = settingsPage.Id == Selected?.Id;
+						<MokaListItem @key="settingsPage.Id"
+									  Icon="settingsPage.Icon"
+									  Text="@settingsPage.Title"
+									  Active="current"
+									  OnClick="() => Shell.SelectSettingsPage(settingsPage.Id)"
+									  aria-current="@(current ? "page" : null)" />
+					}
+				</MokaList>
+			}
+			@if (_visiblePages.Count == 0)
+			{
+				<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary);padding:var(--moka-spacing-md)">
+					No settings match.
+				</MokaText>
+			}
+		</div>
+	</nav>
+
+	<section class="mt-settings-content">
+		@if (Selected is { } selected)
+		{
+			<div class="mt-settings-page-header">
+				<MokaText Element="h2" SizeValue="17px" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
+				@if (!string.IsNullOrWhiteSpace(selected.Description))
+				{
+					<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">@selected.Description</MokaText>
+				}
+			</div>
+			@* Module pages included: one that fails takes only itself down, and picking another page leaves the error behind. *@
+			<ViewBoundary @key="selected.Id" Name="@($"The {selected.Title} page")">
+				<DynamicComponent Type="selected.Component" />
+			</ViewBoundary>
+		}
+		else
+		{
+			<MokaEmptyState Icon="MokatermIcons.Sliders" Title="No settings pages" Description="No module registered a settings page." />
+		}
+	</section>
+</div>

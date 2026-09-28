@@ -1,0 +1,19 @@
+@page "/"
+@using System.Globalization
+
+@*
+	The whole app is one screen. Query flags pick the state to look at:
+	?locked=1 keeps the vault locked (the real lock screen), ?sessions=N opens the first N demo logins.
+*@
+<DevRoot Locked="@(Locked == "1")" SessionCount="SessionCount" />
+
+@code {
+	// Strings, not ints: a mistyped flag should fall back to the default instead of failing the circuit.
+	[SupplyParameterFromQuery(Name = "locked")]
+	private string? Locked { get; set; }
+
+	[SupplyParameterFromQuery(Name = "sessions")]
+	private string? Sessions { get; set; }
+
+	private int SessionCount => int.TryParse(Sessions, NumberStyles.None, CultureInfo.InvariantCulture, out int count) ? count : 0;
+}

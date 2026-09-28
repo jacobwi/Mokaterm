@@ -1,0 +1,95 @@
+@inherits ShellEditorBase<HostEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="@(_original is null ? "New host" : "Edit host")"
+				   DialogSize="MokaDialogSize.Medium"
+				   Busy="_saving"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			<PromptBody @ref="Body">
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+
+				<MokaGrid Columns="2" Gap="MokaSpacingScale.Md">
+					<MokaTextField Label="Address"
+								   Required
+								   @bind-Value="_address"
+								   ErrorText="@_addressError"
+								   Placeholder="10.10.2.3 or server.example.com"
+								   Disabled="_saving"
+								   spellcheck="false"
+								   autocomplete="off"
+								   data-autofocus="true" />
+					<MokaTextField Label="Name"
+								   @bind-Value="_name"
+								   Placeholder="@(string.IsNullOrWhiteSpace(_address) ? "Shown in the tree" : _address.Trim())"
+								   Disabled="_saving" />
+				</MokaGrid>
+
+				<MokaSelect TValue="Guid?"
+							Label="Folder"
+							Items="_folderOptions"
+							@bind-Value="_folderId"
+							ValueSelector="FolderLabel"
+							Placeholder="Top level"
+							Searchable="@(_folderOptions.Count > 8)"
+							Disabled="_saving" />
+
+				<MokaFieldWrapper Label="Environment" HelperText="Tags the host in the tree, its tabs and the status bar.">
+					<MokaSegmentedControl AriaLabel="Environment" Value="@_environment.ToString()" ValueChanged="OnEnvironmentChanged" Size="MokaSize.Sm">
+						@foreach (HostEnvironment environment in HostEnvironmentDisplay.All)
+						{
+							<MokaSegment Value="@environment.ToString()" Text="@HostEnvironmentDisplay.Name(environment)" Disabled="_saving" />
+						}
+					</MokaSegmentedControl>
+				</MokaFieldWrapper>
+
+				<div>
+					<MokaColorInput Label="Color"
+									@bind-Value="_color"
+									Placeholder="#ef5350"
+									ErrorText="@_colorError"
+									HelperText="Marks the host in the tree and tints its tabs."
+									Disabled="_saving" />
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Xs" Align="MokaAlign.Center" Wrap Margin="MokaSpacingScale.Xs">
+						@foreach (string preset in ColorPresets)
+						{
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										aria-label="@($"Use color {preset}")"
+										title="@preset"
+										Disabled="_saving"
+										OnClick="() => _color = preset">
+								<span class="mt-swatch" style="@($"background:{preset}")"></span>
+							</MokaButton>
+						}
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="_saving" OnClick="() => _color = string.Empty">
+							No color
+						</MokaButton>
+					</MokaFlexbox>
+				</div>
+
+				<MokaTagInput Label="Tags"
+							  @bind-Values="_tags"
+							  Placeholder="Type a tag and press Enter"
+							  Disabled="_saving"
+							  data-no-submit="true" />
+
+				<MokaTextArea Label="Notes" @bind-Value="_notes" Rows="3" Disabled="_saving" />
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="Close">Cancel</MokaButton>
+		@if (_original is null)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Disabled="_saving" OnClick="() => SaveAsync(addLogin: true)">Save and add login</MokaButton>
+		}
+		<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" OnClick="() => SaveAsync(addLogin: false)">Save</MokaButton>
+	</Actions>
+</ShellEditorDialog>

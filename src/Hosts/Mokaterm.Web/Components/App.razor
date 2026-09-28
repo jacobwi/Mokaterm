@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="color-scheme" content="dark light" />
+	<base href="/" />
+	<title>Mokaterm</title>
+	<link rel="icon" type="image/svg+xml" href="@Assets["favicon.svg"]" />
+	<link rel="stylesheet" href="@Assets["_content/Moka.Red.Core/moka-boot.css"]" />
+	<link rel="stylesheet" href="@Assets["_content/Moka.Red.Core/moka.css"]" />
+	<link rel="stylesheet" href="@Assets["_content/Mokaterm.UI/css/mokaterm.css"]" />
+	<link rel="stylesheet" href="@Assets["css/web.css"]" />
+	<link rel="stylesheet" href="@Assets["Mokaterm.Web.styles.css"]" />
+	<HeadOutlet @rendermode="_renderMode" />
+</head>
+<body>
+	@* Static splash shown until the circuit renders the app; web.css hides it once .moka-root exists. *@
+	<div class="moka-boot mokaterm-static-boot">
+		<div class="moka-boot-brand">
+			<div class="moka-boot-mark">mokaterm</div>
+			<div class="moka-boot-subtitle">
+				<span class="moka-boot-pulse"></span>
+				<span>connecting</span>
+			</div>
+			<div class="moka-boot-chips">
+				<span>engine<span class="moka-boot-v">BLAZOR SERVER</span></span>
+				<span>ui<span class="moka-boot-v">MOKA.RED</span></span>
+			</div>
+			<div class="moka-boot-bar"><span></span></div>
+		</div>
+	</div>
+
+	<Routes @rendermode="_renderMode" />
+
+	<Mokaterm.UI.Shell.ReconnectModal />
+	<Mokaterm.UI.Shell.CircuitErrorModal />
+
+	<script src="@Assets["_framework/blazor.web.js"]"></script>
+	<script src="@Assets["_content/Mokaterm.UI/js/reconnect.js"]"></script>
+</body>
+</html>
+
+@code {
+	// No prerendering: the shell needs JS and a vault decision before it can show anything meaningful.
+	private static readonly IComponentRenderMode _renderMode = new InteractiveServerRenderMode(prerender: false);
+}

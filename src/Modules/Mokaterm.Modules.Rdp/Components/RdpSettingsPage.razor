@@ -1,0 +1,54 @@
+@inherits SettingsSectionBase<RdpSettings>
+
+@{
+	RdpSettings settings = Settings;
+}
+
+<SettingsPage Title="RDP" OnReset="ResetAsync">
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Connect timeout" Description="Covers the connection, the TLS handshake and the login check.">
+			<NumberSetting TValue="int"
+						   Value="settings.ConnectTimeoutSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"
+						   Min="RdpSettings.MinTimeoutSeconds"
+						   Max="RdpSettings.MaxConnectTimeoutSeconds"
+						   Suffix="s"
+						   AriaLabel="Connect timeout in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Login attempts" Description="Password prompts, the first one included, before a rejected login gives up.">
+			<NumberSetting TValue="int"
+						   Value="settings.AuthenticationAttempts"
+						   ValueChanged="value => SaveAsync(s => s with { AuthenticationAttempts = value })"
+						   Min="1"
+						   Max="RdpSettings.MaxAuthenticationAttempts"
+						   AriaLabel="Login attempts" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Screen">
+		<SettingsRow Label="Frames per second"
+					 Description="How often a session sends what changed. Lower costs detail in fast animations, not correctness.">
+			<NumberSetting TValue="int"
+						   Value="settings.FramesPerSecond"
+						   ValueChanged="value => SaveAsync(s => s with { FramesPerSecond = value })"
+						   Min="RdpSettings.MinFramesPerSecond"
+						   Max="RdpSettings.MaxFramesPerSecond"
+						   AriaLabel="Frames per second" />
+		</SettingsRow>
+		<SettingsRow Label="Raw region limit" Description="Regions up to this size travel as raw pixels, larger ones as PNG.">
+			<NumberSetting TValue="int"
+						   Value="settings.RawFrameKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { RawFrameKilobytes = value })"
+						   Min="RdpSettings.MinRawFrameKilobytes"
+						   Max="RdpSettings.MaxRawFrameKilobytes"
+						   Suffix="KB"
+						   AriaLabel="Raw region limit in kilobytes" />
+		</SettingsRow>
+		<SettingsRow Label="Release held keys when a session is hidden"
+					 Description="Keeps a key from staying pressed on the server when you switch tabs mid keystroke.">
+			<MokaSwitch Value="settings.ReleaseKeysWhenInactive"
+						ValueChanged="value => SaveAsync(s => s with { ReleaseKeysWhenInactive = value })"
+						aria-label="Release held keys when a session is hidden" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

@@ -1,0 +1,104 @@
+@namespace Mokaterm.UI.Commands
+@using Mokaterm.Abstractions.Commands
+
+@* Docked beside the terminal so it can stay open while you work. The search box owns the keys: Enter types the
+	selected command at the prompt, Ctrl+Enter runs it, Escape hands focus back to the terminal. Only the search box:
+	Enter on the Manage button must press that button, not also type (or run) a command in the terminal. *@
+<div class="mt-commands" @ref="_body">
+	<div class="mt-commands-search">
+		<MokaTextField Value="@_query"
+					   ValueChanged="OnQueryChanged"
+					   Placeholder="Search name, command or tag"
+					   Size="MokaSize.Sm"
+					   StartIcon="MokaIcons.Action.Search"
+					   spellcheck="false"
+					   autocomplete="off"
+					   aria-label="Search saved commands"
+					   data-autofocus="true"
+					   @onkeydown="OnKeyDownAsync" />
+	</div>
+
+	@if (_error is not null)
+	{
+		<div class="mt-commands-message">
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+		</div>
+	}
+	else if (_loading)
+	{
+		<div class="mt-commands-message">
+			<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+		</div>
+	}
+	else if (_rows.Count == 0)
+	{
+		<div class="mt-commands-message">
+			@if (_query.Trim().Length > 0)
+			{
+				<MokaEmptyState Icon="MokaIcons.Action.Search"
+								Size="MokaSize.Sm"
+								Title="Nothing matches"
+								Description="@($"No saved command for this session contains \"{_query.Trim()}\".")" />
+			}
+			else
+			{
+				<MokaEmptyState Icon="MokatermIcons.Command"
+								Size="MokaSize.Sm"
+								Title="No commands yet"
+								Description="Hover a command in the terminal and use the save button on its right." />
+			}
+		</div>
+	}
+	else
+	{
+		<div class="mt-commands-list" @ref="_list">
+			<MokaList Dense>
+				@for (int index = 0; index < _rows.Count; index++)
+				{
+					CommandSnippet snippet = _rows[index];
+					int position = index;
+					@* The search box moves through the rows, so they stay out of the tab order: a clickable Moka list row is
+						otherwise a tab stop of its own, one per command. *@
+					<MokaListItem @key="snippet.Id"
+								  Active="@(position == _selected)"
+								  OnClick="args => ApplyAsync(snippet, args.CtrlKey || args.MetaKey)"
+								  tabindex="-1">
+						<ChildContent>
+							<span class="mt-commands-row">
+								@* A command saved with the quick button names itself, and printing it twice says nothing. *@
+								@if (string.Equals(snippet.Name, snippet.Command, StringComparison.Ordinal))
+								{
+									<span class="mt-commands-command mt-commands-lead">@snippet.Command</span>
+								}
+								else
+								{
+									<span class="mt-commands-name">@snippet.Name</span>
+									<span class="mt-commands-command">@snippet.Command</span>
+								}
+							</span>
+						</ChildContent>
+						<EndContent>
+							@if (snippet.RunImmediately)
+							{
+								<MokaTag Text="Runs" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+							}
+							<MokaTag Text="@CommandSnippetSearch.ScopeName(snippet.Scope)" Size="MokaSize.Xs" Color="@ScopeColor(snippet.Scope)" />
+						</EndContent>
+					</MokaListItem>
+				}
+			</MokaList>
+		</div>
+
+		<div class="mt-commands-hint">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				<MokaKbd>Enter</MokaKbd> types, <MokaKbd>Ctrl</MokaKbd>+<MokaKbd>Enter</MokaKbd> runs.
+			</MokaText>
+		</div>
+	}
+
+	<div class="mt-commands-actions">
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Settings" OnClick="Manage">
+			Manage
+		</MokaButton>
+	</div>
+</div>

@@ -1,0 +1,206 @@
+@inherits ShellEditorBase<ConnectionEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="@DialogTitle"
+				   DialogSize="MokaDialogSize.Large"
+				   Busy="_saving"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			<PromptBody @ref="Body">
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+
+				@if (_loading)
+				{
+					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+				}
+				else
+				{
+					<div class="mt-section">Host</div>
+					@if (_hosts.Count > 0)
+					{
+						<MokaSegmentedControl AriaLabel="Host" Value="@(_newHost ? NewHostMode : SavedHostMode)" ValueChanged="OnHostModeChanged" Size="MokaSize.Sm">
+							<MokaSegment Value="@SavedHostMode" Text="Saved host" Icon="MokatermIcons.Server" Disabled="_saving" />
+							<MokaSegment Value="@NewHostMode" Text="New host" Icon="MokaIcons.Action.Add" Disabled="_saving" />
+						</MokaSegmentedControl>
+					}
+
+					@if (_newHost)
+					{
+						<MokaGrid Columns="2" Gap="MokaSpacingScale.Md">
+							<MokaTextField Label="Address"
+										   Required
+										   @bind-Value="_newHostAddress"
+										   ErrorText="@_hostError"
+										   Placeholder="10.10.2.3 or server.example.com"
+										   Disabled="_saving"
+										   spellcheck="false"
+										   autocomplete="off"
+										   data-autofocus="true" />
+							<MokaTextField Label="Host name" @bind-Value="_newHostName" Placeholder="Optional" Disabled="_saving" />
+						</MokaGrid>
+					}
+					else
+					{
+						<MokaSelect TValue="Guid?"
+									Label="Host"
+									Items="_hostOptions"
+									@bind-Value="_hostId"
+									ValueSelector="HostLabel"
+									Placeholder="Choose a host"
+									Searchable="@(_hostOptions.Count > 8)"
+									ErrorText="@_hostError"
+									Disabled="_saving" />
+					}
+
+					<div class="mt-section">Login</div>
+					<MokaSegmentedControl AriaLabel="Protocol" Value="@_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
+						@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
+						{
+							<MokaSegment Value="@protocol.Id" Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" Disabled="_saving" />
+						}
+					</MokaSegmentedControl>
+
+					@* A serial line has no port, so the field would only invite a number that is never used. *@
+					<MokaGrid Columns="@(ShowPort ? 3 : 2)" Gap="MokaSpacingScale.Md">
+						<MokaTextField Label="Username"
+									   @bind-Value="_username"
+									   Placeholder="@UsernamePlaceholder"
+									   Disabled="_saving"
+									   spellcheck="false"
+									   autocomplete="off"
+									   data-autofocus="@(_newHost ? null : "true")" />
+						@if (ShowPort)
+						{
+							<MokaTextField Label="Port"
+										   @bind-Value="_port"
+										   Placeholder="@DefaultPortText"
+										   ErrorText="@_portError"
+										   Disabled="_saving"
+										   inputmode="numeric"
+										   autocomplete="off" />
+						}
+						<MokaTextField Label="Label" @bind-Value="_label" Placeholder="@LabelPlaceholder" Disabled="_saving" />
+					</MokaGrid>
+
+					@if (Protocol is { AuthenticationMethods.Count: > 1 } protocolWithChoices)
+					{
+						<MokaFieldWrapper Label="Authentication" HelperText="@MethodHelp" Disabled="_saving">
+							<MokaSegmentedControl AriaLabel="Authentication" Value="@_method.ToString()" ValueChanged="OnMethodChanged" Size="MokaSize.Sm">
+								@foreach (AuthenticationMethod method in protocolWithChoices.AuthenticationMethods)
+								{
+									<MokaSegment Value="@method.ToString()" Text="@MethodName(method)" Disabled="_saving" />
+								}
+							</MokaSegmentedControl>
+						</MokaFieldWrapper>
+					}
+
+					@if (CredentialKindFor(_method) is { } kind)
+					{
+						<div class="mt-section">@(kind == CredentialKind.Password ? "Password" : "Private key")</div>
+						<MokaSegmentedControl AriaLabel="@(kind == CredentialKind.Password ? "Password" : "Private key")" Value="@(_useKeychain ? KeychainSource : LoginSource)" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
+							<MokaSegment Value="@LoginSource"
+										 Text="@(kind == CredentialKind.Password ? "Saved with this login" : "Key for this login")"
+										 Disabled="_saving" />
+							<MokaSegment Value="@KeychainSource"
+										 Text="From keychain"
+										 Icon="MokatermIcons.Key"
+										 Disabled="@(_saving || KeychainOptions(kind).Count == 0)" />
+						</MokaSegmentedControl>
+
+						@if (_useKeychain)
+						{
+							<MokaSelect TValue="Guid?"
+										Label="Keychain entry"
+										Items="KeychainOptions(kind)"
+										Value="_keychainCredentialId"
+										ValueChanged="OnKeychainCredentialChanged"
+										ValueSelector="CredentialLabel"
+										Placeholder="Choose a saved credential"
+										ErrorText="@_credentialError"
+										Disabled="_saving" />
+						}
+						else if (kind == CredentialKind.Password)
+						{
+							<MokaPasswordField Label="Password"
+											   @bind-Value="_password"
+											   Placeholder="@PasswordPlaceholder"
+											   HelperText="@(_forgetPassword ? "The saved password is deleted when you save." : null)"
+											   Disabled="@(_saving || _forgetPassword)"
+											   autocomplete="new-password" />
+							@if (HasPrivateCredential(CredentialKind.Password))
+							{
+								<MokaCheckbox Label="Forget saved password" @bind-Value="_forgetPassword" Disabled="_saving" />
+							}
+						}
+						else
+						{
+							<PrivateKeyInput @bind-PrivateKey="_privateKey"
+											 @bind-Passphrase="_passphrase"
+											 HasSavedKey="@HasPrivateCredential(CredentialKind.PrivateKey)"
+											 Disabled="_saving" />
+							@if (_credentialError is not null)
+							{
+								<MokaText Size="MokaSize.Xs" Color="MokaColor.Error">@_credentialError</MokaText>
+							}
+						}
+					}
+					else if (_method == AuthenticationMethod.Agent)
+					{
+						<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">Keys come from the running SSH agent.</MokaText>
+					}
+
+					@if (OptionsEditorType is { } optionsEditor)
+					{
+						<div class="mt-section">@ProtocolName options</div>
+						@* The module's own editor: if it fails, the rest of the login can still be edited and saved. *@
+						<ViewBoundary @key="optionsEditor" Name="@($"The {ProtocolName} options")">
+							<DynamicComponent Type="optionsEditor" Parameters="OptionsEditorParameters" />
+						</ViewBoundary>
+					}
+
+					@if (Protocol?.Has(ProtocolCapabilities.Terminal) == true)
+					{
+						<div class="mt-section">Terminal</div>
+						<MokaGrid Columns="3" Gap="MokaSpacingScale.Md">
+							<MokaSelect TValue="string"
+										Label="Theme"
+										Items="_themeIds"
+										@bind-Value="_themeChoice"
+										ValueSelector="ThemeLabel"
+										Placeholder="@GlobalThemeText"
+										Disabled="_saving" />
+							<MokaTextField Label="Font size"
+										   @bind-Value="_fontSize"
+										   Placeholder="@GlobalFontSizeText"
+										   ErrorText="@_fontSizeError"
+										   Disabled="_saving"
+										   inputmode="decimal"
+										   autocomplete="off" />
+							<MokaTextField Label="Font family"
+										   @bind-Value="_fontFamily"
+										   Placeholder="Global setting"
+										   ErrorText="@_fontFamilyError"
+										   Disabled="_saving"
+										   spellcheck="false"
+										   autocomplete="off" />
+						</MokaGrid>
+					}
+				}
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="Close">Cancel</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" StartIcon="MokatermIcons.Connect" Disabled="@(_saving || _loading)" OnClick="() => SaveAsync(connect: true)">
+			Save and connect
+		</MokaButton>
+		<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: false)">
+			Save
+		</MokaButton>
+	</Actions>
+</ShellEditorDialog>

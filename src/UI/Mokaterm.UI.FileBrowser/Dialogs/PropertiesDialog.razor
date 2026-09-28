@@ -1,0 +1,259 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+@using Mokaterm.UI.Common.Components
+
+@{
+	RenderFragment Bit(UnixFileMode bit, string? label, string name) =>
+		@<MokaCheckbox Label="@label"
+					   Value="@(_form.Mode.Get(bit) == true)"
+					   Indeterminate="@(_form.Mode.Get(bit) is null)"
+					   ValueChanged="@(value => _form.Mode.Set(bit, value))"
+					   Size="MokaSize.Sm"
+					   aria-label="@name" />;
+
+	RenderFragment ColumnLabel(string text) =>
+		@<MokaText Element="span" SizeValue="10px" Weight="MokaFontWeight.Semibold" Transform="MokaTextTransform.Uppercase" Style="@MicroLabelStyle">@text</MokaText>;
+}
+
+<DialogFrame>
+	<ChildContent>
+		<div class="props" @onkeydown="OnKeyDown">
+			<div class="props-header">
+				<MokaIcon Icon="@HeaderIcon" Size="MokaSize.Lg" Color="@HeaderColor" />
+				<div class="props-heading">
+					<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold" Mono Truncate title="@HeaderName">@HeaderName</MokaText>
+					<div class="props-path">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@MutedStyle" title="@HeaderPath">@HeaderPath</MokaText>
+						<CopyButton Text="@HeaderPath" Label="Copy path" />
+					</div>
+				</div>
+			</div>
+
+			<DialogSection Title="General">
+				<MokaKeyValue Label="Type" LabelWidth="@LabelWidth">
+					<MokaText Element="span" Size="MokaSize.Xs">@TypeText</MokaText>
+				</MokaKeyValue>
+				<MokaKeyValue Label="Location" LabelWidth="@LabelWidth">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate title="@_form.Location">@_form.Location</MokaText>
+				</MokaKeyValue>
+				@if (_form.Single is { Kind: RemoteEntryKind.SymbolicLink } link)
+				{
+					<MokaKeyValue Label="Target" LabelWidth="@LabelWidth">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate title="@link.LinkTarget">@(link.LinkTarget ?? "unknown")</MokaText>
+						<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@EntryVisuals.LinkTargetKindLabel(link)</MokaText>
+					</MokaKeyValue>
+				}
+				@if (_form.CanMeasure && MeasureSize is not null)
+				{
+					<MokaKeyValue Label="Size" LabelWidth="@LabelWidth">
+						@switch (_sizeState)
+						{
+							case SizeState.Idle:
+								<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" OnClick="CalculateSizeAsync">Calculate</MokaButton>
+								break;
+							case SizeState.Running:
+								<MokaSpinner SizeValue="12px" />
+								<MokaText Element="span" Size="MokaSize.Xs" Mono>@SizeText</MokaText>
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="StopSize">Stop</MokaButton>
+								break;
+							case SizeState.Failed:
+								<MokaText Element="span" Size="MokaSize.Xs" Color="MokaColor.Error">@_sizeError</MokaText>
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="CalculateSizeAsync">Retry</MokaButton>
+								break;
+							default:
+								<MokaText Element="span" Size="MokaSize.Xs" Mono>@SizeText</MokaText>
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+											OnClick="CalculateSizeAsync" title="Calculate again" aria-label="Calculate again" />
+								break;
+						}
+					</MokaKeyValue>
+					@if (_sizeState is SizeState.Running or SizeState.Done or SizeState.Stopped)
+					{
+						<MokaKeyValue Label="@ContainsLabel" LabelWidth="@LabelWidth">
+							<MokaText Element="span" Size="MokaSize.Xs" Mono>@ContainsText</MokaText>
+						</MokaKeyValue>
+						@if (SizeNote is { } note)
+						{
+							<MokaKeyValue Label="" LabelWidth="@LabelWidth">
+								<MokaText Element="span" Size="MokaSize.Xs" Color="MokaColor.Warning">@note</MokaText>
+							</MokaKeyValue>
+						}
+					}
+				}
+				else if (HasSelectedFiles)
+				{
+					<MokaKeyValue Label="Size" LabelWidth="@LabelWidth">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@EntryVisuals.DetailedSize(_form.SelectedFileBytes)</MokaText>
+					</MokaKeyValue>
+				}
+				@if (_form.Single?.LastModified is { } modified)
+				{
+					<MokaKeyValue Label="Modified" LabelWidth="@LabelWidth">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Timestamp(modified)</MokaText>
+					</MokaKeyValue>
+				}
+				@* Without an editor for them, the listing's owner and mode still belong on screen. *@
+				@if (!_form.CanEditOwnership && _form.Single is { } withOwner && EntryOrdering.OwnerLabel(withOwner) is { Length: > 0 } ownerLabel)
+				{
+					<MokaKeyValue Label="Owner" LabelWidth="@LabelWidth">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@ownerLabel</MokaText>
+					</MokaKeyValue>
+				}
+				@if (!_form.CanEditPermissions && _form.Single is { Permissions: { } singleMode } withMode)
+				{
+					<MokaKeyValue Label="Permissions" LabelWidth="@LabelWidth">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@EntryVisuals.PermissionsText(withMode) (@UnixFileModeFormat.ToOctal(singleMode))</MokaText>
+					</MokaKeyValue>
+				}
+			</DialogSection>
+
+			@if (_form.SkippedLinks > 0 && (_form.SupportsOwnership || _form.SupportsPermissions))
+			{
+				<MokaCallout Type="MokaCalloutType.Note">@LinksNote</MokaCallout>
+			}
+
+			@if (_form.CanEditOwnership)
+			{
+				<DialogSection Title="Ownership">
+					<MokaGrid Columns="2" GapValue="12px">
+						<AccountPicker Label="Owner"
+									   Value="@_form.Owner.Text"
+									   ValueChanged="@(value => _form.Owner.Text = value)"
+									   Accounts="@_accounts.Users"
+									   IdLabel="uid"
+									   Placeholder="@EmptyHint(_form.Owner)"
+									   HelperText="@AccountHelp(_form.Owner, _accounts.Users, "uid", "user")"
+									   ErrorText="@(_form.Owner.IsValid ? null : "Not a valid user name.")"
+									   Autofocus="@(Section == PropertiesSection.Ownership)" />
+						<AccountPicker Label="Group"
+									   Value="@_form.Group.Text"
+									   ValueChanged="@(value => _form.Group.Text = value)"
+									   Accounts="@_accounts.Groups"
+									   IdLabel="gid"
+									   Placeholder="@EmptyHint(_form.Group)"
+									   HelperText="@AccountHelp(_form.Group, _accounts.Groups, "gid", "group")"
+									   ErrorText="@(_form.Group.IsValid ? null : "Not a valid group name.")" />
+					</MokaGrid>
+					@if (_form.HasFolders)
+					{
+						<MokaSwitch Label="Apply to everything inside"
+									Value="@_form.OwnershipRecursive"
+									ValueChanged="@(value => _form.OwnershipRecursive = value)"
+									HelperText="@OwnershipInsideText"
+									Size="MokaSize.Sm" />
+					}
+				</DialogSection>
+			}
+
+			@if (_form.CanEditPermissions)
+			{
+				<DialogSection Title="Permissions">
+					@if (_form.Mode.WasMixed)
+					{
+						<MokaText Size="MokaSize.Xs" Style="@MutedStyle">The items differ. A dash keeps each item's own setting until you set it.</MokaText>
+					}
+					<MokaGrid ColumnsValue="64px repeat(3, 1fr)" GapValue="2px 12px" AlignItems="MokaAlign.Center">
+						<span></span>
+						@ColumnLabel("Read")
+						@ColumnLabel("Write")
+						@ColumnLabel("Execute")
+						@foreach (PermissionRow row in PermissionRows)
+						{
+							<MokaText Element="span" Size="MokaSize.Sm">@row.Label</MokaText>
+							@Bit(row.Read, null, row.Label + " read")
+							@Bit(row.Write, null, row.Label + " write")
+							@Bit(row.Execute, null, row.Label + " execute")
+						}
+					</MokaGrid>
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Lg" Wrap>
+						@Bit(UnixFileMode.SetUser, "Set user ID", "Set user ID")
+						@Bit(UnixFileMode.SetGroup, "Set group ID", "Set group ID")
+						@Bit(UnixFileMode.StickyBit, "Sticky", "Sticky")
+					</MokaFlexbox>
+					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Md" Align="MokaAlign.End">
+						<MokaTextField Label="Octal"
+									   Value="@_form.Mode.OctalText"
+									   ValueChanged="@(value => _form.Mode.SetOctal(value))"
+									   Size="MokaSize.Sm"
+									   MaxLength="4"
+									   Placeholder="@(_form.Mode.IsMixed ? "mixed" : null)"
+									   ErrorText="@(_form.Mode.IsOctalValid ? null : "3 or 4 digits from 0 to 7")"
+									   Style="width:96px"
+									   spellcheck="false"
+									   autocomplete="off"
+									   data-dialog-focus="@(Section == PropertiesSection.Permissions ? "true" : null)" />
+						<MokaText Element="span" Size="MokaSize.Sm" Mono Style="padding-bottom:6px">@_form.Mode.Symbolic</MokaText>
+					</MokaFlexbox>
+					@if (_form.HasFolders)
+					{
+						<MokaSwitch Label="Apply to everything inside"
+									Value="@_form.PermissionsRecursive"
+									ValueChanged="@(value => _form.PermissionsRecursive = value)"
+									HelperText="@PermissionsInsideText"
+									Size="MokaSize.Sm" />
+						@if (_form.PermissionsRecursive)
+						{
+							<div class="props-inside">
+								<MokaSegmentedControl Size="MokaSize.Xs" Value="@TargetsValue" ValueChanged="OnTargetsChanged" AriaLabel="Entries to change">
+									<MokaSegment Value="@AllTargets" Text="Folders and files" />
+									<MokaSegment Value="@FolderTargets" Text="Folders only" />
+									<MokaSegment Value="@FileTargets" Text="Files only" />
+								</MokaSegmentedControl>
+								<MokaCheckbox Label="Execute only for folders and files that already have it"
+											  Value="@_form.ConditionalExecute"
+											  ValueChanged="@(value => _form.ConditionalExecute = value)"
+											  Disabled="@(_form.Targets == PermissionTargets.Folders)"
+											  Size="MokaSize.Sm" />
+							</div>
+						}
+					}
+				</DialogSection>
+			}
+
+			@if (!_form.IsReadOnly)
+			{
+				<DialogSection Title="Run as">
+					@if (_form.CanElevate && !_form.IsRootUser)
+					{
+						<MokaSegmentedControl Size="MokaSize.Sm" Value="@RunAsValue" ValueChanged="OnRunAsChanged" AriaLabel="Run as">
+							<MokaSegment Value="@UserValue" Text="@UserName" Icon="MokatermIcons.User" />
+							<MokaSegment Value="@RootValue" Text="root" Icon="MokatermIcons.Root" />
+						</MokaSegmentedControl>
+					}
+					else
+					{
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xs">
+							<MokaIcon Icon="@(_form.IsRootUser ? MokatermIcons.Root : MokatermIcons.User)" Size="MokaSize.Xs" />
+							<MokaText Element="span" Size="MokaSize.Sm" Mono>@UserName</MokaText>
+						</MokaFlexbox>
+					}
+					@if (_form.NeedsRootForOwner)
+					{
+						<MokaCallout Type="MokaCalloutType.Warning" Title="Needs root">@OwnerNeedsRootText</MokaCallout>
+					}
+					else if (_form.RunsAsRoot && !_form.IsRootUser)
+					{
+						<MokaText Size="MokaSize.Xs" Style="@MutedStyle">Runs through sudo, which may ask for the password first.</MokaText>
+					}
+				</DialogSection>
+			}
+		</div>
+	</ChildContent>
+	<Actions>
+		@if (_form.IsReadOnly)
+		{
+			<MokaButton Size="MokaSize.Sm" OnClick="Cancel">Close</MokaButton>
+		}
+		else
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+			<MokaButton Size="MokaSize.Sm"
+						Color="@(ApplyAsRoot ? MokaColor.Error : MokaColor.Primary)"
+						StartIcon="@(ApplyAsRoot ? MokatermIcons.Root : MokaIcons.Status.Check)"
+						Disabled="@(!_form.HasChanges)"
+						OnClick="Apply"
+						title="Apply (Ctrl+Enter)">
+				@(ApplyAsRoot ? "Apply as root" : "Apply")
+			</MokaButton>
+		}
+	</Actions>
+</DialogFrame>

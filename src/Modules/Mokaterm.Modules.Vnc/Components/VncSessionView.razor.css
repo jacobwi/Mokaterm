@@ -1,0 +1,107 @@
+/* The session body is a plain block, so the view takes its height rather than its own content's. */
+.mt-vnc {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	background: var(--moka-color-background);
+}
+
+.mt-vnc-toolbar {
+	container-type: inline-size;
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	height: var(--moka-height-toolbar-dense);
+	padding: 0 var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	background: var(--moka-color-surface);
+}
+
+/* The buttons fold into one menu, and the meta text drops out, as the session gets narrower. */
+.mt-vnc-toolbar ::deep .mt-vnc-compact {
+	display: none;
+}
+
+@container (max-width: 660px) {
+	.mt-vnc-toolbar ::deep .mt-vnc-wide {
+		display: none;
+	}
+
+	.mt-vnc-toolbar ::deep .mt-vnc-compact {
+		display: inline-flex;
+	}
+
+	.mt-vnc-toolbar ::deep .mt-vnc-quality {
+		display: none;
+	}
+}
+
+@container (max-width: 520px) {
+	.mt-vnc-toolbar ::deep .mt-vnc-name {
+		display: none;
+	}
+}
+
+@container (max-width: 400px) {
+	.mt-vnc-toolbar ::deep .mt-vnc-size {
+		display: none;
+	}
+}
+
+.mt-vnc-spacer {
+	flex: 1;
+}
+
+.mt-vnc-toolbar ::deep .mt-vnc-meta {
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-vnc-toolbar ::deep .mt-vnc-name {
+	flex-shrink: 1;
+	min-width: 0;
+	max-width: 22ch;
+}
+
+.mt-vnc-body {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+
+/* noVNC fills this element with its own screen div and canvas, which take their size from it. */
+.mt-vnc-screen {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.mt-vnc-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--moka-spacing-lg);
+	background: color-mix(in srgb, var(--moka-color-background) 88%, transparent);
+}
+
+.mt-vnc-badge {
+	position: absolute;
+	top: var(--moka-spacing-sm);
+	left: 50%;
+	z-index: 2;
+	pointer-events: none;
+	transform: translateX(-50%);
+}
+
+.mt-vnc-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	width: min(480px, 100%);
+}

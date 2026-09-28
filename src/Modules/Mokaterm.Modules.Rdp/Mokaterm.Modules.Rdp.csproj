@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<!--
+		RDP remote desktop over IronRDP. .NET owns the socket, TLS, CredSSP, decoding and input; the page only
+		paints the regions it is given and reports what the user does.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Modules.Rdp</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Modules.Rdp.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Devolutions.IronRdp" />
+		<ProjectReference Include="..\..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

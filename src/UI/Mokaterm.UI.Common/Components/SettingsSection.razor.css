@@ -1,0 +1,26 @@
+.settings-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.settings-section__header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm);
+	padding: 0 var(--moka-spacing-xxs);
+}
+
+.settings-section__heading {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}
+
+.settings-section__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}

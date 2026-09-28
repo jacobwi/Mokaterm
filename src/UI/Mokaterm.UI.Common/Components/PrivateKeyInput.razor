@@ -1,0 +1,47 @@
+@using Moka.Red.Core.Layout
+@using Moka.Red.Forms.PasswordField
+@using Moka.Red.Forms.TextArea
+@using Moka.Red.Layout.Flexbox
+@using Moka.Red.Primitives.Button
+@using Moka.Red.Primitives.Tag
+@using Moka.Red.Primitives.Typography
+@using Mokaterm.Abstractions.Credentials
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Sm">
+	<MokaTextArea Label="Private key"
+				  Value="@PrivateKey"
+				  ValueChanged="OnPrivateKeyChangedAsync"
+				  Rows="6"
+				  Disabled="Disabled"
+				  Placeholder="@(HasSavedKey ? "A key is saved. Paste or import a new one to replace it." : "-----BEGIN OPENSSH PRIVATE KEY-----")"
+				  HelperText="OpenSSH or PEM format. The key is encrypted in the vault and never leaves this device unencrypted." />
+
+	<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Align="MokaAlign.Center" Wrap>
+		@if (FileAccess is not null)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.FileUpload" Disabled="Disabled" OnClick="ImportAsync">
+				Import key file
+			</MokaButton>
+		}
+
+		@if (_inspection is { } inspection)
+		{
+			<MokaTag Text="@StatusText(inspection)" Icon="@(inspection.IsValid ? MokatermIcons.ShieldCheck : MokatermIcons.Root)" Color="@(inspection.IsValid ? MokaColor.Success : MokaColor.Warning)" />
+			@if (inspection.Fingerprint is { } fingerprint)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate>@fingerprint</MokaText>
+			}
+		}
+
+		@if (_importError is not null)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Color="MokaColor.Error">@_importError</MokaText>
+		}
+	</MokaFlexbox>
+
+	<MokaPasswordField Label="Passphrase"
+					   Value="@Passphrase"
+					   ValueChanged="OnPassphraseChangedAsync"
+					   Disabled="Disabled"
+					   HelperText="Leave empty when the key is not encrypted." />
+</MokaFlexbox>

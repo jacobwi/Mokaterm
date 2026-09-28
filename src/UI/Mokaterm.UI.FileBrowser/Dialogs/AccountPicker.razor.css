@@ -1,0 +1,66 @@
+.ap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}
+
+.ap-field {
+	position: relative;
+}
+
+/* Overlays the fields below it; the dialog body scrolls when the list runs past its end. */
+.ap-list {
+	position: absolute;
+	top: calc(100% + 2px);
+	left: 0;
+	right: 0;
+	z-index: 10;
+	max-height: 196px;
+	overflow-y: auto;
+	padding: var(--moka-spacing-xxs) 0;
+	background: var(--moka-color-surface);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-md);
+	box-shadow: 0 0 20px var(--moka-color-primary-glow);
+}
+
+.ap-option {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm);
+	padding: 3px var(--moka-spacing-sm);
+	cursor: pointer;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	transition: background var(--moka-transition-fast);
+}
+
+.ap-option:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.ap-option--active {
+	background: var(--moka-color-surface-hover);
+	box-shadow: inset 2px 0 0 var(--moka-color-primary);
+}
+
+.ap-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ap-id,
+.ap-more {
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.ap-more {
+	padding: 3px var(--moka-spacing-sm);
+	font-size: var(--moka-font-size-xs);
+}

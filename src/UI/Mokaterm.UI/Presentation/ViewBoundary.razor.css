@@ -1,0 +1,40 @@
+/* Only rendered after a failure; in its normal state the boundary adds no element around the view. */
+.mt-fault {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-md);
+}
+
+.mt-fault--fill {
+	flex: 1;
+	align-items: center;
+	height: 100%;
+	min-height: 0;
+	overflow: auto;
+	background: var(--moka-color-background);
+}
+
+.mt-fault-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	width: 100%;
+	max-width: 560px;
+}
+
+.mt-fault-line {
+	display: block;
+	overflow-wrap: anywhere;
+}
+
+.mt-fault-hint {
+	margin-top: var(--moka-spacing-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-fault-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-sm);
+}

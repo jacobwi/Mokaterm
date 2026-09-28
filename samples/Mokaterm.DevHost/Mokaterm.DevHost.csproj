@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<!--
+		Dev-only UI workbench: the real shell over an in-memory demo protocol, with a throwaway vault that every circuit
+		unlocks without a password. It refuses to start outside the Development environment; never deploy it.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.DevHost</RootNamespace>
+		<IsPackable>false</IsPackable>
+		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+	</PropertyGroup>
+
+	<!-- The demo broker: MQTTnet 5 ships its server in a package of its own, which no shipping project references. -->
+	<ItemGroup>
+		<PackageReference Include="MQTTnet.Server" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Mokaterm.Core\Mokaterm.Core.csproj" />
+		<ProjectReference Include="..\..\src\Mokaterm.Sessions\Mokaterm.Sessions.csproj" />
+		<ProjectReference Include="..\..\src\UI\Mokaterm.UI\Mokaterm.UI.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Ssh\Mokaterm.Modules.Ssh.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Ftp\Mokaterm.Modules.Ftp.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Vnc\Mokaterm.Modules.Vnc.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Rdp\Mokaterm.Modules.Rdp.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Telnet\Mokaterm.Modules.Telnet.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Mqtt\Mokaterm.Modules.Mqtt.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Serial\Mokaterm.Modules.Serial.csproj" />
+	</ItemGroup>
+
+</Project>

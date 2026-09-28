@@ -1,0 +1,13 @@
+@namespace Mokaterm.UI.Terminal
+
+<div class="@RootClass" style="@_style" aria-hidden="true">
+	<div class="mt-theme-preview-line"><span class="mt-theme-preview-bold mt-bright-green">moka@@mokaterm</span>:<span class="mt-theme-preview-bold mt-bright-blue">~/projects</span>$ ls --color</div>
+	<div class="mt-theme-preview-line"><span class="mt-theme-preview-bold mt-bright-blue">bin</span>  <span class="mt-theme-preview-bold mt-bright-blue">docs</span>  <span class="mt-theme-preview-bold mt-bright-green">deploy.sh</span>  <span class="mt-theme-preview-bold mt-bright-cyan">latest</span>  <span class="mt-theme-preview-bold mt-bright-red">backup.tar.gz</span>  <span class="mt-theme-preview-bold mt-bright-magenta">logo.png</span>  <span class="mt-theme-preview-selection">README.md</span></div>
+	<div class="mt-theme-preview-line"><span class="mt-theme-preview-bold mt-bright-green">moka@@mokaterm</span>:<span class="mt-theme-preview-bold mt-bright-blue">~/projects</span>$ <span class="mt-theme-preview-cursor">&nbsp;</span></div>
+	<div class="mt-theme-preview-swatches">
+		@foreach (string swatchStyle in SwatchStyles)
+		{
+			<span class="mt-theme-preview-swatch" style="@swatchStyle"></span>
+		}
+	</div>
+</div>

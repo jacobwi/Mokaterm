@@ -1,0 +1,38 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+TestResults/
+*.trx
+
+## MSBuild binary logs record environment variables and command lines, secrets included
+*.binlog
+
+## Packaging output and signing material
+AppPackages/
+BundleArtifacts/
+*.pfx
+
+## IDEs
+.vs/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+
+## Local tooling state
+.claude/
+
+## Runtime data written by the web host during development
+src/Hosts/Mokaterm.Web/App_Data/
+
+## OS noise
+.DS_Store
+Thumbs.db

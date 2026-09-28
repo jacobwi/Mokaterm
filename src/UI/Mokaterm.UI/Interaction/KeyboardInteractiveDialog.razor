@@ -1,0 +1,69 @@
+@* Answers server-driven keyboard-interactive questions, masking the ones that must not echo. *@
+@inherits PromptDialogBase
+
+<MokaDialog Open="true"
+			Title="@Prompt.Title"
+			DialogSize="MokaDialogSize.Small"
+			CloseOnBackdropClick="false"
+			OnClose="CancelAsync">
+	<ChildContent>
+		<PromptBody @ref="Body" AutofocusSelf="@(Prompt.Questions.Count == 0)">
+			@if (!string.IsNullOrWhiteSpace(Prompt.Instruction))
+			{
+				<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">@Prompt.Instruction</MokaText>
+			}
+			@for (int i = 0; i < Prompt.Questions.Count; i++)
+			{
+				int index = i;
+				KeyboardInteractiveQuestion question = Prompt.Questions[index];
+				if (question.Echo)
+				{
+					<MokaTextField Label="@question.Prompt"
+								   Value="@_answers[index]"
+								   ValueChanged="value => _answers[index] = value"
+								   spellcheck="false"
+								   autocomplete="off"
+								   data-autofocus="@Flag(index == 0)" />
+				}
+				else
+				{
+					<MokaPasswordField Label="@question.Prompt"
+									   Value="@_answers[index]"
+									   ValueChanged="value => _answers[index] = value"
+									   autocomplete="off"
+									   data-autofocus="@Flag(index == 0)" />
+				}
+			}
+		</PromptBody>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CancelAsync">Cancel</MokaButton>
+		<MokaButton data-primary="true" OnClick="SubmitAsync">Continue</MokaButton>
+	</Actions>
+</MokaDialog>
+
+@code {
+	private string[] _answers = [];
+
+	[Parameter, EditorRequired]
+	public KeyboardInteractivePrompt Prompt { get; set; } = default!;
+
+	/// <summary>Raised once with one answer per question, or null when cancelled.</summary>
+	[Parameter]
+	public EventCallback<IReadOnlyList<string>?> OnResult { get; set; }
+
+	protected override void OnInitialized() => _answers = [.. Prompt.Questions.Select(_ => "")];
+
+	private Task SubmitAsync()
+	{
+		IReadOnlyList<string> answers = [.. _answers];
+		Array.Fill(_answers, "");
+		return AnswerAsync(OnResult, (IReadOnlyList<string>?)answers);
+	}
+
+	private Task CancelAsync()
+	{
+		Array.Fill(_answers, "");
+		return AnswerAsync(OnResult, (IReadOnlyList<string>?)null);
+	}
+}

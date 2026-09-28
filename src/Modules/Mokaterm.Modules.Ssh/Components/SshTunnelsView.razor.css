@@ -1,0 +1,58 @@
+.mt-tunnels {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.mt-tunnels-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-tunnels-spacer {
+	flex: 1;
+}
+
+.mt-tunnels-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-tunnels-draft,
+.mt-tunnels-row {
+	display: flex;
+	min-width: 0;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-tunnels-draft {
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-tunnels-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-tunnels-row {
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-tunnels-text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}

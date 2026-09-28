@@ -1,0 +1,198 @@
+.fb {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	min-width: 0;
+	background: var(--moka-color-surface);
+	color: var(--moka-color-on-surface);
+	outline: none;
+}
+
+/* Root mode gets an edge in the error color that stays visible whatever is scrolled or open. */
+.fb--root {
+	box-shadow: inset 0 2px 0 var(--moka-color-error);
+}
+
+.fb-path {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+}
+
+.fb-crumbs {
+	flex: 1;
+	min-width: 0;
+	align-self: stretch;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	white-space: nowrap;
+	cursor: text;
+}
+
+.fb-crumbs ::deep .moka-breadcrumb,
+.fb-crumbs ::deep .moka-breadcrumb__list {
+	display: flex;
+	flex-wrap: nowrap;
+	min-width: 0;
+}
+
+/* Long folder names shrink with an ellipsis instead of pushing the current folder out of view. */
+.fb-crumbs ::deep .moka-breadcrumb-item,
+.fb-crumbs ::deep .moka-breadcrumb-item__text {
+	min-width: 0;
+}
+
+.fb-crumbs ::deep .moka-breadcrumb-item:last-child {
+	flex-shrink: 0;
+	max-width: 70%;
+}
+
+/* The separators keep their width while the crumbs around them shrink. */
+.fb-crumbs ::deep .moka-breadcrumb-item__separator,
+.fb-crumbs ::deep .moka-breadcrumb-item__ellipsis {
+	flex-shrink: 0;
+}
+
+.fb-crumb {
+	overflow: hidden;
+	cursor: pointer;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	transition: color var(--moka-transition-fast);
+}
+
+.fb-crumb:hover {
+	color: var(--moka-color-primary);
+}
+
+.fb-filter {
+	flex: 1 1 160px;
+	min-width: 88px;
+	max-width: 280px;
+}
+
+.fb-progress {
+	flex-shrink: 0;
+	height: 2px;
+	overflow: hidden;
+}
+
+.fb-progress ::deep .moka-progress-track {
+	height: 2px;
+	border-radius: 0;
+	background: transparent;
+}
+
+.fb-alert {
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm) 0;
+}
+
+.fb-alert-body {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.fb-list {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.fb-state {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* The table fills the list, so its scrollbars sit at the edges of the list instead of under the last row. */
+.fb-list ::deep .moka-table-wrapper,
+.fb-list ::deep .moka-table-container {
+	flex: 1;
+	min-height: 0;
+}
+
+/* Fixed layout gives the name column whatever the sized columns leave, and long names truncate instead of widening it. */
+.fb-list ::deep .moka-table {
+	table-layout: fixed;
+}
+
+.fb-list ::deep tbody td {
+	user-select: none;
+}
+
+.fb-list ::deep tr.fb-drop-target > td {
+	background: var(--moka-color-primary-glow);
+	box-shadow: inset 0 1px 0 var(--moka-color-primary-border), inset 0 -1px 0 var(--moka-color-primary-border);
+}
+
+/* Cell content covers the cell padding, so a click anywhere in a row reaches a handler that sees modifier keys. */
+.fb-cell {
+	margin: calc(-1 * var(--moka-spacing-xs)) calc(-1 * var(--moka-spacing-sm));
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	overflow: hidden;
+	line-height: 16px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fb-name {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.fb-name-text,
+.fb-link {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The name keeps its room first; the link target takes what is left. */
+.fb-name-text {
+	flex-shrink: 0;
+	max-width: 100%;
+}
+
+.fb-link {
+	font-family: var(--moka-font-family-mono);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.fb-mono,
+.fb-account {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
+}
+
+.fb-account {
+	display: block;
+	max-width: 24ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fb-drop {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in srgb, var(--moka-color-background) 85%, transparent);
+	border: 1px dashed var(--moka-color-primary-border);
+	box-shadow: inset 0 0 24px var(--moka-color-primary-glow);
+	pointer-events: none;
+}

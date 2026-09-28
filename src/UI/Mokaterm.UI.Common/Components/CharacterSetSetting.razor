@@ -1,0 +1,16 @@
+@using Moka.Red.Forms.TextField
+@inherits DraftSettingBase<string>
+
+<MokaTextField Value="@Text"
+			   ValueChanged="OnTextChangedAsync"
+			   OnBlur="OnBlur"
+			   Label="@Label"
+			   ErrorText="@Error"
+			   HelperText="@HelperText"
+			   Placeholder="@(Placeholder ?? Default)"
+			   Disabled="Disabled"
+			   Size="Size"
+			   Style="@WidthStyle"
+			   spellcheck="false"
+			   autocomplete="off"
+			   aria-label="@AriaLabel" />
