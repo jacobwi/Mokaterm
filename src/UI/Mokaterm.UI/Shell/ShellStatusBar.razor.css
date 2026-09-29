@@ -1,0 +1,73 @@
+/*
+	The bar reads as one row of related facts rather than scattered text: the items sit edge to edge and a hairline
+	separates them. Moka's own items carry no separator, so the line is drawn as a background on every item but the
+	first of a group; the hover background sets background-color only, so the line survives it.
+*/
+.mt-status-group {
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+}
+
+/* The left group is the one that gives way when the window is narrow. */
+.mt-status-group-start {
+	overflow: hidden;
+}
+
+.mt-status-group-end {
+	flex-shrink: 0;
+}
+
+.mt-status-group ::deep .moka-statusbar-item + .moka-statusbar-item {
+	background-image: linear-gradient(var(--moka-color-outline), var(--moka-color-outline));
+	background-position: left center;
+	background-repeat: no-repeat;
+	background-size: 1px 12px;
+}
+
+/*
+	An item only gives way at all once it may shrink past its content. The remote title is weighted to lose most of the
+	room, because which machine you are typing at matters more than what its shell calls itself.
+*/
+.mt-status-group ::deep .mt-status-session {
+	min-width: 0;
+}
+
+.mt-status-group ::deep .mt-status-remote-item {
+	flex-shrink: 4;
+	min-width: 0;
+}
+
+.mt-status-group ::deep .mt-status-protocol {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.04em;
+}
+
+/* Typing that lands on more than one machine has to be noticeable without being read. */
+.mt-status-group ::deep .mt-status-broadcast {
+	color: var(--moka-color-warning);
+}
+
+/* Reads as a label beside the mono number it belongs to, not as a second value. */
+.mt-status-label {
+	margin-inline-start: 2px;
+	color: var(--moka-color-on-surface-variant);
+	letter-spacing: 0.06em;
+}
+
+.mt-status-accent {
+	flex-shrink: 0;
+	width: 2px;
+	height: 12px;
+	margin-inline-end: var(--moka-spacing-xs);
+	border-radius: 1px;
+}
+
+/* Whatever the remote shell set as its title, so it is quiet, capped, and told in full by the tooltip. */
+.mt-status-remote {
+	overflow: hidden;
+	max-width: 24ch;
+	color: var(--moka-color-on-surface-variant);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

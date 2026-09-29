@@ -8,9 +8,9 @@ namespace Mokaterm.UI.Tests.Fakes;
 /// <summary>A connected SSH session that never changes, for components that only read a session.</summary>
 internal sealed class FakeSession : ISessionHandle
 {
-	public FakeSession(Guid? connectionId = null)
+	public FakeSession(Guid? connectionId = null, HostEnvironment environment = HostEnvironment.None)
 	{
-		Host = new HostProfile { Id = Guid.NewGuid(), Address = "build-01.example.com" };
+		Host = new HostProfile { Id = Guid.NewGuid(), Address = "build-01.example.com", Environment = environment };
 		Connection = new ConnectionProfile
 		{
 			Id = connectionId ?? Guid.NewGuid(),

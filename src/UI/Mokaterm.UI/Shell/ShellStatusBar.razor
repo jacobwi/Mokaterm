@@ -1,32 +1,70 @@
+@* Session state is deliberately missing from this bar: the tab dot and the session toolbar are where it shows. *@
 <MokaStatusBar Style="position:static;flex-shrink:0">
 	<StartContent>
-		<MokaStatusBarItem Tooltip="Open sessions">
-			<MokaText Element="span" Mono Size="MokaSize.Xs">@_sessionCount</MokaText>
-			<span>@(_sessionCount == 1 ? "SESSION" : "SESSIONS")</span>
-		</MokaStatusBarItem>
-
-		@if (_active is { } active)
-		{
-			<MokaStatusBarItem Tooltip="Active session">
-				<MokaText Element="span" Mono Size="MokaSize.Xs" Style="margin-inline-end:var(--moka-spacing-xs)">@active.Protocol.DisplayName.ToUpperInvariant()</MokaText>
-				<SessionLabel Session="active" ShowPort Mono Tooltip="@EndpointFormat.Format(active)" />
-			</MokaStatusBarItem>
-
-			@if (HostEnvironmentDisplay.Tag(active.Host.Environment) is { } environment)
+		<div class="mt-status-group mt-status-group-start">
+			@if (_catalogLoaded)
 			{
-				<MokaStatusBarItem Tooltip="Host environment">
-					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Color="@HostEnvironmentDisplay.Color(active.Host.Environment)">
-						@environment
-					</MokaText>
+				<MokaStatusBarItem Tooltip="@HostsTooltip" OnClick="Shell.ToggleConnectionsPanel">
+					@if (_hosts > 0)
+					{
+						<MokaText Element="span" Mono Size="MokaSize.Xs">@_hosts</MokaText>
+					}
+					<span class="mt-status-label">@HostsLabel</span>
 				</MokaStatusBarItem>
 			}
-		}
+
+			<MokaStatusBarItem Tooltip="@SessionsTooltip">
+				@if (_sessionCount > 0)
+				{
+					<MokaText Element="span" Mono Size="MokaSize.Xs">@_sessionCount</MokaText>
+				}
+				<span class="mt-status-label">@SessionsLabel</span>
+			</MokaStatusBarItem>
+
+			@if (_active is { } active)
+			{
+				<MokaStatusBarItem Class="mt-status-session" Tooltip="@ActiveTooltip(active)">
+					@* The machine's own colour, the one its tab and its session toolbar already carry. *@
+					<span class="mt-status-accent" style="background:@HostAccent.For(active.Host)" aria-hidden="true"></span>
+					<MokaTag Text="@active.Protocol.DisplayName.ToUpperInvariant()"
+							 Size="MokaSize.Xs"
+							 Variant="MokaVariant.Outlined"
+							 Color="MokaColor.Surface"
+							 Class="mt-status-protocol" />
+					<SessionLabel Session="active" ShowPort Mono />
+				</MokaStatusBarItem>
+
+				@if (HostEnvironmentDisplay.Tag(active.Host.Environment) is { } environment)
+				{
+					<MokaStatusBarItem Tooltip="@EnvironmentTooltip(active)">
+						<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(active.Host.Environment)" />
+					</MokaStatusBarItem>
+				}
+
+				@if (ShowsBroadcast)
+				{
+					<MokaStatusBarItem Class="mt-status-broadcast"
+									   Icon="MokatermIcons.Broadcast"
+									   Text="@BroadcastText"
+									   Tooltip="@BroadcastTooltip" />
+				}
+
+				@if (_remoteTitle is { Length: > 0 } remoteTitle)
+				{
+					<MokaStatusBarItem Class="mt-status-remote-item" Tooltip="@RemoteTitleTooltip(remoteTitle)">
+						<span class="mt-status-remote">@remoteTitle</span>
+					</MokaStatusBarItem>
+				}
+			}
+		</div>
 	</StartContent>
 	<EndContent>
-		<MokaStatusBarItem Icon="MokatermIcons.Transfers" Text="@TransfersText" Tooltip="Transfers panel" OnClick="Shell.ToggleTransfersPanel" />
-		<MokaStatusBarItem Icon="MokatermIcons.Unlock" Text="@VaultText" Tooltip="Lock vault" OnClick="LockVault" />
-		<MokaStatusBarItem Tooltip="@Environment.PlatformName">
-			<MokaText Element="span" Mono Size="MokaSize.Xs">v@(Environment.AppVersion)</MokaText>
-		</MokaStatusBarItem>
+		<div class="mt-status-group mt-status-group-end">
+			<MokaStatusBarItem Icon="MokatermIcons.Transfers" Text="@TransfersText" Tooltip="@TransfersTooltip" OnClick="Shell.ToggleTransfersPanel" />
+			<MokaStatusBarItem Icon="MokatermIcons.Unlock" Text="@VaultText" Tooltip="@VaultTooltip" OnClick="LockVault" />
+			<MokaStatusBarItem Tooltip="@VersionTooltip" OnClick="OpenAbout">
+				<MokaText Element="span" Mono Size="MokaSize.Xs">v@(Environment.AppVersion)</MokaText>
+			</MokaStatusBarItem>
+		</div>
 	</EndContent>
 </MokaStatusBar>
