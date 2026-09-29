@@ -1,0 +1,58 @@
+.mt-edit-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* A remote path is one unbroken string and is the thing most likely to overflow this row. */
+.mt-edit-path {
+	overflow-wrap: anywhere;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-edit-facts {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-edit-dirty {
+	color: var(--moka-color-primary);
+}
+
+/*
+ * A viewport height rather than flex: the dialog's own body owns the column and a grown child would fight it. The
+ * subtraction is the dialog's header, this file's own path row, the actions row and the padding around them, so the
+ * box reaches the bottom of a full-screen dialog instead of leaving a third of it empty.
+ */
+.mt-edit-area {
+	box-sizing: border-box;
+	width: 100%;
+	height: calc(100vh - 230px);
+	min-height: 240px;
+	padding: var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	line-height: var(--moka-line-height-base);
+	tab-size: 4;
+	resize: none;
+	white-space: pre;
+}
+
+.mt-edit-area:focus-visible {
+	outline: none;
+	border-color: var(--moka-color-primary-border);
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}

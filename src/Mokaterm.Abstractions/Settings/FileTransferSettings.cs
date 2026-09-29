@@ -22,6 +22,15 @@ public sealed record FileTransferSettings : ISettingsSection
 	/// <inheritdoc cref="MinParallelTransfers"/>
 	public const int MaxParallelTransfers = 10;
 
+	/// <summary>
+	/// The <see cref="MaxEditKilobytes"/> range. A text area holds the whole file in the page, so the top of this range
+	/// is about where editing stops feeling immediate rather than about what can be read.
+	/// </summary>
+	public const int MinEditKilobytes = 16;
+
+	/// <inheritdoc cref="MinEditKilobytes"/>
+	public const int MaxEditKilobytesLimit = 4096;
+
 	public static string SectionKey => "files";
 
 	/// <summary>Open the file browser next to the terminal when a session has both (SSH).</summary>
@@ -47,9 +56,16 @@ public sealed record FileTransferSettings : ISettingsSection
 	/// <summary>Desktop only. Null asks where to save every time.</summary>
 	public string? DownloadDirectory { get; init; }
 
+	/// <summary>
+	/// The largest file the built-in editor opens. Past it the file is refused rather than cut, because saving a piece
+	/// of a file back would truncate the rest.
+	/// </summary>
+	public int MaxEditKilobytes { get; init; } = 1024;
+
 	/// <summary>A copy with the transfer count inside the range the settings page offers.</summary>
 	public FileTransferSettings Clamped() => this with
 	{
 		MaxConcurrentTransfers = Math.Clamp(MaxConcurrentTransfers, MinParallelTransfers, MaxParallelTransfers),
+		MaxEditKilobytes = Math.Clamp(MaxEditKilobytes, MinEditKilobytes, MaxEditKilobytesLimit),
 	};
 }

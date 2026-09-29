@@ -55,6 +55,20 @@
 		</SettingsRow>
 	</SettingsSection>
 
+	<SettingsSection Title="Editing">
+		<SettingsRow Label="Largest file to edit"
+					 Description="Files above this are refused rather than opened in part, because saving a piece back would truncate the rest."
+					 ControlWidth="200px">
+			<NumberSetting TValue="int"
+						   Value="settings.MaxEditKilobytes"
+						   ValueChanged="value => SaveAsync(s => s with { MaxEditKilobytes = value })"
+						   Min="FileTransferSettings.MinEditKilobytes"
+						   Max="FileTransferSettings.MaxEditKilobytesLimit"
+						   Suffix="KB"
+						   AriaLabel="Largest file to edit in kilobytes" />
+		</SettingsRow>
+	</SettingsSection>
+
 	<SettingsSection Title="Transfers">
 		<SettingsRow Label="Preserve timestamps" Description="Keep the original modification time on copied files.">
 			<MokaSwitch Value="settings.PreserveTimestamps"

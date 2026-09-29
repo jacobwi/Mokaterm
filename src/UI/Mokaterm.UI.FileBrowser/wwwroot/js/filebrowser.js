@@ -35,6 +35,8 @@ function commandFor(event) {
 			return mod || alt ? null : 'up';
 		case 'F2':
 			return 'rename';
+		case 'F4':
+			return 'edit';
 		case 'Delete':
 			return mod || alt ? null : 'delete';
 		case 'F5':

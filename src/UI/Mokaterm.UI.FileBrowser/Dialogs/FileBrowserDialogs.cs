@@ -122,6 +122,38 @@ internal sealed class FileBrowserDialogs
 		return result is UploadRunAs runAs ? runAs : null;
 	}
 
+	/// <param name="save">Writes the file and returns the message to show when it failed, or null once it is saved.</param>
+	/// <param name="confirmDiscard">Asked before throwing away unsaved edits.</param>
+	/// <returns>True once a save went through.</returns>
+	public async Task<bool> EditFileAsync(
+		string fileName,
+		string path,
+		string content,
+		string facts,
+		Func<string, Task<string?>> save,
+		Func<Task<bool>> confirmDiscard)
+	{
+		object? result = await _dialogs.ShowComponentAsync<FileEditDialog>(
+			fileName,
+			parameters =>
+			{
+				parameters[nameof(FileEditDialog.FileName)] = fileName;
+				parameters[nameof(FileEditDialog.Path)] = path;
+				parameters[nameof(FileEditDialog.Content)] = content;
+				parameters[nameof(FileEditDialog.Facts)] = facts;
+				parameters[nameof(FileEditDialog.Save)] = save;
+				parameters[nameof(FileEditDialog.ConfirmDiscard)] = confirmDiscard;
+			},
+			options =>
+			{
+				options.Size = MokaDialogSize.FullScreen;
+				// The dialog asks about unsaved edits from its own Cancel, which a header X and Escape would skip.
+				options.ShowCloseButton = false;
+				options.CloseOnEscape = false;
+			});
+		return result is true;
+	}
+
 	// The dialogs render their own Cancel buttons. Without the header X, the dialog's first field gets the initial focus.
 	private static void Small(MokaDialogOptions options)
 	{

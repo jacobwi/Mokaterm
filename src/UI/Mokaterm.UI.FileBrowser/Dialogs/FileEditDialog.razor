@@ -1,0 +1,38 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<DialogFrame>
+	<ChildContent>
+		<div class="mt-edit-head">
+			<MokaText Element="span" Mono Size="MokaSize.Xs" Class="mt-edit-path">@Path</MokaText>
+			<span class="mt-edit-facts">
+				<span>@Facts</span>
+				@if (_dirty)
+				{
+					<span class="mt-edit-dirty">MODIFIED</span>
+				}
+			</span>
+		</div>
+
+		@if (_error is { Length: > 0 } error)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Title="Could not save" Dense>@error</MokaAlert>
+		}
+
+		<textarea class="mt-edit-area"
+				  value="@_text"
+				  @oninput="OnInput"
+				  spellcheck="false"
+				  autocomplete="off"
+				  autocapitalize="off"
+				  wrap="off"
+				  aria-label="@("Contents of " + FileName)"
+				  data-dialog-focus="true"
+				  data-no-submit="true"></textarea>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_saving" OnClick="CancelAsync">Cancel</MokaButton>
+		<MokaButton Size="MokaSize.Sm" Disabled="@(!_dirty || _saving)" OnClick="SaveAsync" data-dialog-default="true">
+			@(_saving ? "Saving..." : "Save")
+		</MokaButton>
+	</Actions>
+</DialogFrame>

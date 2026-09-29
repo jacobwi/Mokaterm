@@ -83,6 +83,13 @@ public partial class RemoteFileBrowser
 				}
 
 				break;
+			case "edit":
+				if (FocusedOrOnlySelected() is { IsDirectoryLike: false } file)
+				{
+					await EditAsync(file);
+				}
+
+				break;
 			case "delete":
 				await DeleteAsync(SelectedEntries);
 				break;
@@ -293,6 +300,18 @@ public partial class RemoteFileBrowser
 		if (hasFolders || !single)
 		{
 			items.Add(new MokaContextMenuItem { Text = "Download as zip", Icon = MokaIcons.Action.Download, OnClickSync = () => DownloadZip(selected) });
+		}
+
+		if (single && !entry.IsDirectoryLike)
+		{
+			// F4 is the edit key every file manager has used since Norton Commander.
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Edit",
+				Icon = MokatermIcons.File,
+				Shortcut = "F4",
+				OnClick = () => EditAsync(entry),
+			});
 		}
 
 		items.Add(new MokaContextMenuItem
