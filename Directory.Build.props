@@ -44,7 +44,7 @@
 		<Company>Moka</Company>
 		<Product>Mokaterm</Product>
 		<Copyright>Copyright (c) Moka 2026</Copyright>
-		<VersionPrefix>0.1.0</VersionPrefix>
+		<VersionPrefix>0.1.1</VersionPrefix>
 	</PropertyGroup>
 
 	<!--
