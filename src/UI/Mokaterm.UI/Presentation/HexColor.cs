@@ -11,4 +11,8 @@ internal static class HexColor
 	/// <inheritdoc cref="Abstractions.Presentation.HexColor.Normalize"/>
 	public static string? Normalize(string? value) =>
 		Abstractions.Presentation.HexColor.Normalize(value, HexColorForms.Accent);
+
+	/// <summary>The sentence a shell colour field shows when it refuses what was typed.</summary>
+	public static string Requirement() =>
+		Abstractions.Presentation.HexColor.Requirement(HexColorForms.Accent);
 }

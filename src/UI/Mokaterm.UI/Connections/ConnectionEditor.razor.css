@@ -1,0 +1,38 @@
+/* The machine the login lands on, drawn the way the tree and the tabs draw it. */
+.mt-host {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+.mt-host-bar {
+	flex-shrink: 0;
+	width: 3px;
+	align-self: stretch;
+	min-height: 14px;
+	border-radius: var(--moka-radius-sm);
+}
+
+.mt-host-address {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Pushed to the far end, where the tree puts a row's count. */
+.mt-host-logins {
+	margin-left: auto;
+	padding-left: var(--moka-spacing-xs);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+	white-space: nowrap;
+}

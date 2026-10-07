@@ -14,10 +14,31 @@
 					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
 				}
 
-				<MokaGrid Columns="2" Gap="MokaSpacingScale.Md">
+				@* The color, the name that falls back to the address and the environment tag only make sense together,
+				   so the dialog draws the row they produce instead of describing each one on its own. *@
+				<div class="mt-preview">
+					<div class="mt-preview-row">
+						<span class="mt-preview-bar" style="@($"background:{Accent}")" aria-hidden="true"></span>
+						<MokaIcon Icon="MokatermIcons.Server" Size="MokaSize.Xs" Style="@($"color:{Accent}")" />
+						<span class="mt-preview-name">@PreviewName</span>
+						@if (ShowPreviewAddress)
+						{
+							<span class="mt-preview-address">@PreviewAddress</span>
+						}
+						@if (HostEnvironmentDisplay.Tag(_environment) is { } previewTag)
+						{
+							<MokaTag Text="@previewTag" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(_environment)" />
+						}
+					</div>
+					<div class="mt-preview-note">How this host reads in the tree, on its tabs and in the status bar.</div>
+				</div>
+
+				<div class="mt-section">Machine</div>
+				<MokaGrid ColumnsValue="repeat(auto-fit, minmax(200px, 1fr))" Gap="MokaSpacingScale.Md">
 					<MokaTextField Label="Address"
 								   Required
 								   @bind-Value="_address"
+								   @bind-Value:after="OnAddressChanged"
 								   ErrorText="@_addressError"
 								   Placeholder="10.10.2.3 or server.example.com"
 								   Disabled="_saving"
@@ -26,9 +47,16 @@
 								   data-autofocus="true" />
 					<MokaTextField Label="Name"
 								   @bind-Value="_name"
-								   Placeholder="@(string.IsNullOrWhiteSpace(_address) ? "Shown in the tree" : _address.Trim())"
+								   @bind-Value:after="UpdateClash"
+								   Placeholder="@(PreviewAddress.Length == 0 ? "Shown in the tree" : PreviewAddress)"
+								   HelperText="Leave it empty to be listed by address."
 								   Disabled="_saving" />
 				</MokaGrid>
+
+				@if (_clash is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@_clash</MokaAlert>
+				}
 
 				<MokaSelect TValue="Guid?"
 							Label="Folder"
@@ -39,48 +67,69 @@
 							Searchable="@(_folderOptions.Count > 8)"
 							Disabled="_saving" />
 
-				<MokaFieldWrapper Label="Environment" HelperText="Tags the host in the tree, its tabs and the status bar.">
-					<MokaSegmentedControl AriaLabel="Environment" Value="@_environment.ToString()" ValueChanged="OnEnvironmentChanged" Size="MokaSize.Sm">
-						@foreach (HostEnvironment environment in HostEnvironmentDisplay.All)
-						{
-							<MokaSegment Value="@environment.ToString()" Text="@HostEnvironmentDisplay.Name(environment)" Disabled="_saving" />
-						}
-					</MokaSegmentedControl>
+				<div class="mt-section">Appearance</div>
+				<MokaFieldWrapper Label="Environment" HelperText="@EnvironmentHelp" Disabled="_saving">
+					<div class="mt-env">
+						<MokaSegmentedControl AriaLabel="Environment" Value="@_environment.ToString()" ValueChanged="OnEnvironmentChanged" Size="MokaSize.Sm">
+							@foreach (HostEnvironment environment in HostEnvironmentDisplay.All)
+							{
+								<MokaSegment Value="@environment.ToString()"
+											 Text="@HostEnvironmentDisplay.Name(environment)"
+											 Class="mt-env-segment"
+											 Style="@($"--mt-env:{HostEnvironmentDisplay.Accent(environment)}")"
+											 Disabled="_saving" />
+							}
+						</MokaSegmentedControl>
+					</div>
 				</MokaFieldWrapper>
 
 				<div>
 					<MokaColorInput Label="Color"
 									@bind-Value="_color"
+									@bind-Value:after="OnColorChanged"
 									Placeholder="#ef5350"
 									ErrorText="@_colorError"
-									HelperText="Marks the host in the tree and tints its tabs."
-									Disabled="_saving" />
-					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Xs" Align="MokaAlign.Center" Wrap Margin="MokaSpacingScale.Xs">
-						@foreach (string preset in ColorPresets)
+									HelperText="@ColorHelp"
+									Disabled="_saving"
+									spellcheck="false"
+									autocomplete="off" />
+					<div class="mt-swatches">
+						@foreach ((string name, string color) in ColorPresets)
 						{
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										aria-label="@($"Use color {preset}")"
-										title="@preset"
-										Disabled="_saving"
-										OnClick="() => _color = preset">
-								<span class="mt-swatch" style="@($"background:{preset}")"></span>
-							</MokaButton>
+							<button type="button"
+									class="@SwatchClass(color)"
+									style="@($"--mt-swatch:{color}")"
+									title="@name"
+									aria-label="@($"Use the {name} color")"
+									aria-pressed="@AriaPressed(IsChosen(color))"
+									disabled="@_saving"
+									@onclick="() => PickColor(color)"></button>
 						}
-						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="_saving" OnClick="() => _color = string.Empty">
-							No color
-						</MokaButton>
-					</MokaFlexbox>
+						@* Clearing the field does not mean "no color": a host without one is drawn in a color taken from
+						   its address, so the choice shows that color rather than an empty box. *@
+						<button type="button"
+								class="@(_color.Trim().Length == 0 ? "mt-swatch mt-swatch--auto mt-swatch--chosen" : "mt-swatch mt-swatch--auto")"
+								style="@($"--mt-swatch:{AutomaticAccent}")"
+								aria-pressed="@AriaPressed(_color.Trim().Length == 0)"
+								disabled="@_saving"
+								@onclick="PickAutomatic">Automatic</button>
+					</div>
 				</div>
 
 				<MokaTagInput Label="Tags"
 							  @bind-Values="_tags"
+							  Suggestions="_tagSuggestions"
+							  HelperText="The filter above the tree searches tags as well as names."
 							  Placeholder="Type a tag and press Enter"
 							  Disabled="_saving"
 							  data-no-submit="true" />
 
-				<MokaTextArea Label="Notes" @bind-Value="_notes" Rows="3" Disabled="_saving" />
+				<div class="mt-section">Notes</div>
+				<MokaTextArea @bind-Value="_notes"
+							  Rows="3"
+							  Placeholder="Anything worth remembering about this machine."
+							  Disabled="_saving"
+							  aria-label="Notes" />
 			</PromptBody>
 		}
 	</ChildContent>

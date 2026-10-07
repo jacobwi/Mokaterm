@@ -15,10 +15,15 @@
 				}
 				<MokaTextField Label="Name"
 							   @bind-Value="_name"
+							   @bind-Value:after="UpdateClash"
 							   HelperText="@ParentText"
 							   Disabled="_saving"
 							   autocomplete="off"
 							   data-autofocus="true" />
+				@if (_clash is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@_clash</MokaAlert>
+				}
 			</PromptBody>
 		}
 	</ChildContent>

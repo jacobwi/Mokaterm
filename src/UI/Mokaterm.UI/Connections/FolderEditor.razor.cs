@@ -12,9 +12,11 @@ public sealed partial class FolderEditor : ShellEditorBase<FolderEditorRequest>
 {
 	private ConnectionFolder? _original;
 	private string? _parentPath;
+	private IReadOnlyList<string> _siblingNames = [];
 	private string _name = "";
 	private bool _saving;
 	private string? _error;
+	private string? _clash;
 
 	[Inject]
 	private CatalogState Catalog { get; set; } = default!;
@@ -31,7 +33,19 @@ public sealed partial class FolderEditor : ShellEditorBase<FolderEditorRequest>
 
 	protected override bool SubmitOnEnter => true;
 
-	protected override void Reset() => _original = null;
+	/// <summary>
+	/// Drops the catalog with the request: the load awaits it, so keeping these would show the folder just closed inside
+	/// the dialog for the folder just opened.
+	/// </summary>
+	protected override void Reset()
+	{
+		_original = null;
+		_parentPath = null;
+		_siblingNames = [];
+		_name = "";
+		_clash = null;
+		_error = null;
+	}
 
 	protected override async Task LoadAsync(FolderEditorRequest request)
 	{
@@ -45,6 +59,7 @@ public sealed partial class FolderEditor : ShellEditorBase<FolderEditorRequest>
 		Dictionary<Guid, string> paths = FolderPaths.Build(catalog);
 		_saving = false;
 		_error = null;
+		_clash = null;
 		_original = request.FolderId is { } folderId ? catalog.FindFolder(folderId) : null;
 		if (request.FolderId is not null && _original is null)
 		{
@@ -54,6 +69,20 @@ public sealed partial class FolderEditor : ShellEditorBase<FolderEditorRequest>
 		_name = _original?.Name ?? "";
 		Guid? parentId = _original?.ParentId ?? request.ParentId;
 		_parentPath = parentId is { } parent && paths.TryGetValue(parent, out string? path) ? path : null;
+		_siblingNames = [.. catalog.FoldersIn(parentId).Where(folder => folder.Id != _original?.Id).Select(folder => folder.Name)];
+		UpdateClash();
+	}
+
+	/// <summary>
+	/// Says so when a folder beside this one is already called the same. Not a refusal: two folders may share a name under
+	/// different parents, and here it only means two rows that read alike.
+	/// </summary>
+	private void UpdateClash()
+	{
+		string name = _name.Trim();
+		_clash = name.Length > 0 && _siblingNames.Contains(name, StringComparer.OrdinalIgnoreCase)
+			? $"A folder here is already called {name}."
+			: null;
 	}
 
 	private async Task SaveAsync()

@@ -1,7 +1,130 @@
-.mt-swatch {
-	display: inline-block;
-	width: 14px;
-	height: 14px;
-	border: 1px solid var(--moka-color-outline);
+/* The row the tree, the tabs and the status bar will draw, so the color, the name and the tag are judged together. */
+.mt-preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+.mt-preview-row {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* The accent bar the status bar draws beside the machine, which is where the color is largest. */
+.mt-preview-bar {
+	flex-shrink: 0;
+	width: 3px;
+	align-self: stretch;
+	min-height: 14px;
 	border-radius: var(--moka-radius-sm);
+}
+
+/* The name identifies the row, so it is the last thing allowed to lose characters; the address gives way first. */
+.mt-preview-name {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	font-size: var(--moka-font-size-base);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-preview-address {
+	flex: 0 500 auto;
+	min-width: 0;
+	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-preview-note {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+/* The environment colors sit on the segments themselves, so the choice looks like its result. */
+.mt-env ::deep .mt-env-segment::before {
+	content: "";
+	flex-shrink: 0;
+	width: 6px;
+	height: 6px;
+	border-radius: var(--moka-radius-full);
+	background: var(--mt-env);
+	box-shadow: 0 0 6px var(--mt-env);
+}
+
+.mt-swatches {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	margin-top: var(--moka-spacing-xs);
+}
+
+.mt-swatch {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-sm);
+	background: var(--mt-swatch);
+	cursor: pointer;
+}
+
+.mt-swatch:hover:not(:disabled) {
+	border-color: var(--moka-color-primary-border);
+}
+
+.mt-swatch:focus-visible {
+	outline: none;
+	box-shadow: var(--moka-focus-ring);
+}
+
+.mt-swatch:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+/*
+ * The chosen swatch keeps its own color in the middle and takes a ring around it, so which one is in force reads from
+ * across the dialog. An inset ring in the surface color is what separates the two.
+ */
+.mt-swatch--chosen {
+	border-color: var(--moka-color-primary-border);
+	box-shadow: inset 0 0 0 2px var(--moka-color-surface), var(--moka-selected-glow);
+}
+
+/* "Automatic" shows the color an address produces, so clearing the field does not look like clearing the color. */
+.mt-swatch--auto {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	width: auto;
+	height: 22px;
+	padding: 0 var(--moka-spacing-sm);
+	background: none;
+	color: var(--moka-color-on-surface-variant);
+	font-family: inherit;
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-swatch--auto::before {
+	content: "";
+	width: 10px;
+	height: 10px;
+	border-radius: var(--moka-radius-full);
+	background: var(--mt-swatch);
+}
+
+.mt-swatch--auto.mt-swatch--chosen {
+	box-shadow: var(--moka-selected-glow);
 }

@@ -31,17 +31,22 @@
 
 					@if (_newHost)
 					{
-						<MokaGrid Columns="2" Gap="MokaSpacingScale.Md">
+						<MokaGrid ColumnsValue="repeat(auto-fit, minmax(200px, 1fr))" Gap="MokaSpacingScale.Md">
 							<MokaTextField Label="Address"
 										   Required
 										   @bind-Value="_newHostAddress"
+										   @bind-Value:after="OnNewHostAddressChanged"
 										   ErrorText="@_hostError"
 										   Placeholder="10.10.2.3 or server.example.com"
 										   Disabled="_saving"
 										   spellcheck="false"
 										   autocomplete="off"
 										   data-autofocus="true" />
-							<MokaTextField Label="Host name" @bind-Value="_newHostName" Placeholder="Optional" Disabled="_saving" />
+							<MokaTextField Label="Host name"
+										   @bind-Value="_newHostName"
+										   Placeholder="Optional"
+										   HelperText="Color, environment and tags come later, from the host editor."
+										   Disabled="_saving" />
 						</MokaGrid>
 					}
 					else
@@ -50,25 +55,45 @@
 									Label="Host"
 									Items="_hostOptions"
 									@bind-Value="_hostId"
+									@bind-Value:after="UpdateDuplicate"
 									ValueSelector="HostLabel"
 									Placeholder="Choose a host"
 									Searchable="@(_hostOptions.Count > 8)"
 									ErrorText="@_hostError"
 									Disabled="_saving" />
+
+						@* The machine this login lands on, drawn the way the tree and the tabs draw it: a production tag
+						   here is the warning that matters before "Save and connect". *@
+						@if (SelectedHost is { } host)
+						{
+							<div class="mt-host">
+								<span class="mt-host-bar" style="@($"background:{HostAccent.For(host)}")" aria-hidden="true"></span>
+								<MokaIcon Icon="MokatermIcons.Server" Size="MokaSize.Xs" Style="@($"color:{HostAccent.For(host)}")" />
+								<span class="mt-host-address">@host.Address</span>
+								@if (HostEnvironmentDisplay.Tag(host.Environment) is { } hostTag)
+								{
+									<MokaTag Text="@hostTag" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(host.Environment)" />
+								}
+								<span class="mt-host-logins">@ExistingLoginsText</span>
+							</div>
+						}
 					}
 
 					<div class="mt-section">Login</div>
-					<MokaSegmentedControl AriaLabel="Protocol" Value="@_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
-						@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
-						{
-							<MokaSegment Value="@protocol.Id" Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" Disabled="_saving" />
-						}
-					</MokaSegmentedControl>
+					<MokaFieldWrapper Label="Protocol" HelperText="@Protocol?.Description" Disabled="_saving">
+						<MokaSegmentedControl AriaLabel="Protocol" Value="@_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
+							@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
+							{
+								<MokaSegment Value="@protocol.Id" Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" Disabled="_saving" />
+							}
+						</MokaSegmentedControl>
+					</MokaFieldWrapper>
 
 					@* A serial line has no port, so the field would only invite a number that is never used. *@
-					<MokaGrid Columns="@(ShowPort ? 3 : 2)" Gap="MokaSpacingScale.Md">
+					<MokaGrid ColumnsValue="repeat(auto-fit, minmax(170px, 1fr))" Gap="MokaSpacingScale.Md">
 						<MokaTextField Label="Username"
 									   @bind-Value="_username"
+									   @bind-Value:after="UpdateDuplicate"
 									   Placeholder="@UsernamePlaceholder"
 									   Disabled="_saving"
 									   spellcheck="false"
@@ -78,14 +103,25 @@
 						{
 							<MokaTextField Label="Port"
 										   @bind-Value="_port"
+										   @bind-Value:after="OnPortChanged"
 										   Placeholder="@DefaultPortText"
 										   ErrorText="@_portError"
+										   HelperText="Empty uses the default."
 										   Disabled="_saving"
 										   inputmode="numeric"
 										   autocomplete="off" />
 						}
-						<MokaTextField Label="Label" @bind-Value="_label" Placeholder="@LabelPlaceholder" Disabled="_saving" />
+						<MokaTextField Label="Label"
+									   @bind-Value="_label"
+									   Placeholder="@LabelPlaceholder"
+									   HelperText="Title of the tab."
+									   Disabled="_saving" />
 					</MokaGrid>
+
+					@if (_duplicate is not null)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@_duplicate</MokaAlert>
+					}
 
 					@if (Protocol is { AuthenticationMethods.Count: > 1 } protocolWithChoices)
 					{
@@ -101,16 +137,18 @@
 
 					@if (CredentialKindFor(_method) is { } kind)
 					{
-						<div class="mt-section">@(kind == CredentialKind.Password ? "Password" : "Private key")</div>
-						<MokaSegmentedControl AriaLabel="@(kind == CredentialKind.Password ? "Password" : "Private key")" Value="@(_useKeychain ? KeychainSource : LoginSource)" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
-							<MokaSegment Value="@LoginSource"
-										 Text="@(kind == CredentialKind.Password ? "Saved with this login" : "Key for this login")"
-										 Disabled="_saving" />
-							<MokaSegment Value="@KeychainSource"
-										 Text="From keychain"
-										 Icon="MokatermIcons.Key"
-										 Disabled="@(_saving || KeychainOptions(kind).Count == 0)" />
-						</MokaSegmentedControl>
+						<div class="mt-section">@CredentialTitle(kind)</div>
+						<MokaFieldWrapper Label="Source" HelperText="@CredentialSourceHelp" Disabled="_saving">
+							<MokaSegmentedControl AriaLabel="@CredentialTitle(kind)" Value="@(_useKeychain ? KeychainSource : LoginSource)" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
+								<MokaSegment Value="@LoginSource"
+											 Text="With this login"
+											 Disabled="_saving" />
+								<MokaSegment Value="@KeychainSource"
+											 Text="In the keychain"
+											 Icon="MokatermIcons.Key"
+											 Disabled="@(_saving || KeychainOptions(kind).Count == 0)" />
+							</MokaSegmentedControl>
+						</MokaFieldWrapper>
 
 						@if (_useKeychain)
 						{
@@ -166,25 +204,30 @@
 					@if (Protocol?.Has(ProtocolCapabilities.Terminal) == true)
 					{
 						<div class="mt-section">Terminal</div>
-						<MokaGrid Columns="3" Gap="MokaSpacingScale.Md">
+						<MokaGrid ColumnsValue="repeat(auto-fit, minmax(170px, 1fr))" Gap="MokaSpacingScale.Md">
 							<MokaSelect TValue="string"
 										Label="Theme"
 										Items="_themeIds"
 										@bind-Value="_themeChoice"
 										ValueSelector="ThemeLabel"
 										Placeholder="@GlobalThemeText"
+										HelperText="@ThemeHelp"
 										Disabled="_saving" />
 							<MokaTextField Label="Font size"
 										   @bind-Value="_fontSize"
+										   @bind-Value:after="OnFontSizeChanged"
 										   Placeholder="@GlobalFontSizeText"
 										   ErrorText="@_fontSizeError"
+										   HelperText="Empty keeps the global size."
 										   Disabled="_saving"
 										   inputmode="decimal"
 										   autocomplete="off" />
 							<MokaTextField Label="Font family"
 										   @bind-Value="_fontFamily"
+										   @bind-Value:after="OnFontFamilyChanged"
 										   Placeholder="Global setting"
 										   ErrorText="@_fontFamilyError"
+										   HelperText="Empty keeps the global font."
 										   Disabled="_saving"
 										   spellcheck="false"
 										   autocomplete="off" />

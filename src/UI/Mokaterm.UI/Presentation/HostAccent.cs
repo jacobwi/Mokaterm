@@ -14,8 +14,15 @@ internal static class HostAccent
 	public static string For(HostProfile host)
 	{
 		ArgumentNullException.ThrowIfNull(host);
-		return HexColor.Normalize(host.Color) ?? For(host.Address);
+		return For(host.Address, host.Color);
 	}
+
+	/// <summary>
+	/// The colour for a host that is being typed rather than saved, so the editor's preview cannot pick its own rule.
+	/// A <paramref name="color"/> that is not a colour falls back the same way an empty one does.
+	/// </summary>
+	public static string For(string? address, string? color) =>
+		HexColor.Normalize(color) ?? For(address);
 
 	public static string For(string? address) =>
 		$"var(--mt-host-{Index(address)})";

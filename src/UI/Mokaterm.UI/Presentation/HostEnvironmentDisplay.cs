@@ -33,4 +33,16 @@ internal static class HostEnvironmentDisplay
 		HostEnvironment.Production => MokaColor.Error,
 		_ => MokaColor.Surface,
 	};
+
+	/// <summary>
+	/// <see cref="Color"/> as a CSS colour, for a dot or a bar no Moka parameter covers. It reads the enum rather than
+	/// repeating the switch, so a tag and the dot beside it cannot end up different colours.
+	/// </summary>
+	public static string Accent(HostEnvironment environment) => Color(environment) switch
+	{
+		MokaColor.Info => "var(--moka-color-info)",
+		MokaColor.Warning => "var(--moka-color-warning)",
+		MokaColor.Error => "var(--moka-color-error)",
+		_ => "var(--moka-color-on-surface-tertiary)",
+	};
 }

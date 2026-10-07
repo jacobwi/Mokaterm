@@ -26,6 +26,8 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	private const string NewHostMode = "new";
 	private const string LoginSource = "login";
 	private const string KeychainSource = "keychain";
+	private const int MinPort = 1;
+	private const int MaxPort = 65535;
 
 	private bool _loading;
 	private bool _saving;
@@ -56,6 +58,9 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	private AuthenticationMethod _method;
 	private ProtocolOptions _options = ProtocolOptions.Empty;
 	private string? _portError;
+
+	// Another login on this host that answers to the same protocol and user. A notice, never a refusal.
+	private string? _duplicate;
 
 	private CredentialInfo? _existingCredential;
 	private bool _useKeychain;
@@ -143,13 +148,45 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	private string GlobalThemeText =>
 		$"Global ({Themes.Get(Settings.Get<TerminalSettings>().ThemeId).Name})";
 
-	// Invariant, like the parser, so the placeholder can be typed back in as shown.
-	private string GlobalFontSizeText =>
-		Settings.Get<TerminalSettings>().FontSize.ToString(CultureInfo.InvariantCulture);
+	/// <summary>
+	/// A login's theme is the narrowest of the four and wins over the rest, which is only obvious once the host carries an
+	/// environment: that one already replaced the global theme.
+	/// </summary>
+	private string ThemeHelp =>
+		SelectedHost is { Environment: not HostEnvironment.None } host
+			&& Settings.Get<TerminalSettings>().ThemeIdFor(host.Environment) is { } environmentTheme
+			? $"Wins over the {Themes.Get(environmentTheme).Name} theme set for this environment."
+			: "Only for this login.";
+
+	/// <summary>How many other logins the chosen host already carries, so a second SSH login is a deliberate one.</summary>
+	private string ExistingLoginsText
+	{
+		get
+		{
+			int count = SelectedHost is { } host
+				? _catalog.ConnectionsOf(host.Id).Count(connection => connection.Id != _original?.Id)
+				: 0;
+
+			return count switch
+			{
+				0 => "No logins yet",
+				1 => "1 login",
+				_ => string.Create(CultureInfo.CurrentCulture, $"{count} logins"),
+			};
+		}
+	}
 
 	private static string FontSizeRequirement => string.Create(
 		CultureInfo.CurrentCulture,
 		$"Use a size from {TerminalSettings.MinFontSize} to {TerminalSettings.MaxFontSize}, or leave it empty.");
+
+	private static string PortRequirement => string.Create(
+		CultureInfo.CurrentCulture,
+		$"Use a port from {MinPort} to {MaxPort}, or leave it empty for the default.");
+
+	// Invariant, like the parser, so the placeholder can be typed back in as shown.
+	private string GlobalFontSizeText =>
+		Settings.Get<TerminalSettings>().FontSize.ToString(CultureInfo.InvariantCulture);
 
 	private Type? OptionsEditorType =>
 		Contributions.FindProtocol(_protocolId)?.OptionsEditor
@@ -225,6 +262,16 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	};
 
 	private bool IsRemoteDesktop => Protocol?.Has(ProtocolCapabilities.RemoteDesktop) == true;
+
+	private static string CredentialTitle(CredentialKind kind) => kind == CredentialKind.Password ? "Password" : "Private key";
+
+	/// <summary>
+	/// What the two sources mean, which is the part nobody reads off the segment names: a keychain entry belongs to every
+	/// login that points at it, so changing it changes them all.
+	/// </summary>
+	private string CredentialSourceHelp => _useKeychain
+		? "A keychain entry is shared: every login that uses it sees a change to it."
+		: "Kept with this login alone, encrypted in the vault.";
 
 	private static string? Family(ProtocolDescriptor? protocol) => protocol is null ? null : protocol.VariantOf ?? protocol.Id;
 
@@ -343,6 +390,8 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 				_method = protocol.AuthenticationMethods.Count > 0 ? protocol.AuthenticationMethods[0] : AuthenticationMethod.Password;
 			}
 		}
+
+		UpdateDuplicate();
 	}
 
 	private static List<Guid?> SharedCredentialIds(IReadOnlyList<CredentialInfo> credentials, CredentialKind kind) =>
@@ -376,6 +425,7 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		_newHostAddress = "";
 		_newHostName = "";
 		_hostError = null;
+		_duplicate = null;
 		_protocolId = "";
 		_defaultPort = null;
 		_username = "";
@@ -413,6 +463,41 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	{
 		_newHost = mode == NewHostMode;
 		_hostError = null;
+		UpdateDuplicate();
+	}
+
+	private void OnNewHostAddressChanged() => _hostError = HostAddress.Validate(_newHostAddress);
+
+	private void OnPortChanged() => _portError = ReadPort(out _);
+
+	private void OnFontSizeChanged() => _fontSizeError = ReadFontSize(out _);
+
+	private void OnFontFamilyChanged() => _fontFamilyError = FontFamilyProblem();
+
+	/// <summary>
+	/// Says so when the chosen host already carries a login with this protocol and user, which is the rule the importer
+	/// marks duplicates with. Two that differ only in their options are legitimate, so this never refuses a save.
+	/// </summary>
+	private void UpdateDuplicate()
+	{
+		_duplicate = null;
+		if (_newHost || SelectedHost is not { } host || _protocolId.Length == 0)
+		{
+			return;
+		}
+
+		string username = _username.Trim();
+		bool exists = _catalog.ConnectionsOf(host.Id).Any(candidate =>
+			candidate.Id != _original?.Id
+			&& string.Equals(candidate.ProtocolId, _protocolId, StringComparison.OrdinalIgnoreCase)
+			&& string.Equals(candidate.Username ?? "", username, StringComparison.OrdinalIgnoreCase));
+
+		if (exists)
+		{
+			_duplicate = username.Length == 0
+				? $"{host.DisplayName} already has a login over {ProtocolName} with no user."
+				: $"{host.DisplayName} already has a login for {username} over {ProtocolName}.";
+		}
 	}
 
 	private void OnProtocolChanged(string protocolId)
@@ -436,6 +521,8 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		{
 			_options = ProtocolOptions.Empty;
 		}
+
+		UpdateDuplicate();
 	}
 
 	private void OnMethodChanged(string value)
@@ -482,6 +569,7 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 			&& !string.IsNullOrWhiteSpace(credential.Username))
 		{
 			_username = credential.Username;
+			UpdateDuplicate();
 		}
 	}
 
@@ -569,49 +657,14 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 
 	private bool Validate(out int? port, out double? fontSize)
 	{
-		port = null;
-		fontSize = null;
 		_error = Protocol is null ? "Choose a protocol." : null;
 		_hostError = _newHost
 			? HostAddress.Validate(_newHostAddress)
 			: SelectedHost is null ? "Choose a host." : null;
 
-		_portError = null;
-		string portText = ShowPort ? _port.Trim() : "";
-		if (portText.Length > 0)
-		{
-			if (int.TryParse(portText, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedPort) && parsedPort is >= 1 and <= 65535)
-			{
-				port = parsedPort;
-			}
-			else
-			{
-				_portError = "Use a port from 1 to 65535, or leave it empty for the default.";
-			}
-		}
-
-		_fontSizeError = null;
-		string fontSizeText = _fontSize.Trim();
-		if (fontSizeText.Length > 0 && Protocol?.Has(ProtocolCapabilities.Terminal) == true)
-		{
-			// The same range as the setting this overrides: a size the settings page refuses must not reach a terminal
-			// through a saved login either.
-			if (double.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out double size)
-				&& size >= TerminalSettings.MinFontSize
-				&& size <= TerminalSettings.MaxFontSize)
-			{
-				fontSize = size;
-			}
-			else
-			{
-				_fontSizeError = FontSizeRequirement;
-			}
-		}
-
-		_fontFamilyError = _fontFamily.Trim().Length > 0 && Protocol?.Has(ProtocolCapabilities.Terminal) == true && !TerminalFontFamily.IsValid(_fontFamily)
-			? TerminalFontFamily.Requirement
-			: null;
-
+		_portError = ReadPort(out port);
+		_fontSizeError = ReadFontSize(out fontSize);
+		_fontFamilyError = FontFamilyProblem();
 		_credentialError = CredentialKindFor(_method) switch
 		{
 			{ } when _useKeychain && (_keychainCredentialId is not { } keychainId || !_credentialsById.ContainsKey(keychainId)) =>
@@ -624,6 +677,55 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		return _error is null && _hostError is null && _portError is null && _fontSizeError is null && _fontFamilyError is null
 			&& _credentialError is null;
 	}
+
+	/// <summary>
+	/// The port the login would carry, with the message for text that is not one. Each field reads its own value here so
+	/// the editor can report it while it is typed and again when it is saved, from one rule.
+	/// </summary>
+	private string? ReadPort(out int? port)
+	{
+		port = null;
+		string text = ShowPort ? _port.Trim() : "";
+		if (text.Length == 0)
+		{
+			return null;
+		}
+
+		if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed) && parsed is >= MinPort and <= MaxPort)
+		{
+			port = parsed;
+			return null;
+		}
+
+		return PortRequirement;
+	}
+
+	private string? ReadFontSize(out double? fontSize)
+	{
+		fontSize = null;
+		string text = _fontSize.Trim();
+		if (text.Length == 0 || Protocol?.Has(ProtocolCapabilities.Terminal) != true)
+		{
+			return null;
+		}
+
+		// The same range as the setting this overrides: a size the settings page refuses must not reach a terminal
+		// through a saved login either.
+		if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double size)
+			&& size >= TerminalSettings.MinFontSize
+			&& size <= TerminalSettings.MaxFontSize)
+		{
+			fontSize = size;
+			return null;
+		}
+
+		return FontSizeRequirement;
+	}
+
+	private string? FontFamilyProblem() =>
+		_fontFamily.Trim().Length > 0 && Protocol?.Has(ProtocolCapabilities.Terminal) == true && !TerminalFontFamily.IsValid(_fontFamily)
+			? TerminalFontFamily.Requirement
+			: null;
 
 	/// <summary>
 	/// Applies the credential choice. A credential this login owns is updated in place when it keeps its kind; one it no
