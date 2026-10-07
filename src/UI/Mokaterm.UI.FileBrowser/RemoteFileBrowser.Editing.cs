@@ -121,7 +121,8 @@ public sealed partial class RemoteFileBrowser
 	private static bool ChangedSince(RemoteFileEntry opened, RemoteFileEntry current) =>
 		opened.Size != current.Size || opened.LastModified != current.LastModified;
 
-	private static string Facts(RemoteTextFile file, long? length)
+	/// <summary>One chip each, in the order the editor shows them.</summary>
+	private static string[] Facts(RemoteTextFile file, long? length)
 	{
 		string ending = file.LineEnding switch
 		{
@@ -130,9 +131,7 @@ public sealed partial class RemoteFileBrowser
 			_ => "LF",
 		};
 		string encoding = file.HasBom ? "UTF-8 BOM" : "UTF-8";
-		return length is { } bytes
-			? string.Join(" · ", DisplayFormat.Bytes(bytes), encoding, ending)
-			: string.Join(" · ", encoding, ending);
+		return length is { } bytes ? [DisplayFormat.Bytes(bytes), encoding, ending] : [encoding, ending];
 	}
 
 	private static string RefusalText(TextFileRefusal refusal, int maxBytes) => refusal switch

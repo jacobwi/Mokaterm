@@ -38,6 +38,19 @@ internal sealed class FileBrowserInterop : IAsyncDisposable
 		CancellationToken cancellationToken) =>
 		_module.InvokeAsync<IJSObjectReference>("bindDialog", cancellationToken, root, selectionStart, selectionEnd);
 
+	/// <summary>
+	/// Wires the file editor's box: the line-number gutter, which the page fills and scrolls, Tab and Shift+Tab
+	/// indenting, Ctrl+S, and the caret reported through <see cref="FileEditorJsReceiver.OnCaretMoved"/>. Dispose the
+	/// result to detach.
+	/// </summary>
+	public ValueTask<IJSObjectReference> AttachEditorAsync(
+		ElementReference frame,
+		ElementReference area,
+		ElementReference numbers,
+		DotNetObjectReference<FileEditorJsReceiver> receiver,
+		CancellationToken cancellationToken) =>
+		_module.InvokeAsync<IJSObjectReference>("attachEditor", cancellationToken, frame, area, numbers, receiver);
+
 	/// <summary>Scrolls the option marked <c>aria-selected</c> inside <paramref name="list"/> into view.</summary>
 	public ValueTask<bool> ScrollSelectedIntoViewAsync(ElementReference list) =>
 		_module.TryInvokeVoidAsync("scrollSelectedIntoView", list);

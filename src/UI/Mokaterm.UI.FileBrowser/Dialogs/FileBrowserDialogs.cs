@@ -129,7 +129,7 @@ internal sealed class FileBrowserDialogs
 		string fileName,
 		string path,
 		string content,
-		string facts,
+		IReadOnlyList<string> facts,
 		Func<string, Task<string?>> save,
 		Func<Task<bool>> confirmDiscard)
 	{

@@ -1,6 +1,7 @@
 // Browser side of RemoteFileBrowser: keyboard shortcuts that must beat browser defaults (F5 reloads the page, Alt+Left
 // navigates back, Ctrl+A selects the page), moving entries by dragging them onto folder rows, width steps for the
-// responsive layout, focus and scroll helpers, and Enter handling for the browser's dialogs.
+// responsive layout, focus and scroll helpers, Enter handling for the browser's dialogs, and the file editor's gutter,
+// indenting and Ctrl+S.
 import { invoke } from '../../Mokaterm.UI.Common/js/interop.js';
 export { bindDialog } from '../../Mokaterm.UI.Common/js/forms.js';
 
@@ -318,5 +319,271 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 // Keeps the highlighted option of a listbox in view while the keyboard moves through it.
 export function scrollSelectedIntoView(list) {
 	list?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+}
+
+// Tab inserts one tab rather than spaces: how a remote file is indented is the server's business, and one character is
+// also the one thing Shift+Tab can take back exactly. Shift+Tab still lifts up to four leading spaces, which is the
+// box's own tab-size, so a space-indented file outdents too.
+const editorIndent = '\t';
+const editorSpaces = 4;
+
+// Never narrower than two digits, so a short file gets a gutter instead of a hairline.
+const editorMinDigits = 2;
+
+// How long a burst of caret moves is gathered before the gutter and .NET hear about it, about one frame. A timer and
+// not requestAnimationFrame: a window the compositor is not painting still reports itself visible and still takes
+// typing, but its animation frames never run, and the gutter would stop following the text.
+const editorCoalesceMs = 16;
+
+/** Where each line of `text` starts, so a caret offset becomes a line number without rescanning the file. */
+function lineStarts(text) {
+	const starts = [0];
+	for (let index = text.indexOf('\n'); index >= 0; index = text.indexOf('\n', index + 1)) {
+		starts.push(index + 1);
+	}
+
+	return starts;
+}
+
+/** The index in `starts` of the line that holds `offset`. */
+function lineAt(starts, offset) {
+	let low = 0;
+	let high = starts.length - 1;
+	while (low < high) {
+		const middle = (low + high + 1) >> 1;
+		if (starts[middle] <= offset) {
+			low = middle;
+		}
+		else {
+			high = middle - 1;
+		}
+	}
+
+	return low;
+}
+
+/**
+ * The file editor's box: fills and scrolls the line-number gutter, indents with Tab and outdents with Shift+Tab, saves
+ * on Ctrl+S, and reports the caret through FileEditorJsReceiver. The numbers are written here and not rendered by .NET
+ * because a thirty thousand line file would be that many nodes of render tree for something the page can print.
+ * Dispose the result to detach.
+ */
+export function attachEditor(frame, area, numbers, dotNetRef) {
+	const state = { dotNet: dotNetRef, disposed: false };
+	let starts = [0];
+	let stale = true;
+	let drawn = 0;
+	let reported = '';
+	let pending = 0;
+	// Escape arms the next Tab to move the focus instead of indenting, so the keyboard is never stuck in the box.
+	let leaving = false;
+
+	const measure = () => {
+		if (!stale) {
+			return;
+		}
+
+		stale = false;
+		starts = lineStarts(area.value);
+		if (starts.length === drawn) {
+			return;
+		}
+
+		drawn = starts.length;
+		const rows = new Array(drawn);
+		for (let row = 0; row < drawn; row++) {
+			rows[row] = row + 1;
+		}
+
+		numbers.textContent = rows.join('\n');
+		frame.style.setProperty('--mt-edit-digits', String(Math.max(editorMinDigits, String(drawn).length)));
+	};
+
+	// The numbers ride a transform rather than a scrollTop of their own: a box with a horizontal scrollbar is shorter
+	// inside than the gutter beside it, so a copied scrollTop would clamp before the last line.
+	const follow = () => {
+		numbers.style.transform = `translateY(${-area.scrollTop}px)`;
+	};
+
+	const report = () => {
+		measure();
+		const caret = area.selectionDirection === 'backward' ? area.selectionStart : area.selectionEnd;
+		const line = lineAt(starts, caret);
+		const column = caret - starts[line] + 1;
+		const next = `${line}:${column}:${starts.length}`;
+		if (next !== reported) {
+			reported = next;
+			invoke(state, 'OnCaretMoved', line + 1, column, starts.length);
+		}
+	};
+
+	// One pass per burst, so holding an arrow key down costs one call and one gutter rebuild rather than one each.
+	const refresh = () => {
+		pending = 0;
+		if (!state.disposed) {
+			follow();
+			report();
+		}
+	};
+
+	const schedule = () => {
+		if (!pending && !state.disposed) {
+			pending = setTimeout(refresh, editorCoalesceMs);
+		}
+	};
+
+	const edit = (text, selectionStart, selectionEnd) => {
+		// insertText keeps the box's own undo stack and raises the input event Blazor listens for; assigning value
+		// would throw both away. setRangeText is the fallback, and there the event has to be raised by hand.
+		let inserted = false;
+		try {
+			inserted = document.execCommand('insertText', false, text);
+		}
+		catch {
+			inserted = false;
+		}
+
+		if (!inserted) {
+			area.setRangeText(text, area.selectionStart, area.selectionEnd, 'end');
+			area.dispatchEvent(new Event('input', { bubbles: true }));
+		}
+
+		if (typeof selectionStart === 'number') {
+			area.setSelectionRange(selectionStart, selectionEnd);
+		}
+
+		stale = true;
+		schedule();
+	};
+
+	const indent = (outdent) => {
+		measure();
+		const value = area.value;
+		const from = area.selectionStart;
+		const to = area.selectionEnd;
+		const firstLine = lineAt(starts, from);
+		// A selection ending exactly on a line start belongs to the line above, not to the empty one it touches.
+		const lastLine = to > from ? lineAt(starts, to - 1) : firstLine;
+		if (!outdent && firstLine === lastLine) {
+			edit(editorIndent);
+			return;
+		}
+
+		const blockStart = starts[firstLine];
+		const blockEnd = lastLine + 1 < starts.length ? starts[lastLine + 1] - 1 : value.length;
+		const lines = value.slice(blockStart, blockEnd).split('\n');
+		let head = 0;
+		let total = 0;
+		for (let index = 0; index < lines.length; index++) {
+			const line = lines[index];
+			let change = 0;
+			if (!outdent) {
+				// An empty line gets no indentation it would only have to lose again.
+				if (line.length > 0) {
+					lines[index] = editorIndent + line;
+					change = editorIndent.length;
+				}
+			}
+			else if (line.startsWith(editorIndent)) {
+				lines[index] = line.slice(editorIndent.length);
+				change = -editorIndent.length;
+			}
+			else {
+				let spaces = 0;
+				while (spaces < editorSpaces && line[spaces] === ' ') {
+					spaces++;
+				}
+
+				if (spaces > 0) {
+					lines[index] = line.slice(spaces);
+					change = -spaces;
+				}
+			}
+
+			if (index === 0) {
+				head = change;
+			}
+
+			total += change;
+		}
+
+		if (total === 0) {
+			return;
+		}
+
+		area.setSelectionRange(blockStart, blockEnd);
+		edit(lines.join('\n'), Math.max(blockStart, from + head), Math.max(blockStart, to + total));
+	};
+
+	const onKeyDown = (event) => {
+		if (event.isComposing) {
+			return;
+		}
+
+		if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.length === 1 && event.key.toLowerCase() === 's') {
+			event.preventDefault();
+			event.stopPropagation();
+			// The text rides along: an input event still on its way to .NET would otherwise have it save the copy from
+			// before the last keystroke.
+			invoke(state, 'OnSaveRequested', area.value);
+			return;
+		}
+
+		if (event.target !== area) {
+			return;
+		}
+
+		if (event.key === 'Escape') {
+			leaving = true;
+			return;
+		}
+
+		if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+			if (leaving) {
+				leaving = false;
+				return;
+			}
+
+			event.preventDefault();
+			indent(event.shiftKey);
+			return;
+		}
+
+		leaving = false;
+	};
+
+	const onInput = () => {
+		stale = true;
+		schedule();
+	};
+
+	// Ctrl+S belongs to the whole dialog and not only to the box, because Escape then Tab is how the keyboard leaves
+	// the box and the Save button it lands on is outside it.
+	const keys = frame.closest('.moka-dialog') || frame;
+	const selectionEvents = ['selectionchange', 'keyup', 'pointerup', 'focus'];
+	keys.addEventListener('keydown', onKeyDown);
+	area.addEventListener('input', onInput);
+	area.addEventListener('scroll', follow, { passive: true });
+	for (const type of selectionEvents) {
+		area.addEventListener(type, schedule);
+	}
+
+	measure();
+	follow();
+	// The first caret report waits for the timer, so nothing calls .NET while it still awaits this attach.
+	schedule();
+
+	return {
+		dispose() {
+			state.disposed = true;
+			clearTimeout(pending);
+			keys.removeEventListener('keydown', onKeyDown);
+			area.removeEventListener('input', onInput);
+			area.removeEventListener('scroll', follow);
+			for (const type of selectionEvents) {
+				area.removeEventListener(type, schedule);
+			}
+		},
+	};
 }
 

@@ -1,7 +1,7 @@
 .mt-edit-head {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: baseline;
+	align-items: center;
 	justify-content: space-between;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
@@ -9,36 +9,34 @@
 
 /* A remote path is one unbroken string and is the thing most likely to overflow this row. */
 .mt-edit-path {
-	overflow-wrap: anywhere;
-	color: var(--moka-color-on-surface-variant);
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
 }
 
 .mt-edit-facts {
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;
-	gap: var(--moka-spacing-sm);
-	font-size: var(--moka-font-size-xs);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	color: var(--moka-color-on-surface-tertiary);
-}
-
-.mt-edit-dirty {
-	color: var(--moka-color-primary);
+	gap: var(--moka-spacing-xs);
 }
 
 /*
  * A viewport height rather than flex: the dialog's own body owns the column and a grown child would fight it. The
- * subtraction is the dialog's header, this file's own path row, the actions row and the padding around them, so the
- * box reaches the bottom of a full-screen dialog instead of leaving a third of it empty.
+ * subtraction is the dialog's header, this file's own path row, the actions row and the padding around them, so the box
+ * reaches the bottom of a full-screen dialog instead of leaving a third of it empty. The gutter, the text and the status
+ * line share this one height, which is why adding the status line did not move the number.
  */
-.mt-edit-area {
+.mt-edit-frame {
+	--mt-edit-digits: 2;
+	position: relative;
 	box-sizing: border-box;
-	width: 100%;
+	display: flex;
+	flex-direction: column;
 	height: calc(100vh - 230px);
 	min-height: 240px;
-	padding: var(--moka-spacing-md);
+	overflow: hidden;
 	border: 1px solid var(--moka-color-outline);
 	border-radius: var(--moka-radius-sm);
 	background: var(--moka-color-surface-2);
@@ -46,13 +44,88 @@
 	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-sm);
 	line-height: var(--moka-line-height-base);
+}
+
+/* The ring is on the frame, not the box inside it, so the gutter is inside what the focus marks. */
+.mt-edit-frame:focus-within {
+	border-color: var(--moka-color-primary-border);
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+/* Unsaved edits get an edge of their own, which outlives the focus ring instead of competing for the border colour. */
+.mt-edit-frame--dirty::before {
+	content: '';
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 2px;
+	background: var(--moka-color-warning);
+}
+
+.mt-edit-sheet {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.mt-edit-gutter {
+	flex: 0 0 auto;
+	box-sizing: content-box;
+	width: calc(var(--mt-edit-digits) * 1ch);
+	padding: var(--moka-spacing-md) var(--moka-spacing-md) var(--moka-spacing-md) var(--moka-spacing-lg);
+	overflow: hidden;
+	border-right: 1px solid var(--moka-color-outline-variant);
+	color: var(--moka-color-on-surface-tertiary);
+	text-align: right;
+	white-space: pre;
+	user-select: none;
+}
+
+/*
+ * The numbers line up only while the box and the gutter agree on every line box, so the font and the line height come
+ * from the frame for both and the top padding is the same on each. `font: inherit` is what keeps a future change to one
+ * of them from silently drifting the other.
+ */
+.mt-edit-area {
+	flex: 1;
+	min-width: 0;
+	box-sizing: border-box;
+	padding: var(--moka-spacing-md);
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
 	tab-size: 4;
 	resize: none;
 	white-space: pre;
+	overflow: auto;
 }
 
+.mt-edit-area:focus,
 .mt-edit-area:focus-visible {
 	outline: none;
-	border-color: var(--moka-color-primary-border);
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mt-edit-status {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-md);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-md);
+	border-top: 1px solid var(--moka-color-outline-variant);
+	background: var(--moka-color-surface);
+}
+
+.mt-edit-where {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-lg);
+}
+
+.mt-edit-hint {
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
