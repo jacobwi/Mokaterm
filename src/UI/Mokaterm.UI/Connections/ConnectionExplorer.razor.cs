@@ -94,6 +94,20 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 
 	private static string? HostColorStyle(HostProfile host) => HexColor.Normalize(host.Color) is { } color ? $"color:{color}" : null;
 
+	/// <summary>
+	/// The whole row as one line, for the title attribute. A narrow panel truncates the name and drops the address
+	/// beside it, so without this there is nowhere left to read either.
+	/// </summary>
+	private string RowTooltip(ConnectionTreeRow row) => row switch
+	{
+		{ Folder: { } folder } => folder.Name,
+		{ Login: { } login } => string.Join(" - ", LoginLabel(login), Protocols.DisplayName(login.ProtocolId)),
+		{ Host: { } host } => string.Equals(host.DisplayName, host.Address, StringComparison.Ordinal)
+			? host.Address
+			: string.Join(" - ", host.DisplayName, host.Address),
+		_ => "",
+	};
+
 	private static string LoginLabel(ConnectionProfile login) =>
 		!string.IsNullOrWhiteSpace(login.Label) ? login.Label
 		: !string.IsNullOrWhiteSpace(login.Username) ? login.Username

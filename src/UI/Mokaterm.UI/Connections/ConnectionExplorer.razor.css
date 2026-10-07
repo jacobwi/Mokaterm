@@ -1,8 +1,10 @@
+/* The panel is resizable, so rows follow its width through container queries rather than the viewport's. */
 .mt-explorer {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
+	container-type: inline-size;
 }
 
 .mt-explorer-search {
@@ -44,19 +46,38 @@
 	opacity: 0.7;
 }
 
+/*
+ * The name is what identifies a row, so it is the last thing allowed to lose characters. Both it and the meta beside
+ * it shrink, but the meta gives way first by a wide margin: without that the two shrank in proportion and a narrow
+ * panel truncated the name and the address at once, leaving neither readable.
+ */
 .mt-tree-label {
+	flex: 0 1 auto;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
 .mt-tree-meta {
+	flex: 0 500 auto;
+	min-width: 0;
 	overflow: hidden;
 	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-xs);
 	color: var(--moka-color-on-surface-tertiary);
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/*
+ * Past this the meta has nothing readable left to give, and an address cut to "127.0.0..." beside a name cut to
+ * "demo desk..." tells the user less than the name alone. The tooltip and the editor still carry the full address.
+ */
+@container (max-width: 260px) {
+	.mt-tree-meta {
+		display: none;
+	}
 }
 
 .mt-tree-item--drop ::deep .moka-list-item,

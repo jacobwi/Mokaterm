@@ -68,7 +68,7 @@
 						 @ondrop:stopPropagation>
 						<MokaListItem Active="@(row.Key == _selectedKey)" Style="@IndentStyle(row.Depth)">
 							<ChildContent>
-								<span class="mt-tree-line">
+								<span class="mt-tree-line" title="@RowTooltip(row)">
 									<span class="mt-tree-chevron" @onclick="() => Toggle(row)" @onclick:stopPropagation @ondblclick:stopPropagation>
 										@if (row.Expandable)
 										{
