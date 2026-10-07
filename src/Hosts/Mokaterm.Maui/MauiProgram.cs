@@ -58,8 +58,10 @@ public static class MauiProgram
 		// and dropped folders keep their structure.
 		builder.Services.AddScoped<IFileDropBridge, Platforms.Windows.WebView2FileDropBridge>();
 
+#if !MOKATERM_PACKAGED
 		// Updates, and the page that drives them, belong to a host that can replace its own files: the web host must
-		// show neither, so the descriptor is registered here and not in AddMokatermSettingsPages.
+		// show neither, so the descriptor is registered here and not in AddMokatermSettingsPages. A Store package is
+		// read-only and updates through the Store, so that build leaves both out as well.
 		builder.Services.AddSingleton<IAppUpdater, Platforms.Windows.VelopackAppUpdater>();
 		builder.Services.AddSettingsPage(new SettingsPageDescriptor
 		{
@@ -72,6 +74,7 @@ public static class MauiProgram
 			Order = 40,
 			Keywords = "update updates upgrade version release feed channel velopack download install restart startup check",
 		});
+#endif
 
 		// One window, so one chrome: the shell's top bar becomes that window's title bar.
 		builder.Services.AddSingleton<Platforms.Windows.WindowChrome>();

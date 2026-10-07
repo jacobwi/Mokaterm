@@ -7,16 +7,21 @@
   IgnorableNamespaces="uap rescap">
 
   <!--
-    MAUI reads the publisher even for this unpackaged app: it becomes AppInfo.PublisherName and the first folder of
-    FileSystem.AppDataDirectory. The app keeps its own files in DesktopPaths instead, so this no longer moves the vault.
+    The identity Partner Center reserved for the Store listing (Store ID 9N6T7LL5SHKW, package family name
+    M0ka.Mokaterm_0dtghpr9ch70t). It has to match what Partner Center holds exactly or the upload is refused, so none
+    of it is derived from ApplicationId or ApplicationTitle: MAUI only substitutes its own placeholder tokens, and real
+    values pass through untouched.
+
+    The unpackaged build reads this too, where the publisher becomes AppInfo.PublisherName and the first folder of
+    FileSystem.AppDataDirectory. The app keeps its own files in DesktopPaths instead, so this does not move the vault.
   -->
-  <Identity Name="maui-package-name-placeholder" Publisher="CN=Moka" Version="0.0.0.0" />
+  <Identity Name="M0ka.Mokaterm" Publisher="CN=485EF1B7-103A-47E4-B25E-A750807DEDFC" Version="0.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="355E01F1-DE9A-46E0-923F-53BFA6EA0DA5" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>$placeholder$</DisplayName>
-    <PublisherDisplayName>Moka</PublisherDisplayName>
+    <DisplayName>Mokaterm</DisplayName>
+    <PublisherDisplayName>M0ka</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 

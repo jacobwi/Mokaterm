@@ -21,7 +21,7 @@
 
 	<!-- UI -->
 	<ItemGroup>
-		<PackageVersion Include="Moka.Red" Version="0.1.15" />
+		<PackageVersion Include="Moka.Red" Version="0.1.16" />
 	</ItemGroup>
 
 	<!-- Protocols -->

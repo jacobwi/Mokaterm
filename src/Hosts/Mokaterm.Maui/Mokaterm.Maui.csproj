@@ -21,8 +21,18 @@
 		<!-- MAUI's WinUI targets set Version to ApplicationDisplayVersion, which drops the label; the version the app shows keeps it. -->
 		<InformationalVersion Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</InformationalVersion>
 
-		<!-- Unpackaged: runs with dotnet run / F5 without MSIX signing. -->
-		<WindowsPackageType>None</WindowsPackageType>
+		<!--
+			Unpackaged by default: that is what runs with dotnet run and F5, and the only shape Velopack can install
+			or update, since it replaces files an MSIX package keeps read-only. A Store build opts in with
+			-p:WindowsPackageType=MSIX (build/package-store.ps1), which also defines MOKATERM_PACKAGED below.
+		-->
+		<WindowsPackageType Condition="'$(WindowsPackageType)' == ''">None</WindowsPackageType>
+
+		<!--
+			The packaged build cannot update itself, so it leaves the updater and its settings page out rather than
+			offering a button that can never work. A constant and not a runtime check: the two are separate builds.
+		-->
+		<DefineConstants Condition="'$(WindowsPackageType)' == 'MSIX'">$(DefineConstants);MOKATERM_PACKAGED</DefineConstants>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
