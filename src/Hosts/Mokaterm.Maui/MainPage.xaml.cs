@@ -1,22 +1,15 @@
 using Microsoft.AspNetCore.Components.WebView;
-using Mokaterm.Maui.Services;
 
 namespace Mokaterm.Maui;
 
 public partial class MainPage : ContentPage
 {
-	private readonly DesktopDropCoordinator _dropCoordinator;
-
-	public MainPage(DesktopDropCoordinator dropCoordinator)
-	{
-		_dropCoordinator = dropCoordinator;
-		InitializeComponent();
-	}
+	public MainPage() => InitializeComponent();
 
 	private void OnBlazorWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
 	{
 #if WINDOWS
-		Platforms.Windows.WebView2Setup.Configure(e.WebView, _dropCoordinator);
+		Platforms.Windows.WebView2Setup.Configure(e.WebView);
 #endif
 	}
 

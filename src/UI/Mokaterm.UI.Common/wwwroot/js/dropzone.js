@@ -23,8 +23,11 @@ export function newDropId() {
 /**
  * Watches one element for an OS file drop. `onOverChanged(bool)` is told when the overlay should show, and `onDrop`
  * runs while the drop event is still live, which is the only moment its DataTransfer can be read. Dispose to detach.
+ *
+ * `onDrop` is optional: a host that takes the drop outside the page keeps the listeners anyway, because a dragover the
+ * page does not refuse navigates the view to the dropped file, and drives the overlay through `hover` instead.
  */
-export function attachDropZone(element, onOverChanged, onDrop) {
+export function attachDropZone(element, onOverChanged, onDrop = null) {
 	let depth = 0;
 	let over = false;
 	let lastOverAt = 0;
@@ -97,7 +100,7 @@ export function attachDropZone(element, onOverChanged, onDrop) {
 		event.stopPropagation();
 		depth = 0;
 		setOver(false);
-		onDrop(event);
+		onDrop?.(event);
 	};
 
 	element.addEventListener('dragenter', onEnter);
@@ -106,6 +109,17 @@ export function attachDropZone(element, onOverChanged, onDrop) {
 	element.addEventListener('drop', onDropped);
 
 	return {
+		/**
+		 * Moves the overlay for a drag the page cannot see, which is every OS drag in the desktop host: it goes through
+		 * the same flag, the same callback and the same watchdog a browser drag would, so a native drag that stops
+		 * reporting still clears the overlay a second later instead of leaving it on screen.
+		 */
+		hover(value) {
+			lastOverAt = Date.now();
+			depth = value ? 1 : 0;
+			setOver(value);
+		},
+
 		dispose() {
 			element.removeEventListener('dragenter', onEnter);
 			element.removeEventListener('dragover', onOver);

@@ -3,16 +3,21 @@ using System.Collections.Concurrent;
 namespace Mokaterm.Maui.Services;
 
 /// <summary>
-/// Pairs the two halves of a native file drop. The page script raises a Blazor call with a drop id, while WebView2
-/// delivers the dropped paths for that id through its own message channel; either can arrive first.
+/// Pairs the two halves of a native file drop. The window's drop target supplies the dropped paths under a drop id,
+/// and the page raises a Blazor call with that id once it knows which drop zone the point was in; either can arrive
+/// first.
 /// </summary>
 public sealed class DesktopDropCoordinator
 {
-	public const string MessagePrefix = "mokaterm-drop:";
-
 	private readonly ConcurrentDictionary<string, TaskCompletionSource<IReadOnlyList<string>>> _pending = new(StringComparer.Ordinal);
 
 	public void Complete(string dropId, IReadOnlyList<string> paths) => Get(dropId).TrySetResult(paths);
+
+	/// <summary>
+	/// Lets go of paths nobody claimed. A drop that landed outside every zone has no upload to hand them to, and
+	/// without this its id would hold them for as long as the app runs.
+	/// </summary>
+	public void Forget(string dropId) => _pending.TryRemove(dropId, out _);
 
 	public async Task<IReadOnlyList<string>> WaitForPathsAsync(string dropId, TimeSpan timeout, CancellationToken cancellationToken)
 	{

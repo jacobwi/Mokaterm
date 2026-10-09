@@ -28,7 +28,7 @@ internal static class WebView2Setup
 		Environment.SetEnvironmentVariable(VariablePrefix + "USER_DATA_FOLDER", DesktopPaths.WebViewDirectory);
 	}
 
-	public static void Configure(Microsoft.UI.Xaml.Controls.WebView2 webView, DesktopDropCoordinator dropCoordinator)
+	public static void Configure(Microsoft.UI.Xaml.Controls.WebView2 webView)
 	{
 		// Matches the Moka background so resizing and startup never flash white.
 		webView.DefaultBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 6, 6, 8);
@@ -51,36 +51,6 @@ internal static class WebView2Setup
 			{
 				args.State = CoreWebView2PermissionState.Allow;
 			}
-		};
-
-		core.WebMessageReceived += (_, args) =>
-		{
-			string? message;
-			try
-			{
-				message = args.TryGetWebMessageAsString();
-			}
-			catch (ArgumentException)
-			{
-				// Blazor's own IPC also uses this channel; non-string messages are not ours.
-				return;
-			}
-
-			if (message is null || !message.StartsWith(DesktopDropCoordinator.MessagePrefix, StringComparison.Ordinal) || args.AdditionalObjects is null)
-			{
-				return;
-			}
-
-			List<string> paths = [];
-			foreach (object item in args.AdditionalObjects)
-			{
-				if (item is CoreWebView2File file && !string.IsNullOrEmpty(file.Path))
-				{
-					paths.Add(file.Path);
-				}
-			}
-
-			dropCoordinator.Complete(message[DesktopDropCoordinator.MessagePrefix.Length..], paths);
 		};
 	}
 }

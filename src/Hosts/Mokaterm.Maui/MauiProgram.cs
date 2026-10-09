@@ -54,9 +54,13 @@ public static class MauiProgram
 #if WINDOWS
 		builder.Services.AddSingleton<Abstractions.Security.IDeviceKeyProtector, Platforms.Windows.DpapiDeviceKeyProtector>();
 
-		// Replaces the browser drop bridge: WebView2 hands us real paths, so uploads read straight from disk
-		// and dropped folders keep their structure.
+		// Replaces the browser drop bridge: the window's own drop target hands us real paths, so uploads read
+		// straight from disk and dropped folders keep their structure.
 		builder.Services.AddScoped<IFileDropBridge, Platforms.Windows.WebView2FileDropBridge>();
+
+		// And that target itself, which is what makes an external drop arrive at all: WinUI refuses one before any
+		// drag event reaches the WebView's content (microsoft-ui-xaml#10142). One window, so one target.
+		builder.Services.AddSingleton<Platforms.Windows.NativeFileDrop>();
 
 #if !MOKATERM_PACKAGED
 		// Updates, and the page that drives them, belong to a host that can replace its own files: the web host must
@@ -79,8 +83,14 @@ public static class MauiProgram
 		// One window, so one chrome: the shell's top bar becomes that window's title bar.
 		builder.Services.AddSingleton<Platforms.Windows.WindowChrome>();
 		builder.Services.AddSingleton<IWindowChrome>(services => services.GetRequiredService<Platforms.Windows.WindowChrome>());
+
+		// Both of these need the window itself, and its handler is connected by the time this runs.
 		builder.ConfigureLifecycleEvents(events => events.AddWindows(windows => windows.OnWindowCreated(window =>
-			window.GetWindow()?.Handler?.MauiContext?.Services.GetService<Platforms.Windows.WindowChrome>()?.Attach(window))));
+		{
+			IServiceProvider? services = window.GetWindow()?.Handler?.MauiContext?.Services;
+			services?.GetService<Platforms.Windows.WindowChrome>()?.Attach(window);
+			services?.GetService<Platforms.Windows.NativeFileDrop>()?.Attach(window);
+		})));
 #endif
 	}
 }

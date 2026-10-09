@@ -4,12 +4,10 @@ namespace Mokaterm.Maui;
 
 public partial class App : Application
 {
-	private readonly DesktopDropCoordinator _dropCoordinator;
 	private readonly DesktopSessions _sessions;
 
-	public App(DesktopDropCoordinator dropCoordinator, DesktopSessions sessions)
+	public App(DesktopSessions sessions)
 	{
-		_dropCoordinator = dropCoordinator;
 		_sessions = sessions;
 		InitializeComponent();
 
@@ -21,7 +19,7 @@ public partial class App : Application
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
 		// No TitleBar here: on Windows the page's own top bar is the title bar (Platforms/Windows/WindowChrome).
-		Window window = new(new MainPage(_dropCoordinator))
+		Window window = new(new MainPage())
 		{
 			Title = "Mokaterm",
 			MinimumWidth = 960,

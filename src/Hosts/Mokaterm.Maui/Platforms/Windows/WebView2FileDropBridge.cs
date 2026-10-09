@@ -9,13 +9,14 @@ using Mokaterm.UI.Common.Platform;
 namespace Mokaterm.Maui.Platforms.Windows;
 
 /// <summary>
-/// File drops through WebView2: the page script forwards the dropped File objects to the host with
-/// postMessageWithAdditionalObjects, which exposes their real paths, so uploads stream from disk and dropped
+/// File drops on the desktop host, where the window's own drop target sees the drag and the page only hit tests it
+/// (see <see cref="NativeFileDrop"/>). What arrives here are real paths, so uploads stream from disk and dropped
 /// folders keep their structure.
 /// </summary>
 internal sealed class WebView2FileDropBridge : IFileDropBridge, IAsyncDisposable
 {
-	// The native message normally lands within milliseconds of the Blazor call; this only guards against a lost one.
+	// The paths are in the coordinator before the page is told about the drop, so this wait is normally already over
+	// when it starts; it only guards against a drop id the page answered for twice.
 	private static readonly TimeSpan PathsTimeout = TimeSpan.FromSeconds(10);
 
 	private readonly JsModule _module;
@@ -33,7 +34,7 @@ internal sealed class WebView2FileDropBridge : IFileDropBridge, IAsyncDisposable
 	{
 		Registration registration = new(this, handlers);
 		registration.Reference = DotNetObjectReference.Create(registration);
-		registration.Listener = await _module.InvokeAsync<IJSObjectReference>("attach", cancellationToken, element, registration.Reference, DesktopDropCoordinator.MessagePrefix);
+		registration.Listener = await _module.InvokeAsync<IJSObjectReference>("attach", cancellationToken, element, registration.Reference);
 		return registration;
 	}
 

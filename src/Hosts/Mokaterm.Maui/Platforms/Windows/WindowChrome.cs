@@ -238,7 +238,7 @@ internal sealed class WindowChrome : IWindowChrome
 	private RectInt32[] PageCaption(WindowDragRegion[] regions)
 	{
 		double scale = Scale;
-		WinPoint origin = WebViewOrigin();
+		WinPoint origin = WebViewLayout.Origin(_webView);
 		AppWindowTitleBar bar = _appWindow!.TitleBar;
 		int minimumLeft = bar.LeftInset;
 		int maximumRight = _appWindow.ClientSize.Width - bar.RightInset;
@@ -258,25 +258,6 @@ internal sealed class WindowChrome : IWindowChrome
 		}
 
 		return [.. rects];
-	}
-
-	// Where the page starts in the window, in view pixels. The top left corner while MAUI's title bar row is hidden.
-	private WinPoint WebViewOrigin()
-	{
-		if (_webView is null)
-		{
-			return new WinPoint(0, 0);
-		}
-
-		try
-		{
-			return _webView.TransformToVisual(null).TransformPoint(new WinPoint(0, 0));
-		}
-		catch (ArgumentException)
-		{
-			// Not in the window's tree (yet); the page fills the window then.
-			return new WinPoint(0, 0);
-		}
 	}
 
 	private void ApplyColors()
