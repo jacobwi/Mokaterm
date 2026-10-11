@@ -25,6 +25,9 @@ internal sealed class LoopbackFtpServerOptions
 
 	public bool SupportsMfmt { get; init; }
 
+	/// <summary>Advertises XSHA256 and answers it with the file's SHA-256 in upper case, as some servers do.</summary>
+	public bool SupportsXSha256 { get; init; }
+
 	/// <summary>Control connections allowed at once; the next one is greeted with 421.</summary>
 	public int MaxConnections { get; init; } = int.MaxValue;
 

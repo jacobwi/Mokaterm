@@ -140,10 +140,57 @@ internal sealed class SettingsService : ISettingsService, IDisposable
 		}
 	}
 
+	/// <summary>A copy of the whole document as stored, sections of modules that are not loaded included.</summary>
+	internal async Task<JsonObject> CopyDocumentAsync(CancellationToken cancellationToken = default)
+	{
+		await LoadAsync(cancellationToken);
+		lock (_sync)
+		{
+			return (JsonObject)_root.DeepClone();
+		}
+	}
+
+	/// <summary>
+	/// Replaces the whole document with what <paramref name="replace"/> builds from a copy of the current one, and writes
+	/// it at once. Every section is read again, through the sanitizer, the next time it is asked for, and every section
+	/// that was there before or is there now raises <see cref="Changed"/>.
+	/// </summary>
+	internal async Task ReplaceDocumentAsync(Func<JsonObject, JsonObject> replace, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(replace);
+		await LoadAsync(cancellationToken);
+
+		List<string> changedKeys;
+		lock (_sync)
+		{
+			JsonObject replacement = replace((JsonObject)_root.DeepClone());
+			changedKeys = [.. _root.Select(pair => pair.Key)
+				.Union(replacement.Select(pair => pair.Key), StringComparer.Ordinal)
+				.Union(_sections.Keys, StringComparer.Ordinal)];
+			_root = replacement;
+			_sections.Clear();
+			ScheduleWriteLocked();
+		}
+
+		foreach (string key in changedKeys)
+		{
+			Changed?.Invoke(key);
+		}
+
+		// Replacing everything is one deliberate act, not a slider being dragged: it is on disk before the caller hears back.
+		await FlushAsync(cancellationToken);
+	}
+
 	public void Dispose()
 	{
 		lock (_sync)
 		{
+			// Registered both as itself and as ISettingsService, so the container disposes it twice.
+			if (_disposed)
+			{
+				return;
+			}
+
 			_disposed = true;
 		}
 

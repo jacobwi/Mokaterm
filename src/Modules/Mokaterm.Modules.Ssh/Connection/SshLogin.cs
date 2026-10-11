@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Modules.Ssh.SecurityKeys;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using AuthenticationMethod = Renci.SshNet.AuthenticationMethod;
@@ -24,6 +25,8 @@ internal sealed class SshLogin : IDisposable
 	private readonly CancellationToken _cancellationToken;
 	private readonly byte[]? _passwordBytes;
 	private readonly List<AuthenticationMethod> _methods = [];
+	private readonly ITouchKeySource? _touchSource;
+	private readonly SecurityKeyTouch? _touch;
 	private int _passwordAnswered;
 
 	/// <param name="keySource">The loaded key for <see cref="LoginMethod.PublicKey"/> or the agent's keys for <see cref="LoginMethod.Agent"/>; not owned.</param>
@@ -70,6 +73,14 @@ internal sealed class SshLogin : IDisposable
 		KeyboardInteractiveAuthenticationMethod keyboardInteractive = new(credentials.Username);
 		keyboardInteractive.AuthenticationPrompt += OnAuthenticationPrompt;
 		_methods.Add(keyboardInteractive);
+
+		// A security key signs in the middle of this attempt and waits for the user, so it gets this attempt's watchdog.
+		if (keySource is ITouchKeySource touchSource)
+		{
+			_touchSource = touchSource;
+			_touch = new SecurityKeyTouch(watchdog, interaction, account, promptTimeout, cancellationToken);
+			touchSource.Touch.Attach(_touch);
+		}
 	}
 
 	public AuthenticationMethod[] Methods => [.. _methods];
@@ -82,6 +93,11 @@ internal sealed class SshLogin : IDisposable
 
 	public void Dispose()
 	{
+		if (_touchSource is not null && _touch is not null)
+		{
+			_touchSource.Touch.Detach(_touch);
+		}
+
 		foreach (AuthenticationMethod method in _methods)
 		{
 			if (method is KeyboardInteractiveAuthenticationMethod keyboardInteractive)

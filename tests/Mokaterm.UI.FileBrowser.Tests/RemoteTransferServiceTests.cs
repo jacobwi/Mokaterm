@@ -12,7 +12,7 @@ using Mokaterm.UI.FileBrowser.Transfers;
 
 namespace Mokaterm.UI.FileBrowser.Tests;
 
-public sealed class RemoteTransferServiceTests
+public sealed partial class RemoteTransferServiceTests
 {
 	private const string Target = "/srv/upload";
 

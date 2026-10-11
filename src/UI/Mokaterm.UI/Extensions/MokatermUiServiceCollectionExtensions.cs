@@ -10,6 +10,7 @@ using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Connections;
 using Mokaterm.UI.FileBrowser.Extensions;
 using Mokaterm.UI.Interaction;
+using Mokaterm.UI.QuickConnect;
 using Mokaterm.UI.Settings.Extensions;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Terminal.Extensions;
@@ -20,6 +21,14 @@ namespace Mokaterm.UI.Extensions;
 
 public static class MokatermUiServiceCollectionExtensions
 {
+	/// <summary>
+	/// The scoped services of the shell that belong to one page rather than to the window's state. A second page that
+	/// borrows a window's services, such as a session tool's own window on the desktop, gets its own of these and the
+	/// window's of everything else. The prompt queue is one: a question a tool asks shows in the window the tool is in.
+	/// Services that call into the page, Blazor's and Moka.Red's are recognized without being listed here.
+	/// </summary>
+	public static IReadOnlyList<Type> PageServices { get; } = [typeof(IUserInteraction), typeof(UserInteractionService)];
+
 	/// <summary>
 	/// Registers the shell and the UI libraries it hosts: Moka.Red, tabs, terminal, file browser and the built-in
 	/// settings pages. Hosts call it once, next to the core and module registrations, and render <see cref="MokatermApp"/>.
@@ -47,8 +56,13 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<SessionRestore>();
 		services.AddScoped<InputBroadcast>();
 		services.AddScoped<SessionActions>();
+
+		services.AddScoped<SessionToolActions>();
+
+		services.AddScoped<SessionViewRequests>();
 		services.AddScoped<CatalogState>();
 		services.AddScoped<ConnectionActions>();
+		services.AddScoped<QuickConnectHistory>();
 		services.AddScoped<CommandSnippetActions>();
 		services.AddScoped<VaultScreenState>();
 		services.AddScoped<DamagedDocumentNotices>();

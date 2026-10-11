@@ -81,8 +81,24 @@ internal sealed class TerminalInterop : IAsyncDisposable
 
 	public ValueTask FocusFindInputAsync(ElementReference host) => _module.InvokeVoidAsync("focusFindInput", host);
 
+	/// <summary>Starts or stops reporting the shell's folder through <see cref="TerminalJsCallbacks.OnFolderReported"/>.</summary>
+	public ValueTask SetFolderTrackingAsync(int id, bool enabled) => _module.InvokeVoidAsync("setFolderTracking", id, enabled);
+
 	/// <summary>Disposes the xterm.js instance. False when the circuit or WebView is already gone.</summary>
 	public ValueTask<bool> TryDisposeInstanceAsync(int id) => _module.TryInvokeVoidAsync("dispose", id);
+
+	/// <summary>A read-only terminal of a fixed size for <see cref="TerminalPlayer"/>. Returns its id.</summary>
+	public ValueTask<int> CreatePlayerAsync(ElementReference host, ElementReference screen, TerminalJsOptions options, int columns, int rows) =>
+		_module.InvokeAsync<int>("createPlayer", host, screen, options, columns, rows);
+
+	/// <summary>Appends events to what the player holds. Send a long recording in batches: every call is one message.</summary>
+	public ValueTask LoadPlayerAsync(int id, IReadOnlyList<TerminalJsPlayerEvent> events, CancellationToken cancellationToken) =>
+		_module.InvokeVoidAsync("playerLoad", cancellationToken, id, events);
+
+	/// <summary>Shows the screen as it was after the first <paramref name="index"/> events. Returns before it is drawn.</summary>
+	public ValueTask ShowPlayerAsync(int id, int index) => _module.InvokeVoidAsync("playerShow", id, index);
+
+	public ValueTask<bool> TryDisposePlayerAsync(int id) => _module.TryInvokeVoidAsync("disposePlayer", id);
 
 	public ValueTask DisposeAsync() => _module.DisposeAsync();
 }

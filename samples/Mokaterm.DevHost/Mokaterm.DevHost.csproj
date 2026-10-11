@@ -27,6 +27,7 @@
 		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Telnet\Mokaterm.Modules.Telnet.csproj" />
 		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Mqtt\Mokaterm.Modules.Mqtt.csproj" />
 		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Serial\Mokaterm.Modules.Serial.csproj" />
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Local\Mokaterm.Modules.Local.csproj" />
 	</ItemGroup>
 
 </Project>

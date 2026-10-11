@@ -1,0 +1,76 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+
+@* Micro-label tabs: text and a glowing underline for the open one, no boxes. Arrow keys move between them. *@
+<div class="mt-dk-tabs" role="tablist" aria-label="@Label">
+	@foreach ((string id, string text) in Tabs)
+	{
+		<button type="button"
+				@key="id"
+				@ref="_buttons[id]"
+				role="tab"
+				class="@(id == Active ? "mt-dk-tab mt-dk-tab--active" : "mt-dk-tab")"
+				aria-selected="@(id == Active ? "true" : "false")"
+				tabindex="@(id == Active ? 0 : -1)"
+				@onclick="@(() => SelectAsync(id))"
+				@onkeydown="@(args => OnKeyDownAsync(args, id))">
+			@text
+		</button>
+	}
+</div>
+
+@code {
+	private readonly Dictionary<string, ElementReference> _buttons = new(StringComparer.Ordinal);
+	private string? _focus;
+
+	/// <summary>Each tab's id and the text it shows.</summary>
+	[Parameter, EditorRequired]
+	public IReadOnlyList<(string Id, string Text)> Tabs { get; set; } = [];
+
+	[Parameter]
+	public string Active { get; set; } = "";
+
+	[Parameter]
+	public EventCallback<string> ActiveChanged { get; set; }
+
+	[Parameter]
+	public string Label { get; set; } = "Views";
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (_focus is { } id && _buttons.TryGetValue(id, out ElementReference button))
+		{
+			_focus = null;
+			try
+			{
+				await button.FocusAsync();
+			}
+			catch (Exception ex) when (Mokaterm.UI.Common.Interop.JsModule.IsExpected(ex))
+			{
+				// The tab went away with the page; there is nothing to focus.
+			}
+		}
+	}
+
+	private Task SelectAsync(string id) => id == Active ? Task.CompletedTask : ActiveChanged.InvokeAsync(id);
+
+	private Task OnKeyDownAsync(KeyboardEventArgs args, string id)
+	{
+		int index = Tabs.Select(tab => tab.Id).ToList().IndexOf(id);
+		int next = args.Key switch
+		{
+			"ArrowRight" => (index + 1) % Tabs.Count,
+			"ArrowLeft" => (index - 1 + Tabs.Count) % Tabs.Count,
+			"Home" => 0,
+			"End" => Tabs.Count - 1,
+			_ => -1,
+		};
+
+		if (next < 0)
+		{
+			return Task.CompletedTask;
+		}
+
+		_focus = Tabs[next].Id;
+		return SelectAsync(Tabs[next].Id);
+	}
+}

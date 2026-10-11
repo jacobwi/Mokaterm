@@ -16,6 +16,9 @@ public sealed partial class AboutPage : ComponentBase
 		new("SSH.NET", "SSH and SFTP. MIT license.", "https://github.com/sshnet/SSH.NET"),
 		new("FluentFTP", "FTP and FTPS. MIT license.", "https://github.com/robinrodricks/FluentFTP"),
 		new("xterm.js", "Terminal emulator. MIT license.", "https://github.com/xtermjs/xterm.js"),
+		new("noVNC", "VNC screens drawn in the page. MPL-2.0 license.", "https://github.com/novnc/noVNC"),
+		new("IronRDP", "RDP. MIT and Apache-2.0 licenses.", "https://github.com/Devolutions/IronRDP"),
+		new("MQTTnet", "MQTT. MIT license.", "https://github.com/dotnet/MQTTnet"),
 	];
 
 	private IReadOnlyList<ModuleInfo> _modules = [];

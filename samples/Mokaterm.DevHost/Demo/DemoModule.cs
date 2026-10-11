@@ -3,6 +3,8 @@ using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Modules.Ssh.Components;
+using Mokaterm.Modules.Ssh.Components.Admin;
+using Mokaterm.Modules.Ssh.Components.Docker;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Icons;
 
@@ -31,9 +33,34 @@ internal sealed class DemoModule : IMokatermModule
 		services.AddSessionTool(new SessionToolDescriptor
 		{
 			ProtocolId = DemoProtocolProvider.ProtocolId,
+			Id = "port-forwarding",
 			Title = "Port forwarding",
 			Icon = MokatermIcons.Transfers,
 			Component = typeof(SshTunnelsView),
+		});
+
+		// The real system view over the demo's command feature, which answers its reads from canned output.
+		services.AddSessionTool(new SessionToolDescriptor
+		{
+			ProtocolId = DemoProtocolProvider.ProtocolId,
+			Id = "system",
+			Title = "System",
+			Icon = MokatermIcons.Server,
+			Component = typeof(SystemAdminView),
+			Order = 1,
+			Size = SessionToolSize.Wide,
+		});
+
+		// The real Docker manager over an engine that lives in memory (Demo/Docker), for the same reason.
+		services.AddSessionTool(new SessionToolDescriptor
+		{
+			ProtocolId = DemoProtocolProvider.ProtocolId,
+			Id = "docker",
+			Title = "Docker",
+			Icon = MokatermIcons.Modules,
+			Component = typeof(DockerManagerView),
+			Order = 10,
+			Size = SessionToolSize.Wide,
 		});
 	}
 }

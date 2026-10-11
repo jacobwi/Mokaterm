@@ -39,9 +39,9 @@
 		</ToolbarContent>
 		<ChildContent>
 			<MokaColumn Title="Name" Field="credential => credential.Name" />
-			<MokaColumn Title="Kind" Field="credential => KindText(credential.Kind)">
+			<MokaColumn Title="Kind" Field="credential => KindText(credential)">
 				<CellTemplate Context="credential">
-					<MokaTag Text="@KindText(credential.Kind)" Icon="KindIcon(credential.Kind)" Size="MokaSize.Xs" />
+					<MokaTag Text="@KindText(credential)" Icon="KindIcon(credential)" Size="MokaSize.Xs" />
 				</CellTemplate>
 			</MokaColumn>
 			<MokaColumn Title="Username" Field="credential => credential.Username">
@@ -111,7 +111,7 @@
 			{
 				<MokaEmptyState Icon="MokatermIcons.Key"
 								Title="No shared credentials"
-								Description="Add a password or a private key here to reuse it across logins." />
+								Description="Add a password, a private key or a security key file here to reuse it across logins." />
 			}
 		</EmptyContent>
 	</MokaTable>

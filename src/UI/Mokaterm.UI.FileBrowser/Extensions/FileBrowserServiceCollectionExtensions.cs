@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mokaterm.UI.Common.Platform;
+using Mokaterm.UI.FileBrowser.Bookmarks;
 using Mokaterm.UI.FileBrowser.Interop;
 using Mokaterm.UI.FileBrowser.Platform;
 using Mokaterm.UI.FileBrowser.Transfers;
@@ -19,6 +20,7 @@ public static class FileBrowserServiceCollectionExtensions
 		services.TryAddScoped<IFileDropBridge, BrowserFileDropBridge>();
 		services.TryAddScoped<FileBrowserInterop>();
 		services.TryAddScoped<RemoteTransferService>();
+		services.TryAddScoped<FolderBookmarkStore>();
 		return services;
 	}
 }

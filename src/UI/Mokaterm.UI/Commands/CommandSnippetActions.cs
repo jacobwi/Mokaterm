@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
+using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
@@ -178,6 +179,84 @@ internal sealed class CommandSnippetActions
 		{
 			// The command is already typed; the use count only sorts the picker.
 			_logger.LogDebug(ex, "Recording that a saved command was used failed");
+		}
+	}
+
+	/// <summary>
+	/// The snippet a command run saves: for its one login when it ran on one, for that machine when every login was on
+	/// the same one, and for every session otherwise. Never set to run on its own, like the quick button's.
+	/// </summary>
+	public static CommandSnippet CreateRunSnippet(string command, IReadOnlyList<(HostProfile Host, ConnectionProfile Login)> targets)
+	{
+		ArgumentNullException.ThrowIfNull(targets);
+		string text = command?.Trim() ?? "";
+		CommandSnippetScope scope = targets.Count == 1
+			? CommandSnippetScope.Connection
+			: targets.Count > 1 && targets.Select(target => target.Host.Address).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1
+				? CommandSnippetScope.Host
+				: CommandSnippetScope.Global;
+
+		return new CommandSnippet
+		{
+			Id = Guid.NewGuid(),
+			Name = CommandSnippetName.Derive(text),
+			Command = text,
+			Scope = scope,
+			Host = scope == CommandSnippetScope.Global ? null : targets[0].Host.Address,
+			ConnectionId = scope == CommandSnippetScope.Connection ? targets[0].Login.Id : null,
+			RunImmediately = false,
+		};
+	}
+
+	/// <summary>
+	/// Opens the command run with a saved command, on the logins its scope names. Nothing is run until the user says so.
+	/// </summary>
+	public void RunOnSeveralHosts(CommandSnippet snippet)
+	{
+		ArgumentNullException.ThrowIfNull(snippet);
+		if (!_shell.OpenEditor(new CommandRunEditorRequest { Snippet = snippet }))
+		{
+			_interaction.Notify(NoticeSeverity.Info, "Close the open dialog first.");
+		}
+	}
+
+	/// <summary>
+	/// Saves the command of a run, which is the only way a run's command is ever kept. The scope follows the logins it
+	/// ran on (<see cref="CreateRunSnippet"/>).
+	/// </summary>
+	public async Task SaveFromRunAsync(string command, IReadOnlyList<(HostProfile Host, ConnectionProfile Login)> targets)
+	{
+		ArgumentNullException.ThrowIfNull(targets);
+		if (string.IsNullOrWhiteSpace(command))
+		{
+			return;
+		}
+
+		try
+		{
+			CommandSnippet saved = await _store.SaveAsync(CreateRunSnippet(command, targets));
+			string where = saved.Scope switch
+			{
+				CommandSnippetScope.Connection => targets[0].Login.GetTitle(targets[0].Host),
+				CommandSnippetScope.Host => saved.Host ?? targets[0].Host.Address,
+				_ => "every session",
+			};
+
+			_interaction.Notify(NoticeSeverity.Success, $"Saved \"{saved.Name}\" for {where}.", "Command saved");
+		}
+		catch (VaultLockedException)
+		{
+			_interaction.Notify(NoticeSeverity.Warning, "Unlock the vault to save commands.");
+		}
+		catch (ArgumentException ex)
+		{
+			// The store's own rules, such as one line per saved command, written for the user.
+			_interaction.Notify(NoticeSeverity.Warning, ex.Message, "Command not saved");
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			_logger.LogError("Saving the command of a run failed: {Failure}", LogSafe.Describe(ex));
+			_interaction.Notify(NoticeSeverity.Error, "The command could not be saved.");
 		}
 	}
 }

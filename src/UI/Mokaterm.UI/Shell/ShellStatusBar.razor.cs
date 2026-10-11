@@ -22,7 +22,7 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 	private const string AboutPageId = "about";
 
 	private int _sessionCount;
-	private bool _isSplit;
+	private int _paneCount;
 	private ISessionHandle? _active;
 	private string? _remoteTitle;
 	private int _broadcastCount;
@@ -31,6 +31,9 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 	private int _hosts;
 	private int _logins;
 	private (int Active, int Queued, int Failed, int Done) _transfers;
+	private ISessionHandle? _watched;
+	private ISessionIndicators? _indicatorSource;
+	private IReadOnlyList<SessionIndicator> _indicators = [];
 
 	[Inject]
 	private SessionWorkspace Workspace { get; set; } = default!;
@@ -90,7 +93,7 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 				_ => string.Create(CultureInfo.CurrentCulture, $"{_sessionCount} sessions are open."),
 			};
 
-			return _isSplit ? open + " Both panes hold tabs." : open;
+			return _paneCount > 1 ? string.Create(CultureInfo.CurrentCulture, $"{open} They are split over {_paneCount} panes.") : open;
 		}
 	}
 
@@ -140,6 +143,7 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 		Catalog.Changed -= OnCatalogChanged;
 		Transfers.Changed -= OnTransfersChanged;
 		Settings.Changed -= OnSettingsChanged;
+		Watch(null);
 	}
 
 	protected override async Task OnInitializedAsync()
@@ -157,6 +161,13 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 		await Catalog.EnsureLoadedAsync();
 		ReadCatalog();
 	}
+
+	private static string IndicatorClass(SessionIndicatorState state) => state switch
+	{
+		SessionIndicatorState.Active => "mt-status-chip--active",
+		SessionIndicatorState.Problem => "mt-status-chip--problem",
+		_ => "mt-status-chip--on",
+	};
 
 	private static string ActiveTooltip(ISessionHandle session) =>
 		string.Create(CultureInfo.CurrentCulture, $"{session.Protocol.DisplayName} to {EndpointFormat.Format(session)}");
@@ -178,11 +189,66 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 	private void ReadSessions()
 	{
 		_sessionCount = Workspace.Tabs.Count;
-		_isSplit = Workspace.IsSplit;
+		_paneCount = Workspace.PaneCount;
 		_active = Workspace.Active;
 		_remoteTitle = _active is { } session ? Workspace.GetRemoteTitle(session.Id) : null;
 		ReadBroadcast();
+		Watch(_active);
 	}
+
+	/// <summary>
+	/// Follows the focused session's indicators. A reconnect replaces the live session and its features with it, so
+	/// the handle is watched too and the source is looked up again whenever it changes.
+	/// </summary>
+	private void Watch(ISessionHandle? session)
+	{
+		if (!ReferenceEquals(_watched, session))
+		{
+			if (_watched is not null)
+			{
+				_watched.Changed -= OnActiveSessionChanged;
+			}
+
+			_watched = session;
+			if (session is not null)
+			{
+				session.Changed += OnActiveSessionChanged;
+			}
+		}
+
+		ISessionIndicators? source = session?.Session?.GetFeature<ISessionIndicators>();
+		if (!ReferenceEquals(_indicatorSource, source))
+		{
+			if (_indicatorSource is not null)
+			{
+				_indicatorSource.Changed -= OnIndicatorsChanged;
+			}
+
+			_indicatorSource = source;
+			if (source is not null)
+			{
+				source.Changed += OnIndicatorsChanged;
+			}
+		}
+
+		_indicators = source?.Indicators ?? [];
+	}
+
+	private void OnActiveSessionChanged() => _ = InvokeAsync(() =>
+	{
+		IReadOnlyList<SessionIndicator> before = _indicators;
+		Watch(_watched);
+		if (!before.SequenceEqual(_indicators))
+		{
+			StateHasChanged();
+		}
+	});
+
+	private void OnIndicatorsChanged() => _ = InvokeAsync(() =>
+	{
+		Watch(_watched);
+		StateHasChanged();
+	});
 
 	private void ReadBroadcast()
 	{

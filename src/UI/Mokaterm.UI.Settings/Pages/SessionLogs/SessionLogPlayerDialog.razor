@@ -1,0 +1,39 @@
+@using Mokaterm.UI.Terminal
+@using Moka.Red.Feedback.Loading
+@inherits DraftDialogBase
+
+<HeadedDialog Open="Open"
+			  OpenChanged="OnOpenChangedAsync"
+			  Title="@(_file?.Name ?? "Session log")"
+			  Icon="MokatermIcons.Play"
+			  DialogSize="MokaDialogSize.FullScreen"
+			  CloseOnBackdropClick="false">
+	<ChildContent>
+		<div class="log-player">
+			@if (_error is not null)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="This log cannot be played">@_error</MokaAlert>
+			}
+			else if (_recording is null)
+			{
+				<div class="log-player__loading">
+					<MokaSpinner Label="Reading the log" />
+				</div>
+			}
+			else
+			{
+				@if (Notes is { } notes)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Info" Dense>@notes</MokaAlert>
+				}
+
+				<div class="log-player__screen">
+					<TerminalPlayer @key="_recording" Recording="_recording" Settings="_terminalSettings" />
+				</div>
+			}
+		</div>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CloseAsync" data-primary="true">Close</MokaButton>
+	</Actions>
+</HeadedDialog>

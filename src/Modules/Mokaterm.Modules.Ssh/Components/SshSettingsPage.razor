@@ -5,8 +5,8 @@
 }
 
 <SettingsPage Title="SSH" OnReset="ResetAsync">
-	<SettingsSection Title="Connection">
-		<SettingsRow Label="Keepalive interval"
+	<SettingsSection Title="Connections">
+		<SettingsRow Label="Keepalive"
 					 Description="Keeps idle connections open through NAT and firewalls. 0 turns keepalives off.">
 			<NumberSetting TValue="int"
 						   Value="settings.KeepAliveSeconds"

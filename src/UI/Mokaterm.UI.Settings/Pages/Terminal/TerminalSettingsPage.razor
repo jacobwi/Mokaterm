@@ -117,7 +117,7 @@
 						 EmptyError="Enter at least one font."
 						 AriaLabel="Font family" />
 		</SettingsRow>
-		<SettingsRow Label="Font size" Description="In pixels.">
+		<SettingsRow Label="Font size" Description="Ctrl+= and Ctrl+- zoom a single terminal without changing this, and Ctrl+0 goes back to it.">
 			<NumberSetting TValue="double"
 						   Value="settings.FontSize"
 						   ValueChanged="value => SaveAsync(s => s with { FontSize = value })"
@@ -191,7 +191,8 @@
 						ValueChanged="value => SaveAsync(s => s with { CopyOnSelect = value })"
 						aria-label="Copy on select" />
 		</SettingsRow>
-		<SettingsRow Label="Right-click" Description="What a right-click inside the terminal does.">
+		<SettingsRow Label="Right-click"
+					 Description="What a right-click inside the terminal does. Copy or paste copies the selection, or pastes when nothing is selected. Shift+right-click always opens the menu.">
 			<EnumSegmentedControl TEnum="TerminalRightClickAction"
 								  Value="settings.RightClickAction"
 								  ValueChanged="value => SaveAsync(s => s with { RightClickAction = value })"

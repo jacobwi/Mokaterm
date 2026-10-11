@@ -2,13 +2,14 @@
 @using Mokaterm.Abstractions.Credentials
 @inherits DraftDialogBase
 
-<MokaDialog Open="Open"
-			OpenChanged="OnOpenChangedAsync"
-			Title="Generate key"
-			DialogSize="MokaDialogSize.Medium"
-			CloseOnBackdropClick="false"
-			CloseOnEscape="!IsBusy"
-			ShowCloseButton="!IsBusy">
+<HeadedDialog Open="Open"
+			  OpenChanged="OnOpenChangedAsync"
+			  Title="Generate key"
+			  Icon="MokatermIcons.Key"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false"
+			  CloseOnEscape="!IsBusy"
+			  ShowCloseButton="!IsBusy">
 	<ChildContent>
 		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 			<MokaTextField Label="Name"
@@ -22,7 +23,7 @@
 						   data-autofocus="true" />
 
 			<MokaRadioGroup TValue="SshKeyType" Value="_type" ValueChanged="SetType" Label="Key type">
-				@foreach (KeyTypeOption option in Options)
+				@foreach (KeyTypeOption option in AvailableOptions)
 				{
 					<MokaRadioItem TValue="SshKeyType" @key="option.Value" Value="option.Value" Disabled="_busy">
 						<span class="key-option">
@@ -32,6 +33,30 @@
 					</MokaRadioItem>
 				}
 			</MokaRadioGroup>
+
+			@if (IsSecurityKey)
+			{
+				<MokaTextField Label="Application"
+							   Value="@_application"
+							   ValueChanged="SetApplication"
+							   ErrorText="@_applicationError"
+							   Disabled="_busy"
+							   HelperText="What the credential is bound to. Keep ssh: unless one device should hold several resident keys."
+							   autocomplete="off"
+							   spellcheck="false" />
+
+				<MokaSwitch Label="Ask for the key's PIN or a fingerprint at every login"
+							Value="_requireUserVerification"
+							ValueChanged="SetRequireUserVerification"
+							HelperText="What ssh-keygen calls verify-required. Without it, a touch is enough."
+							Disabled="_busy" />
+
+				<MokaSwitch Label="Keep the key on the device"
+							Value="_residentKey"
+							ValueChanged="SetResidentKey"
+							HelperText="A resident key, which ssh-keygen -K can load from the device on another computer. It replaces any resident key the device already holds for the same application."
+							Disabled="_busy" />
+			}
 
 			<MokaTextField Label="Comment"
 						   Value="@_comment"
@@ -72,6 +97,12 @@
 						<code>@key.PublicKey.AuthorizedKeysLine</code>
 						<CopyButton Text="@key.PublicKey.AuthorizedKeysLine" Label="Copy public key" />
 					</div>
+					@if (SecurityKeyTypes.IsSecurityKey(key.PublicKey.Algorithm))
+					{
+						<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+							The private key stays on the security key. The file only names it, so logging in needs the key itself.
+						</MokaText>
+					}
 					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Align="MokaAlign.Center" Wrap>
 						@if (CanExport)
 						{
@@ -92,6 +123,13 @@
 				</div>
 			}
 
+			@if (_busy && IsSecurityKey && _generated is null)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+					Touch your security key when the prompt asks for it.
+				</MokaText>
+			}
+
 			@if (_error is not null)
 			{
 				<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
@@ -109,4 +147,4 @@
 			<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_busy" OnClick="SaveAsync">Save to keychain</MokaButton>
 		}
 	</Actions>
-</MokaDialog>
+</HeadedDialog>

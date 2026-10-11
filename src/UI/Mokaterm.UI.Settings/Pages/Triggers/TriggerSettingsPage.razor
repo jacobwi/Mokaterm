@@ -1,0 +1,131 @@
+@using Mokaterm.UI.Terminal.Triggers
+@inherits SettingsSectionBase<TerminalTriggerSettings>
+
+@{
+	IReadOnlyList<TerminalTrigger> rules = Settings.Rules;
+	IReadOnlyList<TriggerTestResult>? results = ResultsFor(rules);
+}
+
+<SettingsPage Title="Triggers"
+			  OnReset="ResetAsync"
+			  ResetMessage="Remove every trigger rule? Terminals stop coloring and announcing matches at once.">
+	<SettingsSection Title="Rules" Description="@RulesDescription" Flush>
+		<Actions>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Add"
+						Disabled="rules.Count >= TerminalTriggerSettings.MaxRules"
+						OnClick="AddRule">
+				Add rule
+			</MokaButton>
+		</Actions>
+		<ChildContent>
+			<MokaTable TItem="TerminalTrigger"
+					   Items="rules"
+					   ItemKey="rule => rule.Id"
+					   Title="Run in this order"
+					   ShowPagination="false"
+					   ActionsColumnTitle=""
+					   ActionsColumnWidth="152px">
+				<ChildContent>
+					<MokaColumn TItem="TerminalTrigger" Title="On" Sortable="false" Resizable="false" Width="64px">
+						<CellTemplate Context="rule">
+							<MokaSwitch Value="rule.Enabled"
+										ValueChanged="value => SetEnabledAsync(rule.Id, value)"
+										aria-label="@($"Run the trigger {rule.Pattern}")" />
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="TerminalTrigger" Title="Pattern" Sortable="false">
+						<CellTemplate Context="rule">
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@TextStyles.TruncateBox" title="@rule.Pattern">@rule.Pattern</MokaText>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="TerminalTrigger" Title="What it does" Sortable="false">
+						<CellTemplate Context="rule">
+							<span class="trigger-does">
+								@if (TriggerPalette.Hex(rule.Highlight) is { } hex)
+								{
+									<span class="trigger-swatch" style="@($"background:{hex}")" aria-hidden="true"></span>
+								}
+								@if (ErrorFor(rules, results, rule) is { } error)
+								{
+									<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-error)" title="@error">Never runs: @error</MokaText>
+								}
+								else
+								{
+									<MokaText Element="span" Size="MokaSize.Xs">@Describe(rule)</MokaText>
+								}
+							</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+				<RowActions Context="rule">
+					<MokaButton Variant="MokaVariant.Text"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Navigation.ArrowUp"
+								Disabled="IsFirst(rules, rule)"
+								OnClick="() => MoveAsync(rule.Id, -1)"
+								title="Run earlier"
+								aria-label="@($"Move {rule.Pattern} up")" />
+					<MokaButton Variant="MokaVariant.Text"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Navigation.ArrowDown"
+								Disabled="IsLast(rules, rule)"
+								OnClick="() => MoveAsync(rule.Id, 1)"
+								title="Run later"
+								aria-label="@($"Move {rule.Pattern} down")" />
+					<MokaButton Variant="MokaVariant.Text"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Edit"
+								OnClick="() => EditRule(rule)"
+								title="Edit"
+								aria-label="@($"Edit {rule.Pattern}")" />
+					<MokaButton Variant="MokaVariant.Text"
+								Size="MokaSize.Xs"
+								Color="MokaColor.Error"
+								StartIcon="MokaIcons.Action.Delete"
+								OnClick="() => DeleteAsync(rule)"
+								title="Delete"
+								aria-label="@($"Delete {rule.Pattern}")" />
+				</RowActions>
+				<EmptyContent>
+					<MokaEmptyState Icon="MokaIcons.Status.Bell"
+									Title="No triggers yet"
+									Description="Add a rule to color ERROR or FATAL in red, or to be told when a build succeeds in a tab you are not looking at." />
+				</EmptyContent>
+			</MokaTable>
+		</ChildContent>
+	</SettingsSection>
+
+	<SettingsSection Title="Try a line"
+					 Description="Type a line the way a terminal would print it, to see what every rule makes of it.">
+		<SettingsRow Label="Sample line" Stacked>
+			<MokaTextField Value="@_sample"
+						   ValueChanged="SetSample"
+						   Placeholder="ERROR: build failed after 3 retries"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   aria-label="Sample line" />
+			@if (_sample.Length > 0 && rules.Count > 0 && results is not null)
+			{
+				<div class="trigger-results" role="status">
+					<TriggerPreview Text="@_sample" Layers="Layers(rules, results)" />
+					<ul class="trigger-results__list">
+						@for (int index = 0; index < rules.Count; index++)
+						{
+							TerminalTrigger rule = rules[index];
+							TriggerTestResult result = results[index];
+							<li @key="rule.Id" class="trigger-results__item">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="@TextStyles.TruncateBox" title="@rule.Pattern">@rule.Pattern</MokaText>
+								<MokaText Element="span" Size="MokaSize.Xs" Style="@(result.IsMatch && rule.Enabled ? null : TextStyles.Muted)">@Outcome(rule, result)</MokaText>
+							</li>
+						}
+					</ul>
+				</div>
+			}
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>
+
+<TriggerEditorDialog @bind-Open="_editorOpen" Rule="_editing" OnSave="SaveRuleAsync" />

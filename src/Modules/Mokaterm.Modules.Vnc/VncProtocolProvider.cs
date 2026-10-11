@@ -30,6 +30,7 @@ internal sealed class VncProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "VNC",
 		Description = "Remote desktop over VNC (RFB), with TLS when the server offers VeNCrypt.",
+		QuickConnectExample = "host:5900",
 		DefaultPort = DefaultPort,
 		Capabilities = ProtocolCapabilities.RemoteDesktop,
 		AuthenticationMethods = [AuthenticationMethod.Password, AuthenticationMethod.Anonymous],

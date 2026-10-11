@@ -1,0 +1,69 @@
+@using Moka.Red.Feedback.Alert
+@using Moka.Red.Feedback.Loading
+@using Moka.Red.Feedback.Toast
+@using Moka.Red.Primitives.StatusDot
+@using Mokaterm.Modules.Local.Containers
+@implements IDisposable
+
+<div class="mt-local-pick">
+	<div class="mt-local-pick-row">
+		<div class="mt-local-pick-field">
+			@ChildContent
+		</div>
+		<div class="mt-local-pick-actions">
+			@if (_loading)
+			{
+				<MokaSpinner Size="MokaSize.Xs" />
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="Cancel">Cancel</MokaButton>
+			}
+			else
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Search"
+							Disabled="Disabled"
+							OnClick="LoadAsync"
+							title="@ChooseTitle">
+					Choose
+				</MokaButton>
+			}
+		</div>
+	</div>
+
+	@if (_list?.Problem is { } problem)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@problem</MokaAlert>
+	}
+	else if (_list is { } list)
+	{
+		<div class="mt-local-pick-list" role="listbox" aria-label="@What">
+			@if (list.Choices.Count == 0)
+			{
+				<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">@Empty</MokaText>
+			}
+			@foreach (ContainerChoice choice in list.Choices)
+			{
+				<button type="button"
+						class="@(IsSelected(choice) ? "mt-local-pick-item mt-local-pick-item--selected" : "mt-local-pick-item")"
+						role="option"
+						aria-selected="@(IsSelected(choice) ? "true" : "false")"
+						disabled="@Disabled"
+						@onclick="@(() => PickAsync(choice))"
+						@key="@(choice.Namespace + "/" + choice.Name)">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@(choice.IsRunning ? MokaColor.Success : MokaColor.Surface)" Glow="choice.IsRunning" />
+					<span class="mt-local-pick-name">@choice.Name</span>
+					@if (choice.Namespace is { } space)
+					{
+						<span class="mt-local-pick-detail">@space</span>
+					}
+					<span class="mt-local-pick-detail mt-local-pick-detail--grow" title="@choice.Detail">@choice.Detail</span>
+				</button>
+			}
+			@if (list.IsCut)
+			{
+				<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">The list was cut short. Type the name if it is not here.</MokaText>
+			}
+		</div>
+	}
+</div>

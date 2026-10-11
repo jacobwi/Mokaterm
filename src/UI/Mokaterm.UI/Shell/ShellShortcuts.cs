@@ -30,6 +30,17 @@ internal static class ShellShortcuts
 		new(ShellCommandIds.BroadcastInput, "KeyB", Shift: true),
 		new(ShellCommandIds.MoveToOtherPane, "Backslash", Shift: true),
 		new(ShellCommandIds.Shortcuts, "KeyK", Shift: true),
+
+		// Digits rather than letters: Ctrl and a digit means nothing to most programs. xterm.js does turn Ctrl+3 and Ctrl+4
+		// into ESC and FS, which Escape and Ctrl+\ still send.
+		new(ShellCommandIds.FocusPane1, "Digit1", Shift: false),
+		new(ShellCommandIds.FocusPane2, "Digit2", Shift: false),
+		new(ShellCommandIds.FocusPane3, "Digit3", Shift: false),
+		new(ShellCommandIds.FocusPane4, "Digit4", Shift: false),
+		new(ShellCommandIds.MoveToPane1, "Digit1", Shift: true),
+		new(ShellCommandIds.MoveToPane2, "Digit2", Shift: true),
+		new(ShellCommandIds.MoveToPane3, "Digit3", Shift: true),
+		new(ShellCommandIds.MoveToPane4, "Digit4", Shift: true),
 	];
 
 	// Declared after the defaults: a static field is initialized in declaration order, so the other way round it

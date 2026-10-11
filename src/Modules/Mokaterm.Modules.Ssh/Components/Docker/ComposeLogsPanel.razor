@@ -1,0 +1,39 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-panel">
+	<div class="mt-dk-toolbar">
+		<MokaSelect TValue="string"
+					Items="Choices"
+					Value="@_service"
+					ValueChanged="OnServiceChangedAsync"
+					ValueSelector="ChoiceLabel"
+					Size="MokaSize.Sm"
+					aria-label="Which service" />
+		<MokaSegmentedControl Size="MokaSize.Xs" Value="@_tail.ToString(CultureInfo.InvariantCulture)" ValueChanged="OnTailChangedAsync" AriaLabel="Lines from the end">
+			@foreach (int count in TailChoices)
+			{
+				<MokaSegment @key="count" Value="@count.ToString(CultureInfo.InvariantCulture)" Text="@count.ToString("N0", CultureInfo.CurrentCulture)" />
+			}
+		</MokaSegmentedControl>
+		<MokaCheckbox Label="Times" Value="_timestamps" ValueChanged="OnTimestampsChanged" />
+		<MokaButton Variant="@(_follow ? MokaVariant.Filled : MokaVariant.Outlined)"
+					Color="@(_follow ? MokaColor.Primary : MokaColor.Surface)"
+					Size="MokaSize.Xs"
+					StartIcon="@(_follow ? MokatermIcons.Pause : MokatermIcons.Play)"
+					Disabled="@(Context?.Target is null)"
+					OnClick="ToggleFollow"
+					title="@(_follow ? "Stop following" : "Fetch new lines every few seconds")">
+			@(_follow ? "Following" : "Follow")
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+					Disabled="@(IsLoading || Context?.Target is null)" OnClick="ReloadAsync" title="Fetch the tail again" aria-label="Fetch the tail again" />
+		<div class="mt-dk-toolbar-search">
+			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Search the logs" Debounce="150" aria-label="Search the logs" />
+		</div>
+	</div>
+
+	@LoadErrorPanel(ReloadAsync)
+	<span class="mt-dk-cell">@CountText</span>
+	<DockerLogView Lines="_lines.Lines" Query="@_query" ShowTimestamps="_timestamps" EmptyText="@EmptyText" Label="Project logs" SourceClass="SourceClass" />
+</div>

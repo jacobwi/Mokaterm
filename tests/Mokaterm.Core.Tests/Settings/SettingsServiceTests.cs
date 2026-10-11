@@ -274,6 +274,23 @@ public sealed class SettingsServiceTests
 	}
 
 	[Fact]
+	public async Task UpdateAsync_ClampsTheCommandRunSettings()
+	{
+		(CoreTestContext context, _) = CreateInMemory();
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+
+			await settings.UpdateAsync<CommandRunSettings>(run => run with { ParallelHosts = 0, TimeoutSeconds = 99_999, SkipHostsThatAsk = false }, Ct);
+
+			CommandRunSettings saved = settings.Get<CommandRunSettings>();
+			Assert.Equal(CommandRunSettings.MinParallelHosts, saved.ParallelHosts);
+			Assert.Equal(CommandRunSettings.MaxTimeoutSeconds, saved.TimeoutSeconds);
+			Assert.False(saved.SkipHostsThatAsk);
+		}
+	}
+
+	[Fact]
 	public async Task SessionLogSettings_RoundTripThroughTheFile()
 	{
 		await using CoreTestContext context = new();
@@ -293,6 +310,104 @@ public sealed class SettingsServiceTests
 		Assert.True(logSettings.RecordEverySession);
 		Assert.Equal(2048, logSettings.SizeLimitKilobytes);
 		Assert.Equal(SessionLogFormat.Raw, logSettings.Format);
+	}
+
+	[Fact]
+	public async Task SessionLogSettings_KeepTheTimedFormatThroughTheFile()
+	{
+		await using CoreTestContext context = new();
+		ISettingsService settings = Settings(context);
+
+		await settings.UpdateAsync<SessionLogSettings>(logs => logs with { Format = SessionLogFormat.Asciicast }, Ct);
+		await settings.FlushAsync(Ct);
+
+		await using CoreTestContext reopened = new();
+		File.Copy(Path.Combine(context.DataDirectory, "settings.json"), Path.Combine(reopened.DataDirectory, "settings.json"));
+		ISettingsService reloaded = Settings(reopened);
+		await reloaded.LoadAsync(Ct);
+
+		Assert.Equal(SessionLogFormat.Asciicast, reloaded.Get<SessionLogSettings>().Format);
+	}
+
+	[Fact]
+	public async Task TriggerSettings_RoundTripThroughTheFile()
+	{
+		await using CoreTestContext context = new();
+		ISettingsService settings = Settings(context);
+		TerminalTrigger rule = new()
+		{
+			Id = Guid.NewGuid(),
+			Pattern = "ERROR|FATAL",
+			IgnoreCase = true,
+			Highlight = TriggerColor.Red,
+			Notify = true,
+		};
+
+		await settings.UpdateAsync<TerminalTriggerSettings>(triggers => triggers with { Rules = [rule] }, Ct);
+		await settings.FlushAsync(Ct);
+
+		await using CoreTestContext reopened = new();
+		File.Copy(Path.Combine(context.DataDirectory, "settings.json"), Path.Combine(reopened.DataDirectory, "settings.json"));
+		ISettingsService reloaded = Settings(reopened);
+		await reloaded.LoadAsync(Ct);
+
+		Assert.Equal([rule], reloaded.Get<TerminalTriggerSettings>().Rules);
+	}
+
+	[Fact]
+	public async Task LoadAsync_SanitizesHandEditedTriggers()
+	{
+		(CoreTestContext context, InMemoryAppDataStore store) = CreateInMemory();
+		string longPattern = new('a', TerminalTriggerSettings.MaxPatternLength + 1);
+		store.SetJson(SettingsService.DocumentName, $$"""
+			{
+			  "triggers": {
+			    "rules": [
+			      { "id": "11111111-1111-1111-1111-111111111111", "pattern": "ERROR", "highlight": "Red" },
+			      { "id": "11111111-1111-1111-1111-111111111111", "pattern": "WARN", "highlight": 42 },
+			      { "pattern": "no id", "notify": true },
+			      { "pattern": "" },
+			      { "pattern": "{{longPattern}}" },
+			      null
+			    ]
+			  }
+			}
+			""");
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+			await settings.LoadAsync(Ct);
+
+			IReadOnlyList<TerminalTrigger> rules = settings.Get<TerminalTriggerSettings>().Rules;
+			Assert.Equal(["ERROR", "WARN", "no id"], rules.Select(rule => rule.Pattern));
+			Assert.Equal(TriggerColor.Red, rules[0].Highlight);
+			Assert.Equal(TriggerColor.None, rules[1].Highlight);
+			Assert.True(rules[2].Notify);
+			Assert.True(rules[2].Enabled);
+
+			// The page tells rules apart by id, so a copied id and a missing one each get a fresh one.
+			Assert.Equal(new Guid("11111111-1111-1111-1111-111111111111"), rules[0].Id);
+			Assert.Equal(3, rules.Select(rule => rule.Id).Where(id => id != Guid.Empty).Distinct().Count());
+		}
+	}
+
+	[Fact]
+	public async Task UpdateAsync_HoldsTriggersToTheRuleCap()
+	{
+		(CoreTestContext context, _) = CreateInMemory();
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+			TerminalTrigger[] rules =
+			[
+				.. Enumerable.Range(0, TerminalTriggerSettings.MaxRules + 1)
+					.Select(index => new TerminalTrigger { Id = Guid.NewGuid(), Pattern = $"rule{index}", Highlight = TriggerColor.Blue }),
+			];
+
+			await settings.UpdateAsync<TerminalTriggerSettings>(triggers => triggers with { Rules = rules }, Ct);
+
+			Assert.Equal(rules.Take(TerminalTriggerSettings.MaxRules), settings.Get<TerminalTriggerSettings>().Rules);
+		}
 	}
 
 	// A short color is expanded, not kept as written: the browser's color picker only understands #rrggbb and would
@@ -515,6 +630,61 @@ public sealed class SettingsServiceTests
 			// The other way round for the font scale: the stored range was the wider one and the slider now offers it all.
 			Assert.Equal(0.8, settings.Get<AppearanceSettings>().FontScale);
 		}
+	}
+
+	// The right-click setting gained a third mode; files written before it keep their meaning and the new one reads back.
+	[Theory]
+	[InlineData("ContextMenu", TerminalRightClickAction.ContextMenu)]
+	[InlineData("Paste", TerminalRightClickAction.Paste)]
+	[InlineData("CopyOrPaste", TerminalRightClickAction.CopyOrPaste)]
+	public async Task Get_RightClickActionByName_ReadsEveryMode(string stored, TerminalRightClickAction expected)
+	{
+		(CoreTestContext context, InMemoryAppDataStore store) = CreateInMemory();
+		store.SetJson(SettingsService.DocumentName, $$"""{ "terminal": { "rightClickAction": "{{stored}}" } }""");
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+			await settings.LoadAsync(Ct);
+
+			Assert.Equal(expected, settings.Get<TerminalSettings>().RightClickAction);
+		}
+	}
+
+	// A hand edit can leave the toolbar's hidden list with holes, repeats or something no button is called, and a layout
+	// that names none; the toolbar reads the list as a set and the layout as one of three.
+	[Fact]
+	public async Task UpdateAsync_SanitizesTheSessionToolbar()
+	{
+		(CoreTestContext context, _) = CreateInMemory();
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+			string overlong = new('x', AppearanceSettings.MaxToolbarButtonIdLength + 1);
+
+			await settings.UpdateAsync<AppearanceSettings>(
+				appearance => appearance with
+				{
+					ToolbarLayout = (SessionToolbarLayout)42,
+					HiddenToolbarButtons = ["find", " ", "find", " clear ", overlong, .. Enumerable.Range(0, 100).Select(i => $"b{i}")],
+				},
+				Ct);
+
+			AppearanceSettings saved = settings.Get<AppearanceSettings>();
+			Assert.Equal(SessionToolbarLayout.Grouped, saved.ToolbarLayout);
+			Assert.Equal(["find", "clear", "b0"], saved.HiddenToolbarButtons.Take(3));
+			Assert.Equal(AppearanceSettings.MaxHiddenToolbarButtons, saved.HiddenToolbarButtons.Count);
+			Assert.DoesNotContain(overlong, saved.HiddenToolbarButtons);
+		}
+	}
+
+	[Fact]
+	public void Appearance_DefaultsToTheGroupedToolbarAndToolWindows()
+	{
+		AppearanceSettings defaults = new();
+
+		Assert.Equal(SessionToolbarLayout.Grouped, defaults.ToolbarLayout);
+		Assert.Empty(defaults.HiddenToolbarButtons);
+		Assert.True(defaults.ToolsInOwnWindow);
 	}
 
 	private static (CoreTestContext Context, InMemoryAppDataStore Store) CreateInMemory()

@@ -44,4 +44,29 @@ public interface ILocalFileAccess
 	/// the browser starts the download. Returns false when the user cancelled.
 	/// </summary>
 	ValueTask<bool> SaveFileAsync(string suggestedName, long? length, Func<Stream, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// True when <see cref="SaveFileAsync(LocalSave, Func{Stream, long, CancellationToken, Task}, CancellationToken)"/> keeps
+	/// a failed download's partial file and continues it on the next attempt. Only a host that writes to its own disk can:
+	/// a browser download cannot be reopened.
+	/// </summary>
+	bool CanResumeSaves => false;
+
+	/// <summary>
+	/// Saves through <paramref name="save"/>, which remembers where the first attempt wrote. <paramref name="writeAsync"/>
+	/// gets the destination and the bytes it already holds; a host that resumes positions the stream after them and makes
+	/// it readable and seekable, so a caller can read the part already there. The default starts over every time.
+	/// </summary>
+	ValueTask<bool> SaveFileAsync(LocalSave save, Func<Stream, long, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(save);
+		ArgumentNullException.ThrowIfNull(writeAsync);
+		return SaveFileAsync(save.SuggestedName, save.Length, (stream, token) => writeAsync(stream, 0, token), cancellationToken);
+	}
+
+	/// <summary>
+	/// Removes what a failed save left for resuming. Called when the download is abandoned, and before starting it over when
+	/// the part already there cannot be trusted. Nothing to do when the save never wrote or already finished.
+	/// </summary>
+	ValueTask DiscardAsync(LocalSave save) => ValueTask.CompletedTask;
 }

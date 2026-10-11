@@ -3,7 +3,7 @@
 }
 
 <div class="mt-session">
-	<div class="mt-session-toolbar">
+	<div class="mt-session-toolbar" @ref="_toolbar">
 		<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
 		<SessionLabel Session="Session" ShowPort Tooltip="@Endpoint" />
 		@if (HostEnvironmentDisplay.Tag(Session.Host.Environment) is { } environment)
@@ -29,91 +29,7 @@
 
 		<span class="mt-session-spacer"></span>
 
-		@if (Layout == SessionLayout.Split)
-		{
-			<IconAction Icon="MokatermIcons.SplitView"
-						Title="File browser"
-						Active="@(!_viewState.FilesCollapsed)"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ToggleFiles" />
-		}
-		@if (HasTerminalView)
-		{
-			<IconAction Icon="MokatermIcons.Command"
-						Title="Saved commands"
-						Active="@_viewState.CommandsOpen"
-						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.SavedCommands)"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ToggleCommands" />
-			<IconAction Icon="MokatermIcons.Broadcast"
-						Title="@BroadcastTitle"
-						Active="@TypesWithOthers"
-						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.BroadcastInput)"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ToggleBroadcast" />
-			<IconAction Icon="MokatermIcons.Palette"
-						Title="Terminal theme"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ShowThemeMenu" />
-			<IconAction Icon="MokaIcons.Action.Search"
-						Title="Find"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="FindAsync" />
-			<IconAction Icon="MokatermIcons.Eraser"
-						Title="Clear terminal"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ClearAsync" />
-			<IconAction Icon="MokatermIcons.Record"
-						Title="@LogTitle(log)"
-						Active="@log.IsOn"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ToggleLog" />
-		}
-		@foreach (SessionToolDescriptor tool in Tools)
-		{
-			<IconAction Icon="tool.Icon"
-						Title="@tool.Title"
-						Active="@(OpenTool == tool)"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="@(() => ToggleTool(tool))" />
-		}
-		@if (SessionStateDisplay.CanReconnect(Session.State))
-		{
-			<IconAction Icon="MokatermIcons.Reconnect"
-						Title="Reconnect"
-						Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Reconnect)"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="ReconnectAsync" />
-		}
-		<IconAction Icon="MokaIcons.Content.Copy"
-					Title="Duplicate session"
-					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Duplicate)"
-					Size="MokaSize.Xs"
-					TooltipPosition="MokaTooltipPosition.Left"
-					OnClick="DuplicateAsync" />
-		@if (Session.State is SessionState.Connecting or SessionState.Connected)
-		{
-			<IconAction Icon="MokatermIcons.Disconnect"
-						Title="Disconnect"
-						Size="MokaSize.Xs"
-						TooltipPosition="MokaTooltipPosition.Left"
-						OnClick="DisconnectAsync" />
-		}
-		<IconAction Icon="MokatermIcons.Power"
-					Title="Disconnect and close"
-					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.CloseTab)"
-					Size="MokaSize.Xs"
-					TooltipPosition="MokaTooltipPosition.Left"
-					OnClick="CloseAsync" />
+		<SessionToolbar Actions="ToolbarActions" Layout="_appearance.ToolbarLayout" Hidden="_hiddenButtons" />
 	</div>
 
 	@if (ShowBanner)
@@ -154,7 +70,12 @@
 										   CollapsedChanged="SetFilesCollapsed"
 										   SizeChanged="OnFilesPanelResized"
 										   Scrollable="false">
-								<RemoteFileBrowser Session="Session" IsActive="@(IsActive && !_viewState.FilesCollapsed)" Class="mt-fill" />
+								<RemoteFileBrowser @ref="_files"
+												   Session="Session"
+												   IsActive="@(IsActive && !_viewState.FilesCollapsed)"
+												   FollowTerminal="_viewState.FollowTerminalFolder"
+												   FollowTerminalChanged="SetFollowTerminalFolder"
+												   Class="mt-fill" />
 							</MokaDockPanel>
 						}
 						@if (_viewState.CommandsOpen && HasTerminalView)
@@ -228,16 +149,28 @@
 	</div>
 </div>
 
-@if (OpenTool is { } openTool)
+@if (Tools.DialogFor(Session) is { } openTool)
 {
-	<MokaDialog Open="true"
-				OpenChanged="OnToolDialogOpenChanged"
-				Title="@openTool.Title"
-				DialogSize="MokaDialogSize.Large">
-		<ViewBoundary @key="openTool" Name="@openTool.Title">
-			<DynamicComponent Type="openTool.Component" Parameters="ModuleParameters" />
-		</ViewBoundary>
-	</MokaDialog>
+	@* The session's own tab stays where it is underneath, so the header names the session the tool works on. *@
+	<HeadedDialog Open="true"
+				  OpenChanged="OnToolDialogOpenChanged"
+				  Title="@openTool.Title"
+				  DialogSize="MokaDialogSize.Large"
+				  Fill="@(openTool.Size == SessionToolSize.Wide)"
+				  Style="@ToolDialogStyle(openTool)">
+		<Header Context="titleId">
+			<SessionToolHeader Tool="openTool"
+							   Session="Session"
+							   TitleId="@titleId"
+							   OnClose="CloseToolDialog"
+							   OnPopOut="PopOutCallback(openTool)" />
+		</Header>
+		<ChildContent>
+			<ViewBoundary @key="openTool" Name="@openTool.Title">
+				<DynamicComponent Type="openTool.Component" Parameters="ModuleParameters" />
+			</ViewBoundary>
+		</ChildContent>
+	</HeadedDialog>
 }
 
 @code {
@@ -257,6 +190,8 @@
 						  ShowCommandActions="true"
 						  OnCommandSaved="SaveCommandAsync"
 						  OnCommandSavedWithDetails="SaveCommandWithDetails"
+						  TrackFolder="@(Layout == SessionLayout.Split && _viewState.FollowTerminalFolder)"
+						  OnFolderChanged="OnTerminalFolderChanged"
 						  Class="mt-fill" />
 		}
 	</text>;

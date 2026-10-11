@@ -2,6 +2,7 @@
 
 <ShellEditorDialog Open="@(Request is not null)"
 				   Title="@DialogTitle"
+				   Icon="MokatermIcons.User"
 				   DialogSize="MokaDialogSize.Large"
 				   Busy="_saving"
 				   OnClose="Close">
@@ -239,11 +240,20 @@
 	</ChildContent>
 	<Actions>
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="Close">Cancel</MokaButton>
-		<MokaButton Variant="MokaVariant.Outlined" StartIcon="MokatermIcons.Connect" Disabled="@(_saving || _loading)" OnClick="() => SaveAsync(connect: true)">
-			Save and connect
-		</MokaButton>
-		<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: false)">
-			Save
-		</MokaButton>
+		@if (IsDraft)
+		{
+			<MokaButton StartIcon="MokatermIcons.Connect" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: true)">
+				Save and connect
+			</MokaButton>
+		}
+		else
+		{
+			<MokaButton Variant="MokaVariant.Outlined" StartIcon="MokatermIcons.Connect" Disabled="@(_saving || _loading)" OnClick="() => SaveAsync(connect: true)">
+				Save and connect
+			</MokaButton>
+			<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: false)">
+				Save
+			</MokaButton>
+		}
 	</Actions>
 </ShellEditorDialog>

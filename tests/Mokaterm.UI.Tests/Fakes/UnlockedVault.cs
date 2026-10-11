@@ -3,7 +3,7 @@ using Mokaterm.Abstractions.Security;
 namespace Mokaterm.UI.Tests.Fakes;
 
 /// <summary>Unlocked, so a catalog loads and a view renders; nothing else is asked of it.</summary>
-internal sealed class UnlockedVault : IVault
+internal class UnlockedVault : IVault
 {
 	public event Action<VaultStatus>? StatusChanged
 	{

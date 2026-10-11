@@ -36,7 +36,7 @@
 
 	<SettingsSection Title="Confirmations">
 		<SettingsRow Label="Confirm dropped files"
-					 Description="Before uploading a drop, show the target folder and the user the files are written as.">
+					 Description="Before uploading a drop, show the target folder and the user the files are written as. A drop into a folder open as root asks either way.">
 			<MokaSwitch Value="settings.ConfirmDrop"
 						ValueChanged="value => SaveAsync(s => s with { ConfirmDrop = value })"
 						aria-label="Confirm dropped files" />
@@ -57,8 +57,7 @@
 
 	<SettingsSection Title="Editing">
 		<SettingsRow Label="Largest file to edit"
-					 Description="Files above this are refused rather than opened in part, because saving a piece back would truncate the rest."
-					 ControlWidth="200px">
+					 Description="Files above this are refused rather than opened in part, because saving a piece back would truncate the rest.">
 			<NumberSetting TValue="int"
 						   Value="settings.MaxEditKilobytes"
 						   ValueChanged="value => SaveAsync(s => s with { MaxEditKilobytes = value })"
@@ -75,7 +74,19 @@
 						ValueChanged="value => SaveAsync(s => s with { PreserveTimestamps = value })"
 						aria-label="Preserve timestamps" />
 		</SettingsRow>
-		<SettingsRow Label="Parallel transfers" Description="How many files move at the same time." ControlWidth="200px">
+		<SettingsRow Label="Verify transfers"
+					 Description="Check every finished copy against the checksum the server computes, and fail it when they differ. Servers that cannot compute one leave the copy marked unchecked.">
+			<MokaSwitch Value="settings.VerifyTransfers"
+						ValueChanged="value => SaveAsync(s => s with { VerifyTransfers = value })"
+						aria-label="Verify transfers" />
+		</SettingsRow>
+		<SettingsRow Label="Resume interrupted transfers"
+					 Description="@ResumeDescription">
+			<MokaSwitch Value="settings.ResumeTransfers"
+						ValueChanged="value => SaveAsync(s => s with { ResumeTransfers = value })"
+						aria-label="Resume interrupted transfers" />
+		</SettingsRow>
+		<SettingsRow Label="Parallel transfers" Description="How many files move at the same time." ControlWidth="240px">
 			<MokaSlider Value="settings.MaxConcurrentTransfers"
 						ValueChanged="SetMaxConcurrentTransfersAsync"
 						Min="FileTransferSettings.MinParallelTransfers"

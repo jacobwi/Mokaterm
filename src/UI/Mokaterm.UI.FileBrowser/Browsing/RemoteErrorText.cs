@@ -22,7 +22,9 @@ internal static class RemoteErrorText
 		RemoteFileErrorKind.PermissionDenied => "Permission denied.",
 		RemoteFileErrorKind.AlreadyExists => "Something with that name already exists.",
 		RemoteFileErrorKind.DirectoryNotEmpty => "The folder is not empty.",
-		RemoteFileErrorKind.NotSupported => "The server does not support this.",
+		// Every protocol words these as sentences for the user ("The server has no unzip command, ..."), and the general
+		// answer would hide which tool or command is missing.
+		RemoteFileErrorKind.NotSupported => Fallback(exception.Message, "The server does not support this."),
 		RemoteFileErrorKind.ConnectionLost => "The connection was lost.",
 		RemoteFileErrorKind.ElevationFailed => Fallback(exception.Message, "Could not switch to root."),
 		_ => Fallback(exception.Message, "The server reported an error."),

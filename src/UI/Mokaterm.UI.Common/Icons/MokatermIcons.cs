@@ -68,6 +68,15 @@ public static class MokatermIcons
 	public static readonly MokaIconDefinition FileDownload = new("mt-file-download",
 		"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M12 12v6 M9 15l3 3 3-3");
 
+	public static readonly MokaIconDefinition FilePlus = new("mt-file-plus",
+		"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M12 18v-6 M9 15h6");
+
+	public static readonly MokaIconDefinition Cut = new("mt-cut",
+		"M9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M20 4L8.12 15.88 M14.47 14.48L20 20 M8.12 8.12L12 12");
+
+	public static readonly MokaIconDefinition Archive = new("mt-archive",
+		"M21 8v13H3V8 M1 3h22v5H1z M10 12h4");
+
 	public static readonly MokaIconDefinition Symlink = new("mt-symlink",
 		"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 16v-1a3 3 0 0 1 3-3h5 M13 9l3 3-3 3");
 
@@ -119,4 +128,31 @@ public static class MokatermIcons
 
 	public static readonly MokaIconDefinition Modules = new("mt-modules",
 		"M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z");
+
+	/// <summary>One pane, drawn as the frame <see cref="SplitView"/> divides.</summary>
+	public static readonly MokaIconDefinition SinglePane = new("mt-pane-single",
+		"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z");
+
+	public static readonly MokaIconDefinition SplitStacked = new("mt-split-stacked",
+		"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M3 12h18");
+
+	/// <summary>One large pane on the left and two stacked on its right.</summary>
+	public static readonly MokaIconDefinition SplitThree = new("mt-split-three",
+		"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M12 3v18 M12 12h9");
+
+	public static readonly MokaIconDefinition SplitGrid = new("mt-split-grid",
+		"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M12 3v18 M3 12h18");
+
+	public static readonly MokaIconDefinition Play = new("mt-play",
+		"M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z");
+
+	public static readonly MokaIconDefinition Pause = new("mt-pause",
+		"M8 5v14 M16 5v14");
+
+	/// <summary>The session toolbar's menu of tools a module added.</summary>
+	public static readonly MokaIconDefinition Tools = new("mt-tools",
+		"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z");
+
+	/// <summary>Moves a tool out of its dialog into a window of its own.</summary>
+	public static readonly MokaIconDefinition PopOut = MokaIcons.Content.ExternalLink;
 }

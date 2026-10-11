@@ -1,8 +1,9 @@
 // Browser side of RemoteFileBrowser: keyboard shortcuts that must beat browser defaults (F5 reloads the page, Alt+Left
 // navigates back, Ctrl+A selects the page), moving entries by dragging them onto folder rows, width steps for the
 // responsive layout, focus and scroll helpers, Enter handling for the browser's dialogs, and the file editor's gutter,
-// indenting and Ctrl+S.
+// indenting, Ctrl+S and the coloured layer under its text (tokens come from syntax.js).
 import { invoke } from '../../Mokaterm.UI.Common/js/interop.js';
+import { canHighlight, createHighlightModel } from './syntax.js';
 export { bindDialog } from '../../Mokaterm.UI.Common/js/forms.js';
 
 const entryType = 'application/x-mokaterm-entry';
@@ -24,6 +25,12 @@ function isActivatable(target) {
 		&& !!target.closest('button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="checkbox"], [role="switch"], [role="radio"]');
 }
 
+function hasTextSelection(root) {
+	const selection = window.getSelection();
+	return !!selection && !selection.isCollapsed && selection.toString().length > 0
+		&& !!root && typeof root.contains === 'function' && root.contains(selection.anchorNode);
+}
+
 function commandFor(event) {
 	const mod = event.ctrlKey || event.metaKey;
 	const alt = event.altKey;
@@ -36,8 +43,9 @@ function commandFor(event) {
 			return mod || alt ? null : 'up';
 		case 'F2':
 			return 'rename';
+		// Shift+F4 makes a new file and opens it, as in Far and Total Commander, whose F4 is Edit here too.
 		case 'F4':
-			return 'edit';
+			return mod || alt ? null : event.shiftKey ? 'newFile' : 'edit';
 		case 'Delete':
 			return mod || alt ? null : 'delete';
 		case 'F5':
@@ -67,8 +75,20 @@ function commandFor(event) {
 						return 'selectAll';
 					case 'l':
 						return 'editPath';
+					// Ctrl+Shift+F is Find in the terminal too, so the two panes of a session agree on it.
 					case 'f':
-						return 'filter';
+						return event.shiftKey ? 'find' : 'filter';
+					// Copy and paste move entries on the server, never through the system clipboard. Text selected on
+					// the page still copies as text, and Ctrl+Shift+C copies paths as Windows Explorer's "Copy as path" does.
+					case 'c':
+						return event.shiftKey ? 'copyPath' : hasTextSelection(event.currentTarget) ? null : 'copy';
+					// The Shift forms of these belong to the shell: transfers, duplicating the session.
+					case 'x':
+						return event.shiftKey ? null : 'cut';
+					case 'v':
+						return event.shiftKey ? null : 'paste';
+					case 'd':
+						return event.shiftKey ? null : 'duplicate';
 					default:
 						return null;
 				}
@@ -363,12 +383,36 @@ function lineAt(starts, offset) {
 }
 
 /**
- * The file editor's box: fills and scrolls the line-number gutter, indents with Tab and outdents with Shift+Tab, saves
- * on Ctrl+S, and reports the caret through FileEditorJsReceiver. The numbers are written here and not rendered by .NET
- * because a thirty thousand line file would be that many nodes of render tree for something the page can print.
- * Dispose the result to detach.
+ * Fills one line of the coloured layer: plain text between the coloured spans, and the line feed the text area has
+ * after it, so the layer breaks its lines exactly where the box does. An empty line is that line feed alone.
  */
-export function attachEditor(frame, area, numbers, dotNetRef) {
+function drawLine(row, text, tokens) {
+	const parts = [];
+	let at = 0;
+	for (const [from, to, type] of tokens) {
+		if (from > at) {
+			parts.push(text.slice(at, from));
+		}
+
+		const span = document.createElement('span');
+		span.className = `tk-${type}`;
+		span.textContent = text.slice(from, to);
+		parts.push(span);
+		at = to;
+	}
+
+	parts.push(`${text.slice(at)}\n`);
+	row.replaceChildren(...parts);
+}
+
+/**
+ * The file editor's box: fills and scrolls the line-number gutter, paints the coloured copy of the text under the box,
+ * indents with Tab and outdents with Shift+Tab, saves on Ctrl+S, and reports the caret through FileEditorJsReceiver.
+ * The numbers and the colours are written here and not rendered by .NET because a thirty thousand line file would be
+ * that many nodes of render tree for something the page can print. Colouring stops past `maxCharacters` or `maxLines`,
+ * the same limits .NET states in the status bar. The result has setLanguage(id); dispose it to detach.
+ */
+export function attachEditor(frame, area, numbers, lines, dotNetRef, language, maxCharacters, maxLines) {
 	const state = { dotNet: dotNetRef, disposed: false };
 	let starts = [0];
 	let stale = true;
@@ -377,6 +421,92 @@ export function attachEditor(frame, area, numbers, dotNetRef) {
 	let pending = 0;
 	// Escape arms the next Tab to move the focus instead of indenting, so the keyboard is never stuck in the box.
 	let leaving = false;
+
+	// The coloured layer: one span per line, kept in step with the highlight model's lines.
+	let highlighting = language;
+	let model = null;
+	let spans = [];
+	let painted = null;
+	let lastPaint = -Infinity;
+	const clip = lines.parentElement;
+
+	const stopPainting = () => {
+		frame.removeAttribute('data-painted');
+		model = null;
+		spans = [];
+		painted = null;
+		lines.replaceChildren();
+	};
+
+	// Only the lines the edit touched are rebuilt; the rest keep their elements.
+	const apply = (change) => {
+		const { at, removed, added, changed } = change;
+		if (removed > 0) {
+			const gone = spans.splice(at, removed);
+			const range = document.createRange();
+			range.setStartBefore(gone[0]);
+			range.setEndAfter(gone[gone.length - 1]);
+			range.deleteContents();
+		}
+
+		if (added > 0) {
+			const fresh = new Array(added);
+			const fragment = document.createDocumentFragment();
+			for (let index = 0; index < added; index++) {
+				fresh[index] = document.createElement('span');
+				fragment.append(fresh[index]);
+			}
+
+			lines.insertBefore(fragment, spans[at] ?? null);
+			spans = spans.slice(0, at).concat(fresh, spans.slice(at));
+		}
+
+		for (const index of changed) {
+			drawLine(spans[index], model.lineAt(index), model.tokensAt(index));
+		}
+	};
+
+	const paint = () => {
+		const text = area.value;
+		let paints = canHighlight(highlighting) && text.length <= maxCharacters;
+		if (paints) {
+			measure();
+			paints = starts.length <= maxLines;
+		}
+
+		if (!paints) {
+			if (model) {
+				stopPainting();
+			}
+
+			return;
+		}
+
+		if (!model) {
+			model = createHighlightModel(highlighting);
+			spans = [];
+			lines.replaceChildren();
+		}
+
+		if (text === painted) {
+			return;
+		}
+
+		apply(model.update(text));
+		painted = text;
+		lastPaint = performance.now();
+		// Only once there is something to see: the box's own text turns transparent with this.
+		if (!frame.hasAttribute('data-painted')) {
+			frame.setAttribute('data-painted', '');
+		}
+	};
+
+	// The layer is clipped to the inside of the box, short of its scroll bars, whose track is transparent and would
+	// otherwise show coloured text running underneath it.
+	const fit = () => {
+		clip.style.right = `${Math.max(0, area.offsetWidth - area.clientWidth)}px`;
+		clip.style.bottom = `${Math.max(0, area.offsetHeight - area.clientHeight)}px`;
+	};
 
 	const measure = () => {
 		if (!stale) {
@@ -400,9 +530,11 @@ export function attachEditor(frame, area, numbers, dotNetRef) {
 	};
 
 	// The numbers ride a transform rather than a scrollTop of their own: a box with a horizontal scrollbar is shorter
-	// inside than the gutter beside it, so a copied scrollTop would clamp before the last line.
+	// inside than the gutter beside it, so a copied scrollTop would clamp before the last line. The coloured layer
+	// follows the same way, in both directions.
 	const follow = () => {
 		numbers.style.transform = `translateY(${-area.scrollTop}px)`;
+		lines.style.transform = `translate(${-area.scrollLeft}px, ${-area.scrollTop}px)`;
 	};
 
 	const report = () => {
@@ -421,6 +553,8 @@ export function attachEditor(frame, area, numbers, dotNetRef) {
 	const refresh = () => {
 		pending = 0;
 		if (!state.disposed) {
+			paint();
+			fit();
 			follow();
 			report();
 		}
@@ -552,8 +686,14 @@ export function attachEditor(frame, area, numbers, dotNetRef) {
 		leaving = false;
 	};
 
+	// The box's own glyphs are transparent while the layer is painted, so a keystroke is painted at once rather than a
+	// timer later. A burst is painted at most once per period here, and the timer catches whatever came after.
 	const onInput = () => {
 		stale = true;
+		if (performance.now() - lastPaint >= editorCoalesceMs) {
+			paint();
+		}
+
 		schedule();
 	};
 
@@ -568,15 +708,41 @@ export function attachEditor(frame, area, numbers, dotNetRef) {
 		area.addEventListener(type, schedule);
 	}
 
+	// Scroll bars come and go with the window's size as well as with the text.
+	const resizeObserver = new ResizeObserver(() => {
+		if (!state.disposed) {
+			fit();
+		}
+	});
+	resizeObserver.observe(area);
+
 	measure();
+	paint();
+	fit();
 	follow();
 	// The first caret report waits for the timer, so nothing calls .NET while it still awaits this attach.
 	schedule();
 
 	return {
+		// 'plain', or any id syntax.js has no tokenizer for, turns the colours off.
+		setLanguage(id) {
+			if (state.disposed || id === highlighting) {
+				return;
+			}
+
+			highlighting = id;
+			if (model) {
+				stopPainting();
+			}
+
+			paint();
+			follow();
+		},
+
 		dispose() {
 			state.disposed = true;
 			clearTimeout(pending);
+			resizeObserver.disconnect();
 			keys.removeEventListener('keydown', onKeyDown);
 			area.removeEventListener('input', onInput);
 			area.removeEventListener('scroll', follow);

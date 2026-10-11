@@ -1,8 +1,12 @@
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Terminal;
+using Mokaterm.DevHost.Demo.Docker;
 using Mokaterm.DevHost.Demo.FileSystem;
 using Mokaterm.DevHost.Demo.Terminal;
+using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Tunnels;
 
 namespace Mokaterm.DevHost.Demo;
@@ -20,6 +24,9 @@ internal sealed class DemoSession : IProtocolSession
 	private readonly DemoTerminalChannel _terminal;
 	private readonly DemoFileSystemFeature _files;
 	private readonly DemoTunnels _tunnels;
+	private readonly DemoCommandFeature _commands;
+	private readonly DockerSessionFeature _docker;
+	private readonly DemoIndicators _indicators = new();
 	private int _disposed;
 
 	public DemoSession(DemoAccount account, string hostName, string address, TerminalSize size, TimeProvider timeProvider, ILogger logger)
@@ -29,6 +36,8 @@ internal sealed class DemoSession : IProtocolSession
 		DemoShell shell = new(tree, account, hostName, address, size, timeProvider);
 		_terminal = new DemoTerminalChannel(shell, () => _completion.TrySetResult(), logger);
 		_tunnels = new DemoTunnels(timeProvider);
+		_commands = new DemoCommandFeature(account, hostName, timeProvider);
+		_docker = DockerSessionFeature.ForCommands(new DemoDockerCommands(new DemoDockerEngine(timeProvider), timeProvider), timeProvider, hostName, account.Name);
 	}
 
 	public Task Completion => _completion.Task;
@@ -45,6 +54,21 @@ internal sealed class DemoSession : IProtocolSession
 			return _tunnels as TFeature;
 		}
 
+		if (typeof(TFeature) == typeof(IRemoteCommandFeature))
+		{
+			return _commands as TFeature;
+		}
+
+		if (typeof(TFeature) == typeof(DockerSessionFeature))
+		{
+			return _docker as TFeature;
+		}
+
+		if (typeof(TFeature) == typeof(ISessionIndicators))
+		{
+			return _indicators as TFeature;
+		}
+
 		return typeof(TFeature) == typeof(IFileSystemFeature) ? _files as TFeature : null;
 	}
 
@@ -59,6 +83,7 @@ internal sealed class DemoSession : IProtocolSession
 		_closed.Cancel();
 		await _terminal.DisposeAsync();
 		await _files.DisposeAsync();
+		_docker.Dispose();
 		_completion.TrySetResult();
 	}
 }

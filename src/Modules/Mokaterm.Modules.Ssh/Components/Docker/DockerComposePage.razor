@@ -1,0 +1,104 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (_selected is { } selected)
+{
+	<DockerComposeProjectView @key="selected" Session="Session" ProjectName="@selected" Visible="Visible" OnBack="CloseProjectAsync" OnFind="FindFromProjectAsync" />
+}
+else
+{
+	<div class="mt-dk-toolbar">
+		<div class="mt-dk-toolbar-search">
+			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by project, folder or service" Debounce="100" aria-label="Filter projects" />
+		</div>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Search"
+					Disabled="_finding" Loading="_finding" OnClick="FindAsync" title="@FindTitle">
+			Find compose files
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+					Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+	</div>
+
+	@if (ToolNote is { } note)
+	{
+		<span class="mt-dk-note">@note</span>
+	}
+
+	@LoadErrorPanel(RefreshAsync)
+	@ChangePanel
+
+	<div class="mt-dk-scroll">
+		@if (IsFirstLoad)
+		{
+			<div class="mt-dk-center"><MokaSpinner Label="Listing compose projects" /></div>
+		}
+		else if (Shown.Count == 0 && _found is null)
+		{
+			<MokaEmptyState Icon="DockerIcons.Compose"
+							Title="@(_projects.Count == 0 ? "No compose projects" : "Nothing matches")"
+							Description="@(_projects.Count == 0 ? "Compose lists a project while it has containers, running or stopped. Find compose files looks for the ones that have none." : "No project matches the filter.")" />
+		}
+		else
+		{
+			<div class="mt-dk-list" role="list" aria-label="Compose projects">
+				@foreach (ComposeProject project in Shown)
+				{
+					<div class="mt-dk-row" role="listitem" @key="project.Name">
+						<button type="button" class="mt-dk-row-main" @onclick="@(() => Open(project))" title="@project.Status">
+							<MokaStatusDot Size="MokaSize.Xs" Color="@ProjectColor(project)" />
+							<span class="mt-dk-cell-name mt-dk-cell--w30">@project.Name</span>
+							<span class="mt-dk-cell mt-dk-cell--count" title="Containers running, of all of them">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
+							<span class="mt-dk-cell mt-dk-cell--grow" title="@project.WorkingDirectory">@project.WorkingDirectory</span>
+						</button>
+						@if (Feature?.Compose is not null)
+						{
+							<span class="mt-dk-hover">
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect"
+											Disabled="IsBusy" OnClick="@(() => RestartAsync(project))" title="Restart" aria-label="@($"Restart {project.Name}")" />
+							</span>
+						}
+					</div>
+				}
+			</div>
+		}
+
+		@if (_found is { } found)
+		{
+			<div class="mt-dk-section">
+				<div class="mt-dk-section-head">
+					<span class="mt-dk-label">Compose files with no project running</span>
+					<span class="mt-dk-spacer"></span>
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="CloseFound" aria-label="Close the search results" />
+				</div>
+				@if (_findProblem is { } findProblem)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@findProblem</MokaAlert>
+				}
+				else if (found.Count == 0)
+				{
+					<span class="mt-dk-note">@($"Nothing under {SearchedText}.")</span>
+				}
+				@foreach (string file in found)
+				{
+					<div class="mt-dk-row" @key="file">
+						<div class="mt-dk-row-main mt-dk-row-static">
+							<span class="mt-dk-cell mt-dk-cell--grow" title="@file">@file</span>
+						</div>
+						@* The only things to do with a found file, so they stay in sight rather than wait for a hover. *@
+						<span class="mt-dk-row-actions">
+							<CopyButton Text="@file" Label="Copy the path" />
+							@if (Feature?.Compose is not null)
+							{
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Primary" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp"
+											Disabled="IsBusy" OnClick="@(() => UpAsync(file))" aria-label="@($"Bring up {file}")">
+									Up
+								</MokaButton>
+							}
+						</span>
+					</div>
+				}
+				<span class="mt-dk-note">@($"Searched {SearchedText}, {DockerHostScripts.SearchDepth} folders deep.")</span>
+			</div>
+		}
+	</div>
+}

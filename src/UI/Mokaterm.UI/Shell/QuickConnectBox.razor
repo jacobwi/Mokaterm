@@ -1,20 +1,60 @@
-<div class="mt-quick-connect" @ref="_root">
+@* A combobox: the field keeps the focus and drives the list under it with the arrow keys, and the protocol picker beside
+   it follows a scheme typed into the field. *@
+<div class="@RootClass" @ref="_root">
 	@if (_protocolIds.Count > 0)
 	{
-		<MokaSelect TValue="string"
-					Items="_protocolIds"
-					@bind-Value="_protocolId"
-					ValueSelector="ProtocolLabel"
-					Size="MokaSize.Sm"
-					aria-label="Protocol" />
+		<div class="mt-qc-protocol">
+			<span class="mt-qc-protocol-icon" aria-hidden="true">
+				<MokaIcon Icon="@Contributions.GetProtocolIcon(_protocolId)" Size="MokaSize.Xs" />
+			</span>
+			<MokaSelect TValue="string"
+						Items="_protocolIds"
+						Value="@_protocolId"
+						ValueChanged="OnProtocolPickedAsync"
+						ValueSelector="ProtocolLabel"
+						Size="MokaSize.Sm"
+						aria-label="Protocol">
+				<ItemTemplate Context="protocolId">
+					<span class="mt-qc-protocol-option">
+						<MokaIcon Icon="@Contributions.GetProtocolIcon(protocolId)" Size="MokaSize.Xs" />
+						<span>@Protocols.DisplayName(protocolId)</span>
+					</span>
+				</ItemTemplate>
+			</MokaSelect>
+		</div>
 	}
-	<MokaTextField @bind-Value="_target"
-				   Placeholder="user@host:port"
-				   Size="MokaSize.Sm"
-				   StartIcon="MokatermIcons.QuickConnect"
-				   spellcheck="false"
-				   autocomplete="off"
-				   aria-label="Quick connect"
-				   data-autofocus="true"
-				   @onkeydown="OnKeyDown" />
+	<div class="mt-qc-field">
+		<MokaTextField Value="@_text"
+					   ValueChanged="OnTextChanged"
+					   Placeholder="@Placeholder"
+					   Size="MokaSize.Sm"
+					   StartIcon="MokatermIcons.QuickConnect"
+					   OnFocus="OnFocusAsync"
+					   OnBlur="OnBlur"
+					   spellcheck="false"
+					   autocomplete="off"
+					   aria-label="Quick connect"
+					   role="combobox"
+					   aria-autocomplete="list"
+					   aria-expanded="@(IsOpen ? "true" : "false")"
+					   aria-controls="@(IsOpen ? _listId : null)"
+					   aria-activedescendant="@ActiveOptionId"
+					   aria-invalid="@(_error is null ? null : "true")"
+					   aria-describedby="@(_error is null ? null : _hintId)"
+					   data-mt-keys="@KeptKeys"
+					   data-autofocus="true"
+					   @onkeydown="OnKeyDownAsync" />
+		@if (IsOpen)
+		{
+			<QuickConnectList Id="@_listId"
+							  Rows="_rows"
+							  ActiveIndex="_activeIndex"
+							  OnPick="ActivateAsync"
+							  OnRemove="RemoveAsync" />
+		}
+		else if (_error is not null)
+		{
+			<div class="mt-qc-hint" id="@_hintId" role="alert">@_error</div>
+		}
+	</div>
 </div>

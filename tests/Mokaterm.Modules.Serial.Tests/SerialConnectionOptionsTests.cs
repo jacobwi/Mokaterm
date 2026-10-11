@@ -105,6 +105,29 @@ public sealed class SerialConnectionOptionsTests
 		Assert.True(SerialConnectionOptions.HasAny(SerialConnectionOptions.Default.ApplyTo(ProtocolOptions.Empty)));
 	}
 
+	// A quick connect never went through the options editor, so it opens with the line the defaults page names.
+	[Fact]
+	public void ForConnect_AConnectionWithNoSerialKey_TakesTheDefaultsPage()
+	{
+		SerialSettings settings = new() { BaudRate = 9600, Parity = SerialParity.Even, LocalEcho = true };
+
+		SerialConnectionOptions options = SerialConnectionOptions.ForConnect(ProtocolOptions.Empty, settings);
+
+		Assert.Equal(9600, options.Line.BaudRate);
+		Assert.Equal(SerialParity.Even, options.Line.Parity);
+		Assert.True(options.LocalEcho);
+	}
+
+	[Fact]
+	public void ForConnect_AConnectionWithItsOwnLine_KeepsIt()
+	{
+		SerialSettings settings = new() { BaudRate = 9600 };
+		ProtocolOptions saved = (SerialConnectionOptions.Default with { Line = SerialLineSettings.Default with { BaudRate = 57600 } })
+			.ApplyTo(ProtocolOptions.Empty);
+
+		Assert.Equal(57600, SerialConnectionOptions.ForConnect(saved, settings).Line.BaudRate);
+	}
+
 	[Fact]
 	public void ResolvePortName_TakesTheHostAddressUnlessTheConnectionNamesAPort()
 	{

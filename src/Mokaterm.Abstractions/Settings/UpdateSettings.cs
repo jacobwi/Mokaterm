@@ -15,6 +15,7 @@ public sealed record UpdateSettings : ISettingsSection
 	/// The release feed: an http or https address, or a full path to a local or network folder holding the packages.
 	/// Empty turns updates off, which is the default, because no public feed ships with the app.
 	/// </summary>
+	[MachineSpecific]
 	public string Feed { get; init; } = "";
 
 	/// <summary>Look for a new version once after the app starts. Finding one only shows a notice.</summary>

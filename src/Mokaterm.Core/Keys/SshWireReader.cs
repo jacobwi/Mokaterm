@@ -16,6 +16,19 @@ internal ref struct SshWireReader
 
 	public readonly int Remaining => _data.Length - _position;
 
+	public bool TryReadByte(out byte value)
+	{
+		if (Remaining < 1)
+		{
+			value = 0;
+			return false;
+		}
+
+		value = _data[_position];
+		_position++;
+		return true;
+	}
+
 	public bool TryReadUInt32(out uint value)
 	{
 		if (Remaining < 4)
@@ -43,6 +56,9 @@ internal ref struct SshWireReader
 		_position += (int)length;
 		return true;
 	}
+
+	/// <summary>Everything after the current position, without moving it.</summary>
+	public readonly ReadOnlySpan<byte> Rest => _data[_position..];
 
 	public bool TrySkip(int count)
 	{

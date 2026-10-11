@@ -19,6 +19,14 @@
 		<PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
 	</ItemGroup>
 
+	<!--
+		Build-time only: the settings search generator in src/Mokaterm.Generators. Analyzers load into the compiler, so this
+		stays at or below the Roslyn of the oldest SDK global.json allows (10.0.100 ships 5.0) and of Visual Studio 2022.
+	-->
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+	</ItemGroup>
+
 	<!-- UI -->
 	<ItemGroup>
 		<PackageVersion Include="Moka.Red" Version="0.1.16" />

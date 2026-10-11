@@ -29,6 +29,7 @@ internal sealed class RdpProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "RDP",
 		Description = "Remote desktop over RDP, with TLS and network level authentication.",
+		QuickConnectExample = "user@host",
 		DefaultPort = DefaultPort,
 		Capabilities = ProtocolCapabilities.RemoteDesktop,
 		AuthenticationMethods = [AuthenticationMethod.Password, AuthenticationMethod.Anonymous],

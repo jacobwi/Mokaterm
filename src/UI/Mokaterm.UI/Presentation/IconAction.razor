@@ -9,6 +9,10 @@
 				OnClick="OnClick"
 				aria-label="@Title"
 				aria-pressed="@(Active ? "true" : null)" />
+	@if (DotColor is { Length: > 0 } dot)
+	{
+		<span class="mt-icon-dot" style="--mt-icon-dot:@dot" aria-hidden="true"></span>
+	}
 </MokaTooltip>
 
 @code {
@@ -31,6 +35,13 @@
 	/// <summary>Colors the icon with the accent, for toggles that are on.</summary>
 	[Parameter]
 	public bool Active { get; set; }
+
+	/// <summary>
+	/// A small glowing dot on the icon's corner, in this CSS colour, for something going on behind the button such as a
+	/// recording. The title says what it means.
+	/// </summary>
+	[Parameter]
+	public string? DotColor { get; set; }
 
 	[Parameter]
 	public MokaSize Size { get; set; } = MokaSize.Sm;

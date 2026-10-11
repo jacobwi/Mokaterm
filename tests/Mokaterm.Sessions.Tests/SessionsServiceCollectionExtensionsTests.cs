@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
@@ -29,6 +30,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
 		services.AddScoped<IConnectionRepository, FakeConnectionRepository>();
 		services.AddScoped<ICredentialStore, FakeCredentialStore>();
 		services.AddScoped<IHostIdentityVerifier, FakeHostIdentityVerifier>();
+		services.AddScoped<IKnownHostsStore, FakeKnownHostsStore>();
 		services.AddScoped<IUserInteraction, FakeUserInteraction>();
 
 		_ = services.AddMokatermSessions().AddMokatermSessions();
@@ -44,6 +46,7 @@ public sealed class SessionsServiceCollectionExtensionsTests
 			Assert.Same(first, scope.ServiceProvider.GetRequiredService<ISessionManager>());
 			Assert.Same(scope.ServiceProvider.GetRequiredService<ITransferQueue>(), scope.ServiceProvider.GetRequiredService<ITransferQueue>());
 			Assert.Same(scope.ServiceProvider.GetRequiredService<ISessionLogRecorder>(), scope.ServiceProvider.GetRequiredService<ISessionLogRecorder>());
+			Assert.Same(scope.ServiceProvider.GetRequiredService<ICommandRunner>(), scope.ServiceProvider.GetRequiredService<ICommandRunner>());
 		}
 
 		await using AsyncServiceScope second = provider.CreateAsyncScope();

@@ -45,6 +45,12 @@ internal sealed class DemoNode
 	/// <summary>The stored bytes: the whole file when it is small, otherwise only its beginning.</summary>
 	public byte[] Content { get; set; } = [];
 
+	/// <summary>
+	/// True when an upload wrote more than the demo stores. Reads then return made-up bytes after the stored ones, unlike
+	/// a seeded file, whose made-up bytes are its content, so the demo cannot say what this file's checksum is.
+	/// </summary>
+	public bool ContentLost { get; set; }
+
 	public IReadOnlyCollection<DemoNode> Children => _children is null ? [] : _children.Values;
 
 	public int ChildCount => _children?.Count ?? 0;

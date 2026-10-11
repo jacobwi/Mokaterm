@@ -1,0 +1,40 @@
+@namespace Mokaterm.UI.Common.Components
+@using Moka.Red.Feedback.Dialog
+
+@* Moka's header is a plain string, so it is turned off and DialogHeader takes its place at the top of the box. The
+   wrapper adds no box of its own; it only gives the stylesheet an ancestor to reach Moka's body through. *@
+<div class="mt-dialog-scope">
+	<MokaDialog Open="Open"
+				OpenChanged="OnMokaOpenChanged"
+				OnClose="OnMokaClose"
+				ShowCloseButton="false"
+				DialogSize="DialogSize"
+				CloseOnEscape="CloseOnEscape"
+				CloseOnBackdropClick="CloseOnBackdropClick"
+				PreventScroll="PreventScroll"
+				Class="@BoxClass"
+				Style="@Style"
+				Actions="Actions"
+				aria-labelledby="@_titleId"
+				@attributes="AdditionalAttributes">
+		<ChildContent>
+			@if (Header is not null)
+			{
+				@Header(_titleId)
+			}
+			else
+			{
+				<DialogHeader Icon="Icon"
+							  Title="@Title"
+							  TitleId="@_titleId"
+							  Detail="HeaderDetail"
+							  Actions="HeaderActions"
+							  ShowClose="ShowCloseButton"
+							  OnClose="CloseAsync" />
+			}
+			<div class="mt-dialog-content @(Fill ? "mt-dialog-content--fill" : null)">
+				@ChildContent
+			</div>
+		</ChildContent>
+	</MokaDialog>
+</div>

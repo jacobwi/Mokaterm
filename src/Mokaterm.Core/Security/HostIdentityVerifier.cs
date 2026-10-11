@@ -39,45 +39,36 @@ internal sealed class HostIdentityVerifier : IHostIdentityVerifier
 		}
 
 		HostIdentityMatch match = await _knownHosts.MatchAsync(identity, cancellationToken);
-		if (match == HostIdentityMatch.Trusted)
-		{
-			return true;
-		}
-
-		if (match == HostIdentityMatch.Unknown && identity is { Kind: HostIdentityKind.TlsCertificate, ChainTrusted: true })
-		{
-			return true;
-		}
-
 		HostKeyPolicy policy = _settings.Get<SecuritySettings>().HostKeyPolicy;
 		string target = Describe(key);
 		string what = key.Kind == HostIdentityKind.TlsCertificate ? "certificate" : "host key";
-		if (match == HostIdentityMatch.Unknown)
+		switch (HostTrustRule.Decide(identity, match, policy))
 		{
-			switch (policy)
-			{
-				case HostKeyPolicy.Strict:
-					_interaction.Notify(NoticeSeverity.Error, $"The {what} of {target} is not trusted, and the host key policy only allows known hosts.", "Connection refused");
-					return false;
+			case HostTrustAction.Accept:
+				return true;
 
-				case HostKeyPolicy.AcceptNew:
-					await _knownHosts.TrustAsync(identity, cancellationToken);
-					_interaction.Notify(NoticeSeverity.Info, $"Trusted the new {what} of {target} ({key.Algorithm} {key.Fingerprint}).", "New host trusted");
-					return true;
-			}
+			case HostTrustAction.TrustNew:
+				await _knownHosts.TrustAsync(identity, cancellationToken);
+				_interaction.Notify(NoticeSeverity.Info, $"Trusted the new {what} of {target} ({key.Algorithm} {key.Fingerprint}).", "New host trusted");
+				return true;
 
-			return await AskAsync(identity, key, HostIdentityMatch.Unknown, previous: null, cancellationToken);
+			case HostTrustAction.Refuse when match == HostIdentityMatch.Unknown:
+				_interaction.Notify(NoticeSeverity.Error, $"The {what} of {target} is not trusted, and the host key policy only allows known hosts.", "Connection refused");
+				return false;
+
+			case HostTrustAction.Refuse:
+				_interaction.Notify(NoticeSeverity.Warning, $"The {what} of {target} has changed, so the connection was refused. If the server was reinstalled, remove its old entry under Known hosts.", "Host identity changed");
+				return false;
 		}
 
-		if (policy is HostKeyPolicy.Strict or HostKeyPolicy.AcceptNew)
+		KnownHost? previous = null;
+		if (match == HostIdentityMatch.Changed)
 		{
-			_interaction.Notify(NoticeSeverity.Warning, $"The {what} of {target} has changed, so the connection was refused. If the server was reinstalled, remove its old entry under Known hosts.", "Host identity changed");
-			return false;
+			IReadOnlyList<KnownHost> knownHosts = await _knownHosts.ListAsync(cancellationToken);
+			previous = knownHosts.FirstOrDefault(entry => key.SameSlot(HostIdentityKey.From(entry)));
 		}
 
-		IReadOnlyList<KnownHost> knownHosts = await _knownHosts.ListAsync(cancellationToken);
-		KnownHost? previous = knownHosts.FirstOrDefault(entry => key.SameSlot(HostIdentityKey.From(entry)));
-		return await AskAsync(identity, key, HostIdentityMatch.Changed, previous, cancellationToken);
+		return await AskAsync(identity, key, match, previous, cancellationToken);
 	}
 
 	private static string Describe(HostIdentityKey key) =>

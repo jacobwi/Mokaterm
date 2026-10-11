@@ -24,6 +24,7 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 	private readonly ILogger _logger;
 	private readonly Action<SudoFileSystem> _onDisposed;
 	private int _disposed;
+	private int _checksumUnavailable;
 
 	/// <param name="userFileSystem">Opens the logged-in user's SFTP file system, for staging uploads and resolving <c>~</c>.</param>
 	/// <param name="accountNames">The session's account names; passwd and group read the same for root as for the user.</param>
@@ -46,7 +47,8 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 
 	public RemoteFileSystemFeatures Features =>
 		RemoteFileSystemFeatures.Permissions | RemoteFileSystemFeatures.Ownership | RemoteFileSystemFeatures.SymbolicLinks
-		| RemoteFileSystemFeatures.Elevation | RemoteFileSystemFeatures.Accounts;
+		| RemoteFileSystemFeatures.Elevation | RemoteFileSystemFeatures.Accounts
+		| RemoteFileSystemFeatures.Copy | RemoteFileSystemFeatures.Archives;
 
 	public string UserName => "root";
 
@@ -123,6 +125,27 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		await RunAsync(RemoteScripts.Rename, [source, destination, Flag(overwrite)], source, cancellationToken, destination);
 	}
 
+	public async ValueTask CopyAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
+	{
+		string source = Absolute(sourcePath);
+		string destination = Absolute(destinationPath);
+		await RunAsync(RemoteScripts.Copy, RemoteScriptArguments.Copy(source, destination, overwrite), source, cancellationToken, destination);
+	}
+
+	public async ValueTask CompressAsync(string directory, IReadOnlyList<string> names, string archivePath, CancellationToken cancellationToken = default)
+	{
+		string folder = Absolute(directory);
+		string archive = Absolute(archivePath);
+		await RunAsync(RemoteScripts.Compress, RemoteScriptArguments.Compress(folder, names, archive), folder, cancellationToken, archive);
+	}
+
+	public async ValueTask ExtractAsync(string archivePath, string destinationDirectory, CancellationToken cancellationToken = default)
+	{
+		string archive = Absolute(archivePath);
+		string destination = Absolute(destinationDirectory);
+		await RunAsync(RemoteScripts.Extract, RemoteScriptArguments.Extract(archive, destination), archive, cancellationToken, destination);
+	}
+
 	public ValueTask SetPermissionsAsync(string path, UnixFileMode permissions, bool recursive, CancellationToken cancellationToken = default) =>
 		ChangePermissionsAsync(path, new PermissionChange { Mode = permissions, Recursive = recursive }, cancellationToken);
 
@@ -169,7 +192,7 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		}
 
 		// The token only covers opening: SSH.NET would cancel the whole command with it.
-		return await StartReadAsync(target, CancellationToken.None);
+		return await StartReadAsync(target, RemoteScripts.Read, [target], CancellationToken.None);
 	}
 
 	public async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
@@ -204,11 +227,23 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		}
 	}
 
-	public async ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
+
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(destination);
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
 		string target = Absolute(path);
-		ElevatedReadStream source = await StartReadAsync(target, cancellationToken);
+		if (offset > 0 && await StatAsync(target, cancellationToken) is { Kind: RemoteEntryKind.File } entry && entry.Size < offset)
+		{
+			throw TransferStreams.ShorterThanCopied(target, offset);
+		}
+
+		// tail starts at the byte it is given counting from one, so the server skips the part already here.
+		ElevatedReadStream source = offset == 0
+			? await StartReadAsync(target, RemoteScripts.Read, [target], cancellationToken)
+			: await StartReadAsync(target, RemoteScripts.ReadFrom, [target, (offset + 1).ToString(CultureInfo.InvariantCulture)], cancellationToken);
 		await using (source)
 		{
 			byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
@@ -228,6 +263,38 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 				ArrayPool<byte>.Shared.Return(buffer);
 			}
 		}
+	}
+
+	public ChecksumAlgorithm? ServerChecksum => Volatile.Read(ref _checksumUnavailable) == 0 ? ChecksumAlgorithm.Sha256 : null;
+
+	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	{
+		string target = Absolute(path);
+		if (Volatile.Read(ref _checksumUnavailable) != 0)
+		{
+			return null;
+		}
+
+		ReadOnlyMemory<byte> payload;
+		try
+		{
+			payload = await RunAsync(RemoteScripts.Checksum, [target], target, cancellationToken);
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotSupported)
+		{
+			// No SHA-256 tool on this server, which will not change while the session lives.
+			Volatile.Write(ref _checksumUnavailable, 1);
+			return null;
+		}
+
+		if (RemoteOutput.ReadSha256(payload.Span) is { } checksum)
+		{
+			return checksum;
+		}
+
+		Volatile.Write(ref _checksumUnavailable, 1);
+		_logger.LogDebug("The server's checksum tool printed something other than a SHA-256; root transfers stay unverified");
+		return null;
 	}
 
 	public ValueTask DisposeAsync()
@@ -273,12 +340,12 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		return SudoRunner.EnsureSucceeded(result, _runner.Account, path, destination, allowPartialListing);
 	}
 
-	private async Task<ElevatedReadStream> StartReadAsync(string target, CancellationToken cancellationToken)
+	private async Task<ElevatedReadStream> StartReadAsync(string target, string script, string[] arguments, CancellationToken cancellationToken)
 	{
 		ThrowIfDisposed();
 		try
 		{
-			return await _runner.StartReadAsync(RemoteScripts.Read, [target], target, cancellationToken);
+			return await _runner.StartReadAsync(script, arguments, target, cancellationToken);
 		}
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, target, out RemoteFileSystemException? mapped))
 		{

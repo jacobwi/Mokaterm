@@ -1,0 +1,98 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (Context is { } context)
+{
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Project folder</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+						Disabled="IsLoading" OnClick="CheckAsync" title="Check the files again" aria-label="Check the files again" />
+		</div>
+		@if (context.Project.WorkingDirectory is { } folder)
+		{
+			@PathLine(folder, "Copy the folder")
+		}
+		else
+		{
+			<span class="mt-dk-note">Not known: the containers carry no folder label and no file was listed.</span>
+		}
+	</div>
+
+	<div class="mt-dk-section">
+		<span class="mt-dk-label">Compose files</span>
+		@if (context.Project.ConfigFiles.Count == 0)
+		{
+			<span class="mt-dk-note">None listed. Compose reads compose.yaml or docker-compose.yml from the folder.</span>
+		}
+		@foreach (string file in context.Project.ConfigFiles)
+		{
+			<div class="mt-dk-variable" @key="file">
+				@StateDot(file)
+				@PathLine(file, "Copy the path")
+			</div>
+		}
+	</div>
+
+	@if (context.Project.EnvironmentFiles.Count > 0)
+	{
+		<div class="mt-dk-section">
+			<span class="mt-dk-label">Started with --env-file</span>
+			@foreach (string file in context.Project.EnvironmentFiles)
+			{
+				<div class="mt-dk-variable" @key="file">
+					@StateDot(file)
+					@PathLine(file, "Copy the path")
+				</div>
+			}
+			<span class="mt-dk-note">Every command here passes these again, so compose reads the same values it started with.</span>
+		</div>
+	}
+
+	@LoadErrorPanel(CheckAsync)
+	<span class="mt-dk-note">@MissingText</span>
+	<span class="mt-dk-note">Edit a compose file from the session's file browser: a module cannot open the browser at a folder, so it is not offered here.</span>
+}
+
+@code {
+	private IReadOnlyDictionary<string, bool> _exists = new Dictionary<string, bool>();
+	private string? _checked;
+
+	[CascadingParameter]
+	private ComposeProjectContext? Context { get; set; }
+
+	private string MissingText => _exists.Count(entry => !entry.Value) switch
+	{
+		0 => "",
+		1 => "One file is missing on disk: the project runs from what compose read when it started, and the next up would fail.",
+		int count => string.Create(CultureInfo.CurrentCulture, $"{count} files are missing on disk: the next up would fail."),
+	};
+
+	// The project refreshes every few seconds; the files are asked about again only when the list of them changes.
+	protected override Task OnParametersSetAsync() =>
+		Context is { } context && Key(context) != _checked ? CheckAsync() : Task.CompletedTask;
+
+	private static string Key(ComposeProjectContext context) =>
+		string.Join('|', context.Project.ConfigFiles.Concat(context.Project.EnvironmentFiles));
+
+	/// <summary>Which of the project's files exist, in one command on the docker host.</summary>
+	private Task CheckAsync() => LoadAsync(async (client, token) =>
+	{
+		if (Context is not { } context)
+		{
+			return;
+		}
+
+		_checked = Key(context);
+		List<string> paths = [.. context.Project.ConfigFiles, .. context.Project.EnvironmentFiles];
+		IReadOnlyList<bool> states = await client.FileStatesAsync(paths, token);
+		_exists = paths.Zip(states).GroupBy(pair => pair.First, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Second, StringComparer.Ordinal);
+	});
+
+	private RenderFragment StateDot(string path) => _exists.TryGetValue(path, out bool exists)
+		? exists
+			? @<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow="false" title="On disk" />
+			: @<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="MokaColor.Error" />
+		: @<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Surface" Glow="false" title="Not checked yet" />;
+}

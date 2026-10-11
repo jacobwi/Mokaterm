@@ -1,0 +1,86 @@
+@using Mokaterm.UI.Terminal.Triggers
+@inherits DraftDialogBase
+
+<HeadedDialog Open="Open"
+			  OpenChanged="OnOpenChangedAsync"
+			  Title="@(IsNew ? "New trigger" : "Edit trigger")"
+			  Icon="MokaIcons.Status.Bell"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false"
+			  CloseOnEscape="!IsBusy"
+			  ShowCloseButton="!IsBusy">
+	<ChildContent>
+		<form id="@FormId" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+				<MokaTextField Label="Pattern"
+							   Value="@_pattern"
+							   ValueChanged="SetPatternAsync"
+							   Required
+							   ErrorText="@_patternError"
+							   HelperText="A JavaScript regular expression, run on each line a terminal prints."
+							   Disabled="_saving"
+							   Placeholder="ERROR|FATAL"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus="true" />
+				<MokaSwitch Label="Ignore case"
+							Value="_ignoreCase"
+							ValueChanged="SetIgnoreCaseAsync"
+							Disabled="_saving"
+							HelperText="error, Error and ERROR all match." />
+
+				<div>
+					<MokaFieldWrapper Label="Color the match" HelperText="The matched text takes this color. The rest of the line keeps the server's.">
+						<EnumSegmentedControl TEnum="TriggerColor"
+											  Value="_highlight"
+											  ValueChanged="SetHighlight"
+											  Options="ColorOptions"
+											  Disabled="_saving"
+											  AriaLabel="Color for the match" />
+					</MokaFieldWrapper>
+				</div>
+
+				<MokaSwitch Label="Show a notice"
+							Value="_notify"
+							ValueChanged="SetNotify"
+							Disabled="_saving"
+							HelperText="@NotifyHelp" />
+
+				<MokaTextField Label="Try it on a line"
+							   Value="@_sample"
+							   ValueChanged="SetSampleAsync"
+							   Disabled="_saving"
+							   Placeholder="make: *** [all] Error 2"
+							   spellcheck="false"
+							   autocomplete="off" />
+				@if (_sample.Length > 0 && _result is { } result)
+				{
+					<div class="trigger-try" role="status">
+						@if (!result.Valid)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">The pattern needs fixing first.</MokaText>
+						}
+						else if (result.IsMatch)
+						{
+							<TriggerPreview Text="@_sample" Layers="PreviewLayers(result)" />
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@MatchSummary(result)</MokaText>
+						}
+						else
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">No match on this line.</MokaText>
+						}
+					</div>
+				}
+
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+			</MokaFlexbox>
+		</form>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="CloseAsync">Cancel</MokaButton>
+		<MokaButton Type="submit" form="@FormId" StartIcon="MokaIcons.Action.Save" Loading="_saving" data-primary="true">Save</MokaButton>
+	</Actions>
+</HeadedDialog>

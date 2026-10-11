@@ -1,5 +1,6 @@
 @namespace Mokaterm.Modules.Ssh.Components
 @inherits SessionViewBase
+@using Mokaterm.Modules.Ssh.Forwarding
 
 <div class="mt-tunnels">
 	@if (_feature is null)
@@ -98,6 +99,29 @@
 										OnClick="@(() => RemoveAsync(status.Tunnel.Id))"
 										aria-label="Remove tunnel" />
 						}
+					</div>
+				}
+			</div>
+		}
+
+		@if (ForwardingLines.Count > 0)
+		{
+			<div class="mt-tunnels-list">
+				@foreach ((string kind, SshForwardingLine line) in ForwardingLines)
+				{
+					<div class="mt-tunnels-row" @key="kind">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@ForwardingColor(line)" />
+						<MokaTag Text="@kind" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+						<div class="mt-tunnels-text">
+							<MokaText Element="span" Size="MokaSize.Sm" Truncate>@line.Target</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Style="color:var(--moka-color-on-surface-variant)">
+								@DescribeForwarding(line)
+							</MokaText>
+							@if (line.Problem is { } problem)
+							{
+								<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-error)">@problem</MokaText>
+							}
+						</div>
 					</div>
 				}
 			</div>

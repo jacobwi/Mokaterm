@@ -15,6 +15,7 @@ using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Rdp.Interop;
 using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 
 namespace Mokaterm.Modules.Rdp.Components;
@@ -77,7 +78,7 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 	private IUserInteraction Interaction { get; set; } = default!;
 
 	[Inject]
-	private IMokaContextMenuService ContextMenu { get; set; } = default!;
+	private MenuPlacement ContextMenu { get; set; } = default!;
 
 	[Inject]
 	private ILogger<RdpSessionView> Logger { get; set; } = default!;

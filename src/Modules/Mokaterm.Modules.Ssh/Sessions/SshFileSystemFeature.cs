@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.FileSystem;
-using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.Elevation;
 using Mokaterm.Modules.Ssh.FileSystem;
-using LoginMethod = Mokaterm.Abstractions.Connections.AuthenticationMethod;
 
 namespace Mokaterm.Modules.Ssh.Sessions;
 
@@ -41,20 +39,7 @@ internal sealed class SshFileSystemFeature : IFileSystemFeature, IAsyncDisposabl
 
 		ThrowIfDisposed();
 		SshSettings settings = _host.Connector.Settings;
-		SecuritySettings security = _host.Connector.SettingsService.Get<SecuritySettings>();
-		SudoLogin login = new()
-		{
-			Client = await _host.GetSshClientAsync(cancellationToken),
-			SudoCommand = settings.EffectiveSudoCommand,
-			Account = _host.Context.Account,
-			LoginPassword = _host.Context.Credentials.Method is LoginMethod.Password or LoginMethod.KeyboardInteractive
-				? _host.Context.Credentials.Password
-				: null,
-			Cache = _host.SudoPasswords,
-			Interaction = _host.Context.Interaction,
-			OfferRemember = security.RememberSudoPasswordForSession,
-		};
-
+		SudoLogin login = SudoLogin.ForSession(_host, await _host.GetSshClientAsync(cancellationToken));
 		SudoRunner runner = await SudoRunner.AuthenticateAsync(login, cancellationToken);
 		SudoFileSystem fileSystem = new(runner, OpenUserFileSystemAsync, _host.AccountNames, settings.EffectiveStagingDirectory, _logger, Forget);
 		lock (_elevatedLock)

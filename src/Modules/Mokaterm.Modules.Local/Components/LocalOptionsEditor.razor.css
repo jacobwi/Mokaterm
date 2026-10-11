@@ -1,0 +1,18 @@
+.mt-local-shell {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* The picker takes the row; the refresh button keeps its own width, level with the field below the label. */
+.mt-local-shell-field {
+	flex: 1;
+	min-width: 0;
+}
+
+.mt-local-shell-actions {
+	display: flex;
+	align-items: center;
+	padding-top: 1.35rem;
+}

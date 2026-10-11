@@ -1,0 +1,53 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-panel">
+	@LoadErrorPanel(RefreshAsync)
+
+	@if (_stats is { } stats)
+	{
+		<div class="mt-dk-stats">
+			<div class="mt-dk-stat">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">CPU</MokaText>
+				<span class="mt-dk-stat-value">@stats.Cpu</span>
+				<div class="mt-dk-bar" aria-hidden="true"><span style="@BarWidth(CpuShare(stats))"></span></div>
+				<svg class="mt-dk-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+					<polyline points="@Spark(_cpuHistory, CpuScale)" />
+				</svg>
+			</div>
+			<div class="mt-dk-stat">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Memory</MokaText>
+				<span class="mt-dk-stat-value">@stats.MemoryPercent</span>
+				<div class="mt-dk-bar" aria-hidden="true"><span style="@BarWidth(stats.MemoryPercentValue)"></span></div>
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-meta">@stats.Memory</MokaText>
+				<svg class="mt-dk-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+					<polyline points="@Spark(_memoryHistory, 100)" />
+				</svg>
+			</div>
+			<div class="mt-dk-stat">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Network in / out</MokaText>
+				<span class="mt-dk-stat-value">@stats.NetworkIo</span>
+			</div>
+			<div class="mt-dk-stat">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Block read / write</MokaText>
+				<span class="mt-dk-stat-value">@stats.BlockIo</span>
+			</div>
+			<div class="mt-dk-stat">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Processes</MokaText>
+				<span class="mt-dk-stat-value">@stats.Pids</span>
+			</div>
+		</div>
+		<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+			One sample every few seconds while this tab is open, from docker stats. CPU counts every core, so a busy
+			container on a machine with @CoreCount cores can reach @(CoreCount * 100)%.
+		</MokaText>
+	}
+	else if (IsFirstLoad)
+	{
+		<MokaSpinner Label="Sampling the container" />
+	}
+	else if (LoadError is null)
+	{
+		<MokaEmptyState Icon="DockerIcons.Stats" Title="No figures" Description="docker stats reports nothing for a container that is not running." />
+	}
+</div>

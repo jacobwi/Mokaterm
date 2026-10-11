@@ -1,0 +1,53 @@
+@namespace Mokaterm.UI.Common.Components
+
+@* The one header every Mokaterm dialog and tool window draws: the icon, the title, what it is about (a session's
+   label for a tool), buttons of its own, and Close. Moka's dialog header takes a plain string, so it is left out and
+   this one sits at the top of the dialog instead. *@
+<div class="mt-dialog-head @Class">
+	@if (Icon is { } icon)
+	{
+		<span class="mt-dialog-head-icon" aria-hidden="true">
+			<MokaIcon Icon="icon" SizeValue="16px" />
+		</span>
+	}
+	<h2 class="mt-dialog-head-title" id="@TitleId">@Title</h2>
+	@if (Detail is not null)
+	{
+		<span class="mt-dialog-head-detail">@Detail</span>
+	}
+	<span class="mt-dialog-head-spacer"></span>
+	@Actions
+	@if (ShowClose)
+	{
+		<DialogHeaderButton Icon="MokaIcons.Navigation.Close" Title="Close" SizeValue="18px" OnClick="OnClose" />
+	}
+</div>
+
+@code {
+	[Parameter]
+	public MokaIconDefinition? Icon { get; set; }
+
+	[Parameter]
+	public string? Title { get; set; }
+
+	/// <summary>The heading's id, which the dialog names itself by.</summary>
+	[Parameter]
+	public string? TitleId { get; set; }
+
+	/// <summary>What the dialog is about, after the title: a session's label for a tool.</summary>
+	[Parameter]
+	public RenderFragment? Detail { get; set; }
+
+	/// <summary>Buttons before Close, such as moving a tool to a window of its own.</summary>
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+
+	[Parameter]
+	public bool ShowClose { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	[Parameter]
+	public string? Class { get; set; }
+}

@@ -13,6 +13,22 @@ public sealed class RemoteFileSystemDefaultsTests
 		Assert.True((await fileSystem.ListAccountsAsync(TestContext.Current.CancellationToken)).IsEmpty);
 	}
 
+	// A file system that leaves these out (FTP) fails them in a way the browser words for the user, and never offers them.
+	[Fact]
+	public async Task CopyAndArchives_AreNotSupported()
+	{
+		IRemoteFileSystem fileSystem = new TreeFileSystem();
+		CancellationToken token = TestContext.Current.CancellationToken;
+
+		RemoteFileSystemException copy = await Assert.ThrowsAsync<RemoteFileSystemException>(async () => await fileSystem.CopyAsync("/srv/site", "/srv/copy", overwrite: false, token));
+		RemoteFileSystemException compress = await Assert.ThrowsAsync<RemoteFileSystemException>(async () => await fileSystem.CompressAsync("/srv", ["site"], "/srv/site.tar.gz", token));
+		RemoteFileSystemException extract = await Assert.ThrowsAsync<RemoteFileSystemException>(async () => await fileSystem.ExtractAsync("/srv/site.tar.gz", "/srv/site", token));
+
+		Assert.All(new[] { copy, compress, extract }, failure => Assert.Equal(RemoteFileErrorKind.NotSupported, failure.Kind));
+		Assert.Equal("This connection cannot copy on the server.", copy.Message);
+		Assert.Equal(RemoteFileSystemFeatures.None, fileSystem.Features & (RemoteFileSystemFeatures.Copy | RemoteFileSystemFeatures.Archives));
+	}
+
 	[Fact]
 	public async Task WholeModeForEverything_IsOneRecursiveSetPermissions()
 	{

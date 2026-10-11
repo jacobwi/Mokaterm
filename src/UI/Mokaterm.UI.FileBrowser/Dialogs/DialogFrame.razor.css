@@ -1,0 +1,7 @@
+/* The service dialog's body is padded and scrolls; the header takes back the padding and sticks to its top. */
+.mt-frame-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin: calc(-1 * var(--moka-spacing-lg)) calc(-1 * var(--moka-spacing-lg)) var(--moka-spacing-lg);
+}

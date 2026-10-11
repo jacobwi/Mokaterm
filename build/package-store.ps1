@@ -86,11 +86,17 @@ Get-ChildItem (Join-Path $repo 'src\Hosts\Mokaterm.Maui\obj') -Recurse -Filter '
 # ApplicationVersion is forced to 0 because MAUI's WinUI targets build the four-part version as
 # ApplicationDisplayVersion plus ApplicationVersion, and the csproj sets the latter to 1. Partner Center owns the last
 # part and refuses a package that sets it, so a default build produced 0.1.1.1 and would have been rejected.
+#
+# SelfContained carries the .NET runtime inside the package. A runtime identifier alone no longer implies it, and no
+# Store package installs the .NET 10 runtime, so 0.1.4 went out depending on one: certification flagged it under
+# 10.2.4.1 (undisclosed software dependencies), and a machine without .NET 10 could not start the app. The Windows App
+# SDK stays a framework package, because the Store installs a declared framework dependency by itself.
 Write-Host "Publishing $packageVersion for the Store..."
 & dotnet publish $project `
 	-c Release `
 	-f $framework `
 	-r $runtime `
+	-p:SelfContained=true `
 	-p:WindowsPackageType=MSIX `
 	-p:GenerateAppxPackageOnBuild=true `
 	-p:UapAppxPackageBuildMode=StoreUpload `

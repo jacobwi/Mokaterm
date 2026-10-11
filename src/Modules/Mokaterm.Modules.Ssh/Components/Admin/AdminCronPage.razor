@@ -1,0 +1,625 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Clock
+@using Mokaterm.Modules.Ssh.Admin.Cron
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Cron"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter by command"
+				PrimaryText="@(IsCrontabView && Capabilities.HasCrontab ? "Add cron job" : null)"
+				PrimaryIcon="MokaIcons.Action.Add"
+				PrimaryDisabled="@(Busy || _document is null)"
+				OnPrimary="StartAdd"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@DetailFragment">
+	<Chips>
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Scheduled jobs to show" />
+	</Chips>
+	<ChipsEnd>
+		@if (IsCrontabView && _document is not null)
+		{
+			<button type="button" class="mta-link" @onclick="@(() => _showRaw = !_showRaw)">@(_showRaw ? "show entries" : "show the raw crontab")</button>
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@switch (_view)
+		{
+			case "mine" or "root":
+				@if (!Capabilities.HasCrontab)
+				{
+					<MokaEmptyState Icon="SshIcons.Calendar" Title="No crontab command" Description="cron is not installed here, so there is no crontab to read or write. systemd timers, if any, are under Timers." />
+				}
+				else if (ForRoot && !ReadAsRoot)
+				{
+					<MokaEmptyState Icon="MokatermIcons.Root" Title="root's crontab needs root" Description="@(Context.RootChangeBlocked ?? "Turn on root mode to read and change it.")">
+						@if (Context.RootChangeBlocked is null)
+						{
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Lock" OnClick="Context.EnableRoot">Turn on root mode</MokaButton>
+						}
+					</MokaEmptyState>
+				}
+				else if (_crontabError is { } crontabError)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@crontabError</MokaAlert>
+				}
+				else if (_document is { } document)
+				{
+					@if (_showRaw)
+					{
+						<pre class="mta-pre mta-pre--fill">@(_loaded.Length == 0 ? "(empty)" : _loaded)</pre>
+					}
+					else if (!document.Entries.Any() && !document.Problems.Any())
+					{
+						<MokaEmptyState Icon="SshIcons.Calendar" Title="Nothing scheduled" Description="@($"{Owner}'s crontab has no entries. Add one to run a command on a schedule.")">
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="Busy" OnClick="StartAdd">Add cron job</MokaButton>
+						</MokaEmptyState>
+					}
+					else
+					{
+						<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1.3fr) 28px; --mta-cols-narrow: minmax(0, 1fr) 28px">
+							<div class="mta-row mta-row--head">
+								<span>When</span>
+								<span class="mta-wide">Command</span>
+								<span></span>
+							</div>
+							@foreach ((int index, CrontabEntry entry) in document.Entries.Where(pair => Matches(pair.Entry)))
+							{
+								<div class="@(index == _selected && !_editing ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+									 @key="index"
+									 role="button"
+									 tabindex="0"
+									 @onclick="@(() => Select(index))"
+									 @onkeydown="@(args => OnRowKey(args, index))"
+									 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(index, entry)))"
+									 @oncontextmenu:preventDefault="true">
+									<span class="mta-cell" title="@entry.Schedule.Text">
+										<span>@entry.Schedule.Describe()</span><br />
+										<span class="mta-mono mta-dim">@entry.Schedule.Text</span>
+									</span>
+									<span class="mta-cell mta-mono mta-wide" title="@entry.Command">@entry.Command</span>
+									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+										<MokaButton Variant="MokaVariant.Text"
+													Color="MokaColor.Surface"
+													Size="MokaSize.Xs"
+													StartIcon="MokaIcons.Navigation.MoreHorizontal"
+													OnClick="@(args => ShowRowMenu(args, MenuFor(index, entry)))"
+													aria-label="Actions for the entry" />
+									</span>
+								</div>
+							}
+							@foreach ((int number, CrontabLine line) in document.Problems)
+							{
+								<div class="mta-row" @key="@($"problem-{number}")">
+									<span class="mta-cell mta-mono" title="@line.Text">@($"line {number}: {line.Text}")</span>
+									<span class="mta-cell mta-wide" style="color:var(--moka-color-warning)" title="@line.Problem">@line.Problem</span>
+									<span></span>
+								</div>
+							}
+						</div>
+					}
+				}
+				break;
+
+			case "system":
+				@if (_systemError is { } systemError)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@systemError</MokaAlert>
+				}
+				else if (_systemFiles is { } files)
+				{
+					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 80px minmax(0, 1.4fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) 70px">
+						<div class="mta-row mta-row--head">
+							<span>When</span>
+							<span>User</span>
+							<span class="mta-wide">Command</span>
+							<span class="mta-wide">File</span>
+						</div>
+						@foreach (SystemCronFile file in files.Where(file => file.Document is not null))
+						{
+							@foreach ((int index, CrontabEntry entry) in file.Document!.Entries.Where(pair => Matches(pair.Entry)))
+							{
+								<div class="mta-row" @key="@($"{file.Path}/{index}")">
+									<span class="mta-cell" title="@entry.Schedule.Text">
+										<span>@entry.Schedule.Describe()</span><br />
+										<span class="mta-mono mta-dim">@entry.Schedule.Text</span>
+									</span>
+									<span class="mta-cell mta-mono">@entry.User</span>
+									<span class="mta-cell mta-mono mta-wide" title="@entry.Command">@entry.Command</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide" title="@file.Path">@file.Path</span>
+								</div>
+							}
+						}
+					</div>
+					<dl class="mta-kv" style="margin-top:var(--moka-spacing-sm)">
+						@foreach ((string period, IReadOnlyList<string> scripts) in _systemFolders)
+						{
+							<dt>@period</dt>
+							<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@(scripts.Count == 0 ? "nothing in /etc/cron." + period : string.Join("  ", scripts))</MokaText></dd>
+						}
+						@foreach (SystemCronFile unreadable in files.Where(file => !file.Readable))
+						{
+							<dt>Unreadable</dt>
+							<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@unreadable.Path</MokaText><span class="mta-dim mta-after">only root can read it</span></dd>
+						}
+					</dl>
+				}
+				break;
+
+			case "timers":
+				@if (_timersError is { } timersError)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@timersError</MokaAlert>
+				}
+				else if (_timers is { Count: 0 })
+				{
+					<MokaEmptyState Icon="SshIcons.Clock" Title="No timers" Description="systemd has no timer units loaded." />
+				}
+				else if (_timers is { } timers)
+				{
+					<div class="mta-table" style="--mta-cols: 14px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); --mta-cols-narrow: 14px minmax(0, 1fr) minmax(0, 1fr)">
+						<div class="mta-row mta-row--head">
+							<span></span>
+							<span>Timer</span>
+							<span>Next</span>
+							<span class="mta-wide">Last</span>
+						</div>
+						@foreach (SystemTimer timer in timers.Where(timer => _filter.Trim().Length == 0 || timer.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)))
+						{
+							<div class="mta-row" @key="timer.Name">
+								<MokaStatusDot Size="MokaSize.Xs" Color="@(timer.ActiveState == "active" ? MokaColor.Success : MokaColor.Surface)" Glow="@(timer.ActiveState == "active")" />
+								<span class="mta-cell" title="@($"{timer.Description}. Starts {timer.Activates}.")">
+									<span class="mta-mono">@timer.Name</span><br />
+									<span class="mta-mono mta-dim">@timer.Schedule</span>
+								</span>
+								<span class="mta-cell mta-mono" title="@timer.Next">@(timer.Next.Length == 0 ? "never" : timer.Next)</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide" title="@timer.Last">@(timer.Last.Length == 0 ? "never" : timer.Last)</span>
+							</div>
+						}
+					</div>
+				}
+				break;
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private static readonly (string Label, string Schedule)[] Presets =
+	[
+		("Every 5 minutes", "*/5 * * * *"),
+		("Hourly", "0 * * * *"),
+		("Daily 03:00", "0 3 * * *"),
+		("Weekdays 08:00", "0 8 * * 1-5"),
+		("Sundays 04:00", "0 4 * * 0"),
+		("Monthly", "0 2 1 * *"),
+		("At boot", "@reboot"),
+	];
+
+	private string _view = "mine";
+	private string _filter = "";
+	private string _loaded = "";
+	private CrontabDocument? _document;
+	private string? _crontabError;
+	private bool _showRaw;
+	private IReadOnlyList<SystemCronFile>? _systemFiles;
+	private IReadOnlyList<(string Period, IReadOnlyList<string> Scripts)> _systemFolders = [];
+	private string? _systemError;
+	private IReadOnlyList<SystemTimer>? _timers;
+	private string? _timersError;
+	private DateTime? _serverNow;
+	private string _serverZone = "";
+
+	private int? _selected;
+	private bool _editing;
+	private int? _editIndex;
+	private string? _nickname;
+	private readonly string[] _fields = ["0", "3", "*", "*", "*"];
+	private string _command = "";
+	private int _editorVersion;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private bool ForRoot => _view == "root";
+
+	private bool IsCrontabView => _view is "mine" or "root";
+
+	private string Owner => ForRoot ? "root" : Profile.Facts.UserName;
+
+	private string Summary => _view switch
+	{
+		"mine" or "root" when _document is { } document => $"{Owner}'s crontab, {AdminFormat.Count(document.Entries.Count())} entries{(_serverZone.Length > 0 ? $" · server time {_serverZone}" : "")}",
+		"system" when _systemFiles is { } files => $"{AdminFormat.Count(files.Sum(file => file.Document?.Entries.Count() ?? 0))} entries in /etc/crontab and /etc/cron.d, read only",
+		"timers" when _timers is { } timers => $"{AdminFormat.Count(timers.Count)} systemd timers, read only",
+		_ => "",
+	};
+
+	private IReadOnlyList<AdminChip> Chips
+	{
+		get
+		{
+			List<AdminChip> chips = [];
+			if (Capabilities.HasCrontab)
+			{
+				chips.Add(new("mine", Profile.Facts.IsRoot ? "root" : Profile.Facts.UserName));
+				if (!Profile.Facts.IsRoot)
+				{
+					chips.Add(new("root", "root"));
+				}
+			}
+
+			chips.Add(new("system", "System files"));
+			if (Capabilities.HasTimers)
+			{
+				chips.Add(new("timers", "Timers"));
+			}
+
+			return chips;
+		}
+	}
+
+	/// <summary>Why the crontab cannot be written from here, or null.</summary>
+	private string? WriteBlocked => !Feature.SupportsInput
+		? "This session cannot hand a crontab to the server."
+		: ForRoot ? Context.RootChangeBlocked : null;
+
+	private RenderFragment? DetailFragment => !IsCrontabView ? null : _editing ? EditorPanel : SelectedEntry is null ? null : EntryPanel;
+
+	private CrontabEntry? SelectedEntry => _selected is { } index && _document is { } document && index < document.Lines.Count
+		? document.Lines[index].Entry
+		: null;
+
+	protected override void OnInitialized()
+	{
+		if (!Capabilities.HasCrontab)
+		{
+			_view = Capabilities.HasTimers ? "timers" : "system";
+		}
+	}
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		Task clock = LoadClockAsync(cancellationToken);
+		switch (_view)
+		{
+			case "mine" or "root":
+				await LoadCrontabAsync(cancellationToken);
+				break;
+			case "system":
+				await LoadSystemAsync(cancellationToken);
+				break;
+			case "timers":
+				await LoadTimersAsync(cancellationToken);
+				break;
+		}
+
+		await clock;
+	}
+
+	private RenderFragment EntryPanel => __builder =>
+	{
+		if (SelectedEntry is not { } entry || _selected is not { } index)
+		{
+			return;
+		}
+
+		<AdminDetailPanel Title="@entry.Schedule.Describe()" Subtitle="@entry.Schedule.Text" Mono="false" OnClose="@(() => _selected = null)">
+			<Actions>
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" Disabled="Busy" OnClick="@(() => StartEdit(index, entry))">Edit</MokaButton>
+				<MokaButton Variant="MokaVariant.Outlined"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Delete"
+							Disabled="@(Busy || WriteBlocked is not null)"
+							title="@WriteBlocked"
+							OnClick="@(() => DeleteAsync(index, entry))">
+					Delete
+				</MokaButton>
+			</Actions>
+			<ChildContent>
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command</MokaText>
+				<pre class="mta-pre mta-pre--commands">@entry.Command</pre>
+				@NextRunsFragment(entry.Schedule)
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment EditorPanel => __builder =>
+	{
+		CrontabEntry? draft = Draft(out string? problem);
+		<AdminDetailPanel Title="@(_editIndex is null ? $"New cron job for {Owner}" : "Edit cron job")" Mono="false" OnClose="CancelEdit">
+			<div class="mta-chips">
+				@foreach ((string label, string preset) in Presets)
+				{
+					<button type="button" class="@(CurrentSchedule == preset ? "mta-chip mta-chip--active" : "mta-chip")" @onclick="@(() => UsePreset(preset))">@label</button>
+				}
+			</div>
+			@if (_nickname is { } nickname)
+			{
+				<div class="mta-inline">
+					<MokaTag Text="@nickname" Size="MokaSize.Sm" Color="MokaColor.Info" />
+					<button type="button" class="mta-link" @onclick="UseFields">use the five fields instead</button>
+				</div>
+			}
+			else
+			{
+				<div class="mta-form" style="grid-template-columns: repeat(auto-fit, minmax(84px, 1fr))" @key="_editorVersion">
+					<TextSetting Label="Minute" Value="@_fields[0]" ValueChanged="@(value => _fields[0] = value)" Validate="@(text => FieldProblem(CronFieldKind.Minute, text))" Placeholder="0-59" />
+					<TextSetting Label="Hour" Value="@_fields[1]" ValueChanged="@(value => _fields[1] = value)" Validate="@(text => FieldProblem(CronFieldKind.Hour, text))" Placeholder="0-23" />
+					<TextSetting Label="Day" Value="@_fields[2]" ValueChanged="@(value => _fields[2] = value)" Validate="@(text => FieldProblem(CronFieldKind.DayOfMonth, text))" Placeholder="1-31" />
+					<TextSetting Label="Month" Value="@_fields[3]" ValueChanged="@(value => _fields[3] = value)" Validate="@(text => FieldProblem(CronFieldKind.Month, text))" Placeholder="1-12" />
+					<TextSetting Label="Weekday" Value="@_fields[4]" ValueChanged="@(value => _fields[4] = value)" Validate="@(text => FieldProblem(CronFieldKind.DayOfWeek, text))" Placeholder="0-7" />
+				</div>
+			}
+			<TextSetting Label="Command" Value="@_command" ValueChanged="@(value => _command = value)" Validate="CrontabEntry.CheckCommand" Placeholder="/usr/local/bin/backup.sh" @key="@($"command-{_editorVersion}")" />
+			@if (CrontabEntry.PercentNote(_command) is { } note)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-warning)">@note</MokaText>
+			}
+			@if (CronSchedule.TryParse(CurrentSchedule, out _) is { } schedule)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Preview</MokaText>
+				<div class="mta-inline">
+					<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow />
+					<MokaText Element="span" Size="MokaSize.Sm">@schedule.Describe()</MokaText>
+				</div>
+				@if (draft is not null)
+				{
+					<pre class="mta-pre mta-pre--commands">@draft.Format()</pre>
+				}
+				@NextRunsFragment(schedule)
+			}
+			else if (problem is not null)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-warning)">@problem</MokaText>
+			}
+			@if (WriteBlocked is { } blocked)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@blocked The preview still shows what a schedule means.</MokaText>
+			}
+			<div class="mta-form-actions">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CancelEdit">Cancel</MokaButton>
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || draft is null || WriteBlocked is not null)" OnClick="SaveEntryAsync">Save</MokaButton>
+			</div>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment NextRunsFragment(CronSchedule schedule) => __builder =>
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Next runs</MokaText>
+		@if (schedule.IsReboot)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">At every boot, so there is no time to show.</MokaText>
+		}
+		else if (_serverNow is { } now)
+		{
+			IReadOnlyList<DateTime> runs = schedule.NextRuns(now, 3);
+			@if (runs.Count == 0)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-warning)">This schedule never comes round within five years.</MokaText>
+			}
+			else
+			{
+				<ul class="mta-runs">
+					@foreach (DateTime run in runs)
+					{
+						<li>@run.ToString("ddd d MMM yyyy  HH:mm", CultureInfo.InvariantCulture)<span class="mta-dim mta-after">in @AdminFormat.Span(run - now)</span></li>
+					}
+				</ul>
+			}
+		}
+		else
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The server's clock was not read, so the next times are not known.</MokaText>
+		}
+	};
+
+	private string CurrentSchedule => _nickname ?? string.Join(' ', _fields);
+
+	private static string? FieldProblem(CronFieldKind kind, string text)
+	{
+		CronField.TryParse(kind, text, out string? problem);
+		return problem;
+	}
+
+	private bool Matches(CrontabEntry entry) => _filter.Trim().Length == 0
+		|| entry.Command.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| entry.Schedule.Describe().Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(int index, CrontabEntry entry) =>
+	[
+		new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(index, keepOpen: true) },
+		new MokaContextMenuItem { Text = "Edit", Icon = MokaIcons.Action.Edit, DividerBefore = true, Disabled = Busy, OnClickSync = () => StartEdit(index, entry) },
+		new MokaContextMenuItem { Text = "Delete", Icon = MokaIcons.Action.Delete, Disabled = Busy || WriteBlocked is not null, OnClick = () => DeleteAsync(index, entry) },
+	];
+
+	private async Task LoadClockAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			ClockInfo clock = ClockCommands.Parse((await ReadAsync(Capabilities.Clock.Read(), cancellationToken)).Output);
+			_serverZone = clock.TimeZone;
+			_serverNow = clock.LocalTime.Length >= 19
+				&& DateTime.TryParseExact(clock.LocalTime[..19], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime now)
+				? now
+				: null;
+		}
+		catch (AdminException)
+		{
+			_serverNow = null;
+		}
+	}
+
+	private async Task LoadCrontabAsync(CancellationToken cancellationToken)
+	{
+		_crontabError = null;
+		if (ForRoot && !ReadAsRoot)
+		{
+			_document = null;
+			return;
+		}
+
+		AdminOutcome outcome = await ReadAsync(CronCommands.Read(ForRoot), cancellationToken);
+		if (CronCommands.ReadResult(outcome, out string? problem) is { } text)
+		{
+			_loaded = text;
+			_document = CrontabDocument.Parse(text);
+		}
+		else
+		{
+			_document = null;
+			_crontabError = problem;
+		}
+	}
+
+	private async Task LoadSystemAsync(CancellationToken cancellationToken)
+	{
+		_systemError = null;
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(CronCommands.ReadSystem(ReadAsRoot), cancellationToken);
+			_systemFiles = CronCommands.ParseSystemFiles(outcome.Output);
+			_systemFolders = CronCommands.ParseSystemFolders(outcome.Output);
+		}
+		catch (AdminException ex)
+		{
+			_systemError = ex.Message;
+		}
+	}
+
+	private async Task LoadTimersAsync(CancellationToken cancellationToken)
+	{
+		_timersError = null;
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(CronCommands.ListTimers(), cancellationToken);
+			_timers = CronCommands.ParseTimers(outcome.Output);
+		}
+		catch (AdminException ex)
+		{
+			_timersError = ex.Message;
+		}
+	}
+
+	private async Task OnViewChangedAsync(string value)
+	{
+		_view = value;
+		_editing = false;
+		_selected = null;
+		_showRaw = false;
+		await ReloadAsync();
+	}
+
+	private CrontabEntry? Draft(out string? problem) => CrontabEntry.TryCreate(CurrentSchedule, _command, out problem);
+
+	private void Select(int index) => Select(index, keepOpen: false);
+
+	private void Select(int index, bool keepOpen)
+	{
+		_editing = false;
+		_selected = _selected == index && !keepOpen ? null : index;
+	}
+
+	private void OnRowKey(KeyboardEventArgs args, int index)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(index);
+		}
+	}
+
+	private void StartAdd()
+	{
+		_showRaw = false;
+		_editing = true;
+		_editIndex = null;
+		_selected = null;
+		_nickname = null;
+		string[] defaults = ["0", "3", "*", "*", "*"];
+		defaults.CopyTo(_fields, 0);
+		_command = "";
+		_editorVersion++;
+	}
+
+	private void StartEdit(int index, CrontabEntry entry)
+	{
+		_editing = true;
+		_editIndex = index;
+		_selected = index;
+		_command = entry.Command;
+		if (entry.Schedule.Nickname is { } nickname)
+		{
+			_nickname = nickname;
+		}
+		else
+		{
+			_nickname = null;
+			entry.Schedule.Text.Split(' ').CopyTo(_fields, 0);
+		}
+
+		_editorVersion++;
+	}
+
+	private void CancelEdit()
+	{
+		_editing = false;
+		_editIndex = null;
+	}
+
+	private void UsePreset(string schedule)
+	{
+		if (schedule.StartsWith('@'))
+		{
+			_nickname = schedule;
+			return;
+		}
+
+		_nickname = null;
+		schedule.Split(' ').CopyTo(_fields, 0);
+		_editorVersion++;
+	}
+
+	private void UseFields()
+	{
+		if (_nickname is { } nickname && CronSchedule.Nicknames.TryGetValue(nickname, out string? fields) && fields is not null)
+		{
+			fields.Split(' ').CopyTo(_fields, 0);
+		}
+
+		_nickname = null;
+		_editorVersion++;
+	}
+
+	private async Task SaveEntryAsync()
+	{
+		if (_document is not { } document || Draft(out _) is not { } entry || WriteBlocked is not null)
+		{
+			return;
+		}
+
+		CrontabDocument changed = _editIndex is { } index ? document.Replace(index, entry) : document.Add(entry);
+		string title = _editIndex is null ? $"Add a cron job to {Owner}'s crontab" : $"Change a cron job in {Owner}'s crontab";
+		if (await WriteAsync(changed, title) is { Succeeded: true })
+		{
+			CancelEdit();
+		}
+	}
+
+	private async Task DeleteAsync(int index, CrontabEntry entry)
+	{
+		if (_document is { } document && await WriteAsync(document.Remove(index), $"Remove \"{entry.Schedule.Text}\" from {Owner}'s crontab") is { Succeeded: true })
+		{
+			_selected = null;
+		}
+	}
+
+	private Task<AdminActionResult?> WriteAsync(CrontabDocument document, string title)
+	{
+		(AdminAction action, string input) = CronCommands.Write(document, _loaded, ForRoot, Owner, title);
+		return RunAsync(action, AdminInput.Visible(input));
+	}
+}

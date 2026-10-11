@@ -12,15 +12,22 @@ namespace Mokaterm.Core.Settings;
 /// </summary>
 internal static class SettingsSanitizer
 {
-	public static T Sanitize<T>(T section) where T : class, ISettingsSection => section switch
+	public static T Sanitize<T>(T section) where T : class, ISettingsSection => (T)SanitizeSection(section);
+
+	/// <summary>
+	/// The same for a section whose type is only known at run time, such as one read from an imported settings file.
+	/// </summary>
+	public static object SanitizeSection(object section) => section switch
 	{
-		AppearanceSettings appearance => (T)(object)Sanitize(appearance),
-		TerminalSettings terminal => (T)(object)Sanitize(terminal),
-		SecuritySettings security => (T)(object)Sanitize(security),
-		FileTransferSettings files => (T)(object)Sanitize(files),
-		GeneralSettings general => (T)(object)Sanitize(general),
-		UpdateSettings updates => (T)(object)Sanitize(updates),
-		SessionLogSettings sessionLog => (T)(object)Sanitize(sessionLog),
+		AppearanceSettings appearance => Sanitize(appearance),
+		TerminalSettings terminal => Sanitize(terminal),
+		SecuritySettings security => Sanitize(security),
+		FileTransferSettings files => Sanitize(files),
+		GeneralSettings general => Sanitize(general),
+		UpdateSettings updates => Sanitize(updates),
+		SessionLogSettings sessionLog => Sanitize(sessionLog),
+		CommandRunSettings commandRun => commandRun.Clamped(),
+		TerminalTriggerSettings triggers => Sanitize(triggers),
 		_ => section,
 	};
 
@@ -31,7 +38,35 @@ internal static class SettingsSanitizer
 		{
 			Mode = Defined(settings.Mode, defaults.Mode),
 			Density = Defined(settings.Density, defaults.Density),
+			ToolbarLayout = Defined(settings.ToolbarLayout, defaults.ToolbarLayout),
+			HiddenToolbarButtons = ToolbarButtonIds(settings.HiddenToolbarButtons),
 		};
+	}
+
+	/// <summary>Blank, overlong and repeated ids are dropped, and the list is capped, so a hand edit cannot grow it.</summary>
+	private static IReadOnlyList<string> ToolbarButtonIds(IReadOnlyList<string>? ids)
+	{
+		if (ids is null)
+		{
+			return [];
+		}
+
+		List<string> kept = [];
+		HashSet<string> seen = new(StringComparer.Ordinal);
+		foreach (string? id in ids)
+		{
+			string trimmed = id?.Trim() ?? "";
+			if (trimmed.Length is > 0 and <= AppearanceSettings.MaxToolbarButtonIdLength && seen.Add(trimmed))
+			{
+				kept.Add(trimmed);
+				if (kept.Count == AppearanceSettings.MaxHiddenToolbarButtons)
+				{
+					break;
+				}
+			}
+		}
+
+		return kept.Count == ids.Count && kept.SequenceEqual(ids, StringComparer.Ordinal) ? ids : kept;
 	}
 
 	private static TerminalSettings Sanitize(TerminalSettings settings)
@@ -88,6 +123,38 @@ internal static class SettingsSanitizer
 				SessionLogSettings.MaxSizeLimitKilobytes),
 			Format = Defined(settings.Format, defaults.Format),
 		};
+	}
+
+	/// <summary>
+	/// The count and the pattern length come from <see cref="TerminalTriggerSettings.Clamped"/>. Here a color that names
+	/// nothing goes back to none, and a rule without an id, or with one an earlier rule already has, gets a new one, since
+	/// the settings page tells rules apart by it.
+	/// </summary>
+	private static TerminalTriggerSettings Sanitize(TerminalTriggerSettings settings)
+	{
+		TerminalTriggerSettings clamped = settings.Clamped();
+		HashSet<Guid> ids = [];
+		List<TerminalTrigger> rules = new(clamped.Rules.Count);
+		bool changed = false;
+		foreach (TerminalTrigger rule in clamped.Rules)
+		{
+			TerminalTrigger usable = rule;
+			if (!Enum.IsDefined(usable.Highlight))
+			{
+				usable = usable with { Highlight = TriggerColor.None };
+			}
+
+			if (!ids.Add(usable.Id) || usable.Id == Guid.Empty)
+			{
+				usable = usable with { Id = Guid.NewGuid() };
+				ids.Add(usable.Id);
+			}
+
+			changed |= !ReferenceEquals(usable, rule);
+			rules.Add(usable);
+		}
+
+		return changed ? clamped with { Rules = rules } : clamped;
 	}
 
 	/// <summary>Drops custom themes a hand edit left without an id, name or color, and later duplicates of an id.</summary>

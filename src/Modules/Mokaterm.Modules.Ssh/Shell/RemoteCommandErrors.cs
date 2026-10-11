@@ -11,7 +11,8 @@ internal static class RemoteCommandErrors
 		RemoteScripts.ExitNotFound => new RemoteFileSystemException(RemoteFileErrorKind.NotFound, $"{path} does not exist.", path),
 		RemoteScripts.ExitAlreadyExists => new RemoteFileSystemException(RemoteFileErrorKind.AlreadyExists, $"{destination ?? path} already exists.", destination ?? path),
 		RemoteScripts.ExitDirectoryNotEmpty => new RemoteFileSystemException(RemoteFileErrorKind.DirectoryNotEmpty, $"{destination ?? path} is a directory that is not empty.", destination ?? path),
-		RemoteScripts.ExitWrongKind => new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"{destination ?? path} is a directory.", destination ?? path),
+		RemoteScripts.ExitWrongKind => new RemoteFileSystemException(RemoteFileErrorKind.Unknown, StatedOr(error, $"{destination ?? path} is a directory."), destination ?? path),
+		RemoteScripts.ExitUnsupported => new RemoteFileSystemException(RemoteFileErrorKind.NotSupported, MissingTool(error), path),
 		_ => FromMessage(error, path),
 	};
 
@@ -28,6 +29,13 @@ internal static class RemoteCommandErrors
 		string message = line.Length > 0 ? line : $"The command for {path} failed.";
 		return new RemoteFileSystemException(kind, message, path);
 	}
+
+	// A script that can say what is wrong (which tool is missing, which kind is in the way) says so on its first stderr
+	// line, which beats a general answer.
+	private static string MissingTool(string error) => StatedOr(error, "The server has no tool for this.");
+
+	private static string StatedOr(string error, string fallback) =>
+		SudoErrors.FirstLine(error) is { Length: > 0 } line ? line : fallback;
 
 	private static bool Has(string text, string value) => text.Contains(value, StringComparison.OrdinalIgnoreCase);
 }

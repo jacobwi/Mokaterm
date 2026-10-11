@@ -1,0 +1,354 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Services
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Services"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="OnFilterChanged"
+				SearchPlaceholder="Filter by name or description"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@(Selected is null ? null : DetailPanel)">
+	<Chips>
+		@if (Capabilities.Services is not null)
+		{
+			<AdminChips Items="Chips" Value="@_state" ValueChanged="OnStateChanged" AriaLabel="Show services" />
+		}
+	</Chips>
+	<ChildContent>
+		@if (Capabilities.Services is null)
+		{
+			<MokaEmptyState Icon="SshIcons.Gear" Title="No service manager" Description="@Capabilities.ServicesMissing" />
+		}
+		else if (Shown.Count == 0)
+		{
+			<MokaEmptyState Icon="SshIcons.Gear"
+							Title="@(_units.Count == 0 ? "No services" : "Nothing matches")"
+							Description="@(_units.Count == 0 ? "The service manager listed none." : "No service matches the filter. Clear it or pick All.")" />
+		}
+		else
+		{
+			<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) 128px 84px 28px; --mta-cols-narrow: 14px minmax(0, 1fr) 84px 28px">
+				<div class="mta-row mta-row--head">
+					<span></span>
+					<AdminSortHeader Text="Service" Key="name" Sort="_sort" OnChanged="ApplyFilter" />
+					<AdminSortHeader Text="State" Key="state" Sort="_sort" OnChanged="ApplyFilter" Class="mta-wide" />
+					<AdminSortHeader Text="At boot" Key="boot" Sort="_sort" OnChanged="ApplyFilter" />
+					<span></span>
+				</div>
+				@foreach (ServiceUnit unit in Shown.Take(MaxRows))
+				{
+					<div class="@(unit.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+						 @key="unit.Name"
+						 role="button"
+						 tabindex="0"
+						 aria-pressed="@(unit.Name == _selected ? "true" : "false")"
+						 @onclick="@(() => SelectAsync(unit))"
+						 @onkeydown="@(args => OnRowKeyAsync(args, unit))"
+						 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(unit)))"
+						 @oncontextmenu:preventDefault="true">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(unit.State)" Glow="@(unit.State is ServiceState.Running or ServiceState.Failed or ServiceState.Changing)" />
+						<span class="mta-cell" title="@unit.Description">
+							<span class="mta-mono">@unit.Name</span>
+							@if (unit.Description.Length > 0)
+							{
+								<span class="mta-dim mta-after">@unit.Description</span>
+							}
+						</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide">@unit.StateText</span>
+						<span class="mta-cell mta-mono @(unit.Enabled == true ? "" : "mta-dim")">@BootText(unit)</span>
+						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										StartIcon="MokaIcons.Navigation.MoreHorizontal"
+										OnClick="@(args => ShowRowMenu(args, MenuFor(unit)))"
+										aria-label="@($"Actions for {unit.Name}")" />
+						</span>
+					</div>
+				}
+				@if (Shown.Count > MaxRows)
+				{
+					<div class="mta-more">@($"{AdminFormat.Count(Shown.Count - MaxRows)} more. Narrow the filter to see them.")</div>
+				}
+			</div>
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private const int MaxRows = 400;
+
+	private IReadOnlyList<ServiceUnit> _units = [];
+	private List<ServiceUnit> _shown = [];
+	private readonly AdminSort _sort = new("name");
+	private string _filter = "";
+	private string _state = "all";
+	private string? _selected;
+	private string? _status;
+	private string? _statusError;
+	private bool _statusLoading;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private List<ServiceUnit> Shown => _shown;
+
+	private ServiceUnit? Selected => _selected is { } name ? _units.FirstOrDefault(unit => unit.Name == name) : null;
+
+	private int Failed => _units.Count(unit => unit.State == ServiceState.Failed);
+
+	private string Summary => Capabilities.Services is not { } services
+		? "no service manager"
+		: $"{AdminFormat.Count(_units.Count)} services, {AdminFormat.Count(_units.Count(unit => unit.IsRunning))} running, {AdminFormat.Count(Failed)} failed · {InitName(services.Init)}";
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("all", "All", _units.Count),
+		new("running", "Running", _units.Count(unit => unit.IsRunning)),
+		new("failed", "Failed", Failed, Alert: true),
+		new("stopped", "Stopped", _units.Count(unit => unit.State == ServiceState.Stopped)),
+	];
+
+	protected override void OnInitialized()
+	{
+		if (Context.TakeHint() is "failed")
+		{
+			_state = "failed";
+		}
+	}
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Services is not { } services)
+		{
+			return;
+		}
+
+		AdminOutcome outcome = await ReadAsync(services.List(), cancellationToken);
+		_units = services.ParseList(outcome.Output);
+		ApplyFilter();
+		if (_selected is { } selected && _units.Any(unit => unit.Name == selected))
+		{
+			await LoadStatusAsync(selected);
+		}
+	}
+
+	private RenderFragment DetailPanel => __builder =>
+	{
+		if (Selected is not { } unit)
+		{
+			return;
+		}
+
+		<AdminDetailPanel Title="@unit.Name"
+						  Subtitle="@unit.Description"
+						  DotColor="@StateColor(unit.State)"
+						  DotGlow="@(unit.State is ServiceState.Running or ServiceState.Failed)"
+						  OnClose="CloseDetail">
+			<Actions>
+				@foreach (ServiceAction action in Actions(unit))
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="@(action is ServiceAction.Stop or ServiceAction.Disable ? MokaColor.Error : MokaColor.Primary)"
+								Size="MokaSize.Xs"
+								Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+								title="@Context.RootChangeBlocked"
+								OnClick="@(() => ActAsync(action, unit))">
+						@action
+					</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					<dt>State</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(unit.StateText.Length > 0 ? unit.StateText : "unknown")</MokaText></dd>
+					<dt>At boot</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@BootText(unit)</MokaText></dd>
+				</dl>
+				<div class="mta-inline">
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">
+						@(Capabilities.Services?.StatusIncludesLog == true ? "Status and recent log" : "Status")
+					</MokaText>
+					<span class="mta-spacer"></span>
+					<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => LoadStatusAsync(unit.Name))">read again</button>
+				</div>
+				@if (_statusError is { } statusError)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@statusError</MokaAlert>
+				}
+				else if (_status is { } status)
+				{
+					<pre class="mta-pre mta-pre--fill">@status</pre>
+				}
+				else
+				{
+					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private static MokaColor StateColor(ServiceState state) => state switch
+	{
+		ServiceState.Running or ServiceState.Exited => MokaColor.Success,
+		ServiceState.Changing => MokaColor.Warning,
+		ServiceState.Failed => MokaColor.Error,
+		_ => MokaColor.Surface,
+	};
+
+	private static string InitName(InitSystem init) => init switch
+	{
+		InitSystem.Systemd => "systemd",
+		InitSystem.OpenRc => "OpenRC",
+		InitSystem.SysV => "sysvinit",
+		_ => "BusyBox init",
+	};
+
+	private static string BootText(ServiceUnit unit) => unit.EnabledText.Length > 0
+		? unit.EnabledText
+		: unit.Enabled switch { true => "enabled", false => "disabled", _ => "" };
+
+	private IEnumerable<ServiceAction> Actions(ServiceUnit unit)
+	{
+		yield return unit.IsRunning ? ServiceAction.Restart : ServiceAction.Start;
+		if (unit.IsRunning || unit.State == ServiceState.Unknown)
+		{
+			yield return ServiceAction.Stop;
+		}
+
+		if (Capabilities.Services?.CanEnable == true && unit.EnabledText is not ("static" or "masked" or "indirect" or "generated" or "transient"))
+		{
+			yield return unit.Enabled == true ? ServiceAction.Disable : ServiceAction.Enable;
+		}
+	}
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(ServiceUnit unit)
+	{
+		bool blocked = Busy || Context.RootChangeBlocked is not null;
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Show status", OnClick = () => SelectAsync(unit, keepOpen: true) }];
+		bool first = true;
+		foreach (ServiceAction action in Actions(unit))
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = action.ToString(),
+				Disabled = blocked,
+				DividerBefore = first,
+				OnClick = () => ActAsync(action, unit),
+			});
+			first = false;
+		}
+
+		return items;
+	}
+
+	private void OnFilterChanged(string value)
+	{
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void OnStateChanged(string value)
+	{
+		_state = value;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		string filter = _filter.Trim();
+		IEnumerable<ServiceUnit> matching = _units
+			.Where(unit => _state switch
+			{
+				"running" => unit.IsRunning,
+				"stopped" => unit.State == ServiceState.Stopped,
+				"failed" => unit.State == ServiceState.Failed,
+				_ => true,
+			})
+			.Where(unit => filter.Length == 0
+				|| unit.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+				|| unit.Description.Contains(filter, StringComparison.OrdinalIgnoreCase));
+
+		_shown =
+		[
+			.. _sort.Key switch
+			{
+				"state" => _sort.Apply(matching, unit => unit.StateText),
+				"boot" => _sort.Apply(matching, BootText),
+				_ => _sort.Apply(matching, unit => unit.Name),
+			},
+		];
+	}
+
+	private Task SelectAsync(ServiceUnit unit) => SelectAsync(unit, keepOpen: false);
+
+	private async Task SelectAsync(ServiceUnit unit, bool keepOpen)
+	{
+		if (_selected == unit.Name && !keepOpen)
+		{
+			CloseDetail();
+			return;
+		}
+
+		_selected = unit.Name;
+		await LoadStatusAsync(unit.Name);
+	}
+
+	private void CloseDetail()
+	{
+		_selected = null;
+		_status = null;
+		_statusError = null;
+	}
+
+	private async Task OnRowKeyAsync(KeyboardEventArgs args, ServiceUnit unit)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			await SelectAsync(unit);
+		}
+	}
+
+	private async Task LoadStatusAsync(string name)
+	{
+		if (Capabilities.Services is not { } services)
+		{
+			return;
+		}
+
+		_statusLoading = true;
+		_status = null;
+		_statusError = null;
+		StateHasChanged();
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(services.Status(name, ReadAsRoot), CancellationToken.None);
+			if (_selected == name)
+			{
+				string status = AdminText.Clean(outcome.Output).TrimEnd();
+				_status = status.Length > 0 ? status : outcome.Problem();
+			}
+		}
+		catch (AdminException ex)
+		{
+			_statusError = ex.Message;
+		}
+		finally
+		{
+			_statusLoading = false;
+		}
+	}
+
+	private async Task ActAsync(ServiceAction action, ServiceUnit unit)
+	{
+		if (Capabilities.Services is { } services)
+		{
+			_selected = unit.Name;
+			await RunAsync(services.Act(action, unit.Name));
+		}
+	}
+}

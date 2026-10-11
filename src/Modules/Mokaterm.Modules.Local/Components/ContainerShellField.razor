@@ -1,0 +1,69 @@
+@using Mokaterm.Modules.Local.Containers
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaSelect TValue="ContainerShell"
+				Label="Shell"
+				Items="Shells"
+				Value="Shell"
+				ValueChanged="ShellChanged"
+				ValueSelector="Label"
+				HelperText="@Help"
+				Disabled="Disabled"
+				Size="MokaSize.Sm" />
+
+	@if (Shell == ContainerShell.Custom)
+	{
+		<MokaTextField Label="Command"
+					   Value="@(Command ?? "")"
+					   ValueChanged="CommandChanged"
+					   ErrorText="@CommandError"
+					   Placeholder="python3, or /usr/bin/fish -l"
+					   HelperText="@CommandHelp"
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	}
+</MokaFlexbox>
+
+@code {
+	private static readonly IReadOnlyList<ContainerShell> Shells = [ContainerShell.Auto, ContainerShell.Bash, ContainerShell.Sh, ContainerShell.Custom];
+
+	[Parameter]
+	public ContainerShell Shell { get; set; }
+
+	[Parameter]
+	public EventCallback<ContainerShell> ShellChanged { get; set; }
+
+	[Parameter]
+	public string? Command { get; set; }
+
+	[Parameter]
+	public EventCallback<string?> CommandChanged { get; set; }
+
+	/// <summary>The program the command is handed to, for the help text: <c>docker</c>, <c>kubectl</c>.</summary>
+	[Parameter]
+	public string Tool { get; set; } = "docker";
+
+	[Parameter]
+	public bool Disabled { get; set; }
+
+	private string Help => Shell switch
+	{
+		ContainerShell.Auto => "Looks for bash inside the container and falls back to sh, so an image without bash (alpine, busybox) still opens.",
+		ContainerShell.Custom => "Runs the command below instead of a shell.",
+		_ => $"Runs {Label(Shell)}, which the image has to have.",
+	};
+
+	private string CommandHelp => $"Passed to {Tool} exactly as typed, after the container.";
+
+	private string? CommandError => string.IsNullOrWhiteSpace(Command) ? "Name the command to run." : null;
+
+	private static string Label(ContainerShell shell) => shell switch
+	{
+		ContainerShell.Bash => "bash",
+		ContainerShell.Sh => "sh",
+		ContainerShell.Custom => "Another command",
+		_ => "bash if it has it, otherwise sh",
+	};
+}

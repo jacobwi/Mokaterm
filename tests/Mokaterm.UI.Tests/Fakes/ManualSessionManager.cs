@@ -5,7 +5,7 @@ using Mokaterm.Abstractions.Terminal;
 namespace Mokaterm.UI.Tests.Fakes;
 
 /// <summary>A session manager whose open set a test drives by hand.</summary>
-internal sealed class ManualSessionManager : ISessionManager
+internal class ManualSessionManager : ISessionManager
 {
 	private readonly List<ISessionHandle> _sessions = [];
 	private readonly List<Guid> _opened = [];
@@ -16,6 +16,9 @@ internal sealed class ManualSessionManager : ISessionManager
 
 	/// <summary>The connection ids <see cref="OpenAsync"/> was called with, in order.</summary>
 	public IReadOnlyList<Guid> Opened => [.. _opened];
+
+	/// <summary>Logins <see cref="OpenAsync"/> refuses, the way a login deleted since the last run is refused.</summary>
+	public HashSet<Guid> Missing { get; } = [];
 
 	public FakeSession Add(Guid? connectionId = null, ITerminalStream? terminal = null)
 	{
@@ -41,7 +44,9 @@ internal sealed class ManualSessionManager : ISessionManager
 	public Task<ISessionHandle> OpenAsync(Guid connectionId, SessionOpenOptions? options = null, CancellationToken cancellationToken = default)
 	{
 		_opened.Add(connectionId);
-		return Task.FromResult<ISessionHandle>(Add(connectionId));
+		return Missing.Contains(connectionId)
+			? Task.FromException<ISessionHandle>(new KeyNotFoundException("No such login."))
+			: Task.FromResult<ISessionHandle>(Add(connectionId));
 	}
 
 	public ISessionHandle OpenTransient(HostProfile host, ConnectionProfile connection, SessionOpenOptions? options = null) =>

@@ -1,8 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Settings.Pages.Appearance;
 using Mokaterm.UI.Tests.Fakes;
 
@@ -43,7 +47,38 @@ public sealed class AppearanceSettingsPageTests
 		Assert.DoesNotContain("moka-field-error", html, StringComparison.Ordinal);
 	}
 
-	private static Task<string> RenderAsync(AppearanceSettings settings) =>
+	[Fact]
+	public async Task Render_ListsEveryToolbarButton_AndEveryToolOnce_WithItsSwitch()
+	{
+		string html = await RenderAsync(new AppearanceSettings { HiddenToolbarButtons = ["find"] });
+
+		foreach (SessionToolbarButton button in SessionToolbarButtons.BuiltIn)
+		{
+			Assert.Contains($"aria-label=\"Show {button.Title} on the toolbar\"", html, StringComparison.Ordinal);
+		}
+
+		Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "aria-label=\"Show Docker on the toolbar\""));
+		Assert.Contains("Toolbar layout", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_Desktop_OffersToolWindows()
+	{
+		string html = await RenderAsync(new AppearanceSettings(), HostKind.Desktop);
+
+		Assert.Contains("Open tools in their own window", html, StringComparison.Ordinal);
+	}
+
+	// A browser keeps tools in dialogs, so the switch would do nothing there.
+	[Fact]
+	public async Task Render_Web_DoesNotOfferToolWindows()
+	{
+		string html = await RenderAsync(new AppearanceSettings(), HostKind.Web);
+
+		Assert.DoesNotContain("Open tools in their own window", html, StringComparison.Ordinal);
+	}
+
+	private static Task<string> RenderAsync(AppearanceSettings settings, HostKind host = HostKind.Web) =>
 		StaticRender.RenderAsync<AppearanceSettingsPage>(
 			services =>
 			{
@@ -51,9 +86,37 @@ public sealed class AppearanceSettingsPageTests
 				services.AddMokatermUiCommon();
 				services.AddSingleton<ISettingsService>(new FixedSettings(settings));
 				services.AddSingleton<IUserInteraction, SilentInteraction>();
+				services.AddSingleton<IAppEnvironment>(new Host(host));
+				services.AddSessionTool(Tool("ssh"));
+				services.AddSessionTool(Tool("demo"));
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal))
 			.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+
+	private static SessionToolDescriptor Tool(string protocol) => new()
+	{
+		ProtocolId = protocol,
+		Id = "docker",
+		Title = "Docker",
+		Icon = MokatermIcons.Modules,
+		Component = typeof(NoView),
+	};
+
+	/// <summary>A tool's component; the page only lists its name.</summary>
+	private sealed class NoView : SessionViewBase;
+
+	private sealed class Host(HostKind kind) : IAppEnvironment
+	{
+		public HostKind Kind => kind;
+
+		public string PlatformName => kind.ToString();
+
+		public string AppVersion => "0.0.0";
+
+		public string DataDirectory => "";
+
+		public string TempDirectory => "";
+	}
 
 	/// <summary>Only there because SettingsPage confirms its reset; nothing here asks anything.</summary>
 	private sealed class SilentInteraction : IUserInteraction

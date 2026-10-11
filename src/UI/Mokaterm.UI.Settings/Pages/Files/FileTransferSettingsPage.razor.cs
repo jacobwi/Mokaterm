@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Formatting;
 
 namespace Mokaterm.UI.Settings.Pages.Files;
 
@@ -25,6 +26,13 @@ public sealed partial class FileTransferSettingsPage : SettingsSectionBase<FileT
 
 	[Inject]
 	private IAppEnvironment AppEnvironment { get; set; } = default!;
+
+	private string ResumeDescription =>
+		"A retry continues where the failed attempt stopped. Uploads of " + DisplayFormat.Bytes(FileTransferSettings.MinResumableBytes)
+		+ " and more keep a hidden partial file on the server until they finish or leave the transfer list"
+		+ (AppEnvironment.Kind == HostKind.Desktop
+			? ", and downloads keep a .part file beside where they are saved."
+			: ". Downloads start over, because a browser cannot continue one.");
 
 	private static string? ValidateDirectory(string value) =>
 		Path.IsPathFullyQualified(value) ? null : "Enter a full folder path.";

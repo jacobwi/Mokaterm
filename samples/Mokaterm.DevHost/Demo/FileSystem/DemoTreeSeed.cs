@@ -46,6 +46,7 @@ internal static class DemoTreeSeed
 
 		DemoNode loginHome = login.IsRoot ? rootHome : Folder(home, login.Name, new Owner(login.Name, login.Group), "750", now.AddHours(-1));
 		AddHome(loginHome, new Owner(login.Name, login.Group), hostName, installed, now);
+		Docker.DemoDockerFiles.Add(tree, now);
 
 		return new DemoFileTree(tree, [.. SystemUsers, login.Name], [.. SystemGroups, login.Group], timeProvider);
 	}

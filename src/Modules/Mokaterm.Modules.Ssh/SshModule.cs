@@ -5,6 +5,8 @@ using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Modules.Ssh.Components;
+using Mokaterm.Modules.Ssh.Components.Admin;
+using Mokaterm.Modules.Ssh.Components.Docker;
 using Mokaterm.Modules.Ssh.Connection;
 using Mokaterm.Modules.Ssh.Keys;
 using Mokaterm.Modules.Ssh.Protocols;
@@ -47,9 +49,32 @@ public sealed class SshModule : IMokatermModule
 		services.AddSessionTool(new SessionToolDescriptor
 		{
 			ProtocolId = SshProtocolIds.Ssh,
+			Id = "port-forwarding",
 			Title = "Port forwarding",
 			Icon = SshIcons.Tunnel,
 			Component = typeof(SshTunnelsView),
+		});
+
+		services.AddSessionTool(new SessionToolDescriptor
+		{
+			ProtocolId = SshProtocolIds.Ssh,
+			Id = "system",
+			Title = "System",
+			Icon = MokatermIcons.Server,
+			Component = typeof(SystemAdminView),
+			Order = 1,
+			Size = SessionToolSize.Wide,
+		});
+
+		services.AddSessionTool(new SessionToolDescriptor
+		{
+			ProtocolId = SshProtocolIds.Ssh,
+			Id = "docker",
+			Title = "Docker",
+			Icon = DockerIcons.Container,
+			Component = typeof(DockerManagerView),
+			Order = 10,
+			Size = SessionToolSize.Wide,
 		});
 
 		services.AddSettingsPage(new SettingsPageDescriptor

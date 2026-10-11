@@ -62,6 +62,7 @@
 					<MokaListItem @key="snippet.Id"
 								  Active="@(position == _selected)"
 								  OnClick="args => ApplyAsync(snippet, args.CtrlKey || args.MetaKey)"
+								  OnContextMenu="args => ShowMenu(args, snippet)"
 								  tabindex="-1">
 						<ChildContent>
 							<span class="mt-commands-row">

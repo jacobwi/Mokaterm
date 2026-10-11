@@ -1,0 +1,467 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Accounts
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Users"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter by name"
+				PrimaryText="@(Capabilities.Accounts.CanChange ? "Add user" : null)"
+				PrimaryIcon="MokaIcons.Action.Add"
+				PrimaryDisabled="@(Busy || Context.RootChangeBlocked is not null)"
+				PrimaryTitle="@Context.RootChangeBlocked"
+				OnPrimary="StartAdd"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@DetailFragment">
+	<Chips>
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; })" AriaLabel="Accounts to show" />
+	</Chips>
+	<ChipsEnd>
+		@if (_snapshot is { KnowsPasswords: false })
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim" title="Only root can read whether a password is set or locked">password states need root mode</MokaText>
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@if (_snapshot is { } snapshot)
+		{
+			@if (_view == "groups")
+			{
+				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr)">
+					<div class="mta-row mta-row--head">
+						<AdminSortHeader Text="Group" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
+						<AdminSortHeader Text="GID" Key="id" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+						<span>Members</span>
+					</div>
+					@foreach (GroupAccount group in SortedGroups(snapshot.Groups.Where(Matches)))
+					{
+						<div class="mta-row" @key="group.Name">
+							<span class="mta-cell mta-mono">@group.Name</span>
+							<span class="mta-cell mta-mono mta-dim mta-wide">@group.Gid</span>
+							<span class="mta-cell mta-mono mta-dim" title="@string.Join(", ", group.Members)">@string.Join(", ", group.Members)</span>
+						</div>
+					}
+				</div>
+			}
+			else
+			{
+				List<UserAccount> users = [.. SortedUsers(snapshot.Users.Where(user => (_view == "all" || snapshot.IsPerson(user)) && Matches(user)))];
+				@if (users.Count == 0)
+				{
+					<MokaEmptyState Icon="SshIcons.Users" Title="Nothing matches" Description="No account matches the filter.">
+						@if (Capabilities.Accounts.CanChange)
+						{
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="@(Context.RootChangeBlocked is not null)" OnClick="StartAdd">Add user</MokaButton>
+						}
+					</MokaEmptyState>
+				}
+				else
+				{
+					<div class="mta-table" style="@UserColumns">
+						<div class="mta-row mta-row--head">
+							<AdminSortHeader Text="User" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
+							<AdminSortHeader Text="UID" Key="id" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+							<span class="mta-wide">Shell</span>
+							@if (KnowsPasswords)
+							{
+								<span>Password</span>
+							}
+							<span></span>
+						</div>
+						@foreach (UserAccount user in users)
+						{
+							<div class="@(user.Name == _selected && !_adding ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+								 @key="user.Name"
+								 role="button"
+								 tabindex="0"
+								 @onclick="@(() => Select(user.Name))"
+								 @onkeydown="@(args => OnRowKey(args, user.Name))"
+								 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(user)))"
+								 @oncontextmenu:preventDefault="true">
+								<span class="mta-cell">
+									<span class="mta-mono">@user.Name</span>
+									@if (user.Name == Context.LoginName)
+									{
+										<span class="mta-after"><MokaTag Text="YOU" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
+									}
+									@if (user.Comment.Length > 0 && user.Comment != user.Name)
+									{
+										<span class="mta-dim mta-after">@user.Comment</span>
+									}
+								</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide">@user.Uid</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide" title="@user.Shell">@user.Shell</span>
+								@if (KnowsPasswords)
+								{
+									<span class="mta-cell mta-mono @(user.Password is PasswordState.Set ? "" : "mta-dim")" style="@PasswordStyle(user.Password)">@PasswordLabel(user.Password)</span>
+								}
+								<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+									<MokaButton Variant="MokaVariant.Text"
+												Color="MokaColor.Surface"
+												Size="MokaSize.Xs"
+												StartIcon="MokaIcons.Navigation.MoreHorizontal"
+												OnClick="@(args => ShowRowMenu(args, MenuFor(user)))"
+												aria-label="@($"Actions for {user.Name}")" />
+								</span>
+							</div>
+						}
+					</div>
+				}
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private AccountsSnapshot? _snapshot;
+	private readonly AdminSort _sort = new("id");
+	private string _view = "people";
+	private string _filter = "";
+	private string? _selected;
+	private string _password = "";
+	private string? _group;
+	private bool _removeHome;
+
+	private bool _adding;
+	private int _formVersion;
+	private string _newName = "";
+	private string _newComment = "";
+	private string _newShell = "";
+	private string _newPassword = "";
+	private string _newPasswordAgain = "";
+	private bool _newHome = true;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private string Summary => _snapshot is { } snapshot
+		? $"{snapshot.Users.Count(snapshot.IsPerson)} people, {snapshot.Users.Count} accounts, {snapshot.Groups.Count} groups · {ToolsName}"
+		: "";
+
+	private string ToolsName => Capabilities.Accounts.Tools switch
+	{
+		AccountToolKind.Shadow => "shadow-utils",
+		AccountToolKind.BusyBox => "BusyBox",
+		_ => "read only",
+	};
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("people", "People", _snapshot?.Users.Count(_snapshot.IsPerson)),
+		new("all", "All accounts", _snapshot?.Users.Count),
+		new("groups", "Groups", _snapshot?.Groups.Count),
+	];
+
+	private UserAccount? Selected => _selected is { } name ? _snapshot?.Users.FirstOrDefault(user => user.Name == name) : null;
+
+	private RenderFragment? DetailFragment => _view == "groups" ? null : _adding ? AddPanel : Selected is null ? null : UserPanel;
+
+	private string? NewNameProblem => _snapshot?.Users.Any(user => user.Name == _newName) == true ? "That user already exists." : null;
+
+	private string? PasswordMismatch => _newPassword.Length > 0 && _newPasswordAgain != _newPassword ? "The two passwords differ." : null;
+
+	private bool CanAdd => _newName.Length > 0
+		&& AdminNames.CheckAccount(_newName) is null
+		&& NewNameProblem is null
+		&& AdminNames.CheckComment(_newComment) is null
+		&& AdminNames.CheckShellPath(_newShell) is null
+		&& PasswordMismatch is null
+		&& (_newPassword.Length == 0 || AdminNames.CheckPassword(_newPassword) is null);
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		AdminOutcome outcome = await ReadAsync(AccountCommands.Read(ReadAsRoot), cancellationToken);
+		_snapshot = AccountCommands.Parse(outcome.Output);
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		// Typed passwords leave with the page.
+		_password = "";
+		_newPassword = "";
+		_newPasswordAgain = "";
+		base.Dispose(disposing);
+	}
+
+	private RenderFragment UserPanel => __builder =>
+	{
+		if (Selected is not { } user || _snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		string? refusal = AccountCommands.WhyNotDelete(user, Context.LoginName);
+		bool blocked = Busy || Context.RootChangeBlocked is not null;
+		<AdminDetailPanel Title="@user.Name" Subtitle="@(user.Comment.Length > 0 ? user.Comment : null)" OnClose="@(() => _selected = null)">
+			<Actions>
+				@if (Capabilities.Accounts.CanChange)
+				{
+					@if (user.Password != PasswordState.Locked)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" Disabled="blocked" title="@Context.RootChangeBlocked" OnClick="@(() => LockAsync(user, true))">Lock</MokaButton>
+					}
+					@if (user.Password is PasswordState.Locked or PasswordState.Unknown)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="blocked" title="@Context.RootChangeBlocked" OnClick="@(() => LockAsync(user, false))">Unlock</MokaButton>
+					}
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(blocked || refusal is not null)"
+								title="@(refusal ?? Context.RootChangeBlocked)"
+								OnClick="@(() => DeleteAsync(user, snapshot))">
+						Delete
+					</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					<dt>IDs</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"uid {user.Uid} · gid {user.Gid}")</MokaText></dd>
+					<dt>Home</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@user.Home</MokaText></dd>
+					<dt>Shell</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@user.Shell</MokaText></dd>
+					<dt>Password</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(user.Password == PasswordState.Unknown ? "not read (needs root mode)" : PasswordLabel(user.Password).ToLowerInvariant())</MokaText></dd>
+					<dt>Groups</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@string.Join(", ", user.Groups)</MokaText></dd>
+				</dl>
+				@if (Capabilities.Accounts.CanChange)
+				{
+					@if (refusal is null)
+					{
+						<MokaCheckbox Value="_removeHome" ValueChanged="@(value => _removeHome = value)" Label="@($"Delete removes {user.Home} too")" />
+					}
+
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Add to a group</MokaText>
+					<div class="mta-inline">
+						<div class="mta-grow">
+							<MokaSelect TValue="string"
+										Items="GroupNames(snapshot, user)"
+										Value="@_group"
+										ValueChanged="@(value => _group = value)"
+										Searchable
+										Placeholder="Pick a group"
+										Size="MokaSize.Sm"
+										aria-label="Group" />
+						</div>
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="@(blocked || string.IsNullOrEmpty(_group))" OnClick="@(() => AddToGroupAsync(user))">Add</MokaButton>
+					</div>
+
+					@if (Capabilities.Accounts.CanSetPasswords && Feature.SupportsInput)
+					{
+						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Set a new password</MokaText>
+						<div class="mta-inline">
+							<div class="mta-grow">
+								<MokaPasswordField @bind-Value="_password" Placeholder="New password" autocomplete="new-password" Size="MokaSize.Sm" aria-label="New password" />
+							</div>
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="@(blocked || AdminNames.CheckPassword(_password) is not null)" OnClick="@(() => SetPasswordAsync(user))">Set</MokaButton>
+						</div>
+					}
+				}
+				else
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">This machine has neither useradd nor BusyBox's adduser, so accounts are shown and not changed.</MokaText>
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment AddPanel => __builder =>
+	{
+		<AdminDetailPanel Title="Add user" Mono="false" OnClose="CancelAdd">
+			<div class="mta-form" @key="_formVersion">
+				<TextSetting Label="Name" Value="@_newName" ValueChanged="@(value => _newName = value)" Validate="ValidateNewName" Placeholder="alice" />
+				<TextSetting Label="Full name" Value="@_newComment" ValueChanged="@(value => _newComment = value)" Validate="AdminNames.CheckComment" AllowEmpty Placeholder="optional" />
+			</div>
+			<MokaSelect TValue="string"
+						Label="Shell"
+						Items="Shells"
+						Value="@_newShell"
+						ValueChanged="@(value => _newShell = value ?? "")"
+						Size="MokaSize.Sm" />
+			@if (Capabilities.Accounts.CanSetPasswords && Feature.SupportsInput)
+			{
+				<div class="mta-form">
+					<MokaPasswordField Label="Password" @bind-Value="_newPassword" Placeholder="optional" autocomplete="new-password" Size="MokaSize.Sm" />
+					<MokaPasswordField Label="Again" @bind-Value="_newPasswordAgain" ErrorText="@PasswordMismatch" autocomplete="new-password" Size="MokaSize.Sm" />
+				</div>
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Without a password the account cannot log in with one. A password goes to chpasswd on stdin, never on a command line.</MokaText>
+			}
+			<MokaCheckbox Value="_newHome" ValueChanged="@(value => _newHome = value)" Label="Create a home folder" />
+			<div class="mta-form-actions">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CancelAdd">Cancel</MokaButton>
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || !CanAdd || Context.RootChangeBlocked is not null)" OnClick="AddAsync">Add user</MokaButton>
+			</div>
+		</AdminDetailPanel>
+	};
+
+	private IReadOnlyList<string> Shells => _snapshot is { Shells.Count: > 0 } snapshot ? snapshot.Shells : ["/bin/sh"];
+
+	private bool KnowsPasswords => _snapshot?.KnowsPasswords == true;
+
+	// Without root every password reads as unknown, so the column would be a row of blanks.
+	private string UserColumns => KnowsPasswords
+		? "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 88px 28px; --mta-cols-narrow: minmax(0, 1fr) 88px 28px"
+		: "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 28px; --mta-cols-narrow: minmax(0, 1fr) 28px";
+
+	private static string PasswordLabel(PasswordState state) => state switch
+	{
+		PasswordState.Set => "SET",
+		PasswordState.Locked => "LOCKED",
+		PasswordState.Disabled => "NO LOGIN",
+		PasswordState.Empty => "EMPTY",
+		_ => "",
+	};
+
+	private static string? PasswordStyle(PasswordState state) => state switch
+	{
+		PasswordState.Locked => "color:var(--moka-color-warning)",
+		PasswordState.Empty => "color:var(--moka-color-error)",
+		_ => null,
+	};
+
+	private static IReadOnlyList<string> GroupNames(AccountsSnapshot snapshot, UserAccount user) =>
+		[.. snapshot.Groups.Select(group => group.Name).Where(name => !user.Groups.Contains(name) && AdminNames.CheckAccount(name) is null)];
+
+	private string? ValidateNewName(string name) => AdminNames.CheckAccount(name) ?? (_snapshot?.Users.Any(user => user.Name == name) == true ? "That user already exists." : null);
+
+	private IEnumerable<UserAccount> SortedUsers(IEnumerable<UserAccount> users) => _sort.Key switch
+	{
+		"name" => _sort.Apply(users, user => user.Name),
+		_ => _sort.Apply(users, user => (double)user.Uid),
+	};
+
+	private IEnumerable<GroupAccount> SortedGroups(IEnumerable<GroupAccount> groups) => _sort.Key switch
+	{
+		"name" => _sort.Apply(groups, group => group.Name),
+		_ => _sort.Apply(groups, group => (double)group.Gid),
+	};
+
+	private bool Matches(UserAccount user) => _filter.Trim().Length == 0
+		|| user.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| user.Comment.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private bool Matches(GroupAccount group) => _filter.Trim().Length == 0
+		|| group.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| group.Members.Any(member => member.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase));
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(UserAccount user)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(user.Name, keepOpen: true) }];
+		if (!Capabilities.Accounts.CanChange || _snapshot is not { } snapshot)
+		{
+			return items;
+		}
+
+		bool blocked = Busy || Context.RootChangeBlocked is not null;
+		items.Add(user.Password == PasswordState.Locked
+			? new MokaContextMenuItem { Text = "Unlock", DividerBefore = true, Disabled = blocked, OnClick = () => LockAsync(user, false) }
+			: new MokaContextMenuItem { Text = "Lock", DividerBefore = true, Disabled = blocked, OnClick = () => LockAsync(user, true) });
+		items.Add(new MokaContextMenuItem
+		{
+			Text = "Delete",
+			Icon = MokaIcons.Action.Delete,
+			Disabled = blocked || AccountCommands.WhyNotDelete(user, Context.LoginName) is not null,
+			OnClick = () => DeleteAsync(user, snapshot),
+		});
+		return items;
+	}
+
+	private void Select(string name) => Select(name, keepOpen: false);
+
+	private void Select(string name, bool keepOpen)
+	{
+		_adding = false;
+		_selected = _selected == name && !keepOpen ? null : name;
+		_password = "";
+		_group = null;
+		_removeHome = false;
+	}
+
+	private void OnRowKey(KeyboardEventArgs args, string name)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(name);
+		}
+	}
+
+	private void StartAdd()
+	{
+		_view = _view == "groups" ? "people" : _view;
+		_adding = true;
+		_selected = null;
+		_newName = "";
+		_newComment = "";
+		_newPassword = "";
+		_newPasswordAgain = "";
+		_newHome = true;
+		_newShell = Shells.FirstOrDefault(shell => shell.EndsWith("/bash", StringComparison.Ordinal)) ?? Shells[0];
+		_formVersion++;
+	}
+
+	private void CancelAdd()
+	{
+		_adding = false;
+		_newPassword = "";
+		_newPasswordAgain = "";
+	}
+
+	private async Task AddAsync()
+	{
+		if (!CanAdd)
+		{
+			return;
+		}
+
+		string name = _newName;
+		string? password = _newPassword.Length > 0 ? _newPassword : null;
+		(AdminAction action, string? input) = Capabilities.Accounts.AddUser(name, _newComment, _newShell, _newHome, password);
+		_newPassword = "";
+		_newPasswordAgain = "";
+		AdminInput? stdin = input is null ? null : AdminInput.Secret(input, $"{name}:********");
+		if (await RunAsync(action, stdin) is { Succeeded: true })
+		{
+			_adding = false;
+			_selected = name;
+		}
+	}
+
+	private async Task SetPasswordAsync(UserAccount user)
+	{
+		if (AdminNames.CheckPassword(_password) is not null)
+		{
+			return;
+		}
+
+		(AdminAction action, string input) = Capabilities.Accounts.SetPassword(user.Name, _password);
+		_password = "";
+		await RunAsync(action, AdminInput.Secret(input, $"{user.Name}:********"));
+	}
+
+	private Task LockAsync(UserAccount user, bool locked) => RunAsync(Capabilities.Accounts.Lock(user.Name, locked));
+
+	private async Task AddToGroupAsync(UserAccount user)
+	{
+		if (_group is { } group && AdminNames.CheckAccount(group) is null)
+		{
+			await RunAsync(Capabilities.Accounts.AddToGroup(user.Name, group));
+			_group = null;
+		}
+	}
+
+	private async Task DeleteAsync(UserAccount user, AccountsSnapshot snapshot)
+	{
+		if (await RunAsync(Capabilities.Accounts.DeleteUser(user, _removeHome, Context.LoginName, snapshot.FirstPersonUid)) is { Succeeded: true })
+		{
+			_selected = null;
+		}
+	}
+}

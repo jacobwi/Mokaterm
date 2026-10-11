@@ -23,13 +23,24 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 		new(SshKeyType.Rsa4096, "RSA 4096", "The same, with a longer key."),
 	];
 
+	// Only offered where the host can reach a key, which is the desktop app.
+	private static readonly KeyTypeOption[] SecurityKeyOptions =
+	[
+		new(SshKeyType.EcdsaSecurityKey, "ECDSA security key", "The private key stays on a FIDO key or in Windows Hello. Every FIDO key can make one."),
+		new(SshKeyType.Ed25519SecurityKey, "Ed25519 security key", "The same on a FIDO2 key that implements EdDSA, such as a YubiKey 5."),
+	];
+
 	private string _name = "";
 	private string _comment = "";
 	private string _passphrase = "";
 	private string _passphraseAgain = "";
 	private SshKeyType _type = SshKeyType.Ed25519;
+	private string _application = SecurityKeyTypes.DefaultApplication;
+	private bool _requireUserVerification;
+	private bool _residentKey;
 	private GeneratedSshKey? _generated;
 	private string? _nameError;
+	private string? _applicationError;
 	private string? _passphraseError;
 	private string? _error;
 	private bool _busy;
@@ -56,6 +67,11 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 
 	private bool CanExport => Services.GetService<ILocalFileAccess>() is not null;
 
+	private bool IsSecurityKey => _type is SshKeyType.EcdsaSecurityKey or SshKeyType.Ed25519SecurityKey;
+
+	private IEnumerable<KeyTypeOption> AvailableOptions =>
+		Services.GetService<ISecurityKeyAuthenticator>() is { IsAvailable: true } ? [.. Options, .. SecurityKeyOptions] : Options;
+
 	// Strings cannot be wiped; dropping the references is the most a form allows. The generated key goes with them.
 	protected override void Clear()
 	{
@@ -64,8 +80,12 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 		_passphrase = "";
 		_passphraseAgain = "";
 		_type = SshKeyType.Ed25519;
+		_application = SecurityKeyTypes.DefaultApplication;
+		_requireUserVerification = false;
+		_residentKey = false;
 		_generated = null;
 		_nameError = null;
+		_applicationError = null;
 		_passphraseError = null;
 		_error = null;
 		_busy = false;
@@ -87,6 +107,25 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 	private void SetComment(string value)
 	{
 		_comment = value;
+		Invalidate();
+	}
+
+	private void SetApplication(string value)
+	{
+		_application = value;
+		_applicationError = null;
+		Invalidate();
+	}
+
+	private void SetRequireUserVerification(bool value)
+	{
+		_requireUserVerification = value;
+		Invalidate();
+	}
+
+	private void SetResidentKey(bool value)
+	{
+		_residentKey = value;
 		Invalidate();
 	}
 
@@ -119,7 +158,9 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 		_error = null;
 		_nameError = _name.Trim().Length == 0 ? "Enter a name." : null;
 		_passphraseError = _passphrase == _passphraseAgain ? null : "The two passphrases are different.";
-		if (_nameError is not null || _passphraseError is not null)
+		string application = _application.Trim();
+		_applicationError = IsSecurityKey ? SecurityKeyTypes.ValidateApplication(application) : null;
+		if (_nameError is not null || _passphraseError is not null || _applicationError is not null)
 		{
 			return;
 		}
@@ -132,7 +173,16 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 				Type = _type,
 				Comment = _comment,
 				Passphrase = _passphrase.Length == 0 ? null : _passphrase,
+				Application = IsSecurityKey ? application : null,
+				RequireUserVerification = IsSecurityKey && _requireUserVerification,
+				ResidentKey = IsSecurityKey && _residentKey,
 			});
+		}
+		catch (SecurityKeyException ex)
+		{
+			// The user closing the Windows prompt lands here too, so this is a notice and not an error.
+			Logger.LogInformation("Making a security key did not complete: {Failure}", ex.Failure);
+			_error = ex.Message;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -170,7 +220,7 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 					Name = name,
 					Kind = CredentialKind.PrivateKey,
 					IsShared = true,
-					Notes = "Generated in Mokaterm.",
+					Notes = SecurityKeyTypes.IsSecurityKey(key.PublicKey.Algorithm) ? "Made on a security key in Mokaterm." : "Generated in Mokaterm.",
 					CreatedAt = now,
 					UpdatedAt = now,
 				},
@@ -212,9 +262,11 @@ public sealed partial class GenerateKeyDialog : DraftDialogBase
 		bool confirmed = (await Interaction.ConfirmAsync(new ConfirmPrompt
 		{
 			Title = "Export the private key",
-			Message = key.HasPassphrase
-				? $"Write the private key to a file? It stays encrypted with your passphrase, and anyone who learns that passphrase can log in as {key.PublicKey.Comment}."
-				: "Write the private key to a file? It has no passphrase, so anyone who gets the file can log in with it.",
+			Message = SecurityKeyTypes.IsSecurityKey(key.PublicKey.Algorithm)
+				? "Write the key file? It cannot log in without the security key, but it tells whoever has the key which credential to use."
+				: key.HasPassphrase
+					? $"Write the private key to a file? It stays encrypted with your passphrase, and anyone who learns that passphrase can log in as {key.PublicKey.Comment}."
+					: "Write the private key to a file? It has no passphrase, so anyone who gets the file can log in with it.",
 			ConfirmText = "Export",
 			Destructive = true,
 		})).Confirmed;

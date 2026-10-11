@@ -112,9 +112,14 @@ internal sealed class SshAgentClient : IDisposable
 	/// <summary>
 	/// Signs <paramref name="data"/> with the key the agent holds for <paramref name="keyBlob"/>. The answer is the
 	/// wire-format signature blob (algorithm name then signature), which is exactly what an SSH.NET host algorithm returns.
+	/// A security key signature carries its flags and counter after the signature; they pass through untouched.
 	/// </summary>
+	/// <param name="timeout">
+	/// The deadline for this request instead of the connection's: an agent holding a security key answers only once
+	/// the user touched it.
+	/// </param>
 	/// <exception cref="SshAgentException">The agent does not hold the key, or refused to sign.</exception>
-	public byte[] Sign(ReadOnlySpan<byte> keyBlob, ReadOnlySpan<byte> data, uint flags)
+	public byte[] Sign(ReadOnlySpan<byte> keyBlob, ReadOnlySpan<byte> data, uint flags, TimeSpan? timeout = null)
 	{
 		byte[] request = new SshWireWriter()
 			.WriteByte(SignRequest)
@@ -123,13 +128,58 @@ internal sealed class SshAgentClient : IDisposable
 			.WriteUInt32(flags)
 			.ToArray();
 
-		SshWireReader reader = Request(request, SignResponse);
+		SshWireReader reader = Request(request, SignResponse, timeout);
 		if (!reader.TryReadString(out byte[] signature) || signature.Length == 0)
 		{
 			throw new SshAgentException("The agent's signature could not be read.");
 		}
 
 		return signature;
+	}
+
+	/// <summary>
+	/// Sends one request body as it is and returns the answer body whatever its type, under the same deadline as every
+	/// other request. This is the relay for a forwarded agent, which passes on messages it has no need to understand.
+	/// </summary>
+	/// <param name="maxAnswerBytes">An answer announcing more than this is refused before anything is allocated for it.</param>
+	/// <exception cref="SshAgentException">The agent closed the connection, did not answer in time or sent a bad length.</exception>
+	public async Task<byte[]> ExchangeAsync(ReadOnlyMemory<byte> body, int maxAnswerBytes, CancellationToken cancellationToken)
+	{
+		byte[] frame = new byte[sizeof(uint) + body.Length];
+		BinaryPrimitives.WriteUInt32BigEndian(frame, (uint)body.Length);
+		body.CopyTo(frame.AsMemory(sizeof(uint)));
+		using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		deadline.CancelAfter(_timeout);
+		try
+		{
+			await _stream.WriteAsync(frame, deadline.Token);
+			await _stream.FlushAsync(deadline.Token);
+			byte[] header = new byte[sizeof(uint)];
+			await _stream.ReadExactlyAsync(header, deadline.Token);
+			uint length = BinaryPrimitives.ReadUInt32BigEndian(header);
+			if (length == 0 || length > (uint)Math.Min(maxAnswerBytes, MaxFrameBytes))
+			{
+				throw new SshAgentException("The agent announced a message length this client will not read.");
+			}
+
+			byte[] answer = new byte[length];
+			await _stream.ReadExactlyAsync(answer, deadline.Token);
+			return answer;
+		}
+		catch (OperationCanceledException ex) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+		{
+			throw new SshAgentException(
+				string.Create(CultureInfo.InvariantCulture, $"The SSH agent did not answer within {_timeout.TotalSeconds:0.#} seconds."),
+				ex);
+		}
+		catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+		{
+			throw new SshAgentException($"The SSH agent closed the connection: {ex.Message}", ex);
+		}
+		finally
+		{
+			System.Security.Cryptography.CryptographicOperations.ZeroMemory(frame);
+		}
 	}
 
 	public void Dispose()
@@ -181,25 +231,26 @@ internal sealed class SshAgentClient : IDisposable
 		}
 	}
 
-	private SshWireReader Request(byte[] body, byte expectedResponse)
+	private SshWireReader Request(byte[] body, byte expectedResponse, TimeSpan? timeout = null)
 	{
 		byte[] frame = new byte[sizeof(uint) + body.Length];
 		BinaryPrimitives.WriteUInt32BigEndian(frame, (uint)body.Length);
 		body.CopyTo(frame, sizeof(uint));
 
 		// One deadline for the whole exchange, so an agent that trickles its answer cannot stretch it either.
-		using CancellationTokenSource deadline = new(_timeout);
+		TimeSpan wait = timeout ?? _timeout;
+		using CancellationTokenSource deadline = new(wait);
 		try
 		{
-			Complete(_stream.WriteAsync(frame, deadline.Token).AsTask(), deadline);
-			Complete(_stream.FlushAsync(deadline.Token), deadline);
+			Complete(_stream.WriteAsync(frame, deadline.Token).AsTask(), deadline, wait);
+			Complete(_stream.FlushAsync(deadline.Token), deadline, wait);
 		}
 		catch (Exception ex) when (ex is IOException or ObjectDisposedException)
 		{
 			throw new SshAgentException($"The SSH agent closed the connection: {ex.Message}", ex);
 		}
 
-		byte[] response = ReadFrame(deadline);
+		byte[] response = ReadFrame(deadline, wait);
 		SshWireReader reader = new(response);
 		if (!reader.TryReadByte(out byte type))
 		{
@@ -216,10 +267,10 @@ internal sealed class SshAgentClient : IDisposable
 			: string.Create(CultureInfo.InvariantCulture, $"The SSH agent answered with message type {type}, which is not expected here."));
 	}
 
-	private byte[] ReadFrame(CancellationTokenSource deadline)
+	private byte[] ReadFrame(CancellationTokenSource deadline, TimeSpan wait)
 	{
 		byte[] header = new byte[sizeof(uint)];
-		ReadExactly(header, deadline);
+		ReadExactly(header, deadline, wait);
 		uint length = BinaryPrimitives.ReadUInt32BigEndian(header);
 		if (length is 0 or > MaxFrameBytes)
 		{
@@ -227,15 +278,15 @@ internal sealed class SshAgentClient : IDisposable
 		}
 
 		byte[] body = new byte[length];
-		ReadExactly(body, deadline);
+		ReadExactly(body, deadline, wait);
 		return body;
 	}
 
-	private void ReadExactly(byte[] buffer, CancellationTokenSource deadline)
+	private void ReadExactly(byte[] buffer, CancellationTokenSource deadline, TimeSpan wait)
 	{
 		try
 		{
-			Complete(_stream.ReadExactlyAsync(buffer, deadline.Token).AsTask(), deadline);
+			Complete(_stream.ReadExactlyAsync(buffer, deadline.Token).AsTask(), deadline, wait);
 		}
 		catch (Exception ex) when (ex is EndOfStreamException or IOException or ObjectDisposedException)
 		{
@@ -244,7 +295,7 @@ internal sealed class SshAgentClient : IDisposable
 	}
 
 	/// <summary>Waits for one step of a request; the callers are synchronous, SSH.NET's signing thread among them.</summary>
-	private void Complete(Task step, CancellationTokenSource deadline)
+	private static void Complete(Task step, CancellationTokenSource deadline, TimeSpan wait)
 	{
 		try
 		{
@@ -253,7 +304,7 @@ internal sealed class SshAgentClient : IDisposable
 		catch (OperationCanceledException ex) when (deadline.IsCancellationRequested)
 		{
 			throw new SshAgentException(
-				string.Create(CultureInfo.InvariantCulture, $"The SSH agent did not answer within {_timeout.TotalSeconds:0.#} seconds."),
+				string.Create(CultureInfo.InvariantCulture, $"The SSH agent did not answer within {wait.TotalSeconds:0.#} seconds."),
 				ex);
 		}
 	}

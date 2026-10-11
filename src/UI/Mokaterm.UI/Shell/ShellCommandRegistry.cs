@@ -20,7 +20,7 @@ namespace Mokaterm.UI.Shell;
 /// Registers the shell's commands in the Moka command palette while the shell is mounted, including one "Connect"
 /// command per saved login, and runs the same commands for keyboard shortcuts.
 /// </summary>
-internal sealed class ShellCommandRegistry : IDisposable
+internal sealed partial class ShellCommandRegistry : IDisposable
 {
 	private const string ConnectCommandPrefix = "mokaterm.connect.";
 
@@ -36,6 +36,8 @@ internal sealed class ShellCommandRegistry : IDisposable
 	private readonly IUiContributions _contributions;
 	private readonly IUserInteraction _interaction;
 	private readonly IVault _vault;
+	private readonly SessionToolActions _tools;
+	private readonly SessionViewRequests _requests;
 	private readonly Lock _gate = new();
 	private readonly IReadOnlyList<CommandDefinition> _definitions;
 	private readonly Dictionary<string, Func<Task>> _handlers = new(StringComparer.Ordinal);
@@ -56,7 +58,9 @@ internal sealed class ShellCommandRegistry : IDisposable
 		IProtocolRegistry protocols,
 		IUiContributions contributions,
 		IUserInteraction interaction,
-		IVault vault)
+		IVault vault,
+		SessionToolActions tools,
+		SessionViewRequests requests)
 	{
 		_palette = palette;
 		_shell = shell;
@@ -70,6 +74,8 @@ internal sealed class ShellCommandRegistry : IDisposable
 		_contributions = contributions;
 		_interaction = interaction;
 		_vault = vault;
+		_tools = tools;
+		_requests = requests;
 		_definitions = BuildDefinitions();
 		foreach (CommandDefinition definition in _definitions)
 		{
@@ -197,7 +203,7 @@ internal sealed class ShellCommandRegistry : IDisposable
 		new(ShellCommandIds.Shortcuts, "Keyboard shortcuts", "View", MokatermIcons.Keyboard, Sync(() => _shell.SetShortcutsOpen(true)), null, "keys cheatsheet"),
 		new(ShellCommandIds.NextTab, "Next tab", "Sessions", MokaIcons.Navigation.ChevronRight, Sync(() => SwitchTab(1)), null, "session"),
 		new(ShellCommandIds.PreviousTab, "Previous tab", "Sessions", MokaIcons.Navigation.ChevronLeft, Sync(() => SwitchTab(-1)), null, "session"),
-		new(ShellCommandIds.MoveToOtherPane, "Move tab to the other pane", "Sessions", MokatermIcons.SplitView, MoveToOtherPane, "Split the workspace, or move this tab back", "split side by side pane"),
+		new(ShellCommandIds.MoveToOtherPane, "Move tab to the next pane", "Panes", MokatermIcons.SplitView, MoveToOtherPane, "Split the workspace, or move this tab on to the next pane", "split side by side pane other"),
 		new(ShellCommandIds.CloseTab, "Close tab", "Sessions", MokaIcons.Navigation.Close, () => WithActiveSession(session => _sessions.CloseAsync([session.Id])), "Close the active session", "disconnect"),
 		new(ShellCommandIds.CloseAllTabs, "Close all tabs", "Sessions", MokaIcons.Navigation.Close, _sessions.CloseAllAsync, "Close every open session", "disconnect"),
 		new(ShellCommandIds.Reconnect, "Reconnect", "Sessions", MokatermIcons.Reconnect, () => WithActiveSession(session => _sessions.ReconnectAsync(session.Id)), "Reconnect the active session", "retry"),
@@ -207,7 +213,60 @@ internal sealed class ShellCommandRegistry : IDisposable
 		new(ShellCommandIds.SavedCommands, "Saved commands", "Sessions", MokatermIcons.Command, OpenSavedCommands, "Pick a saved command and type or run it here", "snippets notes history run"),
 		new(ShellCommandIds.BroadcastInput, "Type into several sessions", "Sessions", MokatermIcons.Broadcast, ToggleBroadcast, "Turn this on in each session that should get what you type", "broadcast sync input multi"),
 		new(ShellCommandIds.LockVault, "Lock vault", "Security", MokatermIcons.Lock, Sync(() => _vault.Lock(LockReason.User)), "Hide everything until the master password is entered", "security"),
+		new(ShellCommandIds.RunCommand, "Run a command on several hosts", "Connections", MokatermIcons.Command, Sync(() => _connections.RunCommand([])), "Run one command on saved logins without opening their tabs", "exec batch fleet many servers ssh script"),
+
+		// The toolbar's own buttons, so one the user hid from the bar is still a few keystrokes away.
+		new(ShellCommandIds.ToggleFileBrowser, "Show or hide the file browser", "Sessions", MokatermIcons.SplitView, () => Press(SessionToolbarButtons.FileBrowser), "The file panel beside the active session's terminal", "sftp files panel"),
+		new(ShellCommandIds.FindInTerminal, "Find in the terminal", "Sessions", MokaIcons.Action.Search, () => Press(SessionToolbarButtons.Find), null, "search scrollback"),
+		new(ShellCommandIds.TerminalTheme, "Terminal theme for this session", "Sessions", MokatermIcons.Palette, () => Press(SessionToolbarButtons.Theme), null, "colors colours scheme palette"),
+		new(ShellCommandIds.ClearTerminal, "Clear the terminal", "Sessions", MokatermIcons.Eraser, () => Press(SessionToolbarButtons.Clear), null, "reset scrollback cls"),
+		new(ShellCommandIds.RecordSession, "Record to a file", "Sessions", MokatermIcons.Record, () => Press(SessionToolbarButtons.Record), "Start or stop writing what the active session prints to a file", "log logging transcript"),
+		.. BuildToolDefinitions(),
+		.. BuildPaneDefinitions(),
 	];
+
+	/// <summary>
+	/// One "Open" command per tool a module added, for the focused session. A tool on several protocols is one command,
+	/// and a session whose protocol lacks it says so instead of opening something else.
+	/// </summary>
+	private List<CommandDefinition> BuildToolDefinitions()
+	{
+		List<CommandDefinition> definitions = [];
+		foreach (IGrouping<string, SessionToolDescriptor> group in _contributions.SessionTools.GroupBy(tool => tool.Key, StringComparer.Ordinal))
+		{
+			SessionToolDescriptor first = group.First();
+			string key = group.Key;
+			string title = first.Title;
+			definitions.Add(new CommandDefinition(
+				ShellCommandIds.ToolPrefix + key,
+				$"Open {title}",
+				"Tools",
+				first.Icon,
+				() => OpenToolAsync(key, title),
+				$"{title} for the active session",
+				$"tool window {title}"));
+		}
+
+		return definitions;
+	}
+
+	private Task OpenToolAsync(string key, string title) => WithActiveSession(session =>
+	{
+		if (_tools.For(session).FirstOrDefault(tool => tool.Key == key) is { } tool)
+		{
+			return _tools.OpenAsync(session, tool);
+		}
+
+		_interaction.Notify(NoticeSeverity.Info, $"The active session has no {title} tool.");
+		return Task.CompletedTask;
+	});
+
+	private Task Press(string buttonId) => WithActiveSession(session =>
+	{
+		_shell.CloseSettings();
+		_requests.Request(session.Id, buttonId);
+		return Task.CompletedTask;
+	});
 
 	private List<MokaCheatsheetGroup> BuildCheatsheet()
 	{
@@ -263,6 +322,7 @@ internal sealed class ShellCommandRegistry : IDisposable
 
 	private Task MoveToOtherPane() => WithActiveSession(session =>
 	{
+		_shell.CloseSettings();
 		_workspace.MoveToOtherPane(session.Id);
 		return Task.CompletedTask;
 	});

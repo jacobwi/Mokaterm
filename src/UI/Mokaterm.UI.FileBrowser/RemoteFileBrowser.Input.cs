@@ -125,6 +125,27 @@ public partial class RemoteFileBrowser
 			case "filter":
 				_focusSelector = "[data-filter]";
 				break;
+			case "find":
+				await FindFilesAsync(_path);
+				break;
+			case "newFile":
+				await CreateFileAsync();
+				break;
+			case "copy":
+				HoldEntries(SelectedEntries, cut: false);
+				break;
+			case "cut":
+				HoldEntries(SelectedEntries, cut: true);
+				break;
+			case "paste":
+				await PasteAsync(_path);
+				break;
+			case "duplicate":
+				await DuplicateAsync(SelectedEntries);
+				break;
+			case "copyPath":
+				await CopyPathsAsync(SelectedEntries);
+				break;
 			default:
 				return;
 		}
@@ -302,6 +323,16 @@ public partial class RemoteFileBrowser
 			items.Add(new MokaContextMenuItem { Text = "Download as zip", Icon = MokaIcons.Action.Download, OnClickSync = () => DownloadZip(selected) });
 		}
 
+		// A link to a folder is searched and compared through the link, which the user pointed at on purpose.
+		if (single && entry.IsDirectoryLike)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Find files...", Icon = MokaIcons.Action.Search, DividerBefore = true, OnClick = () => FindFilesAsync(entry.Path) });
+			if (LocalFiles.CanPickFolders)
+			{
+				items.Add(new MokaContextMenuItem { Text = "Compare with local folder...", Icon = MokaIcons.Content.Columns, OnClick = () => CompareWithLocalFolderAsync(entry.Path) });
+			}
+		}
+
 		if (single && !entry.IsDirectoryLike)
 		{
 			// F4 is the edit key every file manager has used since Norton Commander.
@@ -325,12 +356,16 @@ public partial class RemoteFileBrowser
 		});
 		items.Add(new MokaContextMenuItem { Text = "Delete", Icon = MokaIcons.Action.Delete, Shortcut = "Del", OnClick = () => DeleteAsync(selected) });
 
+		AddClipboardItems(items, entry, selected);
+		AddArchiveItems(items, entry, selected);
+
 		items.Add(new MokaContextMenuItem
 		{
 			Text = single ? "Copy path" : "Copy paths",
 			Icon = MokaIcons.Content.Copy,
+			Shortcut = "Ctrl+Shift+C",
 			DividerBefore = true,
-			OnClick = () => CopyAsync(string.Join('\n', selected.Select(item => item.Path)), single ? "Path copied" : "Paths copied"),
+			OnClick = () => CopyPathsAsync(selected),
 		});
 		items.Add(new MokaContextMenuItem
 		{
@@ -338,6 +373,15 @@ public partial class RemoteFileBrowser
 			Icon = MokaIcons.Content.Copy,
 			OnClick = () => CopyAsync(string.Join('\n', selected.Select(item => item.Name)), single ? "Name copied" : "Names copied"),
 		});
+		if (single && !entry.IsDirectoryLike && _fileSystem?.ServerChecksum is { } algorithm)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Copy " + FileChecksums.Name(algorithm),
+				Icon = MokaIcons.Content.Copy,
+				OnClick = () => CopyChecksumAsync(entry),
+			});
+		}
 
 		// Both open the properties dialog at their section. Links are never changed, so a selection of links has nothing to edit.
 		bool onlyLinks = selected.TrueForAll(item => item.Kind == RemoteEntryKind.SymbolicLink);
@@ -394,10 +438,50 @@ public partial class RemoteFileBrowser
 		}
 
 		items.Add(new MokaContextMenuItem { Text = "New folder", Icon = MokatermIcons.FolderPlus, DividerBefore = true, OnClick = CreateFolderAsync });
+		items.Add(new MokaContextMenuItem { Text = "New file", Icon = MokatermIcons.FilePlus, Shortcut = "Shift+F4", OnClick = CreateFileAsync });
+		if (CanCopyOnServer || _clipboard is not null)
+		{
+			string here = _path;
+			items.Add(new MokaContextMenuItem { Text = "Paste", Icon = MokaIcons.Content.Paste, Shortcut = "Ctrl+V", Disabled = !CanPaste, OnClick = () => PasteAsync(here) });
+		}
+
 		items.Add(new MokaContextMenuItem { Text = "Refresh", Icon = MokaIcons.Action.Refresh, Shortcut = "F5", OnClick = () => RefreshAsync() });
 		if (Session.Terminal is not null)
 		{
 			items.Add(new MokaContextMenuItem { Text = "Open terminal here", Icon = MokatermIcons.Terminal, OnClick = () => OpenTerminalHereAsync(_path) });
+		}
+
+		items.Add(new MokaContextMenuItem
+		{
+			Text = "Copy folder path",
+			Icon = MokaIcons.Content.Copy,
+			Shortcut = "Ctrl+Shift+C",
+			DividerBefore = true,
+			OnClick = () => CopyPathsAsync([]),
+		});
+		if (CanBookmark)
+		{
+			string here = _path;
+			bool bookmarked = IsBookmarked;
+			items.Add(new MokaContextMenuItem
+			{
+				Text = bookmarked ? "Remove this folder's bookmark" : "Bookmark this folder",
+				Icon = bookmarked ? MokaIcons.Toggle.StarOutline : MokaIcons.Toggle.Star,
+				OnClick = () => bookmarked ? RemoveBookmarkAsync(here) : AddBookmarkAsync(here),
+			});
+		}
+
+		items.Add(new MokaContextMenuItem
+		{
+			Text = "Find files...",
+			Icon = MokaIcons.Action.Search,
+			Shortcut = "Ctrl+Shift+F",
+			DividerBefore = true,
+			OnClick = () => FindFilesAsync(_path),
+		});
+		if (LocalFiles.CanPickFolders)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Compare with local folder...", Icon = MokaIcons.Content.Columns, OnClick = () => CompareWithLocalFolderAsync(_path) });
 		}
 
 		items.Add(new MokaContextMenuItem
@@ -409,11 +493,77 @@ public partial class RemoteFileBrowser
 			OnClick = ToggleHiddenAsync,
 		});
 
+		if (CanFollowTerminal)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Follow the terminal's folder",
+				Icon = MokaIcons.Content.Link,
+				Checked = FollowTerminal,
+				OnClick = ToggleFollowTerminalAsync,
+			});
+		}
+
 		if (CanElevate)
 		{
 			items.Add(new MokaContextMenuItem { Text = "Run as root", Icon = MokatermIcons.Root, Checked = IsElevated, OnClick = () => SwitchModeAsync(!IsElevated) });
 		}
 
 		return items;
+	}
+
+	// Copy and Duplicate need the server to copy, so a connection that cannot (FTP) shows neither. Cut is a move, which
+	// every file system can do, and Paste follows whatever is held.
+	private void AddClipboardItems(List<MokaContextMenuItem> items, RemoteFileEntry entry, List<RemoteFileEntry> selected)
+	{
+		bool canCopy = CanCopyOnServer;
+		if (canCopy)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Copy",
+				Icon = MokaIcons.Content.Copy,
+				Shortcut = "Ctrl+C",
+				DividerBefore = true,
+				OnClickSync = () => HoldEntries(selected, cut: false),
+			});
+		}
+
+		items.Add(new MokaContextMenuItem
+		{
+			Text = "Cut",
+			Icon = MokatermIcons.Cut,
+			Shortcut = "Ctrl+X",
+			DividerBefore = !canCopy,
+			OnClickSync = () => HoldEntries(selected, cut: true),
+		});
+		if (CanPaste)
+		{
+			string here = _path;
+			items.Add(new MokaContextMenuItem { Text = "Paste", Icon = MokaIcons.Content.Paste, Shortcut = "Ctrl+V", OnClick = () => PasteAsync(here) });
+			if (selected.Count == 1 && entry.IsDirectoryLike)
+			{
+				items.Add(new MokaContextMenuItem { Text = "Paste into folder", Icon = MokaIcons.Content.Paste, OnClick = () => PasteAsync(entry.Path) });
+			}
+		}
+
+		if (canCopy)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Duplicate", Icon = MokaIcons.Content.Copy, Shortcut = "Ctrl+D", OnClick = () => DuplicateAsync(selected) });
+		}
+	}
+
+	private void AddArchiveItems(List<MokaContextMenuItem> items, RemoteFileEntry entry, List<RemoteFileEntry> selected)
+	{
+		if (!CanUseArchives)
+		{
+			return;
+		}
+
+		items.Add(new MokaContextMenuItem { Text = "Compress...", Icon = MokatermIcons.Archive, DividerBefore = true, OnClick = () => CompressAsync(selected) });
+		if (selected.Count == 1 && !entry.IsDirectoryLike && RemoteArchives.KindOf(entry.Name) != RemoteArchiveKind.None)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Extract here", Icon = MokatermIcons.Archive, OnClick = () => ExtractHereAsync(entry) });
+		}
 	}
 }

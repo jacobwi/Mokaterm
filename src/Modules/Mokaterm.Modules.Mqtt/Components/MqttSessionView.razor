@@ -111,17 +111,19 @@
 
 @if (_connection is { } publishTarget)
 {
-	<MokaDialog Open="_publishOpen"
-				OpenChanged="OnPublishOpenChanged"
-				Title="Publish"
-				DialogSize="MokaDialogSize.Medium">
+	<HeadedDialog Open="_publishOpen"
+				  OpenChanged="OnPublishOpenChanged"
+				  Title="Publish"
+				  Icon="MokaIcons.Action.Send"
+				  DialogSize="MokaDialogSize.Medium">
 		<MqttPublishForm Connection="publishTarget" Topic="@_selectedTopic" DefaultQos="@DefaultQos" />
-	</MokaDialog>
+	</HeadedDialog>
 
-	<MokaDialog Open="_subscriptionsOpen"
-				OpenChanged="OnSubscriptionsOpenChanged"
-				Title="Subscriptions"
-				DialogSize="MokaDialogSize.Medium">
+	<HeadedDialog Open="_subscriptionsOpen"
+				  OpenChanged="OnSubscriptionsOpenChanged"
+				  Title="Subscriptions"
+				  Icon="MokatermIcons.Broadcast"
+				  DialogSize="MokaDialogSize.Medium">
 		<MqttSubscriptionPanel Connection="publishTarget" Subscriptions="_subscriptions" DefaultQos="@DefaultQos" />
-	</MokaDialog>
+	</HeadedDialog>
 }

@@ -53,6 +53,10 @@ internal sealed class TransferItem : ITransferItem, IDisposable
 
 	public DateTimeOffset? FinishedAt { get; private set; }
 
+	public TransferVerification Verification { get; private set; }
+
+	public long? ResumedFrom { get; private set; }
+
 	internal TransferRequest Request { get; }
 
 	/// <summary>Position in the start order. Retrying takes a new one at the back.</summary>
@@ -65,12 +69,20 @@ internal sealed class TransferItem : ITransferItem, IDisposable
 
 	internal bool IsFinished => State is TransferState.Completed or TransferState.Failed or TransferState.Canceled;
 
+	/// <summary>Set when the item left the queue while its work was still stopping; the work discards once it has.</summary>
+	internal bool DiscardWhenStopped { get; set; }
+
+	/// <summary>True once <see cref="TransferRequest.DiscardAsync"/> was started, which happens at most once.</summary>
+	internal bool Discarded { get; set; }
+
 	internal CancellationToken Start(DateTimeOffset startedAt, long timestamp)
 	{
 		Run++;
 		Cancellation = new CancellationTokenSource();
 		State = TransferState.Running;
 		StartedAt = startedAt;
+		Verification = TransferVerification.NotChecked;
+		ResumedFrom = null;
 		_sampleBytes = 0;
 		_sampleTimestamp = timestamp;
 		_hasRate = false;
@@ -103,6 +115,21 @@ internal sealed class TransferItem : ITransferItem, IDisposable
 
 	internal void SetTotalBytes(long totalBytes) => TotalBytes = totalBytes;
 
+	internal void SetVerification(TransferVerification verification) => Verification = verification;
+
+	/// <summary>
+	/// The attempt continues from <paramref name="offset"/>. The rate starts counting from there, or the bytes an earlier
+	/// attempt moved would read as arriving in the first sample.
+	/// </summary>
+	internal void MarkResumed(long offset, long timestamp)
+	{
+		ResumedFrom = offset;
+		TransferredBytes = offset;
+		_sampleBytes = offset;
+		_sampleTimestamp = timestamp;
+		_hasRate = false;
+	}
+
 	internal void Finish(TransferState state, string? error, DateTimeOffset finishedAt)
 	{
 		State = state;
@@ -124,6 +151,8 @@ internal sealed class TransferItem : ITransferItem, IDisposable
 		TransferredBytes = 0;
 		BytesPerSecond = 0;
 		TotalBytes = Request.TotalBytes;
+		Verification = TransferVerification.NotChecked;
+		ResumedFrom = null;
 	}
 
 	public void Dispose()

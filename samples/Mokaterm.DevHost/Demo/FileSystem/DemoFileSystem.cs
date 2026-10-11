@@ -27,7 +27,8 @@ internal sealed class DemoFileSystem : IRemoteFileSystem
 	}
 
 	public RemoteFileSystemFeatures Features =>
-		RemoteFileSystemFeatures.Permissions | RemoteFileSystemFeatures.Ownership | RemoteFileSystemFeatures.SymbolicLinks | RemoteFileSystemFeatures.Elevation;
+		RemoteFileSystemFeatures.Permissions | RemoteFileSystemFeatures.Ownership | RemoteFileSystemFeatures.SymbolicLinks | RemoteFileSystemFeatures.Elevation
+		| RemoteFileSystemFeatures.Copy;
 
 	public string UserName => _account.Name;
 
@@ -85,6 +86,12 @@ internal sealed class DemoFileSystem : IRemoteFileSystem
 		_tree.Rename(sourcePath, destinationPath, overwrite, _account);
 	}
 
+	public async ValueTask CopyAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
+	{
+		await LatencyAsync(cancellationToken);
+		_tree.Copy(sourcePath, destinationPath, overwrite, _account);
+	}
+
 	public async ValueTask SetPermissionsAsync(string path, UnixFileMode permissions, bool recursive, CancellationToken cancellationToken = default)
 	{
 		await LatencyAsync(cancellationToken);
@@ -113,8 +120,27 @@ internal sealed class DemoFileSystem : IRemoteFileSystem
 		ArgumentNullException.ThrowIfNull(options);
 		await LatencyAsync(cancellationToken);
 
-		// Created before the first byte, like an SFTP open: a failed upload leaves its partial file behind.
-		DemoNode file = _tree.BeginWrite(path, options.Overwrite, options.Permissions, _account);
+		// Created before the first byte and written in place, like FTP: a failed upload leaves its partial file behind, and
+		// the next attempt continues it.
+		string target = RemotePath.Normalize(path);
+		DemoNode file;
+		if (options.Resume is { PartialPath: { } partial, IsTemporary: false } && partial == target && _tree.Stat(target, _account) is { Kind: RemoteEntryKind.File })
+		{
+			(file, long size) = _tree.BeginAppend(target, _account);
+			if (!await TransferStreams.TrySkipAsync(source, size, cancellationToken))
+			{
+				options.Resume.Clear();
+				throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"The file being sent is shorter than what {target} already holds; the next try starts over.", target);
+			}
+
+			options.Resume.NotifyResumed(size);
+		}
+		else
+		{
+			file = _tree.BeginWrite(target, options.Overwrite, options.Permissions, _account);
+		}
+
+		options.Resume?.Record(target, isTemporary: false);
 		await CopyPacedAsync(
 			source,
 			(chunk, _) =>
@@ -126,15 +152,43 @@ internal sealed class DemoFileSystem : IRemoteFileSystem
 			cancellationToken);
 
 		_tree.CompleteWrite(file, options.LastModified);
+		options.Resume?.Clear();
 	}
 
-	public async ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
+
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(destination);
 		Stream source = await OpenReadAsync(path, cancellationToken);
 		await using (source)
 		{
+			if (!await TransferStreams.TrySkipAsync(source, offset, cancellationToken))
+			{
+				throw TransferStreams.ShorterThanCopied(path, offset);
+			}
+
 			await CopyPacedAsync(source, destination.WriteAsync, progress, cancellationToken);
+		}
+	}
+
+	public ChecksumAlgorithm? ServerChecksum => ChecksumAlgorithm.Sha256;
+
+	/// <summary>The checksum of what a read returns, or null for an upload too big for the demo to have kept.</summary>
+	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	{
+		await LatencyAsync(cancellationToken);
+		DemoFileData file = _tree.Read(path, _account);
+		if (file.ContentLost)
+		{
+			return null;
+		}
+
+		Stream content = file.IsComplete ? new MemoryStream(file.Content, writable: false) : new GeneratedStream(file.Size, file.Content);
+		await using (content)
+		{
+			return await FileChecksums.ComputeAsync(content, ChecksumAlgorithm.Sha256, cancellationToken);
 		}
 	}
 

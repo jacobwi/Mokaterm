@@ -31,6 +31,7 @@ public sealed partial class SettingsViewTests
 				services.AddScoped<IUserInteraction, UserInteractionService>();
 				services.AddScoped<UiStateStore>();
 				services.AddScoped<ShellState>();
+				services.AddScoped<ShellInterop>();
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal));
 

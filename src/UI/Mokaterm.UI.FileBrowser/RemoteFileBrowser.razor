@@ -18,6 +18,18 @@
 					Disabled="@(!CanBrowse || RemotePath.IsRoot(_path))" OnClick="GoUpAsync" title="Up (Backspace)" aria-label="Up" />
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.Home"
 					Disabled="@(_fileSystem is null)" OnClick="GoHomeAsync" title="Home" aria-label="Home" />
+		@if (CanBookmark)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Color="@(IsBookmarked ? MokaColor.Primary : MokaColor.Surface)"
+						Size="MokaSize.Sm"
+						StartIcon="@(IsBookmarked ? MokaIcons.Toggle.Star : MokaIcons.Toggle.StarOutline)"
+						Disabled="@(!CanBrowse)"
+						OnClick="ShowBookmarksMenuAsync"
+						title="Bookmarks"
+						aria-label="Bookmarks"
+						aria-haspopup="menu" />
+		}
 
 		<div class="fb-path">
 			@if (_editingPath)
@@ -55,6 +67,8 @@
 
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Refresh"
 					Disabled="@(_fileSystem is null)" OnClick="() => RefreshAsync()" title="Refresh (F5)" aria-label="Refresh" />
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Search"
+					Disabled="@(!CanBrowse)" OnClick="() => FindFilesAsync(_path)" title="Find files (Ctrl+Shift+F)" aria-label="Find files" />
 	</MokaToolbar>
 
 	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="@ToolbarStyle">
@@ -62,6 +76,8 @@
 		{
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokatermIcons.FolderPlus"
 						Disabled="@(!CanBrowse)" OnClick="CreateFolderAsync" title="New folder" aria-label="New folder" />
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokatermIcons.FilePlus"
+						Disabled="@(!CanBrowse)" OnClick="CreateFileAsync" title="New file (Shift+F4)" aria-label="New file" />
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokatermIcons.FileUpload"
 						Disabled="@(!CanBrowse)" OnClick="PickAndUploadFilesAsync" title="Upload files" aria-label="Upload files" />
 			@if (LocalFiles.CanPickFolders)
@@ -94,6 +110,17 @@
 					title="@(ShowHidden ? "Hide hidden files" : "Show hidden files")"
 					aria-label="Show hidden files"
 					aria-pressed="@(ShowHidden ? "true" : "false")" />
+		@if (CanFollowTerminal)
+		{
+			<MokaButton Variant="@(FollowTerminal ? MokaVariant.Soft : MokaVariant.Text)"
+						Color="@(FollowTerminal ? MokaColor.Primary : MokaColor.Surface)"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Content.Link"
+						OnClick="ToggleFollowTerminalAsync"
+						title="@FollowTitle"
+						aria-label="Follow the terminal's folder"
+						aria-pressed="@(FollowTerminal ? "true" : "false")" />
+		}
 		@if (IsNarrow)
 		{
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.MoreHorizontal"
@@ -258,6 +285,11 @@
 				@if (_selection.Count > 0)
 				{
 					<MokaStatusBarItem Text="@SelectionText" />
+				}
+				@* A narrow browser has no room beside the counts; Paste in the menus still says something is held. *@
+				@if (!IsNarrow && ClipboardText is { } held)
+				{
+					<MokaStatusBarItem Text="@held" Tooltip="Ctrl+V pastes them into the folder on screen" />
 				}
 			}
 		</StartContent>

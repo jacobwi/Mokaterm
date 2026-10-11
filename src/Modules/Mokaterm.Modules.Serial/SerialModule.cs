@@ -41,6 +41,7 @@ public sealed class SerialModule : IMokatermModule
 		services.AddSessionTool(new SessionToolDescriptor
 		{
 			ProtocolId = SerialProtocolProvider.ProtocolId,
+			Id = "serial-line",
 			Title = "Serial line",
 			Icon = SerialIcons.Signals,
 			Component = typeof(SerialLineView),

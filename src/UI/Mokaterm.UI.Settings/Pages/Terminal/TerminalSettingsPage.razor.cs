@@ -47,6 +47,7 @@ public sealed partial class TerminalSettingsPage : SettingsSectionBase<TerminalS
 	[
 		new(TerminalRightClickAction.ContextMenu, "Menu"),
 		new(TerminalRightClickAction.Paste, "Paste", MokaIcons.Content.Paste),
+		new(TerminalRightClickAction.CopyOrPaste, "Copy or paste"),
 	];
 
 	private static readonly IReadOnlyList<EnumOption<TerminalPromptColors>> PromptColorOptions =

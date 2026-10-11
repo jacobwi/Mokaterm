@@ -1,0 +1,65 @@
+@using Mokaterm.Modules.Local.Containers
+@inherits ConnectionOptionsEditorBase<KubernetesShellOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		A Kubernetes pod login runs kubectl exec on this computer, so the machine's address names the pod. Choose one below
+		to keep this login on that pod whatever the host is called; it then wins over the address, and its namespace is
+		filled in with it. Pods made by a deployment get a new name when they are replaced, so choose again then.
+	</MokaText>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="Context"
+					   Value="@(Current.Context ?? "")"
+					   ValueChanged="OnContextChangedAsync"
+					   ErrorText="@ContextError"
+					   Placeholder="The current context"
+					   HelperText="A name from kubectl config get-contexts."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+
+		<MokaTextField Label="Namespace"
+					   Value="@(Current.Namespace ?? "")"
+					   ValueChanged="OnNamespaceChangedAsync"
+					   ErrorText="@NamespaceError"
+					   Placeholder="The context's own"
+					   HelperText="Where the pod is, and where Choose looks."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</MokaGrid>
+
+	<ContainerPicker Load="ListAsync" OnPick="OnPickAsync" What="pods" Selected="@Current.Pod" Disabled="Disabled">
+		<MokaTextField Label="Pod"
+					   Value="@(Current.Pod ?? "")"
+					   ValueChanged="OnPodChangedAsync"
+					   ErrorText="@PodError"
+					   Placeholder="The host's address"
+					   HelperText="A pod's name. Empty opens the one the host's address names."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</ContainerPicker>
+
+	<MokaTextField Label="Container"
+				   Value="@(Current.Container ?? "")"
+				   ValueChanged="OnContainerChangedAsync"
+				   ErrorText="@ContainerError"
+				   Placeholder="The pod's default container"
+				   HelperText="@ContainerHelp"
+				   Disabled="Disabled"
+				   Size="MokaSize.Sm"
+				   spellcheck="false"
+				   autocomplete="off" />
+
+	<ContainerShellField Shell="Current.Shell"
+						 ShellChanged="OnShellChangedAsync"
+						 Command="@Current.Command"
+						 CommandChanged="OnCommandChangedAsync"
+						 Tool="kubectl"
+						 Disabled="Disabled" />
+</MokaFlexbox>

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Terminal.Interop;
+using Mokaterm.UI.Terminal.Triggers;
 
 namespace Mokaterm.UI.Terminal.Extensions;
 
@@ -13,6 +14,8 @@ public static class TerminalServiceCollectionExtensions
 		// The view also needs IClipboardService from UI.Common; that registration is idempotent too.
 		services.AddMokatermUiCommon();
 		services.TryAddScoped<TerminalInterop>();
+		services.TryAddScoped<TerminalTriggerSwitch>();
+		services.TryAddScoped<TerminalTriggerTester>();
 		return services;
 	}
 }

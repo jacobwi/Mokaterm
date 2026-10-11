@@ -46,6 +46,33 @@
 	overflow-y: auto;
 }
 
+/* A row result sits under its page, lined up with the page title rather than its icon. */
+.mt-settings-result {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+	padding-left: var(--moka-spacing-lg);
+}
+
+.mt-settings-result-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-settings-result-detail {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	font-size: var(--moka-font-size-xs);
+	line-height: 1.4;
+	color: var(--moka-color-on-surface-tertiary);
+	white-space: normal;
+}
+
 .mt-settings-content {
 	min-height: 0;
 	overflow-y: auto;

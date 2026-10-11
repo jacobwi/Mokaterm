@@ -1,0 +1,79 @@
+@inherits ConnectionOptionsEditorBase<LocalConnectionOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		A local shell runs on this computer, so the machine's address names the shell: pwsh, powershell, cmd, git-bash or
+		a WSL distribution such as Ubuntu, and localhost runs the default one from Settings. Pick a shell below only when
+		this login should run something other than what the address names.
+	</MokaText>
+
+	<div class="mt-local-shell">
+		<div class="mt-local-shell-field">
+			<MokaSelect TValue="string"
+						Label="Shell"
+						Items="_choices"
+						Value="@ShellValue"
+						ValueChanged="OnShellChangedAsync"
+						ValueSelector="ShellLabel"
+						HelperText="@ShellHelp"
+						Disabled="Disabled"
+						Size="MokaSize.Sm" />
+		</div>
+
+		<div class="mt-local-shell-actions">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="Disabled"
+						OnClick="RefreshShells"
+						aria-label="Look for installed shells again" />
+		</div>
+	</div>
+
+	@if (Current.IsCustom)
+	{
+		<MokaTextField Label="Program"
+					   Value="@(Current.Program ?? "")"
+					   ValueChanged="OnProgramChangedAsync"
+					   Placeholder="nu.exe, or the program's full path"
+					   HelperText="A full path, or the name of a program on PATH. %VARIABLES% are expanded."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	}
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="Arguments"
+					   Value="@(Current.Arguments ?? "")"
+					   ValueChanged="OnArgumentsChangedAsync"
+					   Placeholder="@ArgumentsPlaceholder"
+					   HelperText="@ArgumentsHelp"
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+
+		<MokaTextField Label="Starting folder"
+					   Value="@(Current.StartingFolder ?? "")"
+					   ValueChanged="OnFolderChangedAsync"
+					   Placeholder="@FolderPlaceholder"
+					   HelperText="@FolderHelp"
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</MokaGrid>
+
+	<MokaTextArea Label="Environment variables"
+				  Value="@_environment.Show(Current.EnvironmentVariables ?? "")"
+				  ValueChanged="OnEnvironmentChangedAsync"
+				  ErrorText="@_environment.Error"
+				  Rows="3"
+				  Placeholder="NAME=value, one per line"
+				  HelperText="@EnvironmentHelp"
+				  Disabled="Disabled"
+				  Size="MokaSize.Sm"
+				  spellcheck="false" />
+</MokaFlexbox>

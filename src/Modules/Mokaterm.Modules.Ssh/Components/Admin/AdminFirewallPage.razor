@@ -1,0 +1,211 @@
+@using Mokaterm.Modules.Ssh.Admin.Firewall
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Firewall"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter rules"
+				PrimaryText="@(Capabilities.Firewall?.CanChange == true && _status is not null ? "Add rule" : null)"
+				PrimaryIcon="MokaIcons.Action.Add"
+				PrimaryDisabled="@(Busy || _adding)"
+				OnPrimary="StartAdd"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@(_adding ? AddPanel : null)">
+	<Chips>
+		@if (_status is { } status && Capabilities.Firewall is { } firewall)
+		{
+			<MokaStatusDot Size="MokaSize.Xs"
+						   Color="@AdminFormat.Dot(status.Active)"
+						   Glow="@(status.Active == true)"
+						   Label="@(status.Active switch { true => "ACTIVE", false => "INACTIVE", _ => "SEE THE RULES" })" />
+			@if (firewall.CanChange && firewall.AllowsSsh(status) == false && status.Active == true)
+			{
+				<span title="No rule allows the port this session arrived on; something else, such as a source rule, lets it in.">
+					<MokaTag Text="@($"NO RULE FOR PORT {firewall.SshPort}")" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				</span>
+			}
+		}
+	</Chips>
+	<ChipsEnd>
+		@if (_status is { } current && Capabilities.Firewall is { CanChange: true } changeable)
+		{
+			<button type="button"
+					class="mta-link"
+					disabled="@Busy"
+					@onclick="@(() => RunAsync(current.Active == true ? changeable.Disable() : changeable.Enable(current)))">
+				@(current.Active == true ? $"turn {changeable.DisplayName} off" : $"turn {changeable.DisplayName} on")
+			</button>
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@if (Capabilities.Firewall is not { } firewall)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Shield" Title="No firewall tool" Description="@Capabilities.FirewallMissing" />
+		}
+		else if (!ReadAsRoot)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Root"
+							Title="The firewall needs root"
+							Description="@(Context.RootChangeBlocked ?? $"{firewall.DisplayName} only answers root, even to say whether it is on.")">
+				@if (Context.RootChangeBlocked is null)
+				{
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Lock" OnClick="Context.EnableRoot">Turn on root mode</MokaButton>
+				}
+			</MokaEmptyState>
+		}
+		else if (_status is { } status)
+		{
+			@if (status.Summary.Count > 0)
+			{
+				<dl class="mta-kv" style="margin-bottom:var(--moka-spacing-sm)">
+					@foreach ((string key, string value) in status.Summary)
+					{
+						<dt>@key</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
+					}
+				</dl>
+			}
+
+			@if (status.Rules.Count > 0)
+			{
+				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 104px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 90px">
+					<div class="mta-row mta-row--head">
+						<span>Rule</span>
+						<span>Action</span>
+						<span class="mta-wide">From</span>
+					</div>
+					@foreach ((FirewallRule rule, int index) in status.Rules.Select((rule, index) => (rule, index)).Where(pair => Matches(pair.rule)))
+					{
+						<div class="mta-row" @key="index">
+							<span class="mta-cell mta-mono" title="@rule.Target">@rule.Target</span>
+							<span class="mta-cell mta-mono" style="@ActionStyle(rule.Action)">@rule.Action</span>
+							<span class="mta-cell mta-mono mta-dim mta-wide" title="@rule.From">@rule.From</span>
+						</div>
+					}
+				</div>
+			}
+			else if (status.Raw.Length > 0)
+			{
+				<pre class="mta-pre mta-pre--fill">@status.Raw</pre>
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"Read only: {firewall.DisplayName} rule sets are shown as the tool prints them.")</MokaText>
+			}
+			else
+			{
+				<MokaEmptyState Icon="MokatermIcons.Shield"
+								Title="@(status.Active == true ? "No rules" : $"{firewall.DisplayName} is off")"
+								Description="@(status.Active == true ? "Only the default policies apply." : "Nothing is filtered. Turn it on from the line above; the port this session uses is allowed first.")">
+					@if (firewall.CanChange)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="Busy" OnClick="StartAdd">Add rule</MokaButton>
+					}
+				</MokaEmptyState>
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private FirewallStatus? _status;
+	private string _filter = "";
+	private bool _adding;
+	private int _formVersion;
+	private FirewallPort? _port;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private string Summary
+	{
+		get
+		{
+			if (Capabilities.Firewall is not { } firewall)
+			{
+				return "no firewall tool";
+			}
+
+			if (_status is not { } status)
+			{
+				return $"{firewall.DisplayName} · needs root";
+			}
+
+			string state = status.Active switch { true => "active", false => "inactive", _ => "rule set" };
+			return $"{firewall.DisplayName} {state}, {status.Rules.Count} rules · this session uses port {firewall.SshPort}";
+		}
+	}
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Firewall is not { } firewall || !ReadAsRoot)
+		{
+			_status = null;
+			return;
+		}
+
+		AdminOutcome outcome = await ReadAsync(firewall.Status(), cancellationToken);
+		_status = firewall.Parse(outcome);
+	}
+
+	private RenderFragment AddPanel => __builder =>
+	{
+		<AdminDetailPanel Title="Add a rule" Mono="false" OnClose="@(() => _adding = false)">
+			<TextSetting Label="Port"
+						 Value="@(_port?.ToString() ?? "")"
+						 ValueChanged="OnPortChanged"
+						 Validate="PortProblem"
+						 Placeholder="8080/tcp, or 53 for tcp and udp"
+						 @key="_formVersion" />
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+				@(Capabilities.Firewall?.Kind == Mokaterm.Modules.Ssh.Admin.Detection.FirewallKind.Firewalld
+					? "Allow opens the port in the default zone; deny removes it and adds a reject rule. Both are permanent."
+					: "Allow and deny add a ufw rule for the port.")
+			</MokaText>
+			<div class="mta-form-actions">
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || _port is null)" OnClick="@(() => PortAsync(allow: true))">Allow</MokaButton>
+				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Sm" Disabled="@(Busy || _port is null)" OnClick="@(() => PortAsync(allow: false))">Deny</MokaButton>
+			</div>
+		</AdminDetailPanel>
+	};
+
+	private static string? PortProblem(string text)
+	{
+		FirewallPort.TryParse(text, out string? problem);
+		return problem;
+	}
+
+	private static string? ActionStyle(string action) => action switch
+	{
+		_ when action.StartsWith("ALLOW", StringComparison.Ordinal) => "color:var(--moka-color-success)",
+		_ when action.StartsWith("DENY", StringComparison.Ordinal) || action.StartsWith("REJECT", StringComparison.Ordinal) => "color:var(--moka-color-error)",
+		_ => null,
+	};
+
+	private bool Matches(FirewallRule rule) => _filter.Trim().Length == 0
+		|| rule.Target.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| rule.From.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private void OnPortChanged(string text) => _port = FirewallPort.TryParse(text, out _);
+
+	private void StartAdd()
+	{
+		_adding = true;
+		_port = null;
+		_formVersion++;
+	}
+
+	private async Task PortAsync(bool allow)
+	{
+		if (Capabilities.Firewall is not { } firewall || _port is not { } port)
+		{
+			return;
+		}
+
+		if (await RunAsync(allow ? firewall.Allow(port) : firewall.Deny(port)) is { Succeeded: true })
+		{
+			_adding = false;
+		}
+	}
+}

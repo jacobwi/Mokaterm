@@ -1,0 +1,72 @@
+@namespace Mokaterm.UI.QuickConnect
+
+@* The box keeps the focus: rows take no tab stop and swallow the mouse press that would move it, and the box points at
+   the active row through aria-activedescendant. Each row names itself, so a screen reader reads the target and what
+   kind of row it is rather than the label's parts. *@
+<div class="mt-qc-list" id="@Id" role="listbox" aria-label="Quick connect suggestions">
+	@for (int index = 0; index < Rows.Count; index++)
+	{
+		QuickConnectRow row = Rows[index];
+		bool active = index == ActiveIndex;
+		<div @key="row.Key"
+			 id="@OptionId(Id, index)"
+			 class="@RowClass(row, active)"
+			 role="option"
+			 aria-selected="@(active ? "true" : "false")"
+			 aria-label="@AccessibleName(row)"
+			 title="@Tooltip(row)"
+			 @onmousedown:preventDefault
+			 @onclick="() => OnPick.InvokeAsync(row)">
+			@switch (row.Kind)
+			{
+				case QuickConnectRowKind.SavedLogin:
+				case QuickConnectRowKind.Recent:
+					<span class="mt-qc-icon"><MokaIcon Icon="@Contributions.GetProtocolIcon(row.ProtocolId)" Size="MokaSize.Xs" /></span>
+					<span class="mt-qc-main"><SessionLabel Host="row.Host" Connection="row.Connection" ShowPort Mono /></span>
+					@if (row.Kind == QuickConnectRowKind.SavedLogin && HostEnvironmentDisplay.Tag(row.Host!.Environment) is { } environment)
+					{
+						<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(row.Host.Environment)" />
+					}
+					@if (row.Kind == QuickConnectRowKind.Recent)
+					{
+						<span class="mt-qc-recent" aria-hidden="true"><MokaIcon Icon="MokatermIcons.History" Size="MokaSize.Xs" /></span>
+						@* The mouse's way to forget an entry; the keyboard's is Shift+Delete on the active row, which is why the
+						   button stays out of the accessibility tree instead of nesting a control inside an option. *@
+						<button type="button"
+								class="mt-qc-remove"
+								tabindex="-1"
+								aria-hidden="true"
+								title="Remove from history (Shift+Delete)"
+								@onmousedown:preventDefault
+								@onclick:stopPropagation
+								@onclick="() => OnRemove.InvokeAsync(row)">
+							<MokaIcon Icon="MokaIcons.Navigation.Close" Size="MokaSize.Xs" />
+						</button>
+					}
+					break;
+
+				case QuickConnectRowKind.Detected:
+					<span class="mt-qc-icon"><MokaIcon Icon="@Contributions.GetProtocolIcon(row.ProtocolId)" Size="MokaSize.Xs" /></span>
+					<span class="mt-qc-main">
+						<span class="mt-qc-name">@row.Suggestion!.Address</span>
+						@if (row.Suggestion.Description is { Length: > 0 } description)
+						{
+							<span class="mt-qc-detail">@description</span>
+						}
+					</span>
+					break;
+
+				case QuickConnectRowKind.ConnectAndSave:
+					<span class="mt-qc-icon"><MokaIcon Icon="MokaIcons.Action.Save" Size="MokaSize.Xs" /></span>
+					<span class="mt-qc-main mt-qc-action">Connect and save...</span>
+					<span class="mt-qc-keys" aria-hidden="true"><MokaKbd>Ctrl</MokaKbd><MokaKbd>Enter</MokaKbd></span>
+					break;
+
+				case QuickConnectRowKind.ClearHistory:
+					<span class="mt-qc-icon"><MokaIcon Icon="MokatermIcons.Eraser" Size="MokaSize.Xs" /></span>
+					<span class="mt-qc-main mt-qc-action">Clear history</span>
+					break;
+			}
+		</div>
+	}
+</div>

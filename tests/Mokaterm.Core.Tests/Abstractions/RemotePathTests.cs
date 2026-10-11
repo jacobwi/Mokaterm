@@ -81,4 +81,15 @@ public sealed class RemotePathTests
 	[InlineData("/a", false)]
 	public void IsRoot_UsesNormalizedPath(string path, bool expected) =>
 		Assert.Equal(expected, RemotePath.IsRoot(path));
+
+	[Theory]
+	[InlineData("/srv/site", "/srv/site/css/app.css", "css/app.css")]
+	[InlineData("/srv/site/", "/srv/site//index.html", "index.html")]
+	[InlineData("/srv/site", "/srv/site", "")]
+	[InlineData("/", "/etc/hosts", "etc/hosts")]
+	[InlineData("/", "/", "")]
+	[InlineData("/srv/site", "/srv/siteold/a", null)]
+	[InlineData("/srv/site", "/srv", null)]
+	public void GetRelativePath_IsThePartBelowTheAncestor(string ancestor, string path, string? expected) =>
+		Assert.Equal(expected, RemotePath.GetRelativePath(ancestor, path));
 }

@@ -35,6 +35,7 @@ internal sealed class FtpProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "FTP",
 		Description = "File transfer over FTP, optionally secured with TLS (FTPS).",
+		QuickConnectExample = "user@host:port",
 		DefaultPort = DefaultPort,
 		Capabilities = ProtocolCapabilities.FileSystem,
 		AuthenticationMethods = [AuthenticationMethod.Password, AuthenticationMethod.Anonymous],

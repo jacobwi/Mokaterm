@@ -42,7 +42,8 @@ internal sealed class FakeSession : ISessionHandle
 		Capabilities = ProtocolCapabilities.Terminal,
 	};
 
-	public bool IsTransient => false;
+	/// <summary>A quick-connect session when set, with no saved login behind it.</summary>
+	public bool IsTransient { get; init; }
 
 	public SessionState State => SessionState.Connected;
 
@@ -56,5 +57,6 @@ internal sealed class FakeSession : ISessionHandle
 
 	public ITerminalStream? Terminal { get; init; }
 
-	public IProtocolSession? Session => null;
+	/// <summary>The live session, for a test that needs its features; none by default.</summary>
+	public IProtocolSession? Session { get; init; }
 }

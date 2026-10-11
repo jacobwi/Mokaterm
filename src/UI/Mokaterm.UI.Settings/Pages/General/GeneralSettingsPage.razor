@@ -20,14 +20,6 @@
 						ValueChanged="value => SaveAsync(s => s with { AutoReconnect = value })"
 						aria-label="Reconnect automatically" />
 		</SettingsRow>
-		<SettingsRow Label="Reopen at start"
-					 Description="What to do with the tabs that were open when Mokaterm last closed. Quick-connect tabs are never reopened.">
-			<EnumSegmentedControl TEnum="SessionRestoreMode"
-								  Value="settings.RestoreSessions"
-								  ValueChanged="value => SaveAsync(s => s with { RestoreSessions = value })"
-								  Options="RestoreOptions"
-								  AriaLabel="Reopen sessions at start" />
-		</SettingsRow>
 		<SettingsRow Label="Reconnect delay" Description="Seconds to wait before each reconnect attempt.">
 			<NumberSetting TValue="int"
 						   Value="settings.AutoReconnectDelaySeconds"
@@ -37,6 +29,14 @@
 						   Suffix="s"
 						   Disabled="!settings.AutoReconnect"
 						   AriaLabel="Reconnect delay in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Reopen at start"
+					 Description="What to do with the tabs that were open when Mokaterm last closed. Quick-connect tabs are never reopened.">
+			<EnumSegmentedControl TEnum="SessionRestoreMode"
+								  Value="settings.RestoreSessions"
+								  ValueChanged="value => SaveAsync(s => s with { RestoreSessions = value })"
+								  Options="RestoreOptions"
+								  AriaLabel="Reopen sessions at start" />
 		</SettingsRow>
 	</SettingsSection>
 
@@ -50,4 +50,33 @@
 						   AriaLabel="Number of recent connections" />
 		</SettingsRow>
 	</SettingsSection>
+
+	@if (Files is not null)
+	{
+		<SettingsSection Title="Backup"
+						 Description="Every setting in one JSON file, to move to another machine or to keep. Connections, passwords, keys and saved commands are not in it: they stay in the vault.">
+			<SettingsRow Label="Export settings"
+						 Description="Saves the file. Folders, the update feed and the other values that only fit this machine are left out.">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Download"
+							Loading="_exporting"
+							Disabled="Busy"
+							OnClick="ExportAsync">
+					Export
+				</MokaButton>
+			</SettingsRow>
+			<SettingsRow Label="Import settings"
+						 Description="Replaces every setting with the ones in an exported file. This machine keeps its own folders and update feed.">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokaIcons.Action.Upload"
+							Loading="_importing"
+							Disabled="Busy"
+							OnClick="ImportAsync">
+					Import
+				</MokaButton>
+			</SettingsRow>
+		</SettingsSection>
+	}
 </SettingsPage>

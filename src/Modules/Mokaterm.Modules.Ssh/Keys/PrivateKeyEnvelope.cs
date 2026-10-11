@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Security.Cryptography;
+using System.Text;
+using Mokaterm.Abstractions.Credentials;
 
 namespace Mokaterm.Modules.Ssh.Keys;
 
@@ -27,6 +29,12 @@ internal readonly record struct PrivateKeyEnvelope(PrivateKeyFormat Format, bool
 	private const int AesBlockSize = 16;
 
 	public static ReadOnlySpan<byte> Whitespace => " \t\r\n"u8;
+
+	/// <summary>The type of an OpenSSH file's public key, such as <c>sk-ssh-ed25519@openssh.com</c>; null for other formats.</summary>
+	public string? KeyType { get; init; }
+
+	/// <summary>A key on a FIDO device, which SSH.NET cannot load and which signs through the host's authenticator.</summary>
+	public bool IsSecurityKey => Format == PrivateKeyFormat.OpenSsh && SecurityKeyTypes.IsSecurityKey(KeyType);
 
 	private static ReadOnlySpan<byte> PemBegin => "-----BEGIN "u8;
 
@@ -114,17 +122,23 @@ internal readonly record struct PrivateKeyEnvelope(PrivateKeyFormat Format, bool
 
 		uint keyCount = BinaryPrimitives.ReadUInt32BigEndian(rest);
 		rest = rest[4..];
+		string? keyType = null;
 		for (uint i = 0; i < keyCount; i++)
 		{
-			if (!TryReadString(ref rest, out _))
+			if (!TryReadString(ref rest, out ReadOnlySpan<byte> publicKey))
 			{
 				return default;
+			}
+
+			if (i == 0 && TryReadString(ref publicKey, out ReadOnlySpan<byte> typeName))
+			{
+				keyType = Encoding.ASCII.GetString(typeName);
 			}
 		}
 
 		bool encrypted = !cipher.SequenceEqual("none"u8);
 		return TryReadString(ref rest, out ReadOnlySpan<byte> privateSection) && (!encrypted || privateSection.Length % DesBlockSize == 0)
-			? new(PrivateKeyFormat.OpenSsh, encrypted)
+			? new(PrivateKeyFormat.OpenSsh, encrypted) { KeyType = keyType }
 			: default;
 	});
 

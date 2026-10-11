@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Moka.Red.ContextMenu;
 using Moka.Red.Icons;
@@ -6,6 +7,7 @@ using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Terminal;
+using Mokaterm.UI.Commands;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.Platform;
@@ -82,6 +84,7 @@ internal sealed class ConnectionActions
 		new() { Text = "Import hosts here", Icon = MokatermIcons.FileUpload, OnClickSync = () => ImportConnections(folder.Id) },
 		new() { Text = "Rename", Icon = MokaIcons.Action.Edit, DividerBefore = true, OnClickSync = () => RenameFolder(folder.Id) },
 		new() { Text = "Delete", Icon = MokaIcons.Action.Delete, OnClick = () => DeleteFolderAsync(folder) },
+		.. RunCommandItems(CommandRunTargets.InFolder(_catalog.Catalog, folder.Id)),
 	];
 
 	public IReadOnlyList<MokaContextMenuItem> HostMenu(HostProfile host)
@@ -106,6 +109,7 @@ internal sealed class ConnectionActions
 			new() { Text = "Copy address", Icon = MokaIcons.Content.Link, OnClick = () => CopyAsync(host.Address) },
 			new() { Text = "Move to folder", Icon = MokatermIcons.Folder, Children = MoveItems(host, catalog) },
 			new() { Text = "Delete host", Icon = MokaIcons.Action.Delete, DividerBefore = true, OnClick = () => DeleteHostAsync(host) },
+			.. RunCommandItems(catalog.ConnectionsOf(host.Id)),
 		];
 	}
 
@@ -132,8 +136,34 @@ internal sealed class ConnectionActions
 		items.Add(new MokaContextMenuItem { Text = "Copy user@host", Icon = MokaIcons.Content.Link, OnClick = () => CopyAsync(UserAtHost(host, login)) });
 		items.Add(new MokaContextMenuItem { Text = "Favorite", Checked = login.IsFavorite, OnClick = () => ToggleFavoriteAsync(login) });
 		items.Add(new MokaContextMenuItem { Text = "Delete", Icon = MokaIcons.Action.Delete, DividerBefore = true, OnClick = () => DeleteLoginAsync(host, login) });
+		items.AddRange(RunCommandItems([login]));
 		return items;
 	}
+
+	/// <summary>
+	/// The menu for several rows picked together in the tree: one command run on every login under them. A folder
+	/// brings the logins of every host below it, a host brings its own.
+	/// </summary>
+	public IReadOnlyList<MokaContextMenuItem> SelectionMenu(IReadOnlyList<ConnectionTreeRow> rows, Action clearSelection)
+	{
+		ArgumentNullException.ThrowIfNull(rows);
+		List<Guid> runnable = CommandRunTargets.Runnable(LoginsUnder(rows), _protocols);
+		return
+		[
+			new()
+			{
+				Text = runnable.Count == 1 ? "Run command on 1 login..." : string.Create(CultureInfo.CurrentCulture, $"Run command on {runnable.Count} logins..."),
+				Icon = MokatermIcons.Command,
+				Disabled = runnable.Count == 0,
+				OnClickSync = () => RunCommand(runnable),
+			},
+			new() { Text = "Clear selection", Icon = MokaIcons.Navigation.Close, DividerBefore = true, OnClickSync = clearSelection },
+		];
+	}
+
+	/// <summary>Opens the command run with <paramref name="connectionIds"/> picked; an empty list opens it with nothing picked.</summary>
+	public void RunCommand(IReadOnlyList<Guid> connectionIds) =>
+		_shell.OpenEditor(new CommandRunEditorRequest { ConnectionIds = connectionIds });
 
 	public IReadOnlyList<MokaContextMenuItem> EmptyAreaMenu() =>
 	[
@@ -320,6 +350,39 @@ internal sealed class ConnectionActions
 		});
 
 		return copyId;
+	}
+
+	/// <summary>Every login under the rows, each once, in the order the rows come.</summary>
+	private List<ConnectionProfile> LoginsUnder(IEnumerable<ConnectionTreeRow> rows)
+	{
+		ConnectionCatalog catalog = _catalog.Catalog;
+		List<ConnectionProfile> logins = [];
+		foreach (ConnectionTreeRow row in rows)
+		{
+			switch (row)
+			{
+				case { Folder: { } folder }:
+					logins.AddRange(CommandRunTargets.InFolder(catalog, folder.Id));
+					break;
+				case { Login: { } login }:
+					logins.Add(login);
+					break;
+				case { Host: { } host }:
+					logins.AddRange(catalog.ConnectionsOf(host.Id));
+					break;
+			}
+		}
+
+		return logins;
+	}
+
+	/// <summary>"Run command..." for the logins of one row, or nothing when none of them can run one.</summary>
+	private List<MokaContextMenuItem> RunCommandItems(IEnumerable<ConnectionProfile> logins)
+	{
+		List<Guid> runnable = CommandRunTargets.Runnable(logins, _protocols);
+		return runnable.Count == 0
+			? []
+			: [new() { Text = "Run command...", Icon = MokatermIcons.Command, DividerBefore = true, OnClickSync = () => RunCommand(runnable) }];
 	}
 
 	private async Task<bool> RunAsync(string what, Func<Task> action)

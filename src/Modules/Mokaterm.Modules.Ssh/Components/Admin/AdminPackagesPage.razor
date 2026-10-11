@@ -1,0 +1,412 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Packages
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Packages"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter by name"
+				PrimaryText="@PrimaryText"
+				PrimaryIcon="PrimaryIcon"
+				PrimaryDisabled="@(Busy || Capabilities.Packages is null || Context.RootChangeBlocked is not null || (_view == "updates" && _updates is not { Count: > 0 }))"
+				PrimaryTitle="@Context.RootChangeBlocked"
+				OnPrimary="OnPrimaryAsync"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				LoadingText="Reading the installed packages"
+				ListPage
+				Detail="@DetailFragment">
+	<Chips>
+		@if (Capabilities.Packages is not null)
+		{
+			<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Packages to show" />
+		}
+	</Chips>
+	<ChipsEnd>
+		@if (_view == "updates" && Capabilities.Packages?.RefreshIndex() is not null)
+		{
+			<button type="button"
+					class="mta-link"
+					disabled="@(Busy || Context.RootChangeBlocked is not null)"
+					title="Fetch the current package lists from every repository, then check again"
+					@onclick="RefreshIndexAsync">
+				refresh package lists
+			</button>
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@if (Capabilities.Packages is not { } packages)
+		{
+			<MokaEmptyState Icon="SshIcons.Package" Title="No package manager" Description="@Capabilities.PackagesMissing" />
+		}
+		else if (_view == "updates")
+		{
+			@if (_updatesError is { } updatesError)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Dense>@updatesError</MokaAlert>
+			}
+			else if (_updates is null)
+			{
+				<div class="mta-loading"><MokaSpinner Label="@($"Asking {packages.DisplayName} for updates")" /></div>
+			}
+			else if (_updates.Count == 0)
+			{
+				<MokaEmptyState Icon="MokaIcons.Status.CheckCircle"
+								Title="Up to date"
+								Description="@($"{packages.DisplayName} knows of no newer versions. Its lists may be old: refresh them to ask the repositories again.")" />
+			}
+			else
+			{
+				List<PackageUpdate> updates = [.. Sorted(_updates.Where(Matches))];
+				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr)">
+					<div class="mta-row mta-row--head">
+						<AdminSortHeader Text="Package" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
+						<span class="mta-wide">Installed</span>
+						<span>Available</span>
+						<AdminSortHeader Text="From" Key="source" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+					</div>
+					@foreach (PackageUpdate update in updates.Take(MaxRows))
+					{
+						<div class="mta-row" @key="@(update.Name + "/" + update.Architecture)">
+							<span class="mta-cell mta-mono" title="@update.Name">@update.Name</span>
+							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.CurrentVersion">@update.CurrentVersion</span>
+							<span class="mta-cell mta-mono" title="@update.NewVersion">@update.NewVersion</span>
+							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.Source">@update.Source</span>
+						</div>
+					}
+					@if (updates.Count > MaxRows)
+					{
+						<div class="mta-more">@($"{AdminFormat.Count(updates.Count - MaxRows)} more. Narrow the filter to see them.")</div>
+					}
+				</div>
+			}
+		}
+		else
+		{
+			List<InstalledPackage> installed = [.. Sorted(_installed.Where(Matches))];
+			@if (installed.Count == 0)
+			{
+				<MokaEmptyState Icon="SshIcons.Package" Title="Nothing matches" Description="No installed package matches the filter. Install it if it is missing.">
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="@(Context.RootChangeBlocked is not null)" OnClick="StartInstall">
+						Install a package
+					</MokaButton>
+				</MokaEmptyState>
+			}
+			else
+			{
+				<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) minmax(0, 1fr) 64px 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) 28px">
+					<div class="mta-row mta-row--head">
+						<AdminSortHeader Text="Package" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
+						<AdminSortHeader Text="Version" Key="version" Sort="_sort" OnChanged="StateHasChanged" />
+						<span class="mta-wide">Arch</span>
+						<span></span>
+					</div>
+					@foreach (InstalledPackage package in installed.Take(MaxRows))
+					{
+						string key = package.Name + "/" + package.Architecture;
+						<div class="@(key == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+							 @key="key"
+							 role="button"
+							 tabindex="0"
+							 @onclick="@(() => Select(key))"
+							 @onkeydown="@(args => OnRowKey(args, key))"
+							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(package)))"
+							 @oncontextmenu:preventDefault="true">
+							<span class="mta-cell mta-mono" title="@package.Name">@package.Name</span>
+							<span class="mta-cell mta-mono mta-dim" title="@package.Version">@package.Version</span>
+							<span class="mta-cell mta-mono mta-dim mta-wide">@package.Architecture</span>
+							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+								<MokaButton Variant="MokaVariant.Text"
+											Color="MokaColor.Surface"
+											Size="MokaSize.Xs"
+											StartIcon="MokaIcons.Navigation.MoreHorizontal"
+											OnClick="@(args => ShowRowMenu(args, MenuFor(package)))"
+											aria-label="@($"Actions for {package.Name}")" />
+							</span>
+						</div>
+					}
+					@if (installed.Count > MaxRows)
+					{
+						<div class="mta-more">@($"{AdminFormat.Count(installed.Count - MaxRows)} more. Narrow the filter to see them.")</div>
+					}
+				</div>
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private const int MaxRows = 400;
+
+	private IReadOnlyList<InstalledPackage> _installed = [];
+	private IReadOnlyList<PackageUpdate>? _updates;
+	private string? _updatesError;
+	private readonly AdminSort _sort = new("name");
+	private string _view = "installed";
+	private string _filter = "";
+	private string? _selected;
+	private bool _installing;
+	private string _newPackage = "";
+
+	private string Summary
+	{
+		get
+		{
+			if (Capabilities.Packages is not { } packages)
+			{
+				return "no package manager";
+			}
+
+			string updates = _updates is { } list ? $", {AdminFormat.Count(list.Count)} upgradable" : "";
+			return $"{AdminFormat.Count(_installed.Count)} installed{updates} · {packages.DisplayName}";
+		}
+	}
+
+	private string PrimaryText => _view == "updates" ? "Upgrade all" : "Install";
+
+	private MokaIconDefinition? PrimaryIcon => _view == "updates" ? (MokaIconDefinition?)null : MokaIcons.Action.Add;
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("installed", "Installed", _installed.Count),
+		new("updates", "Upgradable", _updates?.Count),
+	];
+
+	private InstalledPackage? Selected => _selected is { } key
+		? _installed.FirstOrDefault(package => package.Name + "/" + package.Architecture == key)
+		: null;
+
+	private RenderFragment? DetailFragment => _view != "installed" ? null : _installing ? InstallPanel : Selected is null ? null : PackagePanel;
+
+	protected override void OnInitialized()
+	{
+		if (Context.TakeHint() is "updates")
+		{
+			_view = "updates";
+		}
+	}
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Packages is not { } packages)
+		{
+			return;
+		}
+
+		AdminOutcome outcome = await ReadAsync(packages.ListInstalled(), cancellationToken);
+		if (!outcome.Succeeded && outcome.Output.Length == 0)
+		{
+			throw new AdminException(outcome.Problem());
+		}
+
+		_installed = packages.ParseInstalled(outcome.Output);
+		if (_view == "updates" || _updates is not null)
+		{
+			await LoadUpdatesAsync(cancellationToken);
+		}
+	}
+
+	private RenderFragment PackagePanel => __builder =>
+	{
+		if (Selected is not { } package || Capabilities.Packages is not { } packages)
+		{
+			return;
+		}
+
+		PackageUpdate? update = _updates?.FirstOrDefault(candidate => candidate.Name == package.Name);
+		<AdminDetailPanel Title="@package.Name" OnClose="@(() => _selected = null)">
+			<Actions>
+				<MokaButton Variant="MokaVariant.Outlined"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							StartIcon="MokaIcons.Action.Delete"
+							Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+							title="@Context.RootChangeBlocked"
+							OnClick="@(() => RemoveAsync(package.Name))">
+					Remove
+				</MokaButton>
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					<dt>Version</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@package.Version</MokaText></dd>
+					@if (package.Architecture.Length > 0)
+					{
+						<dt>Architecture</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@package.Architecture</MokaText></dd>
+					}
+					<dt>Update</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(update is null ? _updates is null ? "not checked" : "none" : $"{update.NewVersion} from {update.Source}")</MokaText></dd>
+					<dt>Manager</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@packages.DisplayName</MokaText></dd>
+				</dl>
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment InstallPanel => __builder =>
+	{
+		<AdminDetailPanel Title="Install a package" Mono="false" OnClose="@(() => _installing = false)">
+			<TextSetting Label="Package name"
+						 Value="@_newPackage"
+						 ValueChanged="@(value => _newPackage = value)"
+						 Validate="AdminNames.CheckPackage"
+						 Placeholder="htop"
+						 Disabled="@(Context.RootChangeBlocked is not null)" />
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The name as the package manager spells it. Whatever it depends on comes with it.</MokaText>
+			<div class="mta-form-actions">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokaIcons.Action.Add"
+							Disabled="@(Busy || _newPackage.Length == 0 || Context.RootChangeBlocked is not null)"
+							OnClick="InstallAsync">
+					Install
+				</MokaButton>
+			</div>
+		</AdminDetailPanel>
+	};
+
+	private IEnumerable<InstalledPackage> Sorted(IEnumerable<InstalledPackage> packages) => _sort.Key switch
+	{
+		"version" => _sort.Apply(packages, package => package.Version),
+		_ => _sort.Apply(packages, package => package.Name),
+	};
+
+	private IEnumerable<PackageUpdate> Sorted(IEnumerable<PackageUpdate> updates) => _sort.Key switch
+	{
+		"source" => _sort.Apply(updates, update => update.Source),
+		_ => _sort.Apply(updates, update => update.Name),
+	};
+
+	private bool Matches(InstalledPackage package) => _filter.Trim().Length == 0 || package.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private bool Matches(PackageUpdate update) => _filter.Trim().Length == 0 || update.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(InstalledPackage package) =>
+	[
+		new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(package.Name + "/" + package.Architecture, keepOpen: true) },
+		new MokaContextMenuItem
+		{
+			Text = "Remove",
+			Icon = MokaIcons.Action.Delete,
+			DividerBefore = true,
+			Disabled = Busy || Context.RootChangeBlocked is not null,
+			OnClick = () => RemoveAsync(package.Name),
+		},
+	];
+
+	private async Task LoadUpdatesAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Packages is not { } packages)
+		{
+			return;
+		}
+
+		_updates = null;
+		_updatesError = null;
+		StateHasChanged();
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(packages.ListUpdates(), cancellationToken);
+			if (!outcome.Succeeded)
+			{
+				_updatesError = outcome.Problem();
+				return;
+			}
+
+			_updates = packages.ParseUpdates(outcome.Output);
+		}
+		catch (AdminException ex)
+		{
+			_updatesError = ex.Message;
+		}
+	}
+
+	private async Task OnViewChangedAsync(string value)
+	{
+		_view = value;
+		_selected = null;
+		_installing = false;
+		if (_view == "updates" && _updates is null)
+		{
+			await LoadUpdatesAsync(CancellationToken.None);
+		}
+	}
+
+	private void Select(string key) => Select(key, keepOpen: false);
+
+	private void Select(string key, bool keepOpen)
+	{
+		_installing = false;
+		_selected = _selected == key && !keepOpen ? null : key;
+	}
+
+	private void OnRowKey(KeyboardEventArgs args, string key)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(key);
+		}
+	}
+
+	private void StartInstall()
+	{
+		_view = "installed";
+		_selected = null;
+		_installing = true;
+		_newPackage = _filter.Trim().Length > 0 && AdminNames.CheckPackage(_filter.Trim()) is null ? _filter.Trim() : "";
+	}
+
+	private async Task OnPrimaryAsync()
+	{
+		if (_view == "updates")
+		{
+			await UpgradeAllAsync();
+		}
+		else
+		{
+			StartInstall();
+		}
+	}
+
+	private async Task InstallAsync()
+	{
+		if (Capabilities.Packages is not { } packages || AdminNames.CheckPackage(_newPackage) is not null)
+		{
+			return;
+		}
+
+		if (await RunAsync(packages.Install(_newPackage)) is { Succeeded: true })
+		{
+			_installing = false;
+			_newPackage = "";
+		}
+	}
+
+	private async Task RemoveAsync(string name)
+	{
+		if (Capabilities.Packages is { } packages && await RunAsync(packages.Remove(name)) is { Succeeded: true })
+		{
+			_selected = null;
+		}
+	}
+
+	private async Task UpgradeAllAsync()
+	{
+		if (Capabilities.Packages is { } packages)
+		{
+			await RunAsync(packages.UpgradeAll());
+		}
+	}
+
+	private async Task RefreshIndexAsync()
+	{
+		if (Capabilities.Packages?.RefreshIndex() is { } refresh)
+		{
+			await RunAsync(refresh);
+		}
+	}
+}

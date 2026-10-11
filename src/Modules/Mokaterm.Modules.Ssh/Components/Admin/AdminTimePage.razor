@@ -1,0 +1,172 @@
+@using Mokaterm.Modules.Ssh.Admin.Clock
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Time" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
+	@if (_clock is { } clock)
+	{
+		<dl class="mta-kv">
+			<dt>Server time</dt>
+			<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@clock.LocalTime</MokaText></dd>
+			@if (Offset(clock) is { } offset)
+			{
+				<dt>This computer</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@offset</MokaText></dd>
+			}
+			<dt>Time zone</dt>
+			<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(clock.TimeZone.Length > 0 ? clock.TimeZone : "not set")</MokaText></dd>
+			<dt>In sync</dt>
+			<dd>
+				<MokaStatusDot Size="MokaSize.Xs"
+							   Color="@AdminFormat.Dot(clock.Synchronized)"
+							   Glow="@(clock.Synchronized == true)"
+							   Label="@(clock.Synchronized switch { true => "SYNCHRONIZED", false => "NOT SYNCHRONIZED", _ => "UNKNOWN" })" />
+				@if (clock.SyncSource.Length > 0)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mta-dim mta-after">from @clock.SyncSource</MokaText>
+				}
+			</dd>
+			@if (clock.NtpEnabled is { } ntp)
+			{
+				<dt>Time sync</dt>
+				<dd>
+					@if (Capabilities.Clock.CanSwitchNtp && clock.CanSwitchNtp != false)
+					{
+						<MokaSwitch Value="ntp"
+									ValueChanged="SetNtpAsync"
+									Label="@(ntp ? "On" : "Off")"
+									Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+									title="@Context.RootChangeBlocked"
+									aria-label="Time synchronisation" />
+					}
+					else
+					{
+						<MokaText Element="span" Size="MokaSize.Sm">@(ntp ? "On" : "Off")</MokaText>
+					}
+				</dd>
+			}
+			@if (clock.RtcInLocalTime == true)
+			{
+				<dt>Hardware clock</dt>
+				<dd>Keeps local time, which breaks around daylight saving changes. <MokaText Element="span" Size="MokaSize.Xs" Mono>timedatectl set-local-rtc 0</MokaText> puts it back on UTC.</dd>
+			}
+		</dl>
+
+		<section class="mta-section">
+			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Change the time zone</MokaText>
+			<div class="mta-inline">
+				<div class="mta-grow">
+					<MokaSelect TValue="string"
+								Items="_zones"
+								Value="@_zone"
+								ValueChanged="OnZoneChanged"
+								Searchable
+								Loading="_zonesLoading"
+								Placeholder="@(_zones.Count == 0 ? "Reading the zones" : $"Search {AdminFormat.Count(_zones.Count)} zones")"
+								ErrorText="@_zonesError"
+								Size="MokaSize.Sm"
+								Disabled="@(Context.RootChangeBlocked is not null)"
+								aria-label="Time zone" />
+				</div>
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							Disabled="@(Busy || string.IsNullOrEmpty(_zone) || _zone == clock.TimeZone || Context.RootChangeBlocked is not null)"
+							title="@Context.RootChangeBlocked"
+							OnClick="SetZoneAsync">
+					Set time zone
+				</MokaButton>
+			</div>
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+				@(Capabilities.Clock.UsesTimedatectl
+					? "Set with timedatectl. Programs that read the zone at start keep the old one until they restart."
+					: "Set by linking /etc/localtime, and /etc/timezone where it exists. Programs that read the zone at start keep the old one until they restart.")
+			</MokaText>
+		</section>
+	}
+</AdminPageFrame>
+
+@code {
+	private ClockInfo? _clock;
+	private DateTimeOffset _readAt;
+	private IReadOnlyList<string> _zones = [];
+	private bool _zonesLoading;
+	private string? _zonesError;
+	private string? _zone;
+
+	[Inject]
+	private TimeProvider Time { get; set; } = default!;
+
+	private string Summary => _clock is not { } clock
+		? ""
+		: $"{(clock.TimeZone.Length > 0 ? clock.TimeZone : "no time zone")} · {(clock.Synchronized switch { true => "synchronized", false => "not synchronized", _ => "sync unknown" })} · {(Capabilities.Clock.UsesTimedatectl ? "timedatectl" : "/etc/localtime")}";
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		AdminOutcome outcome = await ReadAsync(Capabilities.Clock.Read(), cancellationToken);
+		_clock = ClockCommands.Parse(outcome.Output);
+		_readAt = Time.GetUtcNow();
+		_zone ??= _clock.TimeZone.Length > 0 ? _clock.TimeZone : null;
+		if (_zones.Count == 0 && !_zonesLoading)
+		{
+			_ = LoadZonesAsync();
+		}
+	}
+
+	/// <summary>How far the server's clock is from this computer's, which is what makes TLS and logins fail.</summary>
+	private string? Offset(ClockInfo clock)
+	{
+		if (clock.Epoch is not { } epoch)
+		{
+			return null;
+		}
+
+		long difference = epoch - _readAt.ToUnixTimeSeconds();
+		return Math.Abs(difference) switch
+		{
+			< 3 => "agrees with the server",
+			< 120 => $"{Math.Abs(difference)} s {(difference > 0 ? "behind" : "ahead of")} the server",
+			_ => $"{AdminFormat.Span(TimeSpan.FromSeconds(Math.Abs(difference)))} {(difference > 0 ? "behind" : "ahead of")} the server",
+		};
+	}
+
+	private async Task LoadZonesAsync()
+	{
+		_zonesLoading = true;
+		_zonesError = null;
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(Capabilities.Clock.ListZones(), CancellationToken.None);
+			_zones = ClockCommands.ParseZones(outcome.Output);
+			if (_zones.Count == 0)
+			{
+				_zonesError = "The server lists no time zones; the tzdata package may be missing.";
+			}
+		}
+		catch (AdminException ex)
+		{
+			_zonesError = ex.Message;
+		}
+		finally
+		{
+			_zonesLoading = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void OnZoneChanged(string? zone) => _zone = zone;
+
+	private async Task SetZoneAsync()
+	{
+		if (_zone is { } zone && AdminNames.CheckTimeZone(zone) is null)
+		{
+			await RunAsync(Capabilities.Clock.SetTimeZone(zone));
+		}
+	}
+
+	private async Task SetNtpAsync(bool enabled)
+	{
+		if (Capabilities.Clock.CanSwitchNtp)
+		{
+			await RunAsync(Capabilities.Clock.SetNtp(enabled));
+		}
+	}
+}

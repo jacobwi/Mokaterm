@@ -8,6 +8,7 @@
 		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
 		<PackageReference Include="Microsoft.Extensions.Logging" />
+		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -26,6 +27,23 @@
 	-->
 	<ItemGroup>
 		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Platforms\Windows\NativeDropPoint.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!--
+		WebAuthnInterop: the desktop host's webauthn.dll structures and HRESULT grouping. Plain data with no Windows call,
+		here so their layout is checked against webauthn.h without a security key.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Platforms\Windows\WebAuthnInterop.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!--
+		ToolPageServices: how the desktop's tool windows borrow the main window's services. Plain dependency injection,
+		checked here against the shell's real registrations so a service that changes sides is caught before it becomes a
+		second vault in a tool window.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\ToolWindows\ToolPageServices.cs" LinkBase="Shared" />
 	</ItemGroup>
 
 </Project>

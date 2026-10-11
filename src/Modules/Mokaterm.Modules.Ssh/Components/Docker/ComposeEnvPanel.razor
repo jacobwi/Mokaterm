@@ -1,0 +1,102 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (Context is { } context)
+{
+	<div class="mt-dk-toolbar">
+		<span class="mt-dk-note mt-dk-cell--grow">Values are hidden until shown one at a time. Nothing here is logged.</span>
+		@if (_asRoot)
+		{
+			<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Read through sudo" />
+		}
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+					Disabled="@(IsLoading || _editing is not null)" OnClick="LoadAllAsync" title="Read the files again" aria-label="Read the files again" />
+	</div>
+
+	@LoadErrorPanel(LoadAllAsync)
+
+	@if (_unset.Count > 0)
+	{
+		<div class="mt-dk-section">
+			<span class="mt-dk-label">Used but not set</span>
+			<span class="mt-dk-cell mt-dk-cell--error">@string.Join(", ", _unset)</span>
+			<span class="mt-dk-note">The compose files use these and nothing sets them, so compose fills in empty strings (from its own warnings).</span>
+		</div>
+	}
+
+	@if (IsFirstLoad)
+	{
+		<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+	}
+
+	@foreach (EnvFileView file in _files)
+	{
+		<div class="mt-dk-section" @key="file.Path">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">@file.Role</span>
+				@if (!file.Exists)
+				{
+					<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="@(file.Required ? MokaColor.Error : MokaColor.Surface)" />
+				}
+				<span class="mt-dk-spacer"></span>
+				@if (file.Exists && file.Text is { Truncated: false } && _editing is null)
+				{
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" OnClick="@(() => Edit(file))">
+						Edit
+					</MokaButton>
+				}
+			</div>
+			@PathLine(file.Path, "Copy the path")
+
+			@if (_editing == file && file.Text is { } original)
+			{
+				<MokaTextArea Class="mt-dk-code" Value="@_draft"
+							  ValueChanged="OnDraftChanged"
+							  Rows="12"
+							  Disabled="_saving"
+							  Size="MokaSize.Sm"
+							  spellcheck="false"
+							  aria-label="@($"Contents of {file.Path}")" />
+				<div class="mt-dk-toolbar">
+					<span class="mt-dk-note mt-dk-cell--grow">@SaveNote(original)</span>
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="_saving" OnClick="CancelEdit">Cancel</MokaButton>
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_saving" OnClick="SaveAsync">Save</MokaButton>
+				</div>
+				@if (_saveProblem is { } saveProblem)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@saveProblem</MokaAlert>
+				}
+			}
+			else if (file.Problem is { } problem)
+			{
+				<div class="mt-dk-alert-line">
+					<span class="mt-dk-note">@problem</span>
+					@if (file.NeedsRoot && CanUseRoot)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root" Disabled="IsLoading" OnClick="UseRootAsync">Read as root</MokaButton>
+					}
+				</div>
+			}
+			else if (file.Variables.Count == 0 && file.Exists)
+			{
+				<span class="mt-dk-note">No variables.</span>
+			}
+			else
+			{
+				@foreach (DotEnvVariable variable in file.Variables)
+				{
+					<DockerVariableRow @key="variable.Line" Name="@variable.Name" Value="@variable.Value" />
+				}
+				@if (file.Text is { Truncated: true })
+				{
+					<span class="mt-dk-note">Only the start of this file was read, so it is not offered for editing.</span>
+				}
+			}
+		</div>
+	}
+
+	@if (!IsFirstLoad && _files.Count == 0)
+	{
+		<span class="mt-dk-note">The project's folder is not known, so neither is its .env.</span>
+	}
+}

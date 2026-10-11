@@ -23,6 +23,7 @@ public sealed record SessionLogSettings : ISettingsSection
 	public bool RecordEverySession { get; init; }
 
 	/// <summary>Where the files go. Empty means the folder <see cref="FolderOrDefault"/> picks under the data directory.</summary>
+	[MachineSpecific]
 	public string Folder { get; init; } = "";
 
 	/// <summary>How much of one session reaches its file. Past this the file is closed with a note instead of filling the disk.</summary>

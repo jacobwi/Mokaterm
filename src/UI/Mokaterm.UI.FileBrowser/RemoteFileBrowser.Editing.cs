@@ -2,6 +2,7 @@ using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Formatting;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Editing;
 
@@ -10,6 +11,9 @@ namespace Mokaterm.UI.FileBrowser;
 /// <summary>Opening a remote text file in the built-in editor and writing it back in place.</summary>
 public sealed partial class RemoteFileBrowser
 {
+	// What a new file is called until the user types something else; the base name is selected, so typing replaces it.
+	private const string NewFileName = "untitled.txt";
+
 	/// <summary>
 	/// Reads the file, shows the editor, and saves through the file system's own replace, which keeps the owner and
 	/// mode the file already had. Anything the editor could not hand back unchanged is refused up front rather than
@@ -52,12 +56,14 @@ public sealed partial class RemoteFileBrowser
 			return;
 		}
 
+		RemoteFileEdit edit = new(fileSystem, entry.Path, file, opened, maxBytes);
 		bool saved = await Dialogs.EditFileAsync(
 			entry.Name,
 			entry.Path,
 			file.Text,
-			Facts(file, opened?.Size ?? entry.Size),
-			text => SaveEditAsync(fileSystem, entry, opened, file, text),
+			RemoteFileEdit.Facts(file, opened?.Size ?? entry.Size),
+			(text, overwrite) => edit.SaveAsync(text, overwrite, ConnectionToken),
+			edit.AcceptServerCopy,
 			ConfirmDiscardEditAsync);
 
 		if (saved)
@@ -66,44 +72,46 @@ public sealed partial class RemoteFileBrowser
 		}
 	}
 
-	private async Task<string?> SaveEditAsync(
-		IRemoteFileSystem fileSystem,
-		RemoteFileEntry entry,
-		RemoteFileEntry? opened,
-		RemoteTextFile file,
-		string text)
+	/// <summary>
+	/// Asks for a name, creates an empty file of that name in the current folder and opens it in the editor. A taken name
+	/// is refused in the dialog, and the server refuses it again when the listing on screen was out of date. It runs as
+	/// the browser's account, with the usual offer to retry as root, after which the editor opens as root.
+	/// </summary>
+	private async Task CreateFileAsync()
 	{
-		CancellationToken token = ConnectionToken;
+		if (!BeginOperation())
+		{
+			return;
+		}
+
 		try
 		{
-			if (opened is not null && await fileSystem.StatAsync(entry.Path, token) is { } current && ChangedSince(opened, current))
+			string directory = _path;
+			HashSet<string> taken = TakenNames(except: null);
+			string? name = await Dialogs.AskNameAsync("New file", MokatermIcons.FilePlus, "File name", EntryNames.Unique(NewFileName, taken, isFolder: false), "Create", taken, selectBaseName: true);
+			if (name is null)
 			{
-				ConfirmPrompt prompt = new()
-				{
-					Title = "Changed on the server",
-					Message = $"{entry.Name} has changed since it was opened. Saving replaces what is there now.",
-					ConfirmText = "Save anyway",
-					Destructive = true,
-				};
-				if (!(await Interaction.ConfirmAsync(prompt, token)).Confirmed)
-				{
-					return "It changed on the server since it was opened, so nothing was written.";
-				}
+				return;
 			}
 
-			using MemoryStream body = new(file.ToBytes(text));
-			await fileSystem.UploadAsync(entry.Path, body, new UploadOptions { Overwrite = true }, progress: null, token);
-			return null;
+			string path = RemotePath.Combine(directory, name);
+			await RunChangeAsync(
+				"Could not create " + name,
+				(fileSystem, token) => fileSystem.UploadAsync(path, Stream.Null, UploadOptions.Default, progress: null, token).AsTask(),
+				select: path,
+				then: () => EditCreatedAsync(path));
 		}
-		catch (OperationCanceledException)
+		finally
 		{
-			return "The connection went away before the file was written.";
-		}
-		catch (Exception ex)
-		{
-			return RemoteErrorText.Describe(ex);
+			EndOperation();
 		}
 	}
+
+	// The listing, not the view: a new ".env" is in the folder even while hidden files are not shown.
+	private Task EditCreatedAsync(string path) =>
+		_path == RemotePath.GetParent(path) && _entries.FirstOrDefault(entry => entry.Path == path) is { } created
+			? EditAsync(created)
+			: Task.CompletedTask;
 
 	private async Task<bool> ConfirmDiscardEditAsync()
 	{
@@ -115,23 +123,6 @@ public sealed partial class RemoteFileBrowser
 			Destructive = true,
 		};
 		return (await Interaction.ConfirmAsync(prompt, ConnectionToken)).Confirmed;
-	}
-
-	/// <summary>Size and modification time together: either moving is someone else writing the file.</summary>
-	private static bool ChangedSince(RemoteFileEntry opened, RemoteFileEntry current) =>
-		opened.Size != current.Size || opened.LastModified != current.LastModified;
-
-	/// <summary>One chip each, in the order the editor shows them.</summary>
-	private static string[] Facts(RemoteTextFile file, long? length)
-	{
-		string ending = file.LineEnding switch
-		{
-			"\r\n" => "CRLF",
-			"\r" => "CR",
-			_ => "LF",
-		};
-		string encoding = file.HasBom ? "UTF-8 BOM" : "UTF-8";
-		return length is { } bytes ? [DisplayFormat.Bytes(bytes), encoding, ending] : [encoding, ending];
 	}
 
 	private static string RefusalText(TextFileRefusal refusal, int maxBytes) => refusal switch

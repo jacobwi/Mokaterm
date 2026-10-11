@@ -166,9 +166,77 @@ export function attachListKeys(element) {
 	});
 }
 
+// A combobox field (quick connect) drives its list from the keyboard while keeping the focus, so the keys that would
+// move the caret or the focus are kept from the browser while the field uses them. Which ones that is right now is
+// written on the field by .NET in data-mt-keys, because a keydown is handled on the server after the browser acted.
+export function attachComboboxKeys(root) {
+	attachOnce(root, 'comboboxKeys', (target) => {
+		target.addEventListener('keydown', (event) => {
+			const field = event.target;
+			if (!(field instanceof HTMLInputElement) || field.getAttribute('role') !== 'combobox' || event.isComposing) {
+				return;
+			}
+
+			const keys = (field.getAttribute('data-mt-keys') || '').split(' ');
+			const plain = !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey;
+			if (event.key === 'ArrowDown' || event.key === 'ArrowUp'
+				|| (event.key === 'Tab' && plain && keys.includes('tab'))
+				|| (event.key === 'Delete' && event.shiftKey && keys.includes('del'))) {
+				event.preventDefault();
+			}
+		});
+	});
+}
+
 export function scrollActiveIntoView(element) {
 	const active = element ? element.querySelector('.moka-list-item--active') : null;
 	if (active) {
 		active.scrollIntoView({ block: 'nearest' });
 	}
+}
+
+// A settings search result: the row scrolls into view and glows for as long as the class stays on it. The page may
+// still be filling in (one that loads a list first), so the row is looked for over a few frames before giving up.
+const RevealClass = 'settings-row--found';
+const RevealMs = 1500;
+const RevealWaitMs = 1000;
+const revealTimers = new WeakMap();
+
+export function revealSetting(container, anchor) {
+	if (!container) {
+		return;
+	}
+
+	if (!anchor) {
+		container.scrollTop = 0;
+		return;
+	}
+
+	const started = performance.now();
+	const find = () => {
+		const row = container.querySelector(`[data-setting="${CSS.escape(anchor)}"]`);
+		if (!row) {
+			if (performance.now() - started < RevealWaitMs) {
+				requestAnimationFrame(find);
+			}
+
+			return;
+		}
+
+		// A jump, not a glide: on a long page a smooth scroll would spend most of the glow getting there.
+		row.scrollIntoView({ block: 'center' });
+		clearTimeout(revealTimers.get(row));
+		// Taking the class off and reading layout restarts the glow when the same row is opened twice in a row.
+		row.classList.remove(RevealClass);
+		void row.offsetWidth;
+		row.classList.add(RevealClass);
+		revealTimers.set(row, setTimeout(() => row.classList.remove(RevealClass), RevealMs));
+	};
+	find();
+}
+
+// The box of an element in viewport pixels, for a menu the keyboard opened under it rather than at a pointer.
+export function boxOf(element) {
+	const rect = element?.getBoundingClientRect?.();
+	return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null;
 }

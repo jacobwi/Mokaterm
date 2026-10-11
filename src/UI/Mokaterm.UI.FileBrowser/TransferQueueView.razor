@@ -22,14 +22,31 @@
 			}
 		</div>;
 
-	RenderFragment CompactRow(ITransferItem item) =>
-		@<div @key="item.Id" class="tq-row tq-row--compact" title="@Tooltip(item)">
-			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
-			<span class="tq-name">@item.Name</span>
+	RenderFragment Badges(ITransferItem item) =>
+		@<text>
 			@if (item.Elevated)
 			{
 				<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
 			}
+			@if (item.ResumedFrom is { } resumedFrom)
+			{
+				<MokaTag Text="RESUMED" Color="MokaColor.Info" Size="MokaSize.Xs" title="@ResumedText(resumedFrom)" />
+			}
+			@if (item.State == TransferState.Completed && item.Verification == TransferVerification.Verified)
+			{
+				<MokaTag Text="VERIFIED" Color="MokaColor.Success" Size="MokaSize.Xs" title="The server's checksum matches the copy" />
+			}
+			else if (item.State == TransferState.Completed && item.Verification == TransferVerification.Unavailable)
+			{
+				<MokaTag Text="UNCHECKED" Color="MokaColor.Surface" Size="MokaSize.Xs" title="The server cannot compute checksums, so this copy was not checked" />
+			}
+		</text>;
+
+	RenderFragment CompactRow(ITransferItem item) =>
+		@<div @key="item.Id" class="tq-row tq-row--compact" title="@Tooltip(item)">
+			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
+			<span class="tq-name">@item.Name</span>
+			@Badges(item)
 			<span class="tq-route">@Route(item)</span>
 			<div class="tq-progress">
 				<MokaProgress Value="@ProgressValue(item)" />
@@ -45,10 +62,7 @@
 			<div class="tq-line">
 				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)" />
 				<span class="tq-name">@item.Name</span>
-				@if (item.Elevated)
-				{
-					<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
-				}
+				@Badges(item)
 				<span class="tq-grow"></span>
 				<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
 				@Actions(item)

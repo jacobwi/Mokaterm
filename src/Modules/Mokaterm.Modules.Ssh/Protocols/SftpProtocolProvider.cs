@@ -25,6 +25,7 @@ internal sealed class SftpProtocolProvider : IProtocolProvider
 		Id = SshProtocolIds.Sftp,
 		DisplayName = "SFTP",
 		Description = "Files over SSH without a terminal.",
+		QuickConnectExample = "user@host:port",
 		DefaultPort = 22,
 		Capabilities = ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation,
 		AuthenticationMethods = [LoginMethod.Password, LoginMethod.PublicKey, LoginMethod.KeyboardInteractive, LoginMethod.Agent],

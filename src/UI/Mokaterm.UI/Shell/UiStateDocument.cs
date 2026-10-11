@@ -1,3 +1,5 @@
+using Mokaterm.UI.Common.Platform;
+
 namespace Mokaterm.UI.Shell;
 
 /// <summary>
@@ -22,4 +24,22 @@ internal sealed record UiStateDocument
 
 	/// <summary>The logins that had a tab, in tab order, for the next start to offer.</summary>
 	public IReadOnlyList<Guid> RestoreConnectionIds { get; init; } = [];
+
+	/// <summary>
+	/// The pane each of <see cref="RestoreConnectionIds"/> was in, counted from 0 in <see cref="RestoreLayout"/>'s order.
+	/// Empty when everything was in one pane.
+	/// </summary>
+	public IReadOnlyList<int> RestorePanes { get; init; } = [];
+
+	/// <summary>
+	/// The shape of the panes those tabs were in, such as <c>H(P,V(P,P))</c>, with no ids in it. Null for one pane.
+	/// </summary>
+	public string? RestoreLayout { get; init; }
+
+	/// <summary>
+	/// Where each session tool's own window was last, by the tool's key (<c>docker</c>), so the next one opens there.
+	/// One entry per tool rather than per session: the key names a module's view, never a machine.
+	/// </summary>
+	public IReadOnlyDictionary<string, ToolWindowBounds> ToolWindows { get; init; } =
+		new Dictionary<string, ToolWindowBounds>(StringComparer.Ordinal);
 }

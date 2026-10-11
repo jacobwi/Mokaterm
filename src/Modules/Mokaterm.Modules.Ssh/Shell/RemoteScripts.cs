@@ -22,6 +22,12 @@ internal static class RemoteScripts
 
 	public const int ExitDirectoryNotEmpty = 104;
 
+	/// <summary>
+	/// The server has no tool the script needs, such as anything that computes SHA-256. A script that can say which tool
+	/// prints that on its own stderr line first.
+	/// </summary>
+	public const int ExitUnsupported = 105;
+
 	private const string ElevatedPreambleText = """
 		printf '%s\n' MOKATERM-ELEVATED >&2
 
@@ -155,6 +161,109 @@ internal static class RemoteScripts
 		exec cat -- "$1"
 		""";
 
+	// tail counts from 1, so the byte at offset N is +N+1, which the caller passes.
+	private const string ReadFromBody = """
+		if [ ! -e "$1" ]; then exit 101; fi
+		if [ -d "$1" ]; then exit 102; fi
+		exec tail -c "+$2" -- "$1"
+		""";
+
+	// GNU and BusyBox have sha256sum, macOS shasum, the BSDs sha256; openssl is the last resort.
+	private const string ChecksumBody = """
+		if [ ! -e "$1" ]; then exit 101; fi
+		if [ -d "$1" ]; then exit 102; fi
+		if command -v sha256sum >/dev/null 2>&1; then exec sha256sum -- "$1"; fi
+		if command -v shasum >/dev/null 2>&1; then exec shasum -a 256 -- "$1"; fi
+		if command -v sha256 >/dev/null 2>&1; then exec sha256 -q -- "$1"; fi
+		if command -v openssl >/dev/null 2>&1; then exec openssl dgst -sha256 -r "$1"; fi
+		exit 105
+		""";
+
+	// A folder copied over a folder merges into it ("$1/." copies the contents), the way a file manager's overwrite does;
+	// cp given an existing folder as its target would put the copy inside it instead. A link in the way is removed first,
+	// or cp would write through it to whatever it points at.
+	private const string CopyBody = """
+		if [ ! -e "$1" ] && [ ! -L "$1" ]; then exit 101; fi
+		if [ -e "$2" ] || [ -L "$2" ]; then
+			if [ "$3" != 1 ]; then exit 103; fi
+			if [ -d "$1" ] && [ ! -L "$1" ]; then
+				if [ ! -d "$2" ] || [ -L "$2" ]; then
+					echo 'A folder cannot replace a file.' >&2
+					exit 102
+				fi
+				exec cp -a -- "$1/." "$2"
+			fi
+			if [ -d "$2" ] && [ ! -L "$2" ]; then
+				echo 'A file cannot replace a folder.' >&2
+				exit 102
+			fi
+			if [ -L "$2" ]; then rm -f -- "$2" || exit 1; fi
+		fi
+		exec cp -a -- "$1" "$2"
+		""";
+
+	// The archive is created empty with noclobber first, so a file that appears meanwhile is never written over, and
+	// what tar leaves after a failure is only ever this script's own file. Entries arrive as ./name, which no tar reads
+	// as an option.
+	private const string CompressBody = """
+		cd -- "$1" || exit 101
+		archive=$2
+		shift 2
+		if [ -e "$archive" ] || [ -L "$archive" ]; then exit 103; fi
+		if ! command -v tar >/dev/null 2>&1; then
+			printf '%s\n' 'The server has no tar command, which making an archive needs.' >&2
+			exit 105
+		fi
+		set -C
+		if ! : > "$archive"; then
+			if [ -e "$archive" ] || [ -L "$archive" ]; then exit 103; fi
+			exit 1
+		fi
+		set +C
+		tar -czf "$archive" "$@"
+		status=$?
+		if [ "$status" -ne 0 ]; then rm -f -- "$archive"; fi
+		exit "$status"
+		""";
+
+	// The folder is new and the script's own, so a failed unpack removes it rather than leaving half an archive. -o keeps
+	// the files owned by whoever unpacks them, which matters as root: GNU tar would otherwise hand them to the owners the
+	// archive names. unzip -n never asks about a name it already wrote, because nothing could answer on stdin, and its
+	// exit status 1 only means warnings.
+	private const string ExtractBody = """
+		archive=$1
+		target=$2
+		if [ ! -e "$archive" ]; then exit 101; fi
+		if [ -d "$archive" ]; then exit 102; fi
+		if [ -e "$target" ] || [ -L "$target" ]; then exit 103; fi
+		need() {
+			for tool in "$@"; do
+				if command -v "$tool" >/dev/null 2>&1; then return 0; fi
+			done
+			printf 'The server has no %s command, which this archive needs.\n' "$1" >&2
+			exit 105
+		}
+		case $3 in
+			zip) need unzip ;;
+			gz) need tar; need gzip gunzip ;;
+			bz2) need tar; need bzip2 bunzip2 ;;
+			xz) need tar; need xz unxz ;;
+			*) need tar ;;
+		esac
+		mkdir -- "$target" || exit 1
+		case $3 in
+			zip) unzip -q -n "$archive" -d "$target" ;;
+			gz) tar -x -z -o -f "$archive" -C "$target" ;;
+			bz2) tar -x -j -o -f "$archive" -C "$target" ;;
+			xz) tar -x -J -o -f "$archive" -C "$target" ;;
+			*) tar -x -o -f "$archive" -C "$target" ;;
+		esac
+		status=$?
+		if [ "$3" = zip ] && [ "$status" -eq 1 ]; then status=0; fi
+		if [ "$status" -ne 0 ]; then rm -rf -- "$target"; fi
+		exit "$status"
+		""";
+
 	private const string PlaceUploadBody = """
 		staging=$1
 		target=$2
@@ -215,6 +324,33 @@ internal static class RemoteScripts
 
 	/// <summary><c>$1</c> path. Streams the file after the output marker.</summary>
 	public static readonly string Read = Normalize(Preamble + ReadBody);
+
+	/// <summary><c>$1</c> path, <c>$2</c> the offset to start at plus one. Streams the rest of the file after the output marker.</summary>
+	public static readonly string ReadFrom = Normalize(Preamble + ReadFromBody);
+
+	/// <summary>
+	/// <c>$1</c> path. Prints the file's SHA-256 as hex at the start of the output, followed by whatever the tool adds (a
+	/// file name, or nothing). Exits with <see cref="ExitUnsupported"/> when the server has no tool for it.
+	/// </summary>
+	public static readonly string Checksum = Normalize(Preamble + ChecksumBody);
+
+	/// <summary>
+	/// <c>$1</c> source, <c>$2</c> destination, <c>$3</c> <c>1</c> to replace. Runs <c>cp -a</c>: folders with everything
+	/// inside, modes, times and links kept. A folder replacing a folder merges into it.
+	/// </summary>
+	public static readonly string Copy = Normalize(Preamble + CopyBody);
+
+	/// <summary>
+	/// <c>$1</c> folder, <c>$2</c> the new archive's path, then the entries of the folder as <c>./name</c>. Writes a
+	/// gzip-compressed tar and never replaces anything.
+	/// </summary>
+	public static readonly string Compress = Normalize(Preamble + CompressBody);
+
+	/// <summary>
+	/// <c>$1</c> archive, <c>$2</c> the new folder to unpack into, <c>$3</c> <c>tar</c>, <c>gz</c>, <c>bz2</c>, <c>xz</c> or
+	/// <c>zip</c>. Exits with <see cref="ExitUnsupported"/> and the missing tool's name on stderr when the server lacks it.
+	/// </summary>
+	public static readonly string Extract = Normalize(Preamble + ExtractBody);
 
 	/// <summary>
 	/// <c>$1</c> staging file, <c>$2</c> destination, <c>$3</c> <c>1</c> to replace, <c>$4</c> octal mode or empty,

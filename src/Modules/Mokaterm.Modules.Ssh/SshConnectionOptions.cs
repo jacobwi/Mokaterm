@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Modules.Ssh.Forwarding;
 using Mokaterm.Modules.Ssh.Tunnels;
 
 namespace Mokaterm.Modules.Ssh;
@@ -79,6 +80,9 @@ public sealed record SshConnectionOptions
 	/// </summary>
 	public ProxyOptions Proxy { get; init; } = ProxyOptions.None;
 
+	/// <summary>Agent and X11 forwarding, which only the ssh protocol's shell asks for.</summary>
+	public SshForwardingOptions Forwarding { get; init; } = SshForwardingOptions.None;
+
 	public static SshConnectionOptions FromOptions(ProtocolOptions options)
 	{
 		ArgumentNullException.ThrowIfNull(options);
@@ -93,6 +97,7 @@ public sealed record SshConnectionOptions
 			AgentIdentity = NullIfBlank(options.GetString(AgentIdentityKey)),
 			Tunnels = ParseTunnels(options),
 			Proxy = ProxyOptions.From(options, ProxyKeyPrefix),
+			Forwarding = SshForwardingOptions.From(options),
 		};
 	}
 
@@ -110,6 +115,7 @@ public sealed record SshConnectionOptions
 			.With(JumpHostsKey, FormatJumpHosts(JumpConnectionIds));
 
 		written = Proxy.ApplyTo(written, ProxyKeyPrefix);
+		written = Forwarding.ApplyTo(written);
 
 		// Every tunnel key is rewritten, so removing one leaves no gap behind.
 		foreach (string key in written.Keys.Where(IsTunnelKey).ToArray())
@@ -145,6 +151,7 @@ public sealed record SshConnectionOptions
 		&& Elevation == other.Elevation
 		&& AgentIdentity == other.AgentIdentity
 		&& Proxy == other.Proxy
+		&& Forwarding == other.Forwarding
 		&& JumpConnectionIds.SequenceEqual(other.JumpConnectionIds)
 		&& Tunnels.SequenceEqual(other.Tunnels);
 
@@ -158,6 +165,7 @@ public sealed record SshConnectionOptions
 		hash.Add(Elevation);
 		hash.Add(AgentIdentity);
 		hash.Add(Proxy);
+		hash.Add(Forwarding);
 		foreach (Guid jumpHost in JumpConnectionIds)
 		{
 			hash.Add(jumpHost);

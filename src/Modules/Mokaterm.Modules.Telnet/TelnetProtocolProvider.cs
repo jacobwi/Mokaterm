@@ -39,6 +39,7 @@ internal sealed class TelnetProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "Telnet",
 		Description = "A terminal over plain TCP. Telnet has no encryption and no login of its own: the prompt is part of the stream.",
+		QuickConnectExample = "user@host:port",
 		DefaultPort = DefaultPort,
 		Capabilities = ProtocolCapabilities.Terminal,
 

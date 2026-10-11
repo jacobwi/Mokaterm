@@ -1,4 +1,5 @@
 using System.Text;
+using Mokaterm.Abstractions.FileSystem;
 
 namespace Mokaterm.Modules.Ssh.Shell;
 
@@ -45,4 +46,11 @@ internal static class RemoteOutput
 		string text = Encoding.UTF8.GetString(payload);
 		return text.EndsWith('\n') ? text[..^1] : text;
 	}
+
+	/// <summary>
+	/// The SHA-256 that <see cref="RemoteScripts.Checksum"/> printed, or null when the output does not start with one. GNU
+	/// tools put a backslash in front of the line when the file name holds a backslash or a line break.
+	/// </summary>
+	public static string? ReadSha256(ReadOnlySpan<byte> payload) =>
+		FileChecksums.Parse(ChecksumAlgorithm.Sha256, Encoding.UTF8.GetString(payload).TrimStart().TrimStart('\\'));
 }

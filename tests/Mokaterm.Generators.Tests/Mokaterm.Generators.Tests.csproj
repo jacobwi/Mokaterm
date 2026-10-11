@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The source generators run in memory over sample markup, through the same driver the compiler uses. Abstractions and
+		the container are here only for the shared test helpers every test project compiles.
+	-->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Mokaterm.Generators\Mokaterm.Generators.csproj" />
+		<ProjectReference Include="..\..\src\Mokaterm.Abstractions\Mokaterm.Abstractions.csproj" />
+	</ItemGroup>
+
+</Project>

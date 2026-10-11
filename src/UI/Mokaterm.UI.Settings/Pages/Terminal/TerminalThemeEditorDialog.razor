@@ -1,11 +1,12 @@
 @using Mokaterm.Abstractions.Terminal
 @using Mokaterm.UI.Terminal
 
-<MokaDialog Open="Open"
-			OpenChanged="OpenChanged"
-			Title="@(IsNew ? "New custom theme" : "Edit custom theme")"
-			DialogSize="MokaDialogSize.Large"
-			CloseOnBackdropClick="false">
+<HeadedDialog Open="Open"
+			  OpenChanged="OpenChanged"
+			  Title="@(IsNew ? "New custom theme" : "Edit custom theme")"
+			  Icon="MokatermIcons.Palette"
+			  DialogSize="MokaDialogSize.Large"
+			  CloseOnBackdropClick="false">
 	<ChildContent>
 		@if (_draft is { } draft)
 		{
@@ -57,4 +58,4 @@
 		<MokaButton Variant="MokaVariant.Text" OnClick="CancelAsync">Cancel</MokaButton>
 		<MokaButton StartIcon="MokaIcons.Action.Save" OnClick="SaveAsync">Save theme</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>

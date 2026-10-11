@@ -22,6 +22,7 @@ internal sealed class LoopbackFtpConnection : IAsyncDisposable
 	private bool _loggedIn;
 	private bool _protectData;
 	private string? _renameFrom;
+	private long _restart;
 	private Task<Stream>? _pendingData;
 
 	public LoopbackFtpConnection(LoopbackFtpServer server, TcpClient client)
@@ -173,8 +174,11 @@ internal sealed class LoopbackFtpConnection : IAsyncDisposable
 			"SIZE" => SizeAsync(argument, cancellationToken),
 			"MDTM" => ModifiedAsync(argument, cancellationToken),
 			"MFMT" when Options.SupportsMfmt => SetModifiedAsync(argument, cancellationToken),
+			"REST" => RestartAsync(argument, cancellationToken),
 			"RETR" => RetrieveAsync(argument, cancellationToken),
-			"STOR" => StoreAsync(argument, cancellationToken),
+			"STOR" => StoreAsync(argument, append: false, cancellationToken),
+			"APPE" => StoreAsync(argument, append: true, cancellationToken),
+			"XSHA256" when Options.SupportsXSha256 => ChecksumAsync(argument, cancellationToken),
 			"MKD" => MakeDirectoryAsync(argument, cancellationToken),
 			"RMD" => RemoveDirectoryAsync(argument, cancellationToken),
 			"DELE" => DeleteAsync(argument, cancellationToken),
@@ -198,6 +202,11 @@ internal sealed class LoopbackFtpConnection : IAsyncDisposable
 		if (Options.SupportsMfmt)
 		{
 			reply.Append(" MFMT\r\n");
+		}
+
+		if (Options.SupportsXSha256)
+		{
+			reply.Append(" XSHA256\r\n");
 		}
 
 		if (Options.Certificate is not null)
@@ -456,20 +465,40 @@ internal sealed class LoopbackFtpConnection : IAsyncDisposable
 		return ReplyAsync(Invariant($"213 Modify={modified:yyyyMMddHHmmss}; {argument[(space + 1)..]}"), cancellationToken);
 	}
 
+	private Task RestartAsync(string argument, CancellationToken cancellationToken)
+	{
+		if (!long.TryParse(argument, NumberStyles.None, CultureInfo.InvariantCulture, out long offset))
+		{
+			return ReplyAsync("501 Bad REST argument.", cancellationToken);
+		}
+
+		_restart = offset;
+		return ReplyAsync(Invariant($"350 Restarting at {offset}."), cancellationToken);
+	}
+
+	private Task ChecksumAsync(string argument, CancellationToken cancellationToken) =>
+		Files.Resolve(Resolve(argument)) is { Kind: FakeNodeKind.File } node
+			? ReplyAsync("250 " + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(node.Content)), cancellationToken)
+			: ReplyAsync("550 Could not get the checksum.", cancellationToken);
+
 	private Task RetrieveAsync(string argument, CancellationToken cancellationToken)
 	{
+		// REST holds for the one transfer after it.
+		long restart = _restart;
+		_restart = 0;
 		if (Files.Resolve(Resolve(argument)) is { Kind: FakeNodeKind.File } node)
 		{
+			byte[] content = node.Content[(int)Math.Min(restart, node.Content.Length)..];
 			return Options.StallDownloads
-				? SendHalfAndStallAsync("150 Opening BINARY mode data connection.", node.Content, cancellationToken)
-				: SendAsync("150 Opening BINARY mode data connection.", node.Content, cancellationToken);
+				? SendHalfAndStallAsync("150 Opening BINARY mode data connection.", content, cancellationToken)
+				: SendAsync("150 Opening BINARY mode data connection.", content, cancellationToken);
 		}
 
 		DiscardPendingData();
 		return ReplyAsync("550 Failed to open file.", cancellationToken);
 	}
 
-	private async Task StoreAsync(string argument, CancellationToken cancellationToken)
+	private async Task StoreAsync(string argument, bool append, CancellationToken cancellationToken)
 	{
 		string path = Resolve(argument);
 		if (!Files.IsDirectory(RemotePath.GetParent(path)) || Files.Get(path) is { Kind: FakeNodeKind.Directory })
@@ -512,7 +541,8 @@ internal sealed class LoopbackFtpConnection : IAsyncDisposable
 			await CloseQuietlyAsync(Task.FromResult(data));
 		}
 
-		Files.Write(path, received.ToArray());
+		byte[] before = append && Files.Get(path) is { Kind: FakeNodeKind.File } existing ? existing.Content : [];
+		Files.Write(path, [.. before, .. received.ToArray()]);
 		await ReplyAsync("226 Transfer complete.", cancellationToken);
 	}
 

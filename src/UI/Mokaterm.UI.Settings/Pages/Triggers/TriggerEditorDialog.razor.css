@@ -1,0 +1,5 @@
+.trigger-try {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+}

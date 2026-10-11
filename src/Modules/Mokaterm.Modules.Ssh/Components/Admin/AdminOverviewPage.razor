@@ -1,0 +1,200 @@
+@using Mokaterm.Modules.Ssh.Admin.Clock
+@using Mokaterm.Modules.Ssh.Admin.Overview
+@using Mokaterm.Modules.Ssh.Admin.Services
+@using Mokaterm.Modules.Ssh.Admin.Storage
+@using Mokaterm.UI.Common.Formatting
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Overview" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" LoadingText="Reading the machine">
+	@if (_snapshot is { } snapshot)
+	{
+		<div class="mta-cards">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.HostName))">
+				<span class="mta-card-label">System</span>
+				<span class="mta-stat mta-stat--small" title="@Profile.DisplayName">@Profile.DisplayName</span>
+				<span class="mta-card-sub" title="@Profile.Facts.Kernel">@Profile.Facts.Kernel</span>
+			</button>
+
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Logs))">
+				<span class="mta-card-label">Uptime</span>
+				<span class="mta-stat">@(AdminFormat.Span(snapshot.Uptime) is { Length: > 0 } up ? up : "?")</span>
+				<span class="mta-card-sub">@(snapshot.BootedAt is { } booted ? $"booted {DisplayFormat.Timestamp(booted)}" : "boot time unknown")</span>
+			</button>
+
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+				<span class="mta-card-label">CPU load</span>
+				<span class="mta-stat">@(snapshot.Load1 is null ? "?" : AdminFormat.Number(snapshot.Load1))</span>
+				@if (LoadPercent(snapshot) is { } loadPercent)
+				{
+					<div class="@AdminFormat.BarClass(loadPercent)"><span style="@AdminFormat.BarWidth(loadPercent)"></span></div>
+				}
+				<span class="mta-card-sub">@LoadText(snapshot)</span>
+			</button>
+
+			@if (snapshot.MemoryTotalKb is { } total && total > 0)
+			{
+				long used = total - (snapshot.MemoryAvailableKb ?? 0);
+				double percent = used * 100.0 / total;
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+					<span class="mta-card-label">Memory</span>
+					<span class="mta-stat">@AdminFormat.Percent(percent)</span>
+					<div class="@AdminFormat.BarClass(percent)"><span style="@AdminFormat.BarWidth(percent)"></span></div>
+					<span class="mta-card-sub">@AdminFormat.Kb(used) of @AdminFormat.Kb(total)</span>
+				</button>
+			}
+
+			@if (snapshot.SwapTotalKb is { } swap && swap > 0)
+			{
+				long swapUsed = swap - (snapshot.SwapFreeKb ?? swap);
+				double swapPercent = swapUsed * 100.0 / swap;
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+					<span class="mta-card-label">Swap</span>
+					<span class="mta-stat">@AdminFormat.Percent(swapPercent)</span>
+					<div class="@AdminFormat.BarClass(swapPercent)"><span style="@AdminFormat.BarWidth(swapPercent)"></span></div>
+					<span class="mta-card-sub">@AdminFormat.Kb(swapUsed) of @AdminFormat.Kb(swap)</span>
+				</button>
+			}
+
+			<button type="button" class="mta-card" @onclick="OpenFailedServices" disabled="@(Capabilities.Services is null)">
+				<span class="mta-card-label">Failed services</span>
+				<span class="@(_failed > 0 ? "mta-stat mta-stat--alert" : "mta-stat")">@(_services is null ? ServicesPending : AdminFormat.Count(_failed))</span>
+				<span class="mta-card-sub">@ServicesText</span>
+			</button>
+
+			<button type="button" class="mta-card" @onclick="OpenUpdates" disabled="@(Capabilities.Packages is null)">
+				<span class="mta-card-label">Pending updates</span>
+				<span class="mta-stat">@(_updates is { } updates ? AdminFormat.Count(updates) : Capabilities.Packages is null ? "none" : _updatesError is null ? "..." : "?")</span>
+				<span class="mta-card-sub" title="@_updatesError">@UpdatesText</span>
+			</button>
+
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Time))">
+				<span class="mta-card-label">Time zone</span>
+				<span class="mta-stat mta-stat--small" title="@_clock?.LocalTime">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</span>
+				<span class="mta-card-sub">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@AdminFormat.Dot(_clock?.Synchronized)" Glow="@(_clock?.Synchronized == true)" />
+					@(_clock?.Synchronized switch { true => " NTP synchronized", false => " not synchronized", _ => " sync unknown" })
+				</span>
+			</button>
+
+			@foreach (FileSystemUsage disk in snapshot.Disks)
+			{
+				<button type="button" class="mta-card" @key="disk.MountPoint" @onclick="@(() => Context.Navigate(AdminPage.Disks))" title="@($"{disk.Source} on {disk.MountPoint}")">
+					<span class="mta-card-label">@($"Disk {disk.MountPoint}")</span>
+					<span class="mta-stat">@AdminFormat.Percent(disk.UsedPercent)</span>
+					<div class="@AdminFormat.BarClass(disk.UsedPercent)"><span style="@AdminFormat.BarWidth(disk.UsedPercent)"></span></div>
+					<span class="mta-card-sub">@AdminFormat.Kb(disk.AvailableKb) free of @AdminFormat.Kb(disk.TotalKb)</span>
+				</button>
+			}
+		</div>
+	}
+</AdminPageFrame>
+
+@code {
+	private OverviewSnapshot? _snapshot;
+	private IReadOnlyList<ServiceUnit>? _services;
+	private int _failed;
+	private int? _updates;
+	private string? _updatesError;
+	private ClockInfo? _clock;
+
+	private string Summary => _snapshot?.Cores is { } cores
+		? $"{Profile.Facts.HostName} · {cores} cores · logged in as {Profile.Facts.UserName}"
+		: Profile.Facts.HostName;
+
+	private string ServicesPending => Capabilities.Services is null ? "none" : "...";
+
+	private string ServicesText => Capabilities.Services is null
+		? "no service manager"
+		: _services is { } services ? $"of {AdminFormat.Count(services.Count)} services" : "reading";
+
+	private string UpdatesText => Capabilities.Packages is not { } packages
+		? "no package manager"
+		: _updatesError is not null ? "could not check" : _updates is null ? $"asking {packages.DisplayName}" : packages.DisplayName;
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		// The slow ones (a dnf metadata check can take a minute) fill their cards in as they arrive.
+		_ = LoadServicesAsync(cancellationToken);
+		_ = LoadUpdatesAsync(cancellationToken);
+		_ = LoadClockAsync(cancellationToken);
+		AdminOutcome outcome = await ReadAsync(OverviewCommands.Read(), cancellationToken);
+		_snapshot = OverviewCommands.Parse(outcome.Output);
+	}
+
+	private static double? LoadPercent(OverviewSnapshot snapshot) =>
+		snapshot.Load1 is { } load && snapshot.Cores is { } cores && cores > 0 ? load * 100 / cores : null;
+
+	private static string LoadText(OverviewSnapshot snapshot) =>
+		$"5m {AdminFormat.Number(snapshot.Load5)} · 15m {AdminFormat.Number(snapshot.Load15)}{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+
+	private void OpenFailedServices() => Context.NavigateWith(AdminPage.Services, "failed");
+
+	private void OpenUpdates() => Context.NavigateWith(AdminPage.Packages, "updates");
+
+	private async Task LoadServicesAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Services is not { } services)
+		{
+			return;
+		}
+
+		try
+		{
+			_services = services.ParseList((await ReadAsync(services.List(), cancellationToken)).Output);
+			_failed = _services.Count(unit => unit.State == ServiceState.Failed);
+		}
+		catch (Exception ex) when (ex is AdminException or OperationCanceledException)
+		{
+			return;
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task LoadUpdatesAsync(CancellationToken cancellationToken)
+	{
+		if (Capabilities.Packages is not { } packages)
+		{
+			return;
+		}
+
+		_updates = null;
+		_updatesError = null;
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(packages.ListUpdates(), cancellationToken);
+			if (outcome.Succeeded)
+			{
+				_updates = packages.ParseUpdates(outcome.Output).Count;
+			}
+			else
+			{
+				_updatesError = outcome.Problem();
+			}
+		}
+		catch (AdminException ex)
+		{
+			_updatesError = ex.Message;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task LoadClockAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			_clock = ClockCommands.Parse((await ReadAsync(Capabilities.Clock.Read(), cancellationToken)).Output);
+		}
+		catch (Exception ex) when (ex is AdminException or OperationCanceledException)
+		{
+			return;
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+}

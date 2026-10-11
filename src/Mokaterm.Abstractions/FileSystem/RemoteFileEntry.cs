@@ -19,6 +19,12 @@ public enum RemoteFileSystemFeatures
 
 	/// <summary><see cref="IRemoteFileSystem.ListAccountsAsync"/> can read the server's users and groups.</summary>
 	Accounts = 1 << 4,
+
+	/// <summary><see cref="IRemoteFileSystem.CopyAsync"/> copies on the server, without the bytes passing through here.</summary>
+	Copy = 1 << 5,
+
+	/// <summary><see cref="IRemoteFileSystem.CompressAsync"/> and <see cref="IRemoteFileSystem.ExtractAsync"/> run on the server.</summary>
+	Archives = 1 << 6,
 }
 
 /// <summary>One directory entry.</summary>
@@ -63,4 +69,7 @@ public sealed record UploadOptions
 
 	/// <summary>Applied after the upload when the protocol supports setting times.</summary>
 	public DateTimeOffset? LastModified { get; init; }
+
+	/// <summary>Set to let a failed attempt be continued by the next one with the same instance. See <see cref="UploadResume"/>.</summary>
+	public UploadResume? Resume { get; init; }
 }

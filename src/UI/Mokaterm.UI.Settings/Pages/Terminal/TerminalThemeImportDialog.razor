@@ -1,11 +1,12 @@
 @using Mokaterm.Abstractions.Terminal
 @using Mokaterm.UI.Terminal
 
-<MokaDialog Open="Open"
-			OpenChanged="OpenChanged"
-			Title="Import a color scheme"
-			DialogSize="MokaDialogSize.Medium"
-			CloseOnBackdropClick="false">
+<HeadedDialog Open="Open"
+			  OpenChanged="OpenChanged"
+			  Title="Import a color scheme"
+			  Icon="MokatermIcons.FileUpload"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false">
 	<ChildContent>
 		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
@@ -60,4 +61,4 @@
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CancelAsync">Cancel</MokaButton>
 		<MokaButton StartIcon="MokatermIcons.Palette" Disabled="@(!CanImport)" OnClick="ImportAsync">Add theme</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>

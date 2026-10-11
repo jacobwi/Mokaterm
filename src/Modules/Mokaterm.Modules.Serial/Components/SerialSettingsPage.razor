@@ -5,7 +5,7 @@
 	SerialSettings settings = Settings;
 }
 
-<SettingsPage Title="Serial" OnReset="ResetAsync">
+<SettingsPage Title="Serial" OnReset="ResetAsync" ResetMessage="Put every serial setting back to its default? Saved connections keep the line they carry.">
 	<SettingsSection Title="The line a new connection starts from"
 					 Description="Changing this changes new connections only: every saved one carries its own line, in its own options.">
 		<SettingsRow Label="Baud rate" Description="Bits per second a new connection starts at.">

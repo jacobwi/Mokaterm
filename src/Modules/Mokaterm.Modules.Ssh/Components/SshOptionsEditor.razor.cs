@@ -1,10 +1,12 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Mokaterm.Abstractions.Connections;
+using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.Agent;
+using Mokaterm.Modules.Ssh.Forwarding;
 using Mokaterm.Modules.Ssh.Tunnels;
 using Mokaterm.UI.Common.Components;
 
@@ -15,6 +17,7 @@ public partial class SshOptionsEditor : ConnectionOptionsEditorBase<SshConnectio
 {
 	private readonly FieldDraft<string> _terminalType = new();
 	private readonly FieldDraft<string> _keepAlive = new();
+	private readonly FieldDraft<string> _display = new();
 	private readonly CancellationTokenSource _disposal = new();
 	private IReadOnlyList<ConnectionChoice> _connections = [];
 	private IReadOnlyList<AgentChoice> _agentKeys = [];
@@ -36,8 +39,22 @@ public partial class SshOptionsEditor : ConnectionOptionsEditorBase<SshConnectio
 	[Inject]
 	private IVault Vault { get; set; } = default!;
 
+	[Inject]
+	private IAppEnvironment AppEnvironment { get; set; } = default!;
+
 	/// <summary>SFTP sessions have no shell, so the terminal options stay hidden for them.</summary>
 	private bool IsTerminalProtocol => !string.Equals(ProtocolId, SshProtocolIds.Sftp, StringComparison.OrdinalIgnoreCase);
+
+	/// <summary>On the web host the X server would be the server's own, so X11 forwarding is the desktop app's alone.</summary>
+	private bool OffersX11 => AppEnvironment.Kind == HostKind.Desktop;
+
+	private string AgentForwardingHelp => AppEnvironment.Kind == HostKind.Desktop
+		? "Programs on the server can use your SSH agent, or this login's saved key when no agent runs."
+		: "Programs on the server can use this login's saved key. The server's own agent is never forwarded.";
+
+	private string X11Help => OffersX11
+		? "Shows windows of programs on the server through an X server here, such as VcXsrv, Xming or X410."
+		: "Needs the desktop app: on the web host the X server would have to run on the server.";
 
 	private string DefaultTerminalType => SettingsService.Get<TerminalSettings>().TerminalType;
 
@@ -184,6 +201,22 @@ public partial class SshOptionsEditor : ConnectionOptionsEditorBase<SshConnectio
 	private Task SetTunnelsAsync(IReadOnlyList<SshTunnelDefinition> tunnels) => ChangeAsync(Current with { Tunnels = tunnels });
 
 	private Task SetProxyAsync(ProxyOptions proxy) => ChangeAsync(Current with { Proxy = proxy });
+
+	private Task SetForwardAgentAsync(bool value) => ChangeAsync(Current with { Forwarding = Current.Forwarding with { ForwardAgent = value } });
+
+	private Task SetForwardX11Async(bool value) => ChangeAsync(Current with { Forwarding = Current.Forwarding with { ForwardX11 = value } });
+
+	private Task SetDisplayAsync(string value)
+	{
+		if (!X11Display.TryParse(value, out _, out string? error))
+		{
+			_display.Reject(value, error ?? "This is not an X display.");
+			return Task.CompletedTask;
+		}
+
+		_display.Clear();
+		return ChangeAsync(Current with { Forwarding = Current.Forwarding with { Display = value } });
+	}
 
 	private Task SetAgentIdentityAsync(AgentChoice? choice) => ChangeAsync(Current with { AgentIdentity = choice?.Fingerprint });
 

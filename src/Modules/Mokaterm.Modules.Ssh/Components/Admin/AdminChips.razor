@@ -1,0 +1,36 @@
+@namespace Mokaterm.Modules.Ssh.Components.Admin
+
+<div class="mta-chips" role="radiogroup" aria-label="@AriaLabel">
+	@foreach (AdminChip chip in Items)
+	{
+		bool active = chip.Value == Value;
+		<button type="button"
+				class="@(active ? "mta-chip mta-chip--active" : "mta-chip")"
+				role="radio"
+				aria-checked="@(active ? "true" : "false")"
+				@key="chip.Value"
+				@onclick="@(() => SelectAsync(chip.Value))">
+			<span>@chip.Label</span>
+			@if (chip.Count is { } count)
+			{
+				<span class="@(chip.Alert && count > 0 ? "mta-chip-count mta-chip-count--alert" : "mta-chip-count")">@count.ToString("N0", CultureInfo.CurrentCulture)</span>
+			}
+		</button>
+	}
+</div>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<AdminChip> Items { get; set; } = [];
+
+	[Parameter]
+	public string Value { get; set; } = "";
+
+	[Parameter]
+	public EventCallback<string> ValueChanged { get; set; }
+
+	[Parameter]
+	public string? AriaLabel { get; set; }
+
+	private Task SelectAsync(string value) => value == Value ? Task.CompletedTask : ValueChanged.InvokeAsync(value);
+}

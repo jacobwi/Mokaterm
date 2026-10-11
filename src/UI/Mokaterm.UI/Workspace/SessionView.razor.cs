@@ -18,6 +18,7 @@ using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Connections;
+using Mokaterm.UI.FileBrowser;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Terminal;
@@ -36,10 +37,13 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	private TerminalSettings _terminalSettings = new();
 	private FileBrowserPlacement _placement;
 	private TerminalView? _terminal;
+	private RemoteFileBrowser? _files;
 	private CommandsPanel? _commands;
 	private bool _focusCommands;
-	private SessionToolDescriptor? _openTool;
 	private BroadcastTerminalStream? _broadcastStream;
+	private ElementReference _toolbar;
+	private AppearanceSettings _appearance = new();
+	private HashSet<string> _hiddenButtons = [];
 
 	private enum SessionLayout
 	{
@@ -76,6 +80,9 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	[Inject]
+	private MenuPlacement Menus { get; set; } = default!;
+
+	[Inject]
 	private ShellState Shell { get; set; } = default!;
 
 	[Inject]
@@ -95,6 +102,15 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 
 	[Inject]
 	private ISessionLogRecorder SessionLogs { get; set; } = default!;
+
+	[Inject]
+	private SessionToolActions Tools { get; set; } = default!;
+
+	[Inject]
+	private SessionViewRequests Requests { get; set; } = default!;
+
+	[Inject]
+	private ShellInterop ShellInterop { get; set; } = default!;
 
 	[Inject]
 	private ILogger<SessionView> Logger { get; set; } = default!;
@@ -175,20 +191,88 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		[nameof(SessionViewBase.IsActive)] = IsActive,
 	};
 
-	/// <summary>Toolbar views modules registered for this protocol, such as the SSH tunnels panel.</summary>
-	private IReadOnlyList<SessionToolDescriptor> Tools
+	/// <summary>
+	/// Everything the toolbar can do for this session right now. The layout decides which become buttons; all of them
+	/// are in the overflow menu, and the palette presses them through <see cref="SessionViewRequests"/>.
+	/// </summary>
+	private List<ToolbarAction> ToolbarActions
 	{
 		get
 		{
-			IReadOnlyList<SessionToolDescriptor> tools = Contributions.FindSessionTools(Session.Protocol.Id);
-			return tools.Count == 0 || Session.State == SessionState.Connected
-				? tools
-				: [.. tools.Where(tool => tool.ShowWhileDisconnected)];
+			SessionLogStatus log = SessionLogs.StatusFor(Session.Id);
+			List<ToolbarAction> actions = [];
+			if (Layout == SessionLayout.Split)
+			{
+				actions.Add(new ToolbarAction
+				{
+					Id = SessionToolbarButtons.FileBrowser,
+					Title = "File browser",
+					MenuText = "File browser panel",
+					Icon = MokatermIcons.SplitView,
+					Group = ToolbarGroup.Panels,
+					Active = !_viewState.FilesCollapsed,
+					Toggle = true,
+					Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.ToggleFileBrowser),
+					Run = _ => Done(ToggleFiles),
+				});
+			}
+
+			if (HasTerminalView)
+			{
+				AddTerminalActions(actions, log);
+			}
+
+			actions.Add(new ToolbarAction
+			{
+				Id = SessionToolbarButtons.Duplicate,
+				Title = "Duplicate session",
+				Icon = MokaIcons.Content.Copy,
+				Group = ToolbarGroup.Session,
+				Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.Duplicate),
+				Run = _ => DuplicateAsync(),
+			});
+
+			AddToolActions(actions);
+
+			if (SessionStateDisplay.CanReconnect(Session.State))
+			{
+				actions.Add(new ToolbarAction
+				{
+					Id = SessionToolbarButtons.Reconnect,
+					Title = "Reconnect",
+					Icon = MokatermIcons.Reconnect,
+					Group = ToolbarGroup.Connection,
+					Pinned = true,
+					Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.Reconnect),
+					Run = _ => ReconnectAsync(),
+				});
+			}
+
+			if (Session.State is SessionState.Connecting or SessionState.Connected)
+			{
+				actions.Add(new ToolbarAction
+				{
+					Id = SessionToolbarButtons.Disconnect,
+					Title = "Disconnect",
+					Icon = MokatermIcons.Disconnect,
+					Group = ToolbarGroup.Connection,
+					Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.Disconnect),
+					Run = _ => DisconnectAsync(),
+				});
+			}
+
+			actions.Add(new ToolbarAction
+			{
+				Id = SessionToolbarButtons.Close,
+				Title = "Disconnect and close",
+				Icon = MokatermIcons.Power,
+				Group = ToolbarGroup.Connection,
+				Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.CloseTab),
+				Run = _ => CloseAsync(),
+			});
+			return actions;
 		}
 	}
-
-	/// <summary>The tool whose dialog is showing. A tool that went away with the connection closes itself.</summary>
-	private SessionToolDescriptor? OpenTool => _openTool is { } tool && Tools.Contains(tool) ? tool : null;
 
 	private string ActiveThemeId => ThemeCatalog.Get(_terminalSettings.ThemeId).Id;
 
@@ -241,6 +325,8 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 
 	public void Dispose()
 	{
+		Tools.Changed -= OnToolsChanged;
+		Requests.Requested -= OnRequested;
 		Settings.Changed -= OnSettingsChanged;
 		Commands.TerminalFocusRequested -= OnTerminalFocusRequested;
 		Commands.CommandsRequested -= OnCommandsRequested;
@@ -251,6 +337,9 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	protected override void OnInitialized()
 	{
 		_placement = Settings.Get<FileTransferSettings>().Placement;
+		ReadAppearance();
+		Tools.Changed += OnToolsChanged;
+		Requests.Requested += OnRequested;
 		Settings.Changed += OnSettingsChanged;
 		Commands.TerminalFocusRequested += OnTerminalFocusRequested;
 		Commands.CommandsRequested += OnCommandsRequested;
@@ -323,14 +412,213 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		_ => "Record what this session prints to a file",
 	};
 
-	private void ToggleTool(SessionToolDescriptor tool) => _openTool = ReferenceEquals(_openTool, tool) ? null : tool;
+	/// <summary>
+	/// The wide size: most of the window and a fixed height the tool fills. Moka's sizes stop at 720 px short of full
+	/// screen, so the width is set on the box itself.
+	/// </summary>
+	private static string? ToolDialogStyle(SessionToolDescriptor tool) => tool.Size == SessionToolSize.Wide
+		? "width:min(1200px, calc(100vw - 32px));max-width:none;height:min(900px, calc(100vh - 64px))"
+		: null;
+
+	private static Task Done(Action action)
+	{
+		action();
+		return Task.CompletedTask;
+	}
+
+	private void AddTerminalActions(List<ToolbarAction> actions, SessionLogStatus log)
+	{
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.SavedCommands,
+			Title = "Saved commands",
+			Icon = MokatermIcons.Command,
+			Group = ToolbarGroup.Panels,
+			Active = _viewState.CommandsOpen,
+			Toggle = true,
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.SavedCommands),
+			Run = _ => Done(ToggleCommands),
+		});
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.Find,
+			Title = "Find",
+			Icon = MokaIcons.Action.Search,
+			Group = ToolbarGroup.View,
+
+			// The terminal's own key while it has focus; a shell gesture bound to the command wins over it.
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.FindInTerminal) ?? "Ctrl+Shift+F",
+			Run = _ => FindAsync(),
+		});
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.Theme,
+			Title = _viewState.ThemeId is null ? "Terminal theme" : "Terminal theme (one picked for this session)",
+			MenuText = "Terminal theme",
+			Icon = MokatermIcons.Palette,
+			Group = ToolbarGroup.View,
+			Active = _viewState.ThemeId is not null,
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.TerminalTheme),
+			Run = args => Done(() => ShowThemeMenu(args)),
+			Children = BuildThemeMenu,
+		});
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.Clear,
+			Title = "Clear terminal",
+			Icon = MokatermIcons.Eraser,
+			Group = ToolbarGroup.View,
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.ClearTerminal),
+			Run = _ => ClearAsync(),
+		});
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.Record,
+			Title = LogTitle(log),
+			MenuText = "Record to a file",
+			Icon = MokatermIcons.Record,
+			Group = ToolbarGroup.Session,
+			Active = log.IsOn,
+			Toggle = true,
+			Dot = log.State switch
+			{
+				SessionLogState.Recording => ToolbarDot.Recording,
+				SessionLogState.Full or SessionLogState.Failed => ToolbarDot.Warning,
+				_ => ToolbarDot.None,
+			},
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.RecordSession),
+			Run = _ => Done(ToggleLog),
+		});
+		actions.Add(new ToolbarAction
+		{
+			Id = SessionToolbarButtons.Broadcast,
+			Title = BroadcastTitle,
+			MenuText = "Type into several sessions",
+			Icon = MokatermIcons.Broadcast,
+			Group = ToolbarGroup.Session,
+			Active = TypesWithOthers,
+			Toggle = true,
+			Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.BroadcastInput),
+			Run = _ => Done(ToggleBroadcast),
+		});
+	}
+
+	/// <summary>One action per tool, plus the grouped layout's menu of them, which is lit while any of them shows.</summary>
+	private void AddToolActions(List<ToolbarAction> actions)
+	{
+		IReadOnlyList<SessionToolDescriptor> tools = Tools.Available(Session);
+		bool anyOpen = false;
+		foreach (SessionToolDescriptor tool in tools)
+		{
+			bool open = Tools.IsOpen(Session, tool);
+			anyOpen |= open;
+			actions.Add(new ToolbarAction
+			{
+				Id = SessionToolbarButtons.ForTool(tool),
+				Title = Tools.IsInWindow(Session, tool) ? $"{tool.Title} (in its own window)" : tool.Title,
+				MenuText = tool.Title,
+				Icon = tool.Icon,
+				Group = ToolbarGroup.Tools,
+				Active = open,
+				Toggle = true,
+				Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.ForTool(tool)),
+				Run = _ => Tools.ToggleAsync(Session, tool),
+			});
+		}
+
+		if (tools.Count > 0)
+		{
+			actions.Add(new ToolbarAction
+			{
+				Id = SessionToolbarButtons.ToolsMenu,
+				Title = "Tools",
+				Icon = MokatermIcons.Tools,
+				Group = ToolbarGroup.Tools,
+				Active = anyOpen,
+				Run = args => Done(() => ShowToolsMenu(args, tools)),
+			});
+		}
+	}
+
+	private EventCallback PopOutCallback(SessionToolDescriptor tool) => Tools.CanOpenWindows
+		? EventCallback.Factory.Create(this, () => Tools.PopOutAsync(Session, tool))
+		: default;
+
+	private void CloseToolDialog() => Tools.CloseDialog(Session.Id);
 
 	private void OnToolDialogOpenChanged(bool open)
 	{
 		if (!open)
 		{
-			_openTool = null;
+			Tools.CloseDialog(Session.Id);
 		}
+	}
+
+	private void OnToolsChanged() => _ = InvokeAsync(StateHasChanged);
+
+	private void ShowToolsMenu(MouseEventArgs args, IReadOnlyList<SessionToolDescriptor> tools)
+	{
+		// The menu lists the tools the user kept on the bar; a hidden one is in the overflow menu with the rest.
+		List<MokaContextMenuItem> items = [];
+		foreach (SessionToolDescriptor tool in tools.Where(tool => !_hiddenButtons.Contains(SessionToolbarButtons.ForTool(tool))))
+		{
+			SessionToolDescriptor captured = tool;
+			items.Add(new MokaContextMenuItem
+			{
+				Text = tool.Title,
+				Icon = tool.Icon,
+				Checked = Tools.IsOpen(Session, tool),
+				Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.ForTool(tool)),
+				OnClick = () => Tools.ToggleAsync(Session, captured),
+			});
+		}
+
+		Menus.Show(args, items);
+	}
+
+	/// <summary>A button pressed from the command palette, which still works when the button is hidden.</summary>
+	private void OnRequested(Guid sessionId, string buttonId)
+	{
+		if (sessionId != Session.Id)
+		{
+			return;
+		}
+
+		_ = InvokeAsync(async () =>
+		{
+			if (buttonId == SessionToolbarButtons.Theme && HasTerminalView)
+			{
+				await ShowThemeMenuUnderToolbarAsync();
+				return;
+			}
+
+			if (ToolbarActions.Find(action => action.Id == buttonId) is { Run: { } run })
+			{
+				await run(new MouseEventArgs());
+				return;
+			}
+
+			string what = SessionToolbarButtons.BuiltIn.FirstOrDefault(button => button.Id == buttonId)?.Title ?? "That";
+			Interaction.Notify(NoticeSeverity.Info, $"{what} is not available in this session.");
+		});
+	}
+
+	// Opened from the keyboard there is no pointer to put the menu at, so it hangs under the toolbar's right end.
+	private async Task ShowThemeMenuUnderToolbarAsync()
+	{
+		const double MenuWidth = 240;
+		if (await ShellInterop.BoxOfAsync(_toolbar) is not { } box)
+		{
+			return;
+		}
+
+		Menu.Show(Math.Max(box.Left, box.Right - MenuWidth), box.Bottom, BuildThemeMenu(), openedFromKeyboard: true, anchorTop: box.Top);
+	}
+
+	private void ReadAppearance()
+	{
+		_appearance = Settings.Get<AppearanceSettings>();
+		_hiddenButtons = new HashSet<string>(_appearance.HiddenToolbarButtons, StringComparer.Ordinal);
 	}
 
 	private void ToggleBroadcast()
@@ -396,7 +684,7 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		_terminalSettings = _viewState.ThemeId is { } themeId ? settings with { ThemeId = themeId } : settings;
 	}
 
-	private void ShowThemeMenu(MouseEventArgs args) => Menu.Show(args, BuildThemeMenu());
+	private void ShowThemeMenu(MouseEventArgs args) => Menus.Show(args, BuildThemeMenu());
 
 	private List<MokaContextMenuItem> BuildThemeMenu()
 	{
@@ -443,6 +731,12 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	}
 
 	private void OnFilesPanelResized(double width) => UiState.Update(state => state with { FilesPanelWidth = width });
+
+	// The terminal and the file browser live in libraries that do not know each other, so the folder passes through here.
+	private void SetFollowTerminalFolder(bool follow) => _viewState.FollowTerminalFolder = follow;
+
+	private Task OnTerminalFolderChanged(TerminalFolder folder) =>
+		_files?.ShowTerminalFolderAsync(folder.Path, folder.User) ?? Task.CompletedTask;
 
 	private void OnRemoteTitleChanged(string title) => Workspace.SetRemoteTitle(Session.Id, title);
 
@@ -532,6 +826,14 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 			_ = InvokeAsync(() =>
 			{
 				ApplyTerminalSettings();
+				StateHasChanged();
+			});
+		}
+		else if (sectionKey == AppearanceSettings.SectionKey)
+		{
+			_ = InvokeAsync(() =>
+			{
+				ReadAppearance();
 				StateHasChanged();
 			});
 		}

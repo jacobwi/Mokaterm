@@ -1,11 +1,12 @@
 @* A yes or no question, styled as dangerous for deletes and overwrites. *@
 @inherits PromptDialogBase
 
-<MokaDialog Open="true"
-			Title="@Prompt.Title"
-			DialogSize="MokaDialogSize.Small"
-			CloseOnBackdropClick="false"
-			OnClose="() => AnswerAsync(OnResult, ConfirmResult.No)">
+<HeadedDialog Open="true"
+			  Title="@Prompt.Title"
+			  Icon="@(Prompt.Destructive ? MokaIcons.Status.Warning : MokaIcons.Status.HelpCircle)"
+			  DialogSize="MokaDialogSize.Small"
+			  CloseOnBackdropClick="false"
+			  OnClose="() => AnswerAsync(OnResult, ConfirmResult.No)">
 	<ChildContent>
 		<PromptBody @ref="Body" AutofocusSelf="true">
 			<MokaText Size="MokaSize.Sm" Class="mt-break">@Prompt.Message</MokaText>
@@ -29,7 +30,7 @@
 			@Prompt.ConfirmText
 		</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>
 
 @code {
 	// Only read when the prompt offered the check box, and only reported with a yes: cancelling answers nothing, so

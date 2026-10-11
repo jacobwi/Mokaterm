@@ -8,9 +8,9 @@ using Mokaterm.UI.Shell;
 namespace Mokaterm.UI.Workspace;
 
 /// <summary>
-/// Remembers which saved logins have a tab, so the next start can offer them again. An entry leaves the set only when
-/// the user closes that tab: a window or a circuit going away takes its sessions with it, and that must not read as
-/// "the user closed everything".
+/// Remembers which saved logins have a tab, which pane each tab is in and how the panes are laid out, so the next start
+/// can offer them again. An entry leaves the set only when the user closes that tab: a window or a circuit going away
+/// takes its sessions with it, and that must not read as "the user closed everything".
 /// </summary>
 internal sealed class SessionRestore : IDisposable
 {
@@ -22,8 +22,9 @@ internal sealed class SessionRestore : IDisposable
 	private readonly ILogger<SessionRestore> _logger;
 	private readonly Lock _gate = new();
 	private readonly List<RestoreEntry> _entries = [];
-	private List<Guid> _pending = [];
-	private List<Guid> _persisted = [];
+	private SavedTabs _pending = SavedTabs.Empty;
+	private SavedTabs _persisted = SavedTabs.Empty;
+	private PaneNode? _layout;
 	private bool _started;
 	private bool _disposed;
 
@@ -53,7 +54,7 @@ internal sealed class SessionRestore : IDisposable
 		{
 			lock (_gate)
 			{
-				return [.. _pending];
+				return _pending.ConnectionIds;
 			}
 		}
 	}
@@ -71,10 +72,10 @@ internal sealed class SessionRestore : IDisposable
 			}
 
 			_started = true;
-			_persisted = [.. _uiState.Current.RestoreConnectionIds];
+			_persisted = SavedTabs.From(_uiState.Current);
 			if (Mode != SessionRestoreMode.Off)
 			{
-				_pending = [.. _persisted];
+				_pending = _persisted;
 			}
 		}
 
@@ -105,28 +106,36 @@ internal sealed class SessionRestore : IDisposable
 		Persist();
 	}
 
-	/// <summary>Opens every login in the saved set, in the order their tabs had.</summary>
+	/// <summary>Opens every login in the saved set, in the order their tabs had, each in the pane it was in.</summary>
 	public async Task RestoreAsync()
 	{
-		List<Guid> ids = TakePending();
-		if (ids.Count == 0)
+		SavedTabs saved = TakePending();
+		if (saved.ConnectionIds.Count == 0)
 		{
 			return;
 		}
 
+		_workspace.BeginRestore(saved.Layout, [.. saved.ConnectionIds.Select((id, index) => new PanePlacement(id, saved.PaneAt(index)))]);
 		int failed = 0;
-		foreach (Guid connectionId in ids)
+		try
 		{
-			try
+			foreach (Guid connectionId in saved.ConnectionIds)
 			{
-				await _manager.OpenAsync(connectionId);
+				try
+				{
+					await _manager.OpenAsync(connectionId);
+				}
+				catch (Exception ex) when (ex is not OperationCanceledException)
+				{
+					// A login deleted since the last run is the usual reason, and one bad id must not stop the rest.
+					failed++;
+					_logger.LogWarning(ex, "Reopening connection {ConnectionId} failed.", connectionId);
+				}
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
-			{
-				// A login deleted since the last run is the usual reason, and one bad id must not stop the rest.
-				failed++;
-				_logger.LogWarning(ex, "Reopening connection {ConnectionId} failed.", connectionId);
-			}
+		}
+		finally
+		{
+			_workspace.EndRestore();
 		}
 
 		if (failed > 0)
@@ -142,7 +151,7 @@ internal sealed class SessionRestore : IDisposable
 	/// <summary>Turns the offer down. What is open from now on takes the saved set's place.</summary>
 	public void Dismiss()
 	{
-		if (TakePending().Count == 0)
+		if (TakePending().ConnectionIds.Count == 0)
 		{
 			return;
 		}
@@ -165,26 +174,29 @@ internal sealed class SessionRestore : IDisposable
 		_workspace.Changed -= OnWorkspaceChanged;
 	}
 
-	private List<Guid> TakePending()
+	private static bool Covers(PaneNode layout, List<RestoreEntry> entries) =>
+		entries.TrueForAll(entry => PaneLayout.Contains(layout, entry.PaneId));
+
+	private SavedTabs TakePending()
 	{
-		List<Guid> ids;
+		SavedTabs saved;
 		lock (_gate)
 		{
-			ids = _pending;
-			_pending = [];
+			saved = _pending;
+			_pending = SavedTabs.Empty;
 		}
 
-		if (ids.Count > 0)
+		if (saved.ConnectionIds.Count > 0)
 		{
 			Changed?.Invoke();
 		}
 
-		return ids;
+		return saved;
 	}
 
 	private void OnWorkspaceChanged()
 	{
-		IReadOnlyList<ISessionHandle> tabs = _workspace.Tabs;
+		WorkspaceSnapshot snapshot = _workspace.Snapshot();
 		bool offerGone = false;
 		lock (_gate)
 		{
@@ -193,28 +205,50 @@ internal sealed class SessionRestore : IDisposable
 				return;
 			}
 
-			List<RestoreEntry> next = [];
+			Queue<RestoreEntry> tabs = new();
 			HashSet<Guid> open = [];
-			foreach (ISessionHandle session in tabs)
+			foreach (PanedTab tab in snapshot.Tabs)
 			{
 				// A quick-connect tab has no saved login to reopen.
-				if (session.IsTransient || !open.Add(session.Id))
+				if (tab.Session.IsTransient || !open.Add(tab.Session.Id))
 				{
 					continue;
 				}
 
-				next.Add(new RestoreEntry(session.Id, session.Connection.Id));
+				tabs.Enqueue(new RestoreEntry(tab.Session.Id, tab.Session.Connection.Id, tab.PaneId));
 			}
 
-			// Tabs that went away without a close stay, after the open ones: that is a window closing, not a user.
-			next.AddRange(_entries.Where(entry => !open.Contains(entry.SessionId)));
+			// Tabs that went away without a close stay, and in their place: that is a window closing, not a user, and it
+			// closes its sessions in no particular order. The open tabs fill the other places in tab order, and tabs that
+			// are new since the last change go last.
+			List<RestoreEntry> next = [];
+			foreach (RestoreEntry entry in _entries)
+			{
+				if (!open.Contains(entry.SessionId))
+				{
+					next.Add(entry);
+				}
+				else if (tabs.TryDequeue(out RestoreEntry? tab))
+				{
+					next.Add(tab);
+				}
+			}
+
+			next.AddRange(tabs);
 			_entries.Clear();
 			_entries.AddRange(next);
 
-			if (_pending.Count > 0 && open.Count > 0)
+			// A window closing takes its tabs one at a time and collapses their panes as it goes, so the layout saved is the
+			// last one that still held every remembered tab's pane.
+			if (_layout is null || Covers(snapshot.Layout, _entries) || !Covers(_layout, _entries))
+			{
+				_layout = snapshot.Layout;
+			}
+
+			if (_pending.ConnectionIds.Count > 0 && open.Count > 0)
 			{
 				// The user got going on their own, so the offer is stale.
-				_pending = [];
+				_pending = SavedTabs.Empty;
 				offerGone = true;
 			}
 		}
@@ -229,7 +263,7 @@ internal sealed class SessionRestore : IDisposable
 
 	private void Persist()
 	{
-		List<Guid> ids;
+		SavedTabs saved;
 		lock (_gate)
 		{
 			if (_disposed)
@@ -237,18 +271,64 @@ internal sealed class SessionRestore : IDisposable
 				return;
 			}
 
-			ids = [.. _pending];
-			ids.AddRange(_entries.Select(entry => entry.ConnectionId));
-			if (ids.SequenceEqual(_persisted))
+			saved = _pending.ConnectionIds.Count > 0 ? _pending.Append(_entries) : Current();
+			if (saved.SameAs(_persisted))
 			{
 				return;
 			}
 
-			_persisted = ids;
+			_persisted = saved;
 		}
 
-		_uiState.Update(state => state with { RestoreConnectionIds = ids });
+		_uiState.Update(state => state with
+		{
+			RestoreConnectionIds = saved.ConnectionIds,
+			RestorePanes = saved.Panes,
+			RestoreLayout = saved.Layout,
+		});
 	}
 
-	private sealed record RestoreEntry(Guid SessionId, Guid ConnectionId);
+	/// <summary>The remembered tabs against the layout, cut down to the panes they are in.</summary>
+	private SavedTabs Current()
+	{
+		HashSet<int> used = [.. _entries.Select(entry => entry.PaneId)];
+		PaneNode? layout = _layout is null ? null : PaneLayout.Prune(_layout, used.Contains);
+		if (layout is null)
+		{
+			return new SavedTabs([.. _entries.Select(entry => entry.ConnectionId)], [], null);
+		}
+
+		IReadOnlyList<int> panes = PaneLayout.Panes(layout);
+		List<int> positions = [.. _entries.Select(entry => Math.Max(0, PaneLayout.IndexOf(panes, entry.PaneId)))];
+
+		// One pane is what a restore does without being told, so the file only says more when there is more to say.
+		return panes.Count > 1
+			? new SavedTabs([.. _entries.Select(entry => entry.ConnectionId)], positions, PaneLayout.Write(layout))
+			: new SavedTabs([.. _entries.Select(entry => entry.ConnectionId)], [], null);
+	}
+
+	private sealed record RestoreEntry(Guid SessionId, Guid ConnectionId, int PaneId);
+
+	/// <summary>The logins to reopen in tab order, the pane each goes to, and the layout those panes are counted in.</summary>
+	private sealed record SavedTabs(IReadOnlyList<Guid> ConnectionIds, IReadOnlyList<int> Panes, string? Layout)
+	{
+		public static SavedTabs Empty { get; } = new([], [], null);
+
+		public static SavedTabs From(UiStateDocument document) =>
+			new([.. document.RestoreConnectionIds], [.. document.RestorePanes], document.RestoreLayout);
+
+		/// <summary>The pane for the login at <paramref name="index"/>; one saved without a pane goes to the first.</summary>
+		public int PaneAt(int index) => index < Panes.Count ? Panes[index] : 0;
+
+		/// <summary>The saved set with tabs opened since added after it, in the first pane.</summary>
+		public SavedTabs Append(IReadOnlyList<RestoreEntry> entries) => entries.Count == 0
+			? this
+			: new SavedTabs(
+				[.. ConnectionIds, .. entries.Select(entry => entry.ConnectionId)],
+				[.. ConnectionIds.Select((_, index) => PaneAt(index)), .. entries.Select(_ => 0)],
+				Layout);
+
+		public bool SameAs(SavedTabs other) =>
+			ConnectionIds.SequenceEqual(other.ConnectionIds) && Panes.SequenceEqual(other.Panes) && Layout == other.Layout;
+	}
 }

@@ -21,7 +21,7 @@
 						aria-label="Record every session" />
 		</SettingsRow>
 		<SettingsRow Label="What to write"
-					 Description="Plain text drops colors and cursor moves, so the file reads like a transcript. Raw keeps every byte, which replays with cat.">
+					 Description="Plain text drops colors and cursor moves, so the file reads like a transcript. Raw keeps every byte, which replays with cat. Timed keeps every byte and when it arrived, as an asciicast that plays back here or in asciinema.">
 			<EnumSegmentedControl TEnum="SessionLogFormat"
 								  Value="settings.Format"
 								  ValueChanged="value => UpdateAsync(s => s with { Format = value })"
@@ -71,7 +71,7 @@
 					   SortColumn="Written"
 					   SortDirection="MokaSortDirection.Descending"
 					   ActionsColumnTitle=""
-					   ActionsColumnWidth="40px">
+					   ActionsColumnWidth="72px">
 				<ChildContent>
 					<MokaColumn Title="File" Field="file => file.Name">
 						<CellTemplate Context="file">
@@ -93,6 +93,12 @@
 					</MokaColumn>
 				</ChildContent>
 				<RowActions Context="file">
+					<MokaButton Variant="MokaVariant.Text"
+								Size="MokaSize.Xs"
+								StartIcon="MokatermIcons.Play"
+								OnClick="() => Play(file)"
+								title="Play"
+								aria-label="@($"Play {file.Name}")" />
 					@if (CanSaveFiles)
 					{
 						<MokaButton Variant="MokaVariant.Text"
@@ -113,3 +119,5 @@
 		</ChildContent>
 	</SettingsSection>
 </SettingsPage>
+
+<SessionLogPlayerDialog @bind-Open="_playerOpen" File="_playing" />

@@ -3,16 +3,85 @@
 	align-items: center;
 	gap: var(--moka-spacing-xs);
 	width: 100%;
-	max-width: 520px;
+	max-width: 560px;
 	margin: 0 auto;
 }
 
-/* The protocol picker keeps a fixed width; the target field takes the rest. */
-.mt-quick-connect ::deep .moka-field:first-child:not(:last-child) {
-	flex: 0 0 96px;
+/* The picker takes what its short name needs and the field takes the rest. */
+.mt-qc-protocol {
+	position: relative;
+	flex: 0 0 auto;
+	width: 116px;
 }
 
-.mt-quick-connect ::deep .moka-field:last-child {
+/* The icon is drawn over the picker's own button, which keeps its keyboard handling and its combobox role. */
+.mt-qc-protocol-icon {
+	position: absolute;
+	top: 50%;
+	left: 9px;
+	z-index: 1;
+	display: flex;
+	transform: translateY(-50%);
+	color: var(--moka-color-primary);
+	pointer-events: none;
+}
+
+.mt-qc-protocol ::deep .moka-select-trigger {
+	padding-left: 28px;
+}
+
+.mt-qc-protocol ::deep .moka-select-value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.06em;
+}
+
+/* The full names are longer than the picker, so its list sizes to them instead of to the button. */
+.mt-qc-protocol ::deep .moka-select-dropdown {
+	right: auto;
+	min-width: 100%;
+	width: max-content;
+}
+
+.mt-qc-protocol-option {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-md);
+	white-space: nowrap;
+}
+
+.mt-qc-field {
+	position: relative;
 	flex: 1;
 	min-width: 0;
+}
+
+/* A target that does not read: the field wears the focus ring in the error colour until the next keystroke. */
+.mt-quick-connect--error .mt-qc-field ::deep .moka-textfield-input,
+.mt-quick-connect--error .mt-qc-field ::deep .moka-textfield-input:focus {
+	border-color: var(--moka-color-error);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--moka-color-error) 18%, transparent),
+		inset 0 0 12px color-mix(in srgb, var(--moka-color-error) 10%, transparent);
+}
+
+/* The hint hangs under the field rather than below it in the flow, which would push the top bar taller. */
+.mt-qc-hint {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	z-index: var(--moka-z-dropdown);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-md);
+	border: 1px solid color-mix(in srgb, var(--moka-color-error) 35%, transparent);
+	border-left: 3px solid var(--moka-color-error);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface);
+	color: var(--moka-color-on-surface);
+	font-size: var(--moka-font-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }

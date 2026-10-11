@@ -1,0 +1,191 @@
+@using Mokaterm.Modules.Ssh.Admin.Storage
+@using Mokaterm.UI.Common.Formatting
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Disks"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter by device or mount point"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage>
+	<Chips>
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => _view = value)" AriaLabel="Disk details to show" />
+	</Chips>
+	<ChipsEnd>
+		@if (_view != "devices")
+		{
+			<MokaCheckbox Value="_everything" ValueChanged="@(value => _everything = value)" Label="Kernel and memory file systems too" />
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@if (_snapshot is { } snapshot)
+		{
+			@switch (_view)
+			{
+				case "devices":
+					@if (snapshot.Devices.Count == 0)
+					{
+						<MokaEmptyState Icon="SshIcons.Disk" Title="No block devices" Description="Neither lsblk nor /proc/partitions listed one, which is usual in a container." />
+					}
+					else
+					{
+						<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) 56px 72px 72px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 64px minmax(0, 1fr)">
+							<div class="mta-row mta-row--head">
+								<span>Device</span>
+								<span class="mta-wide">Type</span>
+								<span class="mta-wide">File system</span>
+								<span>Size</span>
+								<span>Mounted on</span>
+							</div>
+							@foreach ((BlockDevice device, int depth) in Flatten(snapshot.Devices, 0).Where(pair => Matches(pair.Device.Name) || Matches(pair.Device.MountPoint)))
+							{
+								<div class="mta-row" @key="@($"{device.Name}|{depth}|{device.MountPoint}")">
+									<span class="mta-cell" style="@($"padding-left:{depth * 14}px")" title="@DeviceTitle(device)">
+										<span class="mta-mono">@device.Name</span>
+										@if (device.Model.Length > 0 || device.Label.Length > 0)
+										{
+											<span class="mta-dim mta-after">@(device.Model.Length > 0 ? device.Model : device.Label)</span>
+										}
+									</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide">@device.Type</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide">@device.FileSystem</span>
+									<span class="mta-cell mta-mono">@(device.SizeBytes is { } size ? DisplayFormat.Bytes(size) : "")</span>
+									<span class="mta-cell mta-mono" title="@device.MountPoint">@device.MountPoint</span>
+								</div>
+							}
+						</div>
+						@if (snapshot.DevicesFromPartitions)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">lsblk is not installed, so only names and sizes from /proc/partitions are known.</MokaText>
+						}
+					}
+					break;
+
+				case "usage":
+					<div class="mta-table" style="--mta-cols: minmax(0, 1.2fr) minmax(0, 1fr) 60px 120px 70px; --mta-cols-narrow: minmax(0, 1fr) 96px 60px">
+						<div class="mta-row mta-row--head">
+							<AdminSortHeader Text="Mounted on" Key="mount" Sort="_sort" OnChanged="StateHasChanged" />
+							<span class="mta-wide">Source</span>
+							<span class="mta-wide">Type</span>
+							<AdminSortHeader Text="Used" Key="used" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+							<AdminSortHeader Text="Size" Key="size" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+						</div>
+						@foreach (FileSystemUsage item in SortedUsage(snapshot.Usage.Where(item => (_everything || DiskCommands.IsStorage(item)) && (Matches(item.MountPoint) || Matches(item.Source)))))
+						{
+							<div class="mta-row" @key="@($"{item.MountPoint}|{item.Source}")">
+								<span class="mta-cell mta-mono" title="@item.MountPoint">@item.MountPoint</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide" title="@item.Source">@item.Source</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide">@item.Type</span>
+								<span class="mta-cell" title="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")">
+									<span class="mta-mono">@AdminFormat.Percent(item.UsedPercent)</span>
+									<span class="mta-mono mta-dim mta-after">@AdminFormat.Kb(item.AvailableKb) free</span>
+									<div class="@AdminFormat.BarClass(item.UsedPercent)"><span style="@AdminFormat.BarWidth(item.UsedPercent)"></span></div>
+								</span>
+								<span class="mta-cell mta-mono">@AdminFormat.Kb(item.TotalKb)</span>
+							</div>
+						}
+					</div>
+					break;
+
+				default:
+					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) 76px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 70px">
+						<div class="mta-row mta-row--head">
+							<span>Mounted on</span>
+							<span class="mta-wide">Source</span>
+							<span>Type</span>
+							<span class="mta-wide">Options</span>
+						</div>
+						@foreach (MountEntry mount in snapshot.Mounts.Where(mount => (_everything || IsStorageMount(mount, snapshot)) && (Matches(mount.MountPoint) || Matches(mount.Source))))
+						{
+							<div class="mta-row" @key="@($"{mount.MountPoint}|{mount.Source}|{mount.Type}")">
+								<span class="mta-cell mta-mono" title="@mount.MountPoint">
+									@mount.MountPoint
+									@if (mount.IsReadOnly)
+									{
+										<span class="mta-after"><MokaTag Text="RO" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+									}
+								</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide" title="@mount.Source">@mount.Source</span>
+								<span class="mta-cell mta-mono">@mount.Type</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide" title="@mount.Options">@mount.Options</span>
+							</div>
+						}
+					</div>
+					break;
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private DiskSnapshot? _snapshot;
+	private readonly AdminSort _sort = new("mount");
+	private string _view = "usage";
+	private string _filter = "";
+	private bool _everything;
+
+	private string Summary
+	{
+		get
+		{
+			if (_snapshot is not { } snapshot)
+			{
+				return "";
+			}
+
+			List<FileSystemUsage> storage = [.. snapshot.Usage.Where(DiskCommands.IsStorage)];
+			int full = storage.Count(item => item.UsedPercent >= 90);
+			return $"{storage.Count} file systems{(full > 0 ? $", {full} over 90% full" : "")} · {snapshot.Devices.Count} block devices · read only";
+		}
+	}
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("usage", "Usage", _snapshot?.Usage.Count(DiskCommands.IsStorage)),
+		new("devices", "Devices", _snapshot?.Devices.Count),
+		new("mounts", "Mounts", _snapshot?.Mounts.Count),
+	];
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		AdminOutcome outcome = await ReadAsync(DiskCommands.Read(), cancellationToken);
+		_snapshot = DiskCommands.Parse(outcome.Output);
+	}
+
+	private static IEnumerable<(BlockDevice Device, int Depth)> Flatten(IEnumerable<BlockDevice> devices, int depth)
+	{
+		foreach (BlockDevice device in devices)
+		{
+			yield return (device, depth);
+			foreach ((BlockDevice child, int childDepth) in Flatten(device.Children, depth + 1))
+			{
+				yield return (child, childDepth);
+			}
+		}
+	}
+
+	private static string DeviceTitle(BlockDevice device) => string.Join(", ", new[]
+	{
+		device.Model,
+		device.Label.Length > 0 ? $"label {device.Label}" : "",
+		device.Removable ? "removable" : "",
+		device.ReadOnly ? "read only" : "",
+	}.Where(part => part.Length > 0));
+
+	/// <summary>A mount worth listing by default: one df counts as storage.</summary>
+	private static bool IsStorageMount(MountEntry mount, DiskSnapshot snapshot) =>
+		snapshot.Usage.Any(item => item.MountPoint == mount.MountPoint && DiskCommands.IsStorage(item));
+
+	private IEnumerable<FileSystemUsage> SortedUsage(IEnumerable<FileSystemUsage> usage) => _sort.Key switch
+	{
+		"used" => _sort.Apply(usage, item => (double)item.UsedPercent),
+		"size" => _sort.Apply(usage, item => (double)item.TotalKb),
+		_ => _sort.Apply(usage, item => item.MountPoint),
+	};
+
+	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+}

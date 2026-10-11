@@ -2,20 +2,21 @@
    button and the backdrop all go, which is what Moka.Red 0.1.13 made possible, and the editor's own Close still
    refuses. *@
 
-<MokaDialog Open="Open"
-			Title="@Title"
-			DialogSize="DialogSize"
-			CloseOnBackdropClick="false"
-			CloseOnEscape="@(!Busy)"
-			ShowCloseButton="@(!Busy)"
-			OnClose="OnClose">
+<HeadedDialog Open="Open"
+			  Title="@Title"
+			  Icon="Icon"
+			  DialogSize="DialogSize"
+			  CloseOnBackdropClick="false"
+			  CloseOnEscape="@(!Busy)"
+			  ShowCloseButton="@(!Busy)"
+			  OnClose="OnClose">
 	<ChildContent>
 		@ChildContent
 	</ChildContent>
 	<Actions>
 		@Actions
 	</Actions>
-</MokaDialog>
+</HeadedDialog>
 
 @code {
 	[Parameter]
@@ -23,6 +24,10 @@
 
 	[Parameter]
 	public string? Title { get; set; }
+
+	/// <summary>Drawn before the title, the way every dialog in the app names what it is.</summary>
+	[Parameter]
+	public MokaIconDefinition? Icon { get; set; }
 
 	[Parameter]
 	public MokaDialogSize DialogSize { get; set; } = MokaDialogSize.Medium;

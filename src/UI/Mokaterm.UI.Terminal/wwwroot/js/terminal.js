@@ -1,4 +1,4 @@
-// One xterm.js instance per TerminalView, driven from .NET through TerminalInterop.
+// One xterm.js instance per TerminalView or TerminalPlayer, driven from .NET through TerminalInterop.
 // xterm.js 6.0.0 with addon-fit 0.11.0, addon-search 0.16.0, addon-unicode11 0.9.0, addon-web-links 0.12.0 and
 // addon-webgl 0.19.0: the npm ESM builds, vendored with a .js extension because the MAUI WebView serves .mjs as
 // application/octet-stream, which browsers refuse to run as a module.
@@ -8,6 +8,7 @@ import { SearchAddon } from '../lib/xterm/addon-search.js';
 import { Unicode11Addon } from '../lib/xterm/addon-unicode11.js';
 import { WebLinksAddon } from '../lib/xterm/addon-web-links.js';
 import { createInstances, disposeQuietly, invoke, listen } from '../../Mokaterm.UI.Common/js/interop.js';
+import { compileTriggers, matchRanges, MaxLineLength, safeEnd, SlowMatchMs } from './triggers.js';
 
 // JS-to-.NET messages count against SignalR's receive limit on Blazor Server (32 KB by default). A chunk of input
 // made only of control characters is 6 bytes per character as JSON, so 4096 characters stays below it.
@@ -51,11 +52,29 @@ const PromptRepaintLimit = 2000;
 // xterm.js runs a listener of every marker for each line a full scrollback drops, and keeps a hidden element for every
 // decoration that has been on screen, so only the newest prompts keep their colors.
 const MaxPromptMarks = 200;
+// An OSC 7 is a path; anything longer is not one worth sending to .NET.
+const MaxFolderReport = 4096;
+// Triggers run on whole lines once the cursor has left them, at most this many lines and this long per frame.
+const TriggerLinesPerFrame = 200;
+const TriggerFrameBudgetMs = 8;
+// A pass starts no further back than this: a flood of output is scanned where it ends, not replayed from where it began.
+const TriggerBacklogLimit = 2000;
+// For the same reason as the prompt marks, only the newest highlighted rows keep their colors.
+const MaxTriggerMarks = 300;
+
+// How long a scan waits for an animation frame before a timer runs it instead. A hidden or minimized page gets no
+// frames at all, and a notice matters most exactly then, while the window is behind another one.
+const TriggerHiddenDelayMs = 250;
+// A notice is a toast, not a log viewer.
+const MaxTriggerNoticeLength = 300;
 const IsMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform ?? navigator.platform ?? '');
 const LinkHint = IsMac ? 'Cmd+click to open' : 'Ctrl+click to open';
 const MaxLinkLabelLength = 300;
 
 const instances = createInstances();
+const players = createInstances();
+// A recording is handed to xterm.js in pieces of about this many characters, so a long seek still lets the page draw.
+const PlayerWriteChunk = 256 * 1024;
 let stylesheet;
 let webglAddon;
 let audioContext;
@@ -81,6 +100,7 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 		scrollback: options.scrollback,
 		minimumContrastRatio: options.minimumContrastRatio,
 		drawBoldTextInBrightColors: options.drawBoldTextInBrightColors,
+		rightClickSelectsWord: rightClickSelectsWord(options.rightClickAction),
 		theme: xtermTheme(options.theme),
 		overviewRuler: { width: ScrollbarWidth },
 		// OSC 8 hyperlinks; without a handler xterm.js asks through window.confirm, which a WebView may not show.
@@ -141,6 +161,17 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 		promptMarks: [],
 		promptAnchor: null,
 		promptFrame: 0,
+		triggers: compileTriggers(options.triggers),
+		triggerNotifyMs: options.triggerNotifyMs ?? 5000,
+		triggerMarks: [],
+		triggerAnchor: null,
+		// Lines before this one were on screen before the view was, so they get colors but never a notice.
+		triggerLive: null,
+		triggerLiveLine: 0,
+		// True until the first write has been parsed: that write is the replay buffer, which is history too.
+		triggerHistory: true,
+		triggerFrame: 0,
+		triggerTimer: 0,
 		disposables: [],
 		disposed: false,
 	};
@@ -170,8 +201,12 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 			term.buffer.onBufferChange(() => {
 				updateScrollState(state);
 				schedulePromptScan(state);
+				scheduleTriggerScan(state);
 			}),
-			term.onWriteParsed(() => schedulePromptScan(state)),
+			term.onWriteParsed(() => {
+				schedulePromptScan(state);
+				scheduleTriggerScan(state);
+			}),
 			term.onRender(range => refreshHover(state, range)),
 			term.parser.registerOscHandler(52, data => handleClipboardSequence(state, data)),
 			listen(screen, 'wheel', event => handleWheel(state, event), true),
@@ -210,6 +245,7 @@ export function write(id, data) {
 	return new Promise(resolve => {
 		const done = () => {
 			state.pendingWrites.delete(done);
+			endTriggerHistory(state);
 			resolve();
 		};
 		state.pendingWrites.add(done);
@@ -235,6 +271,7 @@ export function clear(id) {
 		state.term.clear();
 		updateScrollState(state);
 		repaintPrompts(state);
+		repaintTriggers(state);
 	}
 }
 
@@ -245,6 +282,9 @@ export function reset(id) {
 		state.term.reset();
 		updateScrollState(state);
 		repaintPrompts(state);
+		// A new stream starts with its own replay buffer, which is history again.
+		forgetTriggers(state);
+		state.triggerHistory = true;
 	}
 }
 
@@ -355,10 +395,23 @@ async function applyOptions(state, changes) {
 		repaintPrompts(state);
 	}
 
+	if ('triggerNotifyMs' in changes) {
+		state.triggerNotifyMs = changes.triggerNotifyMs;
+	}
+
+	if ('triggers' in changes) {
+		state.triggers = compileTriggers(changes.triggers);
+		repaintTriggers(state);
+	}
+
 	for (const key of ['bell', 'copyOnSelect', 'rightClickAction', 'confirmMultiLinePaste', 'allowClipboardWrite']) {
 		if (key in changes) {
 			state[key] = changes[key];
 		}
+	}
+
+	if ('rightClickAction' in changes) {
+		term.options.rightClickSelectsWord = rightClickSelectsWord(changes.rightClickAction);
 	}
 
 	if ('useWebGl' in changes) {
@@ -425,6 +478,8 @@ export function dispose(id) {
 	cancelAnimationFrame(state.fitFrame);
 	cancelAnimationFrame(state.promptFrame);
 	forgetPrompts(state);
+	stopFolderTracking(state);
+	forgetTriggers(state);
 	state.observer?.disconnect();
 	state.inputQueue.length = 0;
 	state.selectionSnapshot = null;
@@ -504,15 +559,6 @@ function splitPoint(text, max) {
 	}
 
 	return safeEnd(text, end);
-}
-
-function safeEnd(text, end) {
-	if (end >= text.length) {
-		return text.length;
-	}
-
-	const code = text.charCodeAt(end - 1);
-	return code >= 0xd800 && code <= 0xdbff ? end - 1 : end;
 }
 
 // onBinary delivers one byte per character (mouse reports that are not valid UTF-8).
@@ -1006,24 +1052,36 @@ function pastePreview(text) {
 	return preview.join('\n');
 }
 
+// Shift+right-click opens the menu in every mode: it is the only way to the menu while a right-click pastes, and while
+// a program reads the mouse (tmux, htop, vim) a plain right-click belongs to that program.
 function handleContextMenu(state, event) {
 	event.preventDefault();
-	// With mouse reporting on (tmux, htop, vim) the right click belongs to the application; Shift+right-click still
-	// opens the menu.
 	if (state.term.modes.mouseTrackingMode !== 'none' && !event.shiftKey) {
 		return;
 	}
 
-	if (state.rightClickAction === 'paste') {
-		// Read here, inside the click, because some browsers only allow clipboard reads during a user gesture.
-		if (navigator.clipboard?.readText) {
-			navigator.clipboard.readText().then(text => pasteText(state, text), () => { });
-		}
-
+	if (event.shiftKey || state.rightClickAction === 'menu') {
+		invoke(state, 'OnContextMenu', event.clientX, event.clientY, state.term.hasSelection());
 		return;
 	}
 
-	invoke(state, 'OnContextMenu', event.clientX, event.clientY, state.term.hasSelection());
+	// Windows Terminal's way: a selection is copied and cleared, and the next right-click pastes it.
+	if (state.rightClickAction === 'copy-or-paste' && state.term.hasSelection()) {
+		copySelection(state, true);
+		return;
+	}
+
+	// Read here, inside the click, because some browsers only allow clipboard reads during a user gesture. The text
+	// takes the same path as every other paste, so the multi-line check and the control character filter still apply.
+	if (navigator.clipboard?.readText) {
+		navigator.clipboard.readText().then(text => pasteText(state, text), () => { });
+	}
+}
+
+// xterm.js selects the word under a right-click on macOS. That suits the menu, but in copy-or-paste mode the word would
+// be copied instead of the clipboard being pasted, and in paste mode it would leave a selection behind every paste.
+function rightClickSelectsWord(action) {
+	return action === 'menu' && IsMac;
 }
 
 //#endregion
@@ -1158,16 +1216,18 @@ function isValidPattern(pattern) {
 	}
 }
 
-// The scrollbar slider is the theme's foreground made translucent, so it reads on light and dark themes alike. The
-// overview ruler (search matches, drawn over the scrollbar) outlines itself in white unless given a border color.
+// The scrollbar slider is the theme's cursor color made translucent: the cursor is the theme's accent and has to stand
+// out on its background, so the slider matches the accent-tinted scrollbars around the terminal and still reads on any
+// theme. The overview ruler (search matches, drawn over the scrollbar) outlines itself in white unless given a border.
 function xtermTheme(theme) {
 	const foreground = firstColor(theme?.foreground);
+	const slider = firstColor(theme?.cursor, theme?.foreground);
 	return foreground
 		? {
 			...theme,
-			scrollbarSliderBackground: withAlpha(foreground, 0.16),
-			scrollbarSliderHoverBackground: withAlpha(foreground, 0.28),
-			scrollbarSliderActiveBackground: withAlpha(foreground, 0.4),
+			scrollbarSliderBackground: withAlpha(slider, 0.2),
+			scrollbarSliderHoverBackground: withAlpha(slider, 0.32),
+			scrollbarSliderActiveBackground: withAlpha(slider, 0.45),
 			overviewRulerBorder: withAlpha(foreground, 0),
 		}
 		: { ...theme, overviewRulerBorder: '#00000000' };
@@ -1263,14 +1323,14 @@ function paintPromptLine(state, buffer, y, cursor, colors) {
 	}
 
 	const text = line.translateToString(true);
-	const existing = findPromptMark(state, y);
+	const existing = findMark(state.promptMarks, y);
 	if (existing) {
 		if (text.startsWith(existing.prompt)) {
 			return;
 		}
 
 		// The row was drawn over, so its old colors would land on new text.
-		disposePromptMark(state, existing);
+		disposeMark(state.promptMarks, existing);
 	}
 
 	const match = PromptPattern.exec(text);
@@ -1321,25 +1381,14 @@ function paintPromptLine(state, buffer, y, cursor, colors) {
 		return;
 	}
 
-	marker.onDispose(() => removePromptMark(state, mark));
-	insertPromptMark(state, mark);
+	marker.onDispose(() => removeMark(state.promptMarks, mark));
+	insertMark(state.promptMarks, mark, MaxPromptMarks);
 }
 
 // Rows on screen can be redrawn in place (clear, a prompt repainted after Ctrl+L), so the marks there are checked
 // against what the row says now.
 function dropOverwrittenPrompts(state, buffer) {
-	const top = Math.min(buffer.viewportY, buffer.baseY);
-	for (let i = state.promptMarks.length - 1; i >= 0; i--) {
-		const mark = state.promptMarks[i];
-		if (mark.marker.line < top) {
-			break;
-		}
-
-		const text = buffer.getLine(mark.marker.line)?.translateToString(true) ?? '';
-		if (!text.startsWith(mark.prompt)) {
-			disposePromptMark(state, mark);
-		}
-	}
+	dropOverwrittenMarks(state.promptMarks, buffer, (mark, text) => text.startsWith(mark.prompt));
 }
 
 function promptPalette(state) {
@@ -1396,12 +1445,394 @@ function isPlain(line, from, to) {
 	return true;
 }
 
-// Marks stay ordered by line, so a lookup near the cursor stops as soon as it passes the row it wants.
-function findPromptMark(state, y) {
-	for (let i = state.promptMarks.length - 1; i >= 0; i--) {
-		const line = state.promptMarks[i].marker.line;
+function forgetPrompts(state) {
+	forgetMarks(state.promptMarks);
+	disposeQuietly(state.promptAnchor);
+	state.promptAnchor = null;
+}
+
+//#endregion
+
+//#region Folder tracking
+
+// Where the shell is, for a view whose file browser follows it, and only while one does: nothing is registered or scanned
+// otherwise. OSC 7 (file://host/path), which a shell sends when it is set up for it, is the folder as the shell knows
+// it, so once one arrives prompts are no longer read. Until then the folder of a user@host:path prompt on the cursor's
+// line stands in, found with the same pattern the prompt colors use. .NET parses both and decides what is a change.
+export function setFolderTracking(id, enabled) {
+	const state = instances.get(id);
+	if (!state) {
+		return;
+	}
+
+	stopFolderTracking(state);
+	if (!enabled || state.disposed) {
+		return;
+	}
+
+	const tracking = { osc7: false, last: '', frame: 0, disposables: [] };
+	tracking.send = latestSender(report =>
+		state.dotNet.invokeMethodAsync('OnFolderReported', report.source, report.value, report.user, report.machine));
+	tracking.disposables.push(
+		state.term.parser.registerOscHandler(7, data => {
+			tracking.osc7 = true;
+			reportFolder(tracking, { source: 'osc7', value: data.slice(0, safeEnd(data, MaxFolderReport)), user: null, machine: null });
+			return true;
+		}),
+		state.term.onWriteParsed(() => scheduleFolderScan(state, tracking)),
+	);
+	state.folderTracking = tracking;
+
+	// A view that starts following halfway through a session reports where the shell is now.
+	scheduleFolderScan(state, tracking);
+}
+
+function stopFolderTracking(state) {
+	const tracking = state.folderTracking;
+	if (!tracking) {
+		return;
+	}
+
+	state.folderTracking = null;
+	cancelAnimationFrame(tracking.frame);
+	for (const disposable of tracking.disposables) {
+		disposeQuietly(disposable);
+	}
+}
+
+function scheduleFolderScan(state, tracking) {
+	if (tracking.osc7 || tracking.frame || state.disposed) {
+		return;
+	}
+
+	// One look per frame, however many chunks of output arrived in it.
+	tracking.frame = requestAnimationFrame(() => {
+		tracking.frame = 0;
+		if (state.folderTracking === tracking && !tracking.osc7 && !state.disposed) {
+			scanFolder(state, tracking);
+		}
+	});
+}
+
+// A shell waiting for a command has its prompt on the cursor's line, which may wrap onto the rows below its start.
+function scanFolder(state, tracking) {
+	const buffer = state.term.buffer.active;
+	if (buffer.type !== 'normal') {
+		return;
+	}
+
+	const cursor = buffer.baseY + buffer.cursorY;
+	let start = cursor;
+	while (start > 0 && buffer.getLine(start)?.isWrapped) {
+		start--;
+	}
+
+	let text = '';
+	for (let y = start; y <= cursor; y++) {
+		const line = buffer.getLine(y);
+		if (!line) {
+			return;
+		}
+
+		text += line.translateToString(y === cursor);
+	}
+
+	const match = PromptPattern.exec(text);
+	if (match && match[5]) {
+		reportFolder(tracking, { source: 'prompt', value: match[5], user: match[2], machine: match[3] });
+	}
+}
+
+// Every prompt is drawn again after every command, so only a report that differs from the last one is sent.
+function reportFolder(tracking, report) {
+	const key = `${report.source}\n${report.value}\n${report.user ?? ''}\n${report.machine ?? ''}`;
+	if (key !== tracking.last) {
+		tracking.last = key;
+		tracking.send(report);
+	}
+}
+
+//#endregion
+
+//#region Triggers
+
+// Triggers color what a rule matches and raise a notice for it, with decorations like the prompt colors, so the text
+// and the stream stay exactly what the server sent. A line is matched once, after the cursor has left it, so a line
+// still being written is never judged by its first half.
+function scheduleTriggerScan(state) {
+	if (state.disposed || state.triggers.length === 0 || state.triggerFrame || state.triggerTimer) {
+		return;
+	}
+
+	// Whichever comes first runs the scan: the frame on a page that is shown, the timer on one that is not.
+	const run = () => {
+		cancelTriggerScan(state);
+		scanTriggers(state);
+	};
+	state.triggerFrame = requestAnimationFrame(run);
+	state.triggerTimer = setTimeout(run, TriggerHiddenDelayMs);
+}
+
+function cancelTriggerScan(state) {
+	cancelAnimationFrame(state.triggerFrame);
+	clearTimeout(state.triggerTimer);
+	state.triggerFrame = 0;
+	state.triggerTimer = 0;
+}
+
+// The first write after the view opens or switches streams is the session's replay buffer: output from before this
+// view, which a remounted tab would otherwise announce a second time.
+function endTriggerHistory(state) {
+	if (!state.triggerHistory || state.disposed) {
+		return;
+	}
+
+	state.triggerHistory = false;
+	setTriggerLiveBoundary(state);
+}
+
+function setTriggerLiveBoundary(state) {
+	disposeQuietly(state.triggerLive);
+	state.triggerLive = state.term.registerMarker(0) ?? null;
+
+	// No marker can be placed while the alternate screen is up. A plain line number drifts once scrollback is trimmed,
+	// but only towards missing a notice, never towards repeating one.
+	const normal = state.term.buffer.normal;
+	state.triggerLiveLine = normal.baseY + normal.cursorY;
+}
+
+function triggerLiveFrom(state) {
+	if (state.triggerHistory) {
+		return Infinity;
+	}
+
+	if (state.triggerLive) {
+		return state.triggerLive.isDisposed ? 0 : state.triggerLive.line;
+	}
+
+	return state.triggerLiveLine;
+}
+
+// New rules, or rules switched off and on again: what is already on screen is colored again, and only what arrives
+// from now on can raise a notice.
+function repaintTriggers(state) {
+	forgetMarks(state.triggerMarks);
+	disposeQuietly(state.triggerAnchor);
+	state.triggerAnchor = null;
+	cancelTriggerScan(state);
+	if (state.disposed) {
+		return;
+	}
+
+	if (!state.triggerHistory) {
+		setTriggerLiveBoundary(state);
+	}
+
+	scheduleTriggerScan(state);
+}
+
+function forgetTriggers(state) {
+	cancelTriggerScan(state);
+	forgetMarks(state.triggerMarks);
+	disposeQuietly(state.triggerAnchor);
+	disposeQuietly(state.triggerLive);
+	state.triggerAnchor = null;
+	state.triggerLive = null;
+}
+
+function scanTriggers(state) {
+	if (state.disposed || state.triggers.length === 0) {
+		return;
+	}
+
+	const { term } = state;
+	const buffer = term.buffer.active;
+
+	// Full-screen programs redraw the alternate screen in place; nothing there is a line of output.
+	if (buffer.type !== 'normal') {
+		return;
+	}
+
+	const cursor = buffer.baseY + buffer.cursorY;
+	const anchor = state.triggerAnchor && !state.triggerAnchor.isDisposed ? state.triggerAnchor.line : -1;
+	let y = Math.max(0, anchor, cursor - TriggerBacklogLimit);
+
+	// A pass has to start at the beginning of a line, which skipping ahead can land in the middle of.
+	while (y < cursor && buffer.getLine(y)?.isWrapped) {
+		y++;
+	}
+
+	const live = triggerLiveFrom(state);
+	const deadline = performance.now() + TriggerFrameBudgetMs;
+	for (let lines = 0; y < cursor && lines < TriggerLinesPerFrame && performance.now() < deadline; lines++) {
+		const end = lineEnd(buffer, y);
+
+		// A line that runs onto the cursor row is still being written.
+		if (end >= cursor) {
+			break;
+		}
+
+		runTriggers(state, buffer, y, end, cursor, y >= live);
+		y = end + 1;
+	}
+
+	dropOverwrittenMarks(state.triggerMarks, buffer, (mark, text) => text === mark.text);
+
+	// Where the next pass starts: a marker rather than a line number, because trimmed scrollback moves every line up.
+	disposeQuietly(state.triggerAnchor);
+	state.triggerAnchor = term.registerMarker(y - cursor) ?? null;
+	if (y < cursor && lineEnd(buffer, y) < cursor) {
+		scheduleTriggerScan(state);
+	}
+}
+
+// The last row of the line that starts at y: rows after it carry on the same line for as long as they are wrapped.
+function lineEnd(buffer, y) {
+	let end = y;
+	while (buffer.getLine(end + 1)?.isWrapped) {
+		end++;
+	}
+
+	return end;
+}
+
+function runTriggers(state, buffer, y, end, cursor, live) {
+	const rows = [];
+	let text = '';
+	for (let row = y; row <= end && text.length < MaxLineLength; row++) {
+		const line = buffer.getLine(row);
+		if (!line) {
+			break;
+		}
+
+		rows.push({ y: row, line, start: text.length, columns: null });
+
+		// Only the last row of a wrapped line loses its trailing blanks; the others run straight on into the next row.
+		text += line.translateToString(row === end);
+	}
+
+	text = text.slice(0, safeEnd(text, MaxLineLength));
+	if (text.length === 0) {
+		return;
+	}
+
+	// A prompt line is a command being typed, and typing `grep ERROR` is not an error.
+	const prompt = PromptPattern.test(text);
+	const paint = new Map();
+	for (const rule of state.triggers) {
+		if (rule.off) {
+			continue;
+		}
+
+		const started = performance.now();
+		const ranges = matchRanges(rule.regex, text);
+		if (performance.now() - started > SlowMatchMs) {
+			rule.off = true;
+			invoke(state, 'OnTriggerSlow', rule.index);
+			continue;
+		}
+
+		if (ranges.length === 0) {
+			continue;
+		}
+
+		if (rule.color) {
+			addTriggerSegments(paint, rows, text.length, ranges, rule.color);
+		}
+
+		if (rule.notify && live && !prompt) {
+			notifyTrigger(state, rule, text);
+		}
+	}
+
+	for (const [index, segments] of paint) {
+		markTriggerRow(state, rows[index], segments, cursor);
+	}
+}
+
+// Splits each match into one piece per row it covers, in columns rather than string offsets: a wide character fills
+// two cells but one position of the string.
+function addTriggerSegments(paint, rows, length, ranges, color) {
+	for (const { start, length: size } of ranges) {
+		const end = start + size;
+		for (let index = 0; index < rows.length; index++) {
+			const row = rows[index];
+			const rowEnd = index + 1 < rows.length ? rows[index + 1].start : length;
+			const from = Math.max(start, row.start) - row.start;
+			const to = Math.min(end, rowEnd) - row.start;
+			if (to <= from) {
+				continue;
+			}
+
+			row.columns ??= columnsOf(row.line, rowEnd - row.start);
+			const x = row.columns[from];
+			const last = row.columns[to - 1];
+			if (x === undefined || last === undefined) {
+				continue;
+			}
+
+			const width = last + Math.max(1, row.line.getCell(last)?.getWidth() ?? 1) - x;
+			if (!paint.has(index)) {
+				paint.set(index, []);
+			}
+
+			paint.get(index).push({ x, width, color });
+		}
+	}
+}
+
+// One mark per row, with every rule's colors on it. When two rules color the same cells, the later rule wins, because
+// xterm.js draws the decoration registered last on top.
+function markTriggerRow(state, row, segments, cursor) {
+	const existing = findMark(state.triggerMarks, row.y);
+	if (existing) {
+		disposeMark(state.triggerMarks, existing);
+	}
+
+	const marker = state.term.registerMarker(row.y - cursor);
+	if (!marker) {
+		return;
+	}
+
+	const mark = { marker, text: row.line.translateToString(true), decorations: [] };
+	for (const { x, width, color } of segments) {
+		const decoration = state.term.registerDecoration({ marker, x, width, foregroundColor: color });
+		if (decoration) {
+			mark.decorations.push(decoration);
+		}
+	}
+
+	if (mark.decorations.length === 0) {
+		marker.dispose();
+		return;
+	}
+
+	marker.onDispose(() => removeMark(state.triggerMarks, mark));
+	insertMark(state.triggerMarks, mark, MaxTriggerMarks);
+}
+
+// Once per rule per interval, so a looping error raises one notice and not a screenful.
+function notifyTrigger(state, rule, text) {
+	const now = performance.now();
+	if (now - rule.lastNotice < state.triggerNotifyMs) {
+		return;
+	}
+
+	rule.lastNotice = now;
+	invoke(state, 'OnTriggerMatched', rule.index, text.slice(0, safeEnd(text, MaxTriggerNoticeLength)));
+}
+
+//#endregion
+
+//#region Decoration marks
+
+// A mark is a marker with the decorations on its row. Prompt colors and triggers each keep a list of them, ordered by
+// line, so a lookup near the cursor stops as soon as it passes the row it wants.
+function findMark(marks, y) {
+	for (let i = marks.length - 1; i >= 0; i--) {
+		const line = marks[i].marker.line;
 		if (line === y) {
-			return state.promptMarks[i];
+			return marks[i];
 		}
 
 		if (line < y) {
@@ -1412,28 +1843,27 @@ function findPromptMark(state, y) {
 	return null;
 }
 
-function insertPromptMark(state, mark) {
-	const marks = state.promptMarks;
+function insertMark(marks, mark, max) {
 	let index = marks.length;
 	while (index > 0 && marks[index - 1].marker.line > mark.marker.line) {
 		index--;
 	}
 
 	marks.splice(index, 0, mark);
-	while (marks.length > MaxPromptMarks) {
-		disposePromptMark(state, marks[0]);
+	while (marks.length > max) {
+		disposeMark(marks, marks[0]);
 	}
 }
 
-function removePromptMark(state, mark) {
-	const index = state.promptMarks.indexOf(mark);
+function removeMark(marks, mark) {
+	const index = marks.indexOf(mark);
 	if (index >= 0) {
-		state.promptMarks.splice(index, 1);
+		marks.splice(index, 1);
 	}
 }
 
-function disposePromptMark(state, mark) {
-	removePromptMark(state, mark);
+function disposeMark(marks, mark) {
+	removeMark(marks, mark);
 	for (const decoration of mark.decorations) {
 		disposeQuietly(decoration);
 	}
@@ -1441,14 +1871,156 @@ function disposePromptMark(state, mark) {
 	disposeQuietly(mark.marker);
 }
 
-function forgetPrompts(state) {
-	for (const mark of [...state.promptMarks]) {
-		disposePromptMark(state, mark);
+function forgetMarks(marks) {
+	for (const mark of [...marks]) {
+		disposeMark(marks, mark);
 	}
 
-	state.promptMarks.length = 0;
-	disposeQuietly(state.promptAnchor);
-	state.promptAnchor = null;
+	marks.length = 0;
+}
+
+// Marks on the rows from the top of the screen down are checked against what the row says now, and the ones whose row
+// was drawn over go: their colors would land on new text.
+function dropOverwrittenMarks(marks, buffer, stillMatches) {
+	const top = Math.min(buffer.viewportY, buffer.baseY);
+	for (let i = marks.length - 1; i >= 0; i--) {
+		const mark = marks[i];
+		if (mark.marker.line < top) {
+			break;
+		}
+
+		const text = buffer.getLine(mark.marker.line)?.translateToString(true) ?? '';
+		if (!stillMatches(mark, text)) {
+			disposeMark(marks, mark);
+		}
+	}
+}
+
+//#endregion
+
+//#region Playback
+
+// A read-only terminal that replays a recording for TerminalPlayer. It keeps the grid the recording was made at rather
+// than fitting its element, because output laid out for 80 columns is garbled at any other width, and it keeps every
+// event, so seeking backwards replays from the start here without .NET sending anything again. Nothing typed goes
+// anywhere, and the answers a recording's queries would get from a live terminal are dropped.
+export async function createPlayer(host, screen, options, cols, rows) {
+	await ensureStylesheet();
+	await loadFont(options.fontFamily, options.fontSize);
+	const term = new Terminal({
+		// The unicode11 addon reads term.unicode, which xterm.js 6 still calls a proposed API.
+		allowProposedApi: true,
+		cols,
+		rows,
+		disableStdin: true,
+		cursorBlink: false,
+		cursorStyle: options.cursorStyle,
+		fontFamily: options.fontFamily,
+		fontSize: options.fontSize,
+		letterSpacing: options.letterSpacing,
+		lineHeight: options.lineHeight,
+		scrollback: options.scrollback,
+		minimumContrastRatio: options.minimumContrastRatio,
+		drawBoldTextInBrightColors: options.drawBoldTextInBrightColors,
+		theme: xtermTheme(options.theme),
+		// A recording is untrusted, and without a handler an OSC 8 link asks through window.confirm.
+		linkHandler: { activate: (event, uri) => openLink(event, uri) },
+	});
+
+	try {
+		term.loadAddon(new Unicode11Addon());
+		term.unicode.activeVersion = '11';
+		term.open(screen);
+	}
+	catch (error) {
+		disposeQuietly(term);
+		throw error;
+	}
+
+	return players.add({ term, host, cols, rows, events: [], shown: 0, target: 0, busy: false, disposables: [], disposed: false });
+}
+
+/** Appends events in the order they happened: `{ output }` for text, `{ columns, rows }` for a resize. */
+export function playerLoad(id, events) {
+	const state = players.get(id);
+	if (!state || !Array.isArray(events)) {
+		return;
+	}
+
+	for (const event of events) {
+		state.events.push(event);
+	}
+}
+
+/** Shows the screen as it was after the first `index` events. Calls that arrive while one is drawing only move the target. */
+export function playerShow(id, index) {
+	const state = players.get(id);
+	if (!state) {
+		return;
+	}
+
+	state.target = Math.max(0, Math.min(state.events.length, Math.trunc(index) || 0));
+	if (!state.busy) {
+		pumpPlayer(state);
+	}
+}
+
+export function disposePlayer(id) {
+	const state = players.release(id);
+	if (state) {
+		state.events = [];
+		disposeQuietly(state.term);
+	}
+}
+
+async function pumpPlayer(state) {
+	state.busy = true;
+	try {
+		while (!state.disposed && state.shown !== state.target) {
+			if (state.target < state.shown) {
+				// Output cannot be taken back, so going backwards means starting over and replaying up to the new point.
+				state.term.reset();
+				state.term.resize(state.cols, state.rows);
+				state.shown = 0;
+				continue;
+			}
+
+			let text = '';
+			let size = null;
+			let index = state.shown;
+			while (index < state.target && text.length < PlayerWriteChunk) {
+				const event = state.events[index];
+				if (typeof event?.output !== 'string') {
+					// A resize applies once the output before it has been drawn at the old size.
+					if (text.length === 0) {
+						size = event;
+						index++;
+					}
+
+					break;
+				}
+
+				text += event.output;
+				index++;
+			}
+
+			if (text.length > 0) {
+				await new Promise(resolve => state.term.write(text, resolve));
+			}
+
+			if (size && !state.disposed && size.columns > 0 && size.rows > 0) {
+				state.term.resize(size.columns, size.rows);
+			}
+
+			state.shown = index;
+		}
+	}
+	catch {
+		// Disposed while drawing.
+	}
+	finally {
+		state.busy = false;
+	}
 }
 
 //#endregion

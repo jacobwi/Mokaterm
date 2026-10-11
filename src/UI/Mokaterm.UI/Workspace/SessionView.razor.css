@@ -16,9 +16,12 @@
 	border-bottom: 1px solid var(--moka-color-outline-variant);
 }
 
+/* A container for its own width, which is what SessionToolbar folds its buttons by. */
 .mt-session-toolbar {
 	height: var(--moka-height-toolbar-dense);
 	background: var(--moka-color-surface);
+	container-type: inline-size;
+	container-name: mt-session-toolbar;
 }
 
 .mt-session-banner {

@@ -41,8 +41,9 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "Demo",
 		Description = "In-memory shell and file system for UI work",
+		QuickConnectExample = "user@host:port",
 		DefaultPort = 22,
-		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation,
+		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands,
 		AuthenticationMethods = [AuthenticationMethod.Anonymous, AuthenticationMethod.Password],
 		RequiresUsername = true,
 		Order = 100,
@@ -89,7 +90,10 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 				$"The demo server has no user named '{userName}'. Use letters, digits, '.', '_' or '-'.");
 		}
 
-		return new DemoSession(DemoAccount.ForUser(userName), HostNameOf(context.Host), context.Host.Address, context.TerminalSize, _timeProvider, _logger);
+		DemoAccount account = DemoAccount.ForUser(userName);
+		return context.Purpose == ConnectPurpose.Commands
+			? new DemoCommandSession(account, HostNameOf(context.Host), _timeProvider)
+			: new DemoSession(account, HostNameOf(context.Host), context.Host.Address, context.TerminalSize, _timeProvider, _logger);
 	}
 
 	private static bool IsValidUserName(string userName) =>

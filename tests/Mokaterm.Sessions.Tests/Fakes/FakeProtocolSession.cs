@@ -20,7 +20,10 @@ internal sealed class FakeProtocolSession : IProtocolSession
 	/// <summary>When set, disposing waits for this task, like a library stuck closing a dead socket.</summary>
 	public Task? DisposeBlocker { get; init; }
 
-	public TFeature? GetFeature<TFeature>() where TFeature : class => Channel as TFeature;
+	/// <summary>Features beyond the terminal channel, such as a command feature.</summary>
+	public IReadOnlyList<object> Features { get; init; } = [];
+
+	public TFeature? GetFeature<TFeature>() where TFeature : class => Channel as TFeature ?? Features.OfType<TFeature>().FirstOrDefault();
 
 	/// <summary>The remote side ended the session normally, for example after <c>exit</c>.</summary>
 	public void EndCleanly()

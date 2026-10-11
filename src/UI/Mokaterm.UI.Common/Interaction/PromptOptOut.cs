@@ -5,8 +5,9 @@ using Mokaterm.Abstractions.Settings;
 namespace Mokaterm.UI.Common.Interaction;
 
 /// <summary>
-/// The prompts a user meets often enough to want silenced: closing a connected session, pasting several lines. Each
-/// offers <see cref="Label"/> and turns off the setting behind it, which is also the setting that turns it back on.
+/// The prompts a user meets often enough to want silenced: closing a connected session, pasting several lines,
+/// uploading dropped files. Each offers <see cref="Label"/> and turns off the setting behind it, which is also the
+/// setting that turns it back on.
 /// </summary>
 public static class PromptOptOut
 {

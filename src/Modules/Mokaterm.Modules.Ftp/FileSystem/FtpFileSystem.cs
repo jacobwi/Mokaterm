@@ -35,12 +35,16 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 	private readonly string _homeDirectory;
 	private readonly TimeSpan _dataTimeout;
 
+	// What FEAT offered at login; a server that refuses it in practice turns _checksumUnavailable on.
+	private readonly ChecksumAlgorithm? _checksum;
+
 	// Replaced when the connection breaks. Only used while holding _gate.
 	private AsyncFtpClient _client;
 	private long _lastActivity;
 	private int _chmodSupport;
 	private int _listAllFiles;
 	private int _linksSeen;
+	private int _checksumUnavailable;
 	private int _closed;
 
 	/// <param name="client">The connected browsing connection. The file system owns it from now on.</param>
@@ -70,6 +74,7 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 
 		// IIS and other Windows servers have no SITE CHMOD; everywhere else it is tried on first use.
 		_chmodSupport = client.ServerOS == FtpOperatingSystem.Windows ? FeatureUnsupported : FeatureUnknown;
+		_checksum = FtpChecksums.Choose(client.HashAlgorithms, client.HasFeature);
 		_pool = new FtpClientPool(connectAsync, maxTransferClients, LeaseSharedClientAsync, timeProvider, logger);
 	}
 
@@ -294,17 +299,30 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 		bool reusable = false;
 		try
 		{
-			if (!options.Overwrite && await lease.Client.FileExists(target, cancellationToken))
+			long resumeAt = await ResumePointAsync(lease.Client, target, source, options.Resume, cancellationToken);
+			if (resumeAt == 0 && !options.Overwrite && await lease.Client.FileExists(target, cancellationToken))
 			{
 				throw FtpErrors.Create(RemoteFileErrorKind.AlreadyExists, "upload", target, "a file with that name already exists");
 			}
 
-			remote = await lease.Client.OpenWrite(target, FtpDataType.Binary, checkIfFileExists: false, cancellationToken);
+			// FTP writes in place, so what a failed attempt leaves is the target itself.
+			options.Resume?.Record(target, isTemporary: false);
+			if (resumeAt > 0)
+			{
+				options.Resume!.NotifyResumed(resumeAt);
+				remote = await lease.Client.OpenAppend(target, FtpDataType.Binary, resumeAt, cancellationToken);
+			}
+			else
+			{
+				remote = await lease.Client.OpenWrite(target, FtpDataType.Binary, checkIfFileExists: false, cancellationToken);
+			}
+
 			await FtpDataStreams.CopyAsync(source, remote, progress, _dataTimeout, cancellationToken);
 			Stream finished = remote;
 			remote = null;
 			await FtpDataStreams.FinishAsync(finished, cancellationToken);
 			reusable = true;
+			options.Resume?.Clear();
 			await ApplyUploadMetadataAsync(lease.Client, target, options, cancellationToken);
 		}
 		catch (Exception ex) when (!IsCancellation(ex, cancellationToken))
@@ -318,16 +336,26 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 		}
 	}
 
-	public async ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
+
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(destination);
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
 		string source = RemotePath.Normalize(path);
 		FtpClientLease lease = await LeaseAsync("download", source, cancellationToken);
 		Stream? remote = null;
 		bool reusable = false;
 		try
 		{
-			remote = await lease.Client.OpenRead(source, FtpDataType.Binary, 0, checkIfFileExists: false, cancellationToken);
+			if (offset > 0 && await lease.Client.GetFileSize(source, -1, cancellationToken) is var size && size >= 0 && size < offset)
+			{
+				throw TransferStreams.ShorterThanCopied(source, offset);
+			}
+
+			// REST: the server starts sending at the offset.
+			remote = await lease.Client.OpenRead(source, FtpDataType.Binary, offset, checkIfFileExists: false, cancellationToken);
 
 			// The reads from the server have FluentFTP's read timeout; the writes go to this machine, which may pause.
 			await FtpDataStreams.CopyAsync(remote, destination, progress, writeTimeout: null, cancellationToken);
@@ -338,13 +366,55 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 		}
 		catch (Exception ex) when (!IsCancellation(ex, cancellationToken))
 		{
-			reusable = remote is null && ex is FtpCommandException;
+			reusable = remote is null && ex is FtpCommandException or RemoteFileSystemException;
 			throw FtpErrors.ToRemoteException(ex, "download", source, RemoteFileErrorKind.NotFound);
 		}
 		finally
 		{
 			await CompleteTransferAsync(lease, remote, reusable);
 		}
+	}
+
+	public ChecksumAlgorithm? ServerChecksum => Volatile.Read(ref _checksumUnavailable) == 0 ? _checksum : null;
+
+	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	{
+		if (ServerChecksum is not { } algorithm)
+		{
+			return null;
+		}
+
+		// On a transfer connection: hashing a large file keeps the server busy for a while, and browsing goes on meanwhile.
+		string target = RemotePath.Normalize(path);
+		FtpHash? hash = await RunOnTransferClientAsync<FtpHash?>(
+			"checksum",
+			target,
+			RemoteFileErrorKind.NotFound,
+			async (client, token) =>
+			{
+				try
+				{
+					return await client.GetChecksum(target, FtpChecksums.ToFluent(algorithm), token);
+				}
+				catch (FtpCommandException ex) when (FtpErrors.IsNotImplemented(ex.CompletionCode))
+				{
+					// Listed in FEAT and refused anyway.
+					return null;
+				}
+			},
+			cancellationToken);
+
+		if (hash is { IsValid: true } && hash.Algorithm == FtpChecksums.ToFluent(algorithm) && FileChecksums.Parse(algorithm, hash.Value) is { } checksum)
+		{
+			return checksum;
+		}
+
+		if (Interlocked.Exchange(ref _checksumUnavailable, 1) == 0)
+		{
+			_logger.LogDebug("The FTP server did not compute the checksum it offers; transfers stay unverified");
+		}
+
+		return null;
 	}
 
 	/// <summary>The session owns the connections and closes them; disposing this view does nothing.</summary>
@@ -481,6 +551,37 @@ internal sealed class FtpFileSystem : IRemoteFileSystem
 		}
 
 		return reply.Code is { Length: > 0 } code && code[0] == '5' ? RemoteEntryKind.File : null;
+	}
+
+	/// <summary>
+	/// Where an upload carries on: the size of what the last attempt wrote into the target, with <paramref name="source"/>
+	/// moved past that many bytes, or 0 to start over. A source shorter than what is already there is no longer the file
+	/// the last attempt sent, and since the part of it read so far is gone, this attempt fails and the next starts over.
+	/// </summary>
+	private static async Task<long> ResumePointAsync(AsyncFtpClient client, string target, Stream source, UploadResume? resume, CancellationToken cancellationToken)
+	{
+		if (resume is not { PartialPath: { } partial, IsTemporary: false } || partial != target)
+		{
+			return 0;
+		}
+
+		long size = await client.GetFileSize(target, -1, cancellationToken);
+		if (size <= 0)
+		{
+			return 0;
+		}
+
+		if (!await TransferStreams.TrySkipAsync(source, size, cancellationToken))
+		{
+			resume.Clear();
+			throw FtpErrors.Create(
+				RemoteFileErrorKind.Unknown,
+				"continue the upload to",
+				target,
+				"the file being sent is now shorter than what the last attempt wrote, so the next try starts over");
+		}
+
+		return size;
 	}
 
 	private static async Task CompleteTransferAsync(FtpClientLease lease, Stream? remote, bool reusable)

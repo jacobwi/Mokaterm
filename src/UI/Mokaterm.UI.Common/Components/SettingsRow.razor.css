@@ -43,3 +43,27 @@
 .settings-row--stacked .settings-row__control {
 	flex: none;
 }
+
+/* A settings search result that was just opened. Inset, because the card around the rows clips anything outside it;
+   the script takes the class off again once the glow has faded. */
+.settings-row--found {
+	animation: settings-row-found 1.5s ease-out forwards;
+}
+
+@keyframes settings-row-found {
+	0%,
+	40% {
+		box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 20px var(--moka-color-primary-glow-md);
+	}
+
+	100% {
+		box-shadow: inset 0 0 0 1px transparent, inset 0 0 20px transparent;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.settings-row--found {
+		animation: none;
+		box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 20px var(--moka-color-primary-glow-md);
+	}
+}

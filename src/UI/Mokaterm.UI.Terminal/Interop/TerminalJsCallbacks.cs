@@ -43,4 +43,14 @@ internal sealed class TerminalJsCallbacks
 
 	[JSInvokable]
 	public void OnRowHover(string text, int top, int height) => _view.HandleRowHover(text, top, height);
+
+	[JSInvokable]
+	public void OnTriggerMatched(int rule, string line) => _view.HandleTriggerMatched(rule, line);
+
+	[JSInvokable]
+	public void OnTriggerSlow(int rule) => _view.HandleTriggerSlow(rule);
+
+	[JSInvokable]
+	public Task OnFolderReported(string source, string value, string? user, string? machine) =>
+		_view.HandleFolderReportAsync(source, value, user, machine);
 }

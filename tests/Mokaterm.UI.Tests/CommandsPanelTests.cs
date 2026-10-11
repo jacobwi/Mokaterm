@@ -6,6 +6,7 @@ using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Storage;
 using Mokaterm.UI.Commands;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Shell;
@@ -49,6 +50,7 @@ public sealed partial class CommandsPanelTests
 				services.AddScoped<ShellState>();
 				services.AddScoped<ShellInterop>();
 				services.AddScoped<FormInterop>();
+				services.AddScoped<MenuPlacement>();
 
 				// A saved command also types into the sessions that type together, so the actions need that group.
 				services.AddScoped<ISessionManager, ManualSessionManager>();

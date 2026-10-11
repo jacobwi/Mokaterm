@@ -1,5 +1,5 @@
 <div class="mt-settings">
-	<nav class="mt-settings-nav">
+	<nav class="mt-settings-nav" aria-label="Settings">
 		<div class="mt-settings-header">
 			<span class="mt-settings-label">Settings</span>
 			<IconAction Icon="MokaIcons.Navigation.Close"
@@ -8,36 +8,87 @@
 						TooltipPosition="MokaTooltipPosition.Right"
 						OnClick="Shell.CloseSettings" />
 		</div>
+		@* The search box owns the keys while it has text: arrows move through the results, Enter opens one, Escape
+			clears the box. The results stay out of the tab order for that reason. *@
 		<div class="mt-settings-search">
-			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Search settings" Size="MokaSize.Sm" Debounce="0" />
+			<MokaSearchInput Value="@_query"
+							 ValueChanged="OnQueryChanged"
+							 Placeholder="Search settings"
+							 Size="MokaSize.Sm"
+							 Debounce="0"
+							 autocomplete="off"
+							 spellcheck="false"
+							 aria-label="Search settings"
+							 @onkeydown="OnSearchKeyDown" />
 		</div>
-		<div class="mt-settings-pages">
-			@foreach (IGrouping<SettingsPageGroup, SettingsPageDescriptor> group in _visiblePages.GroupBy(page => page.Group))
+		<div class="mt-settings-pages" @ref="_list">
+			@if (Searching)
 			{
-				<div class="mt-settings-group">@GroupName(group.Key)</div>
-				<MokaList Dense>
-					@foreach (SettingsPageDescriptor settingsPage in group)
-					{
-						bool current = settingsPage.Id == Selected?.Id;
-						<MokaListItem @key="settingsPage.Id"
-									  Icon="settingsPage.Icon"
-									  Text="@settingsPage.Title"
-									  Active="current"
-									  OnClick="() => Shell.SelectSettingsPage(settingsPage.Id)"
-									  aria-current="@(current ? "page" : null)" />
-					}
-				</MokaList>
+				@if (_results.Count == 0)
+				{
+					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary);padding:var(--moka-spacing-md)">
+						No settings match.
+					</MokaText>
+				}
+				else
+				{
+					<MokaList Dense aria-label="Settings that match">
+						@for (int index = 0; index < _results.Count; index++)
+						{
+							SettingsSearchResult result = _results[index];
+							int position = index;
+							if (result.Row is { } row)
+							{
+								<MokaListItem @key="@($"{result.Page.Id}#{row.Anchor}")"
+											  Active="position == _active"
+											  OnClick="() => Open(position)"
+											  tabindex="-1">
+									<span class="mt-settings-result">
+										<span class="mt-settings-result-label">@row.Label</span>
+										@* A label such as Style or Status needs its section to say where it is when nothing else does. *@
+										@if ((row.Description ?? row.Section) is { } detail)
+										{
+											<span class="mt-settings-result-detail">@detail</span>
+										}
+									</span>
+								</MokaListItem>
+							}
+							else
+							{
+								<MokaListItem @key="result.Page.Id"
+											  Icon="result.Page.Icon"
+											  Text="@result.Page.Title"
+											  Active="position == _active"
+											  OnClick="() => Open(position)"
+											  tabindex="-1" />
+							}
+						}
+					</MokaList>
+				}
 			}
-			@if (_visiblePages.Count == 0)
+			else
 			{
-				<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary);padding:var(--moka-spacing-md)">
-					No settings match.
-				</MokaText>
+				@foreach (IGrouping<SettingsPageGroup, SettingsPageDescriptor> group in Contributions.SettingsPages.GroupBy(page => page.Group))
+				{
+					<div class="mt-settings-group">@GroupName(group.Key)</div>
+					<MokaList Dense>
+						@foreach (SettingsPageDescriptor settingsPage in group)
+						{
+							bool current = settingsPage.Id == Selected?.Id;
+							<MokaListItem @key="settingsPage.Id"
+										  Icon="settingsPage.Icon"
+										  Text="@settingsPage.Title"
+										  Active="current"
+										  OnClick="() => Shell.SelectSettingsPage(settingsPage.Id)"
+										  aria-current="@(current ? "page" : null)" />
+						}
+					</MokaList>
+				}
 			}
 		</div>
 	</nav>
 
-	<section class="mt-settings-content">
+	<section class="mt-settings-content" @ref="_content">
 		@if (Selected is { } selected)
 		{
 			<div class="mt-settings-page-header">

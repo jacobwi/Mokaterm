@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Platform;
+using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
@@ -129,6 +130,31 @@ public sealed partial class ShellStatusBarTests
 		Assert.DoesNotContain("TYPING INTO", html, StringComparison.Ordinal);
 	}
 
+	// The shell knows nothing of SSH: whatever the session's module lists is drawn, one chip each, with its sentence.
+	[Fact]
+	public async Task Render_TheSessionReportsIndicators_ShowsAChipForEach()
+	{
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add(new FakeSession
+		{
+			Session = new IndicatingSession(
+				new SessionIndicator("AGENT", SessionIndicatorState.On, "Agent forwarding is on."),
+				new SessionIndicator("X11", SessionIndicatorState.Problem, "X11 forwarding is not working.")),
+		}));
+
+		Assert.Contains("mt-status-chip mt-status-chip--on", html, StringComparison.Ordinal);
+		Assert.Contains("mt-status-chip mt-status-chip--problem", html, StringComparison.Ordinal);
+		Assert.Contains(">AGENT", html, StringComparison.Ordinal);
+		Assert.Contains("title=\"X11 forwarding is not working.\"", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_ASessionWithoutIndicators_ShowsNoChip()
+	{
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add());
+
+		Assert.DoesNotContain("mt-status-chip", html, StringComparison.Ordinal);
+	}
+
 	[Fact]
 	public async Task Render_AutoLockOff_SaysTheVaultNeverLocksByItself()
 	{
@@ -164,6 +190,20 @@ public sealed partial class ShellStatusBarTests
 
 		// The connections panel, the transfers panel, locking the vault, and the about page.
 		Assert.Equal(4, items.Count(item => item.Contains("role=\"button\"", StringComparison.Ordinal)));
+	}
+
+	[Fact]
+	public async Task Render_SplitWorkspace_SaysHowManyPanes()
+	{
+		string html = await RenderAsync(CatalogWith(1), (manager, workspace, _) =>
+		{
+			manager.Add();
+			manager.Add();
+			manager.Add();
+			workspace.Arrange(PaneArrangement.MainAndStack);
+		});
+
+		Assert.Contains("3 sessions are open. They are split over 3 panes.", html, StringComparison.Ordinal);
 	}
 
 	private static ConnectionCatalog CatalogWith(int hosts)
@@ -218,6 +258,24 @@ public sealed partial class ShellStatusBarTests
 
 	[GeneratedRegex("title=\"([^\"]*)\"")]
 	private static partial Regex TitleAttribute();
+
+	/// <summary>A live session whose only feature is the indicators it was given.</summary>
+	private sealed class IndicatingSession(params SessionIndicator[] indicators) : IProtocolSession, ISessionIndicators
+	{
+		public event Action? Changed
+		{
+			add { }
+			remove { }
+		}
+
+		public Task Completion => Task.CompletedTask;
+
+		public IReadOnlyList<SessionIndicator> Indicators => indicators;
+
+		public TFeature? GetFeature<TFeature>() where TFeature : class => this as TFeature;
+
+		public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+	}
 
 	/// <summary>The catalog the bar counts, handed over as it is.</summary>
 	private sealed class FixedCatalog(ConnectionCatalog catalog) : IConnectionRepository

@@ -1,12 +1,13 @@
 @inherits DraftDialogBase
 
-<MokaDialog Open="Open"
-			OpenChanged="OnOpenChangedAsync"
-			Title="Reset vault"
-			DialogSize="MokaDialogSize.Small"
-			CloseOnBackdropClick="false"
-			CloseOnEscape="!IsBusy"
-			ShowCloseButton="!IsBusy">
+<HeadedDialog Open="Open"
+			  OpenChanged="OnOpenChangedAsync"
+			  Title="Reset vault"
+			  Icon="MokaIcons.Status.Warning"
+			  DialogSize="MokaDialogSize.Small"
+			  CloseOnBackdropClick="false"
+			  CloseOnEscape="!IsBusy"
+			  ShowCloseButton="!IsBusy">
 	<ChildContent>
 		<form id="@FormId" @onsubmit="ResetAsync" @onsubmit:preventDefault="true">
 			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
@@ -40,4 +41,4 @@
 			Reset vault
 		</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>

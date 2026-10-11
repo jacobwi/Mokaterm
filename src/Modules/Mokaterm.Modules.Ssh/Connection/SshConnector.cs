@@ -7,6 +7,7 @@ using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.Agent;
 using Mokaterm.Modules.Ssh.Keys;
+using Mokaterm.Modules.Ssh.SecurityKeys;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using LoginMethod = Mokaterm.Abstractions.Connections.AuthenticationMethod;
@@ -27,14 +28,31 @@ internal sealed class SshConnector
 
 	private readonly ISettingsService _settings;
 	private readonly ILogger<SshConnector> _logger;
+	private readonly ISshSecurityKeyReader? _securityKeyReader;
+	private readonly ISecurityKeyAuthenticator? _securityKeys;
 
-	public SshConnector(ISettingsService settings, ILoggerFactory? loggerFactory = null)
+	/// <param name="securityKeyReader">Core's reader for security key files, which SSH.NET cannot load.</param>
+	/// <param name="securityKeys">The host's authenticator; only the desktop host has one.</param>
+	public SshConnector(
+		ISettingsService settings,
+		ILoggerFactory? loggerFactory = null,
+		TimeProvider? timeProvider = null,
+		ISshSecurityKeyReader? securityKeyReader = null,
+		ISecurityKeyAuthenticator? securityKeys = null)
 	{
 		_settings = settings;
 		_logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<SshConnector>();
+		Time = timeProvider ?? TimeProvider.System;
+		_securityKeyReader = securityKeyReader;
+		_securityKeys = securityKeys;
 	}
 
+	private delegate PrivateKeyStatus KeyLoader(ReadOnlySpan<byte> keyText, string? passphrase, out IPrivateKeySource? keySource, out string? error);
+
 	public SshSettings Settings => _settings.Get<SshSettings>();
+
+	/// <summary>The clock commands are timed with.</summary>
+	public TimeProvider Time { get; }
 
 	public ISettingsService SettingsService => _settings;
 
@@ -259,11 +277,11 @@ internal sealed class SshConnector
 	}
 
 	/// <summary>
-	/// Loads what the login signs with: a private key, asking for its passphrase when none is saved or the saved one is
-	/// wrong and once more after a wrong answer, or the keys an SSH agent holds. A typed passphrase is kept in the
-	/// returned credentials, which replace the input.
+	/// Loads what the login signs with: a private key or a security key file, asking for its passphrase when none is saved
+	/// or the saved one is wrong and once more after a wrong answer, or the keys an SSH agent holds. A typed passphrase is
+	/// kept in the returned credentials, which replace the input.
 	/// </summary>
-	private static async Task<(LoginCredentials Credentials, IPrivateKeySource? KeySource)> PrepareCredentialsAsync(
+	private async Task<(LoginCredentials Credentials, IPrivateKeySource? KeySource)> PrepareCredentialsAsync(
 		LoginCredentials credentials,
 		IUserInteraction interaction,
 		string account,
@@ -289,7 +307,8 @@ internal sealed class SshConnector
 			throw new ProtocolConnectException(ConnectFailure.AuthenticationFailed, "No private key is saved for this login.");
 		}
 
-		PrivateKeyStatus status = SshPrivateKeys.TryLoad(privateKey.Span, credentials.Passphrase?.RevealString(), out PrivateKeyFile? keyFile, out string? error);
+		KeyLoader load = LoaderFor(privateKey.Span);
+		PrivateKeyStatus status = load(privateKey.Span, credentials.Passphrase?.RevealString(), out IPrivateKeySource? keySource, out string? error);
 		string? typedPassphrase = null;
 		for (int prompt = 0; allowPrompt && prompt < MaxPassphrasePrompts && status is PrivateKeyStatus.PassphraseRequired or PrivateKeyStatus.WrongPassphrase; prompt++)
 		{
@@ -304,10 +323,10 @@ internal sealed class SshConnector
 				cancellationToken) ?? throw Cancelled();
 
 			typedPassphrase = answer.Secret;
-			status = SshPrivateKeys.TryLoad(privateKey.Span, typedPassphrase, out keyFile, out error);
+			status = load(privateKey.Span, typedPassphrase, out keySource, out error);
 		}
 
-		if (keyFile is null)
+		if (keySource is null)
 		{
 			string reason = status switch
 			{
@@ -321,7 +340,7 @@ internal sealed class SshConnector
 
 		if (typedPassphrase is null)
 		{
-			return (credentials, keyFile);
+			return (credentials, keySource);
 		}
 
 		LoginCredentials withPassphrase = new()
@@ -335,7 +354,65 @@ internal sealed class SshConnector
 		};
 
 		credentials.Dispose();
-		return (withPassphrase, keyFile);
+		return (withPassphrase, keySource);
+	}
+
+	/// <summary>
+	/// How the saved key is read. SSH.NET loads ordinary keys; a security key file goes to Core's reader and signs through
+	/// the host's authenticator, which only the desktop app has, so elsewhere it is refused before any passphrase is asked.
+	/// </summary>
+	/// <exception cref="ProtocolConnectException">The key is a security key and nothing here can reach one.</exception>
+	private KeyLoader LoaderFor(ReadOnlySpan<byte> keyText)
+	{
+		if (!SshPrivateKeys.IsSecurityKey(keyText))
+		{
+			return LoadKeyFile;
+		}
+
+		if (_securityKeys is not { } authenticator || _securityKeyReader is not { } reader)
+		{
+			throw new ProtocolConnectException(
+				ConnectFailure.AuthenticationFailed,
+				"This login signs with a security key, and security keys work in the desktop app only.");
+		}
+
+		if (!authenticator.IsAvailable)
+		{
+			throw new ProtocolConnectException(
+				ConnectFailure.AuthenticationFailed,
+				"This login signs with a security key, and this computer offers no way to reach one.");
+		}
+
+		return (ReadOnlySpan<byte> text, string? passphrase, out IPrivateKeySource? keySource, out string? error) =>
+			LoadSecurityKey(reader, authenticator, text, passphrase, out keySource, out error);
+	}
+
+	private static PrivateKeyStatus LoadKeyFile(ReadOnlySpan<byte> keyText, string? passphrase, out IPrivateKeySource? keySource, out string? error)
+	{
+		PrivateKeyStatus status = SshPrivateKeys.TryLoad(keyText, passphrase, out PrivateKeyFile? keyFile, out error);
+		keySource = keyFile;
+		return status;
+	}
+
+	private static PrivateKeyStatus LoadSecurityKey(
+		ISshSecurityKeyReader reader,
+		ISecurityKeyAuthenticator authenticator,
+		ReadOnlySpan<byte> keyText,
+		string? passphrase,
+		out IPrivateKeySource? keySource,
+		out string? error)
+	{
+		keySource = null;
+		SecurityKeyFileResult result = reader.Read(keyText, passphrase);
+		if (!result.IsValid)
+		{
+			error = result.Error;
+			return result.Status;
+		}
+
+		keySource = new SecurityKeySource(result.Key, authenticator);
+		error = null;
+		return PrivateKeyStatus.Valid;
 	}
 
 	/// <summary>The agent keys this login signs with. Nothing but the signature ever crosses the agent boundary.</summary>

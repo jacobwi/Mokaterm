@@ -1,0 +1,153 @@
+/* Under the box, as wide as it, and above the workspace. The box sits in the top bar, so the list is the one thing
+   that reaches past the bar. */
+.mt-qc-list {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	z-index: var(--moka-z-dropdown);
+	display: flex;
+	flex-direction: column;
+	padding: var(--moka-spacing-xs);
+	background: var(--moka-color-surface);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-md);
+	box-shadow: var(--moka-shadow-popup);
+}
+
+.mt-qc-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+	min-height: 28px;
+	padding: 0 var(--moka-spacing-md);
+	border-radius: var(--moka-radius-sm);
+	font-size: var(--moka-font-size-sm);
+	color: var(--moka-color-on-surface);
+	cursor: pointer;
+	user-select: none;
+}
+
+.mt-qc-row:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+/* The keyboard's row: the Moka selected-row glow, so it reads apart from the row the pointer happens to rest on. */
+.mt-qc-row--active {
+	background: var(--moka-color-surface-hover);
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow), inset 0 0 0 1px var(--moka-color-primary-border);
+}
+
+/* Actions sit apart from the targets above them. */
+.mt-qc-row--action {
+	margin-top: var(--moka-spacing-xs);
+}
+
+.mt-qc-row--action::before {
+	content: "";
+	position: absolute;
+	top: calc(-1 * var(--moka-spacing-xs) / 2 - 0.5px);
+	left: var(--moka-spacing-md);
+	right: var(--moka-spacing-md);
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-qc-row--action + .mt-qc-row--action {
+	margin-top: 0;
+}
+
+.mt-qc-row--action + .mt-qc-row--action::before {
+	display: none;
+}
+
+.mt-qc-row--quiet {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-qc-icon {
+	display: flex;
+	flex-shrink: 0;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-qc-row--active .mt-qc-icon {
+	color: var(--moka-color-primary);
+}
+
+.mt-qc-main {
+	display: flex;
+	align-items: baseline;
+	gap: var(--moka-spacing-md);
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.mt-qc-name {
+	flex-shrink: 0;
+	max-width: 60%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+}
+
+.mt-qc-detail {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-qc-action {
+	font-weight: var(--moka-font-weight-medium);
+}
+
+.mt-qc-keys {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+/* A recent row says it is history with a clock, which makes way for the remove button while the row is pointed at or
+   active, so the button never covers the label. */
+.mt-qc-recent,
+.mt-qc-remove {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	color: var(--moka-color-on-surface-quaternary);
+}
+
+.mt-qc-remove {
+	display: none;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: var(--moka-radius-sm);
+	background: transparent;
+	color: var(--moka-color-on-surface-variant);
+	cursor: pointer;
+}
+
+.mt-qc-row:hover .mt-qc-recent,
+.mt-qc-row--active .mt-qc-recent {
+	display: none;
+}
+
+.mt-qc-row:hover .mt-qc-remove,
+.mt-qc-row--active .mt-qc-remove {
+	display: flex;
+}
+
+.mt-qc-remove:hover {
+	border-color: var(--moka-color-primary-border);
+	color: var(--moka-color-primary);
+	background: var(--moka-color-primary-glow);
+}

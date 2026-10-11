@@ -8,6 +8,9 @@ internal sealed class SessionViewState
 	/// <summary>Whether the saved commands panel is docked open beside the terminal.</summary>
 	public bool CommandsOpen { get; set; }
 
+	/// <summary>Whether the file browser follows the terminal's folder. Off until asked for, for each session.</summary>
+	public bool FollowTerminalFolder { get; set; }
+
 	/// <summary>A theme picked for this session only, on top of the connection's and the global one.</summary>
 	public string? ThemeId { get; set; }
 

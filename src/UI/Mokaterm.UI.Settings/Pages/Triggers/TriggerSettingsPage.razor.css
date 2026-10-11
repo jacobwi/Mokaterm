@@ -1,0 +1,38 @@
+.trigger-does {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* The rule's own color, from the fixed palette, next to the words that name it. */
+.trigger-swatch {
+	flex: none;
+	width: 10px;
+	height: 10px;
+	border-radius: var(--moka-radius-full);
+}
+
+.trigger-results {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	margin-top: var(--moka-spacing-sm);
+}
+
+.trigger-results__list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.trigger-results__item {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}

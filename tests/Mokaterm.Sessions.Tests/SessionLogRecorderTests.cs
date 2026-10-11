@@ -1,9 +1,11 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Time.Testing;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.Abstractions.Terminal;
 using Mokaterm.Sessions.Protocols;
 using Mokaterm.Sessions.Terminal;
 using Mokaterm.Sessions.Tests.Fakes;
@@ -17,6 +19,9 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 
 	/// <summary>The name a second file of the same session in the same second falls back to.</summary>
 	private const string SecondLogName = "10.0.0.5-abc-20260926-142530-1.log";
+
+	/// <summary>The same session recorded with timing.</summary>
+	private const string CastName = "10.0.0.5-abc-20260926-142530.cast";
 
 	private static readonly HostProfile Host = new() { Id = Guid.NewGuid(), Address = "10.0.0.5" };
 
@@ -163,6 +168,65 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	}
 
 	[Fact]
+	public async Task Asciicast_RecordsWhenEachPieceArrived_AndTheResizesBetween()
+	{
+		CreateRecorder(new SessionLogSettings { RecordEverySession = true, Folder = LogFolder, Format = SessionLogFormat.Asciicast });
+		(ISessionHandle handle, FakeTerminalChannel channel) = await OpenConnectedAsync();
+
+		channel.Emit("first\r\n");
+		_ = await WaitForLogAsync(CastName, "first");
+		_time.Advance(TimeSpan.FromSeconds(1.5));
+		await handle.Terminal!.ResizeAsync(new TerminalSize(100, 40), Ct);
+		channel.Emit("\u001b[1msecond\u001b[0m\r\n");
+
+		string text = await WaitForLogAsync(CastName, "second");
+		string[] lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+		Assert.Equal(4, lines.Length);
+		using (JsonDocument header = JsonDocument.Parse(lines[0]))
+		{
+			Assert.Equal(2, header.RootElement.GetProperty("version").GetInt32());
+			Assert.True(header.RootElement.GetProperty("width").GetInt32() > 0);
+			Assert.Equal("abc@10.0.0.5:22", header.RootElement.GetProperty("title").GetString());
+			Assert.Contains("Nothing typed is recorded.", header.RootElement.GetProperty("mokaterm").GetString(), StringComparison.Ordinal);
+		}
+
+		Assert.Equal((0m, "o", "first\r\n"), ReadEvent(lines[1]));
+		Assert.Equal((1.5m, "r", "100x40"), ReadEvent(lines[2]));
+		Assert.Equal((1.5m, "o", "\u001b[1msecond\u001b[0m\r\n"), ReadEvent(lines[3]));
+		Assert.Contains(Recorder.ListFiles(), file => file.Name == CastName);
+		Assert.Equal(CastName, Recorder.StatusFor(handle.Id).FileName);
+	}
+
+	[Fact]
+	public async Task Asciicast_PastTheSizeLimit_EndsWithANoticeEvent_AndStaysValidJson()
+	{
+		CreateRecorder(new SessionLogSettings
+		{
+			RecordEverySession = true,
+			Folder = LogFolder,
+			Format = SessionLogFormat.Asciicast,
+			SizeLimitKilobytes = SessionLogSettings.MinSizeLimitKilobytes,
+		});
+
+		(ISessionHandle handle, FakeTerminalChannel channel) = await OpenConnectedAsync();
+		string kilobyte = new('x', 1024);
+		for (int i = 0; i < 24; i++)
+		{
+			channel.Emit(kilobyte);
+		}
+
+		await Eventually.TrueAsync(() => Recorder.StatusFor(handle.Id).State == SessionLogState.Full, "the recording reports a full file");
+		Assert.True(Recorder.StatusFor(handle.Id).Bytes <= SessionLogSettings.MinSizeLimitKilobytes * 1024L);
+		string[] lines = ReadLog(CastName).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+		foreach (string line in lines.Skip(1))
+		{
+			_ = ReadEvent(line);
+		}
+
+		Assert.Contains("the rest of this session is not recorded", ReadEvent(lines[^1]).Data, StringComparison.Ordinal);
+	}
+
+	[Fact]
 	public async Task PastTheSizeLimit_TheFileSaysSoAndTakesNoMore()
 	{
 		CreateRecorder(new SessionLogSettings
@@ -256,7 +320,9 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	[InlineData("..\\vault.json")]
 	[InlineData("../vault.json")]
 	[InlineData("logs/a.log")]
+	[InlineData("../a.cast")]
 	[InlineData("a.txt")]
+	[InlineData("a.cast.json")]
 	[InlineData(" ")]
 	public void OpenRead_RefusesAnythingButAPlainLogName(string name)
 	{
@@ -272,6 +338,10 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	[InlineData("admin/domain@some host.example.com:2222", "some_host.example.com-admin_domain-20260926-142530.log")]
 	public void BuildFileName_KeepsTheSessionReadableAndTheNameUsable(string endpoint, string expected) =>
 		Assert.Equal(expected, SessionLogWriter.BuildFileName(endpoint, new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), attempt: 0));
+
+	[Fact]
+	public void BuildFileName_TakesTheFormatsExtension() =>
+		Assert.Equal(CastName, SessionLogWriter.BuildFileName("abc@10.0.0.5:22", new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), 0, ".cast"));
 
 	public async ValueTask DisposeAsync()
 	{
@@ -295,6 +365,14 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 		{
 			return false;
 		}
+	}
+
+	private static (decimal Time, string Code, string Data) ReadEvent(string line)
+	{
+		using JsonDocument document = JsonDocument.Parse(line);
+		JsonElement root = document.RootElement;
+		Assert.Equal(3, root.GetArrayLength());
+		return (root[0].GetDecimal(), root[1].GetString()!, root[2].GetString()!);
 	}
 
 	private SessionLogRecorder CreateRecorder(SessionLogSettings settings)

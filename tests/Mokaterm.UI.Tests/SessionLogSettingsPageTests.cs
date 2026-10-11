@@ -38,6 +38,17 @@ public sealed class SessionLogSettingsPageTests
 		Assert.Contains(Written.Name, html, StringComparison.Ordinal);
 		Assert.Contains("2 KB", html, StringComparison.Ordinal);
 		Assert.Contains($"Save a copy of {Written.Name}", html, StringComparison.Ordinal);
+		Assert.Contains($"Play {Written.Name}", html, StringComparison.Ordinal);
+		Assert.Contains("Timed", html, StringComparison.Ordinal);
+		Assert.Contains("asciinema", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_WithoutALocalFileAccess_StillPlays()
+	{
+		string html = await RenderAsync(new SessionLogSettings(), withFileAccess: false, Written);
+
+		Assert.Contains($"Play {Written.Name}", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

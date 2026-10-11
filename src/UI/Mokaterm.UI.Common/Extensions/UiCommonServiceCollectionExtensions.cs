@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 
@@ -15,6 +16,7 @@ public static class UiCommonServiceCollectionExtensions
 		services.TryAddSingleton<IUiContributions, UiContributions>();
 		services.TryAddScoped<IClipboardService, JsClipboardService>();
 		services.TryAddScoped<FormInterop>();
+		services.TryAddScoped<MenuPlacement>();
 		return services;
 	}
 }

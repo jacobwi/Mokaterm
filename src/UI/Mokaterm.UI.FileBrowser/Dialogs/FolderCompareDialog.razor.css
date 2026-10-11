@@ -1,0 +1,102 @@
+.fc {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.fc-sides {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	align-items: center;
+	gap: var(--moka-spacing-md);
+}
+
+.fc-side {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+.fc-reading,
+.fc-bar,
+.fc-failed {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.fc-reading {
+	gap: var(--moka-spacing-sm);
+	min-height: 32px;
+}
+
+.fc-bar {
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-md) var(--moka-spacing-lg);
+}
+
+.fc-failed {
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-sm);
+}
+
+.fc-counts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xs);
+}
+
+/* Fixed layout gives the path column whatever the sized columns leave, and long paths truncate instead of widening it. */
+.fc-table ::deep .moka-table {
+	table-layout: fixed;
+}
+
+.fc-cell {
+	overflow: hidden;
+	line-height: 16px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fc-mono,
+.fc-copy {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.fc-copy {
+	display: flex;
+	gap: var(--moka-spacing-sm);
+}
+
+.fc-size {
+	flex: 0 0 64px;
+	text-align: right;
+}
+
+.fc-status {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.fc-status--upload {
+	color: var(--moka-color-primary);
+}
+
+.fc-status--check {
+	color: var(--moka-color-warning);
+}
+
+@media (max-width: 560px) {
+	.fc-sides {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

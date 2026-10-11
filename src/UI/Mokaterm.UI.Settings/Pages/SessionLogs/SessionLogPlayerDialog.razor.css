@@ -1,0 +1,20 @@
+/* The dialog body has no height of its own, so the player is given one that leaves room for the title and the footer. */
+.log-player {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	height: calc(100vh - 11rem);
+	min-height: 320px;
+}
+
+.log-player__loading {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+}
+
+.log-player__screen {
+	flex: 1 1 auto;
+	min-height: 0;
+}

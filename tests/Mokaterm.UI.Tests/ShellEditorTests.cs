@@ -33,7 +33,9 @@ public sealed class ShellEditorTests
 	{
 		string html = await RenderFolderEditorAsync(shell => { });
 
-		Assert.Equal(string.Empty, html);
+		// The headed dialog keeps an empty wrapper with no box of its own (display: contents) while closed.
+		Assert.DoesNotContain("moka-dialog", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("<h2", html, StringComparison.Ordinal);
 	}
 
 	// Every editor is mounted all the time, so each one has to ignore the requests that belong to another.
@@ -42,7 +44,8 @@ public sealed class ShellEditorTests
 	{
 		string html = await RenderFolderEditorAsync(shell => shell.OpenEditor(new HostEditorRequest(null)));
 
-		Assert.Equal(string.Empty, html);
+		Assert.DoesNotContain("moka-dialog", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("<h2", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

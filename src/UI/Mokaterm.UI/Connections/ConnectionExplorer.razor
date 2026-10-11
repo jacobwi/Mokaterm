@@ -55,7 +55,7 @@
 						 class="@RowClass(row)"
 						 draggable="@(row.Kind == ConnectionTreeRowKind.Host ? "true" : "false")"
 						 data-mt-drag="@(row.Kind == ConnectionTreeRowKind.Host ? row.Key : null)"
-						 @onclick="() => Select(row)"
+						 @onclick="e => OnRowClick(e, row)"
 						 @ondblclick="() => ActivateAsync(row)"
 						 @oncontextmenu="e => OnRowContextMenu(e, row)"
 						 @oncontextmenu:preventDefault

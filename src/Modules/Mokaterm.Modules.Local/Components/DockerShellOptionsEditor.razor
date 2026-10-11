@@ -1,0 +1,78 @@
+@using Mokaterm.Modules.Local.Containers
+@inherits ConnectionOptionsEditorBase<DockerShellOptions>
+
+<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
+		A Docker container login runs docker exec on this computer, so the machine's address names the container the way
+		docker ps shows it. Choose one below to keep this login on that container whatever the host is called; it then
+		wins over the address.
+	</MokaText>
+
+	<ContainerPicker Load="ListAsync" OnPick="OnPickAsync" What="containers" Selected="@Current.Container" Disabled="Disabled">
+		<MokaTextField Label="Container"
+					   Value="@(Current.Container ?? "")"
+					   ValueChanged="OnContainerChangedAsync"
+					   ErrorText="@ContainerError"
+					   Placeholder="The host's address"
+					   HelperText="A running container's name or id. Empty opens the one the host's address names."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</ContainerPicker>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="Context"
+					   Value="@(Current.Context ?? "")"
+					   ValueChanged="OnContextChangedAsync"
+					   ErrorText="@ContextError"
+					   Placeholder="The current context"
+					   HelperText="A name from docker context ls."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+
+		<MokaTextField Label="Host"
+					   Value="@(Current.Host ?? "")"
+					   ValueChanged="OnHostChangedAsync"
+					   ErrorText="@HostError"
+					   Placeholder="From the context"
+					   HelperText="ssh://user@server or tcp://server:2376, instead of a context."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</MokaGrid>
+
+	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
+		<MokaTextField Label="User"
+					   Value="@(Current.User ?? "")"
+					   ValueChanged="OnUserChangedAsync"
+					   ErrorText="@UserError"
+					   Placeholder="The image's user"
+					   HelperText="A name or uid, with :group after it if needed."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+
+		<MokaTextField Label="Working folder"
+					   Value="@(Current.Folder ?? "")"
+					   ValueChanged="OnFolderChangedAsync"
+					   ErrorText="@FolderError"
+					   Placeholder="The image's own"
+					   HelperText="An absolute path inside the container."
+					   Disabled="Disabled"
+					   Size="MokaSize.Sm"
+					   spellcheck="false"
+					   autocomplete="off" />
+	</MokaGrid>
+
+	<ContainerShellField Shell="Current.Shell"
+						 ShellChanged="OnShellChangedAsync"
+						 Command="@Current.Command"
+						 CommandChanged="OnCommandChangedAsync"
+						 Tool="docker"
+						 Disabled="Disabled" />
+</MokaFlexbox>

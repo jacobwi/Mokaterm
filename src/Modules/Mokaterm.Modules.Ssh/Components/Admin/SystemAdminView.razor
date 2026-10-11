@@ -1,0 +1,248 @@
+@namespace Mokaterm.Modules.Ssh.Components.Admin
+@inherits SessionViewBase
+
+<div class="mt-admin">
+	@if (_feature is null)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Disconnect"
+						Title="The session is not connected"
+						Description="The system view reads the server over the session's SSH connection." />
+	}
+	else if (_profile is null)
+	{
+		<div class="mta-center">
+			@if (_detectError is { } detectError)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Title="Could not tell what this server is">@detectError</MokaAlert>
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Refresh" OnClick="RefreshDetectionAsync">
+					Try again
+				</MokaButton>
+			}
+			else
+			{
+				<MokaSpinner Label="Finding out what this server runs" />
+			}
+		</div>
+	}
+	else if (_profile.UnsupportedReason is { } unsupported)
+	{
+		<div class="mta-center">
+			<MokaEmptyState Icon="MokatermIcons.Server" Title="@($"{_profile.DisplayName} is not supported")" Description="@unsupported" />
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mta-dim">@_profile.Facts.Kernel</MokaText>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh" OnClick="RefreshDetectionAsync">
+				Detect again
+			</MokaButton>
+		</div>
+	}
+	else
+	{
+		SystemProfile profile = _profile;
+		<div class="mta-strip">
+			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow />
+			<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Truncate Class="mta-strip-name" title="@profile.Facts.Kernel">@profile.DisplayName</MokaText>
+			@foreach (string part in SystemParts(profile))
+			{
+				<span class="mta-strip-part">@part</span>
+			}
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mta-dim mta-strip-kernel">@profile.Facts.Kernel</MokaText>
+			<span class="mta-spacer"></span>
+
+			@if (_feature.LoginIsRoot)
+			{
+				<MokaTag Text="ROOT LOGIN" Size="MokaSize.Xs" Color="MokaColor.Error" title="This session logged in as root, so changes run without sudo." />
+			}
+			else if (_feature.RootBlockedReason is { } blocked)
+			{
+				<MokaTag Text="READ ONLY" Size="MokaSize.Xs" Color="MokaColor.Surface" title="@blocked" />
+			}
+			else if (_feature.RootModeOn)
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							StartIcon="MokatermIcons.Root"
+							Class="mta-root-on"
+							Disabled="@(_feature.Running is not null)"
+							OnClick="DisableRoot"
+							title="Root mode is on: sudo is ready for this view. Click to turn it off.">
+					Root
+				</MokaButton>
+			}
+			else
+			{
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Xs"
+							StartIcon="MokatermIcons.Lock"
+							Loading="_rootBusy"
+							Disabled="_rootBusy"
+							OnClick="EnableRootAsync"
+							title="Read and change what needs root, through sudo. It lasts until this window closes.">
+					Root mode
+				</MokaButton>
+			}
+
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Loading="_detecting"
+						Disabled="_detecting"
+						OnClick="RefreshDetectionAsync"
+						title="Detect the system again"
+						aria-label="Detect the system again" />
+		</div>
+
+		@if (_rootError is { } rootError)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _rootError = null)">@rootError</MokaAlert>
+		}
+
+		<div class="mta-body">
+			<nav class="mta-nav" aria-label="System pages">
+				@foreach (AdminNavEntry entry in Entries(profile))
+				{
+					<button type="button"
+							class="@NavClass(entry)"
+							aria-current="@(entry.Page == _page ? "page" : null)"
+							title="@(entry.Unavailable is { } reason ? $"{entry.Label}: {reason}" : entry.Label)"
+							@key="entry.Page"
+							@onclick="@(() => Show(entry.Page))">
+						<MokaIcon Icon="entry.Icon" Size="MokaSize.Xs" />
+						<span class="mta-nav-label">@entry.Label</span>
+					</button>
+				}
+			</nav>
+
+			<div class="mta-nav-select">
+				<MokaSelect TValue="AdminPage"
+							Items="AllPages"
+							Value="_page"
+							ValueChanged="Show"
+							ValueSelector="@(page => SelectLabel(profile, page))"
+							Size="MokaSize.Sm"
+							aria-label="System page" />
+			</div>
+
+			<div class="mta-stage">
+				<div class="mta-main">
+					<CascadingValue Value="_context" IsFixed="false">
+						@switch (_page)
+						{
+							case AdminPage.Overview:
+								<AdminOverviewPage @key="profile" />
+								break;
+							case AdminPage.Services:
+								<AdminServicesPage @key="profile" />
+								break;
+							case AdminPage.Packages:
+								<AdminPackagesPage @key="profile" />
+								break;
+							case AdminPage.Cron:
+								<AdminCronPage @key="profile" />
+								break;
+							case AdminPage.Time:
+								<AdminTimePage @key="profile" />
+								break;
+							case AdminPage.HostName:
+								<AdminHostNamePage @key="profile" />
+								break;
+							case AdminPage.Network:
+								<AdminNetworkPage @key="profile" />
+								break;
+							case AdminPage.Users:
+								<AdminUsersPage @key="profile" />
+								break;
+							case AdminPage.Disks:
+								<AdminDisksPage @key="profile" />
+								break;
+							case AdminPage.Processes:
+								<AdminProcessesPage @key="profile" />
+								break;
+							case AdminPage.Logs:
+								<AdminLogsPage @key="profile" />
+								break;
+							case AdminPage.Firewall:
+								<AdminFirewallPage @key="profile" />
+								break;
+						}
+					</CascadingValue>
+				</div>
+
+				@if (_review is { } review)
+				{
+					<div class="mta-review-layer" @onkeydown="OnReviewKeyDown" @onkeydown:stopPropagation="true">
+						<div class="mta-review" role="alertdialog" aria-label="@review.Title" aria-describedby="mta-review-commands">
+							<MokaText Element="h3" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@review.Title</MokaText>
+							@if (review.Description is { Length: > 0 } description)
+							{
+								<MokaText Element="p" Size="MokaSize.Sm" Class="mta-dim">@description</MokaText>
+							}
+							@if (review.Warning is { Length: > 0 } warning)
+							{
+								<MokaAlert Severity="@(review.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
+							}
+							<div class="mta-review-runs">
+								<MokaStatusDot Size="MokaSize.Xs" Color="@(review.Script.AsRoot ? MokaColor.Error : MokaColor.Info)" Glow />
+								<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@RunsAs(review)</MokaText>
+							</div>
+							<pre id="mta-review-commands" class="mta-pre mta-pre--commands">@review.Script.Body</pre>
+							@if (_reviewInput is { } reviewInput)
+							{
+								<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">On stdin</MokaText>
+								<pre class="mta-pre">@reviewInput.Preview</pre>
+							}
+							<div class="mta-review-actions">
+								@if (review.Destructive)
+								{
+									<button @ref="_reviewDefault" type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
+									<button type="button" class="mta-run-button mta-run-button--danger" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
+								}
+								else
+								{
+									<button type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
+									<button @ref="_reviewDefault" type="button" class="mta-run-button" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
+								}
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		</div>
+
+		@if (Result is { } result)
+		{
+			<div class="@ResultClass(result)" role="status">
+				<div class="mta-result-head">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@ResultColor(result)" Pulse="result.IsRunning" Glow />
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@ResultLabel(result)</MokaText>
+					<MokaText Element="span" Size="MokaSize.Sm" Truncate title="@result.Title">@result.Title</MokaText>
+					@if (ResultMeta(result) is { Length: > 0 } meta)
+					{
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mta-dim">@meta</MokaText>
+					}
+					<span class="mta-spacer"></span>
+					@if (result.IsRunning)
+					{
+						<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+					}
+					else
+					{
+						<CopyButton Text="@ResultText(result)" Label="Copy the output" />
+						<MokaButton Variant="MokaVariant.Text"
+									Color="MokaColor.Surface"
+									Size="MokaSize.Xs"
+									StartIcon="@(OutputOpen(result) ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronUp)"
+									OnClick="ToggleOutput"
+									title="@(OutputOpen(result) ? "Hide the output" : "Show the output")"
+									aria-label="@(OutputOpen(result) ? "Hide the output" : "Show the output")" />
+					}
+				</div>
+				@if (!result.IsRunning && OutputOpen(result))
+				{
+					<pre class="mta-pre mta-pre--result">@ResultText(result)</pre>
+				}
+			</div>
+		}
+	}
+</div>

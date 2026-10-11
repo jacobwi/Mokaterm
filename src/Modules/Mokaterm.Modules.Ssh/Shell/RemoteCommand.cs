@@ -12,15 +12,16 @@ namespace Mokaterm.Modules.Ssh.Shell;
 internal sealed record RemoteCommandResult(int? ExitStatus, byte[] Output, string Error);
 
 /// <summary>A running exec channel with its stdout available as a stream.</summary>
-internal sealed class RemoteCommand : IDisposable
+internal sealed class RemoteCommand : IExecChannel
 {
 	/// <summary>
-	/// The most stdout <see cref="RunAsync"/> collects. Listings and account databases stay far below it; a server that
-	/// sends more is broken or hostile, and holding it all would exhaust memory.
+	/// The most stdout <see cref="RunAsync"/> collects, and the most a command run reads from either stream before it
+	/// stops the command. Listings and account databases stay far below it; a server that sends more is broken or
+	/// hostile, and holding it all would exhaust memory.
 	/// </summary>
 	internal const int MaxOutputBytes = 64 * 1024 * 1024;
 
-	private const int CopyBufferBytes = 80 * 1024;
+	internal const int CopyBufferBytes = 80 * 1024;
 
 	private readonly SshCommand _command;
 
@@ -38,8 +39,33 @@ internal sealed class RemoteCommand : IDisposable
 
 	public int? ExitStatus => _command.ExitStatus;
 
+	/// <summary>Stderr as a stream, for a caller that reads it alongside <see cref="Output"/> instead of through <see cref="ReadError"/>.</summary>
+	public Stream ErrorOutput => _command.ExtendedOutputStream;
+
+	public string? ExitSignal => _command.ExitSignal;
+
 	/// <summary>Everything the command wrote to stderr. Blocks until the command finished, so read it after <see cref="Execution"/>.</summary>
 	public string ReadError() => _command.Error;
+
+	/// <summary>
+	/// Closes stdin without writing anything, so a command that reads it sees the end of its input instead of waiting
+	/// for a line that will never come.
+	/// </summary>
+	public void CloseInput()
+	{
+		Stream stdin;
+		try
+		{
+			stdin = _command.CreateInputStream();
+		}
+		catch (Exception ex) when (ex is InvalidOperationException or SshException or ObjectDisposedException)
+		{
+			// The command already finished, so nothing will read stdin.
+			return;
+		}
+
+		CloseInput(stdin);
+	}
 
 	/// <summary>
 	/// Starts <paramref name="commandText"/> and, when <paramref name="input"/> is given, writes it as one line on stdin and

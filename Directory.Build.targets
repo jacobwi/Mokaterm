@@ -1,0 +1,14 @@
+<Project>
+
+	<!--
+		Every Razor project runs the settings search generator, so a settings page added anywhere (a module included) is
+		indexed without its project asking for it. A project with no SettingsRow in its markup gets no output.
+	-->
+	<ItemGroup Condition="'$(UsingMicrosoftNETSdkRazor)' == 'true'">
+		<ProjectReference Include="$(MSBuildThisFileDirectory)src\Mokaterm.Generators\Mokaterm.Generators.csproj"
+						  OutputItemType="Analyzer"
+						  ReferenceOutputAssembly="false"
+						  PrivateAssets="all" />
+	</ItemGroup>
+
+</Project>

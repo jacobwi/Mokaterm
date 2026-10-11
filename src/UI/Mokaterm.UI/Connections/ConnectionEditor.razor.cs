@@ -115,8 +115,12 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 
 	private string DialogTitle =>
 		Request?.TransientSession is not null ? "Save connection"
+		: Request?.Draft is not null ? "Connect and save"
 		: _original is null ? "New login"
 		: "Edit login";
+
+	/// <summary>A quick-connect target with no session yet: saving it is how it gets opened, so Save alone is not offered.</summary>
+	private bool IsDraft => Request?.Draft is not null;
 
 	private ProtocolDescriptor? Protocol => Protocols.FindDescriptor(_protocolId);
 
@@ -372,11 +376,11 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		}
 		else if (request.TransientSession is { } session)
 		{
-			LoadLogin(session.Connection);
-			HostProfile? match = _hosts.Find(host => string.Equals(host.Address, session.Host.Address, StringComparison.OrdinalIgnoreCase));
-			_hostId = match?.Id;
-			_newHost = match is null;
-			_newHostAddress = match is null ? session.Host.Address : "";
+			LoadUnsaved(session.Host, session.Connection);
+		}
+		else if (request.Draft is { } draft)
+		{
+			LoadUnsaved(draft.Host, draft.Connection);
 		}
 		else
 		{
@@ -401,6 +405,16 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 			.OrderBy(credential => credential.Name, StringComparer.CurrentCultureIgnoreCase)
 			.Select(credential => (Guid?)credential.Id),
 	];
+
+	/// <summary>A login quick connect made up: a saved host at the same address is picked, otherwise a new one is filled in.</summary>
+	private void LoadUnsaved(HostProfile host, ConnectionProfile connection)
+	{
+		LoadLogin(connection);
+		HostProfile? match = _hosts.Find(saved => string.Equals(saved.Address, host.Address, StringComparison.OrdinalIgnoreCase));
+		_hostId = match?.Id;
+		_newHost = match is null;
+		_newHostAddress = match is null ? host.Address : "";
+	}
 
 	private void LoadLogin(ConnectionProfile connection)
 	{

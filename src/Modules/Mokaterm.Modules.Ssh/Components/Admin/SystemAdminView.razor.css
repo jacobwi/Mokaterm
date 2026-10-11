@@ -1,0 +1,839 @@
+/* The tool is registered wide, so the dialog or window around it has a fixed height and this fills it: the strip,
+   the navigation and the result stay put while a page's list and detail panel scroll on their own. */
+.mt-admin {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	height: 100%;
+	min-height: 360px;
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+	min-width: 0;
+	container-type: inline-size;
+	container-name: mt-admin;
+}
+
+.mta-center {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--moka-spacing-md);
+	padding: var(--moka-spacing-lg);
+	text-align: center;
+}
+
+.mta-strip {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding-bottom: var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+}
+
+.mta-strip-part {
+	flex-shrink: 0;
+	padding: 1px 6px;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-sm);
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+	letter-spacing: 0.02em;
+}
+
+.mta-body {
+	display: grid;
+	flex: 1;
+	grid-template-columns: 148px minmax(0, 1fr);
+	gap: var(--moka-spacing-md);
+	min-height: 0;
+}
+
+.mta-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.mta-nav-select {
+	display: none;
+}
+
+.mta-nav-item {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	padding: 6px var(--moka-spacing-sm);
+	border: 0;
+	border-radius: var(--moka-radius-sm);
+	background: transparent;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	font-size: var(--moka-font-size-sm);
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background var(--moka-transition-fast), color var(--moka-transition-fast);
+}
+
+.mta-nav-item:hover {
+	background: var(--moka-color-surface-hover);
+	color: var(--moka-color-on-surface);
+}
+
+.mta-nav-item:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-nav-item--active {
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface);
+	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+/* Greyed, never hidden: the page still opens and says why it has nothing to drive. */
+.mta-nav-item--off {
+	opacity: 0.45;
+}
+
+.mta-stage {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+/* Size containment: the pages fill exactly this box, and their list and detail panel scroll inside it. */
+.mta-main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	container-type: size;
+	container-name: mta-main;
+}
+
+/* Middle widths: icons only. */
+@container mt-admin (max-width: 899px) {
+	.mta-body {
+		grid-template-columns: 36px minmax(0, 1fr);
+		gap: var(--moka-spacing-sm);
+	}
+
+	.mta-nav-item {
+		justify-content: center;
+		padding: 8px 0;
+	}
+
+	.mta-nav-label,
+	.mt-admin ::deep .mta-strip-kernel {
+		display: none;
+	}
+}
+
+/* Narrow: a dropdown above the page. */
+@container mt-admin (max-width: 559px) {
+	.mta-body {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+	}
+
+	.mta-nav {
+		display: none;
+	}
+
+	.mta-nav-select {
+		display: block;
+	}
+
+	.mta-strip-part {
+		display: none;
+	}
+}
+
+/* The review covers the page, never the navigation or the result, so it reads as part of this view. */
+.mta-review-layer {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: var(--moka-spacing-lg) var(--moka-spacing-xs);
+	overflow: auto;
+	background: color-mix(in srgb, var(--moka-color-background) 85%, transparent);
+	backdrop-filter: blur(6px);
+}
+
+.mta-review {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	width: min(100%, 600px);
+	padding: var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-lg);
+	background: var(--moka-color-surface);
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow-faint);
+}
+
+.mta-review-runs {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}
+
+.mta-review-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-run-button,
+.mta-plain-button {
+	padding: 6px var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-md);
+	background: transparent;
+	color: var(--moka-color-primary);
+	font: inherit;
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background var(--moka-transition-fast), box-shadow var(--moka-transition-fast);
+}
+
+.mta-plain-button {
+	border-color: var(--moka-color-outline-variant);
+	color: var(--moka-color-on-surface);
+}
+
+.mta-run-button--danger {
+	border-color: var(--moka-color-error);
+	color: var(--moka-color-error);
+}
+
+.mta-run-button:hover,
+.mta-plain-button:hover {
+	background: var(--moka-color-primary-glow);
+}
+
+.mta-run-button:active {
+	box-shadow: 0 0 24px var(--moka-color-primary-glow-strong);
+}
+
+.mta-run-button:focus-visible,
+.mta-plain-button:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-result {
+	display: flex;
+	flex-shrink: 0;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	padding: 4px var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-left: 3px solid var(--moka-color-success);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+.mta-result--running {
+	border-left-color: var(--moka-color-warning);
+}
+
+.mta-result--failed {
+	border-left-color: var(--moka-color-error);
+}
+
+.mta-result-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-root-on {
+	box-shadow: 0 0 12px var(--moka-color-primary-glow-md);
+}
+
+/* Shared by every page, which renders inside this view. */
+.mt-admin ::deep .mta-spacer {
+	flex: 1;
+}
+
+.mt-admin ::deep .mta-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-admin ::deep .mta-dim {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-admin ::deep .mta-after {
+	margin-left: 6px;
+}
+
+.mt-admin ::deep .mta-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mt-admin ::deep .mta-page {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-admin ::deep .mta-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm) var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-head-title {
+	display: flex;
+	flex: 1 1 200px;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* The filter, the primary action and refresh wrap as one group, so refresh never ends up alone on a line. Only the
+   filter gives way when the group is short of room; a shrunk button would cut its own label. */
+.mt-admin ::deep .mta-head-actions {
+	display: flex;
+	flex: 0 1 auto;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	margin-left: auto;
+}
+
+.mt-admin ::deep .mta-head-actions > :not(.mta-search) {
+	flex-shrink: 0;
+}
+
+/*
+	Wide enough for the longest placeholder ("Filter by name or description") while there is room. A width rather than a
+	basis alone: the group sizes itself from what its children ask for, and the search box would otherwise ask for its
+	own 200px.
+*/
+.mt-admin ::deep .mta-search {
+	flex: 0 1 280px;
+	width: 280px;
+	min-width: 130px;
+}
+
+.mt-admin ::deep .mta-subhead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-loading {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-xl) 0;
+}
+
+.mt-admin ::deep .mta-scroll {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-height: 0;
+	padding-right: 2px;
+	overflow-y: auto;
+}
+
+/* The list and its detail panel: side by side when there is room, one above the other when not. */
+.mt-admin ::deep .mta-md {
+	display: grid;
+	flex: 1;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--moka-spacing-md);
+	min-height: 0;
+}
+
+.mt-admin ::deep .mta-md--open {
+	grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+}
+
+.mt-admin ::deep .mta-md-list,
+.mt-admin ::deep .mta-md-detail {
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.mt-admin ::deep .mta-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.mt-admin ::deep .mta-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-sm);
+	background: transparent;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	font-size: var(--moka-font-size-xs);
+	cursor: pointer;
+	transition: border-color var(--moka-transition-fast), color var(--moka-transition-fast);
+}
+
+.mt-admin ::deep .mta-chip:hover {
+	border-color: var(--moka-color-primary-border);
+	color: var(--moka-color-on-surface);
+}
+
+.mt-admin ::deep .mta-chip:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mt-admin ::deep .mta-chip--active {
+	border-color: var(--moka-color-primary-border);
+	color: var(--moka-color-on-surface);
+	box-shadow: inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mt-admin ::deep .mta-chip-count {
+	color: var(--moka-color-on-surface-tertiary);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+}
+
+.mt-admin ::deep .mta-chip-count--alert {
+	color: var(--moka-color-error);
+}
+
+.mt-admin ::deep .mta-link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	font-size: var(--moka-font-size-xs);
+	text-decoration: underline dotted;
+	cursor: pointer;
+}
+
+.mt-admin ::deep .mta-link:hover:not(:disabled) {
+	color: var(--moka-color-primary);
+}
+
+.mt-admin ::deep .mta-link:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+.mt-admin ::deep .mta-table {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+}
+
+.mt-admin ::deep .mta-row {
+	display: grid;
+	grid-template-columns: var(--mta-cols);
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 30px;
+	padding: 3px var(--moka-spacing-sm);
+	border-top: 1px solid var(--moka-color-outline-variant);
+	font-size: var(--moka-font-size-sm);
+}
+
+.mt-admin ::deep .mta-row:first-child {
+	border-top: 0;
+}
+
+.mt-admin ::deep .mta-row:not(.mta-row--head):hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mt-admin ::deep .mta-row--head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	min-height: 26px;
+	background: var(--moka-color-surface);
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mt-admin ::deep .mta-row--clickable {
+	cursor: pointer;
+}
+
+.mt-admin ::deep .mta-row--clickable:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mt-admin ::deep .mta-row--selected,
+.mt-admin ::deep .mta-row--selected:hover {
+	background: var(--moka-color-surface-2);
+	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+.mt-admin ::deep .mta-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	cursor: pointer;
+}
+
+.mt-admin ::deep .mta-sort--active,
+.mt-admin ::deep .mta-sort:hover {
+	color: var(--moka-color-on-surface);
+}
+
+.mt-admin ::deep .mta-cell {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-admin ::deep .mta-cell--end {
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* The row menu stays quiet until the row is pointed at or chosen. */
+.mt-admin ::deep .mta-row-menu {
+	opacity: 0.35;
+	transition: opacity var(--moka-transition-fast);
+}
+
+.mt-admin ::deep .mta-row:hover .mta-row-menu,
+.mt-admin ::deep .mta-row--selected .mta-row-menu,
+.mt-admin ::deep .mta-row-menu:focus-within {
+	opacity: 1;
+}
+
+.mt-admin ::deep .mta-more {
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border-top: 1px solid var(--moka-color-outline-variant);
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-admin ::deep .mta-detail {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 100%;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-admin ::deep .mta-detail-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-detail-title {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.mt-admin ::deep .mta-detail-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-kv {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 4px var(--moka-spacing-md);
+	margin: 0;
+	font-size: var(--moka-font-size-sm);
+}
+
+.mt-admin ::deep .mta-kv dt {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 20px;
+	text-transform: uppercase;
+}
+
+.mt-admin ::deep .mta-kv dd {
+	min-width: 0;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.mt-admin ::deep .mta-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-admin ::deep .mta-card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+
+.mt-admin ::deep button.mta-card {
+	cursor: pointer;
+	transition: border-color var(--moka-transition-fast), background var(--moka-transition-fast);
+}
+
+.mt-admin ::deep button.mta-card:hover {
+	border-color: var(--moka-color-primary-border);
+	background: var(--moka-color-surface-hover);
+}
+
+.mt-admin ::deep button.mta-card:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mt-admin ::deep .mta-card-label {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.mt-admin ::deep .mta-stat {
+	overflow: hidden;
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: 20px;
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: 1.2;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-admin ::deep .mta-stat--small {
+	font-size: 15px;
+}
+
+.mt-admin ::deep .mta-stat--alert {
+	color: var(--moka-color-error);
+}
+
+.mt-admin ::deep .mta-card-sub {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-admin ::deep .mta-bar {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: var(--moka-color-surface-3);
+}
+
+.mt-admin ::deep .mta-bar > span {
+	display: block;
+	height: 100%;
+	background: var(--moka-color-success);
+}
+
+.mt-admin ::deep .mta-bar--warn > span {
+	background: var(--moka-color-warning);
+}
+
+.mt-admin ::deep .mta-bar--full > span {
+	background: var(--moka-color-error);
+}
+
+.mt-admin ::deep .mta-pre {
+	max-height: 260px;
+	margin: 0;
+	padding: var(--moka-spacing-sm);
+	overflow: auto;
+	border-left: 3px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	line-height: var(--moka-line-height-base);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	tab-size: 4;
+}
+
+.mt-admin ::deep .mta-pre--commands {
+	border-left-color: var(--moka-color-primary);
+	color: var(--moka-color-on-surface);
+}
+
+.mt-admin ::deep .mta-pre--result {
+	max-height: 150px;
+}
+
+.mt-admin ::deep .mta-pre--fill {
+	flex: 1;
+	max-height: none;
+	min-height: 120px;
+}
+
+.mt-admin ::deep .mta-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-admin ::deep .mta-form {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: var(--moka-spacing-sm);
+	align-items: start;
+}
+
+.mt-admin ::deep .mta-form-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-admin ::deep .mta-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-inline > .mta-grow {
+	flex: 1 1 180px;
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-runs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+/* The list and its panel stack once the page is narrower than a usable side panel. */
+@container mta-main (max-width: 719px) {
+	.mt-admin ::deep .mta-md--open {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr) minmax(0, 1.2fr);
+	}
+
+	.mt-admin ::deep .mta-detail {
+		min-height: 0;
+	}
+}
+
+/* Columns that only fit a wide list step aside on a narrow one. */
+@container mta-main (max-width: 559px) {
+	.mt-admin ::deep .mta-row {
+		grid-template-columns: var(--mta-cols-narrow, var(--mta-cols));
+	}
+
+	.mt-admin ::deep .mta-wide {
+		display: none;
+	}
+
+	.mt-admin ::deep .mta-kv {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+	}
+
+	.mt-admin ::deep .mta-kv dd {
+		margin-bottom: var(--moka-spacing-xs);
+	}
+
+	.mt-admin ::deep .mta-head-actions {
+		flex: 1 1 100%;
+	}
+
+	.mt-admin ::deep .mta-search {
+		flex: 1 1 auto;
+	}
+}

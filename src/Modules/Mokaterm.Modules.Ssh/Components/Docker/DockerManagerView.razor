@@ -1,0 +1,161 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits SessionViewBase
+
+<div class="mt-dk">
+	@if (_feature is null)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Disconnect"
+						Title="The session is not connected"
+						Description="The Docker manager runs docker over the live SSH connection." />
+	}
+	else if (_status is null)
+	{
+		<div class="mt-dk-center">
+			<MokaSpinner Label="@($"Looking for Docker on {_feature.Host}")" />
+		</div>
+	}
+	else
+	{
+		<div class="mt-dk-head">
+			<MokaStatusDot Size="MokaSize.Xs" Color="@HeadColor" Pulse="_detecting" Label="@HeadLabel" />
+			@if (_status.Version is { ServerApiVersion.Length: > 0 } version)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-meta">API @version.ServerApiVersion</MokaText>
+			}
+			@if (_feature.Compose is { } compose)
+			{
+				<MokaTag Text="@ComposeLabel(compose)" Size="MokaSize.Xs" Color="MokaColor.Surface" title="@($"Compose commands run as {compose.Display}")" />
+			}
+			@if (_status.Info is { Rootless: true })
+			{
+				<MokaTag Text="ROOTLESS" Size="MokaSize.Xs" Color="MokaColor.Info" title="The daemon runs as an ordinary user" />
+			}
+			@if (_status.IsElevated)
+			{
+				<MokaTag Text="SUDO" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Every docker command runs through sudo" />
+			}
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="_detecting"
+						OnClick="DetectAsync"
+						title="Look for Docker again"
+						aria-label="Look for Docker again" />
+		</div>
+
+		@switch (_status.Availability)
+		{
+			case DockerAvailability.Ready:
+				<div class="mt-dk-body">
+					<nav class="mt-dk-nav" aria-label="Docker">
+						@foreach (DockerManagerPage page in Pages)
+						{
+							<MokaButton @key="page"
+										Variant="MokaVariant.Text"
+										Color="@(page == _page ? MokaColor.Primary : MokaColor.Surface)"
+										Size="MokaSize.Sm"
+										StartIcon="@PageIcon(page)"
+										Class="@(page == _page ? "mt-dk-nav-item mt-dk-nav-item--active" : "mt-dk-nav-item")"
+										OnClick="@(() => Show(page))"
+										title="@PageTitle(page)"
+										aria-current="@(page == _page ? "page" : null)">
+								<span class="mt-dk-nav-label">@PageTitle(page)</span>
+							</MokaButton>
+						}
+					</nav>
+					<div class="mt-dk-page" @key="(_feature.Client, _feature.ComposePreference)">
+						@switch (_page)
+						{
+							case DockerManagerPage.Overview:
+								<DockerOverviewPage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Containers:
+								<DockerContainersPage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Compose:
+								<DockerComposePage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Images:
+								<DockerImagesPage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Volumes:
+								<DockerVolumesPage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Networks:
+								<DockerNetworksPage Session="Session" Visible="IsActive" />
+								break;
+						}
+					</div>
+				</div>
+				break;
+
+			case DockerAvailability.PermissionDenied:
+				<div class="mt-dk-scroll mt-dk-padded">
+					<MokaCallout Type="MokaCalloutType.Warning" Title="Docker refused this account">
+						<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Sm">
+							<MokaText Element="p" Size="MokaSize.Sm">@_status.Message</MokaText>
+							@if (_feature.CanElevate)
+							{
+								<MokaText Element="p" Size="MokaSize.Sm">
+									Commands can run through sudo instead. sudo may ask for this account's password; it goes to the
+									server on stdin and is never part of a command line.
+								</MokaText>
+								<div>
+									<MokaButton Variant="MokaVariant.Outlined"
+												Size="MokaSize.Sm"
+												StartIcon="MokatermIcons.Root"
+												Loading="_elevating"
+												Disabled="_elevating"
+												OnClick="ElevateAsync">
+										Run through sudo
+									</MokaButton>
+								</div>
+							}
+							else
+							{
+								<MokaText Element="p" Size="MokaSize.Sm" Style="@TextStyles.Muted">
+									Running as root is turned off for this connection, so sudo is not offered.
+								</MokaText>
+							}
+							@if (_elevationError is { } elevationError)
+							{
+								<MokaAlert Severity="MokaToastSeverity.Error" Dense>@elevationError</MokaAlert>
+							}
+						</MokaFlexbox>
+					</MokaCallout>
+
+					<div class="mt-dk-section">
+						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Or join the docker group</MokaText>
+						<MokaText Element="p" Size="MokaSize.Sm">
+							An administrator adds the account to the docker group, then the session reconnects: group membership is
+							read when a login starts. Membership is as good as root on that machine, because the daemon runs
+							whatever a member asks of it.
+						</MokaText>
+						<div class="mt-dk-copyline">
+							<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate>@DockerGroupCommand</MokaText>
+							<CopyButton Text="@DockerGroupCommand" Label="Copy the command" />
+						</div>
+					</div>
+
+					<div>
+						<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Refresh" Disabled="_detecting" OnClick="DetectAsync">
+							Try again
+						</MokaButton>
+					</div>
+				</div>
+				break;
+
+			default:
+				<div class="mt-dk-center">
+					<MokaEmptyState Icon="DockerIcons.Container" Title="@UnavailableTitle" Description="@_status.Message">
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Refresh" Disabled="_detecting" OnClick="DetectAsync">
+							Try again
+						</MokaButton>
+					</MokaEmptyState>
+				</div>
+				break;
+		}
+	}
+</div>

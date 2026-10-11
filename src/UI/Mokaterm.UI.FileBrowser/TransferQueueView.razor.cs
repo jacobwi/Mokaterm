@@ -187,6 +187,8 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 		return item.State == TransferState.Failed && !string.IsNullOrEmpty(item.Error) ? route + "\n" + item.Error : route;
 	}
 
+	private static string ResumedText(long offset) => "Continued from " + DisplayFormat.Bytes(offset) + " instead of starting over";
+
 	// Whole percentages: the progress bar writes the value into its style with the current culture's decimal separator.
 	private static double? ProgressValue(ITransferItem item) => item.State switch
 	{
@@ -202,6 +204,11 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 
 	private static string RateText(ITransferItem item)
 	{
+		if (item is { State: TransferState.Running, Verification: TransferVerification.Checking })
+		{
+			return "Checking the copy";
+		}
+
 		if (item.State != TransferState.Running || item.BytesPerSecond <= 0)
 		{
 			return "";
@@ -229,6 +236,7 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 	private static string StateLabel(ITransferItem item) => item.State switch
 	{
 		TransferState.Queued => "Queued",
+		TransferState.Running when item.Verification == TransferVerification.Checking => "Verifying",
 		TransferState.Running => "Running",
 		TransferState.Completed => "Done",
 		TransferState.Failed => "Failed",

@@ -1,0 +1,86 @@
+@namespace Mokaterm.UI.Commands
+@using Mokaterm.Abstractions.Commands
+
+@* One host of a run. The head is the toggle for the output below it; the output boxes are plain text in a monospace
+   pre, and copying takes what is shown, never more. *@
+<div class="@RowClass">
+	<div class="mt-run-host__head"
+		 role="button"
+		 tabindex="0"
+		 aria-expanded="@(Collapsed ? "false" : "true")"
+		 data-no-submit="true"
+		 @onclick="OnToggle"
+		 @onkeydown="OnHeadKeyDownAsync">
+		<span class="mt-run-host__chevron">
+			<MokaIcon Icon="@(Collapsed ? MokaIcons.Navigation.ChevronRight : MokaIcons.Navigation.ChevronDown)" SizeValue="12px" />
+		</span>
+		<MokaStatusDot Size="MokaSize.Xs" Color="@CommandRunDisplay.Color(Result)" Pulse="@Result.IsPending" />
+		<span class="mt-run-host__state">@CommandRunDisplay.Label(Result.State)</span>
+		<ProtocolIcon ProtocolId="@Result.ProtocolId" Size="MokaSize.Xs" />
+		<span class="mt-run-host__title" title="@Result.Title">@Result.Title</span>
+		@* A login with a label of its own does not say who it logs in as, so the user goes beside it. *@
+		@if (Result.Username is { } user && !Result.Title.StartsWith(user + "@", StringComparison.Ordinal))
+		{
+			<span class="mt-run-host__meta">as @user</span>
+		}
+		@if (!string.IsNullOrEmpty(Result.HostName) && !string.Equals(Result.HostName, Result.Address, StringComparison.Ordinal))
+		{
+			<span class="mt-run-host__meta">@Result.HostName</span>
+		}
+		<span class="mt-run-host__end">
+			@if (CommandRunDisplay.Exit(Result) is { } exit)
+			{
+				<span class="@ExitClass">@exit</span>
+			}
+			@if (Result.Duration is { } duration)
+			{
+				<span class="mt-run-host__time">@CommandRunDisplay.Duration(duration)</span>
+			}
+		</span>
+	</div>
+
+	@if (!Collapsed)
+	{
+		<div class="mt-run-host__body">
+			@if (Result.Message is { Length: > 0 } message)
+			{
+				<span class="mt-run-host__message">@message</span>
+			}
+
+			@if (Result.Output.Text.Length > 0)
+			{
+				<div class="mt-run-output">
+					<div class="mt-run-output__bar">
+						<span class="mt-run-output__label">STDOUT</span>
+						@if (Result.Output.IsTruncated)
+						{
+							<span class="mt-run-output__note">@CutNote(Result.Output)</span>
+						}
+						<CopyButton Text="@Result.Output.Text" Label="Copy output" />
+					</div>
+					<pre class="mt-run-output__text">@Result.Output.Text</pre>
+				</div>
+			}
+
+			@if (Result.Error.Text.Length > 0)
+			{
+				<div class="mt-run-output mt-run-output--error">
+					<div class="mt-run-output__bar">
+						<span class="mt-run-output__label">STDERR</span>
+						@if (Result.Error.IsTruncated)
+						{
+							<span class="mt-run-output__note">@CutNote(Result.Error)</span>
+						}
+						<CopyButton Text="@Result.Error.Text" Label="Copy error output" />
+					</div>
+					<pre class="mt-run-output__text">@Result.Error.Text</pre>
+				</div>
+			}
+
+			@if (Result.State == CommandHostState.Done && Result.Output.TotalBytes == 0 && Result.Error.TotalBytes == 0)
+			{
+				<span class="mt-run-host__message">No output.</span>
+			}
+		</div>
+	}
+</div>

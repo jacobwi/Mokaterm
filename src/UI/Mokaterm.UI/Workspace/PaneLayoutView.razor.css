@@ -1,0 +1,67 @@
+.mt-panes {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-panes ::deep .mt-pane-split {
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+}
+
+/*
+ * Moka's two halves are plain blocks that scroll, so whatever sits in one is only as tall as its own content, and a
+ * terminal fitted to that never grows. As flex columns they hand their whole size to the pane or the split inside, which
+ * is what lets a terminal refit when a splitter moves. Every view scrolls its own content, so the halves clip.
+ */
+.mt-panes ::deep .mt-pane-split > .moka-split-pane-first,
+.mt-panes ::deep .mt-pane-split > .moka-split-pane-second {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/*
+ * Moka sets each half's minimum with a descendant selector, so the halves of a split nested in one of the other axis
+ * pick up a minimum across their own axis too: in the grid every half would be at least 260px tall. A half only keeps
+ * the minimum along its own split.
+ */
+.mt-panes ::deep .mt-pane-split.moka-split-pane--horizontal > .moka-split-pane-first,
+.mt-panes ::deep .mt-pane-split.moka-split-pane--horizontal > .moka-split-pane-second {
+	min-height: 0;
+}
+
+.mt-panes ::deep .mt-pane-split.moka-split-pane--vertical > .moka-split-pane-first,
+.mt-panes ::deep .mt-pane-split.moka-split-pane--vertical > .moka-split-pane-second {
+	min-width: 0;
+}
+
+/*
+ * The handle and its grip are sized by descendant selectors too, and the vertical rules come later in Moka's file, so a
+ * side-by-side split inside a stacked one got a handle 4px tall (and the three-pane layout's stack one 4px wide): a
+ * splitter that can hardly be grabbed. Each split's own handle takes its axis and cursor back.
+ */
+.mt-panes ::deep .mt-pane-split.moka-split-pane--horizontal > .moka-split-pane-handle {
+	width: var(--moka-spacing-xs);
+	height: auto;
+	cursor: col-resize;
+}
+
+.mt-panes ::deep .mt-pane-split.moka-split-pane--vertical > .moka-split-pane-handle {
+	width: auto;
+	height: var(--moka-spacing-xs);
+	cursor: row-resize;
+}
+
+.mt-panes ::deep .mt-pane-split.moka-split-pane--horizontal > .moka-split-pane-handle > .moka-split-pane-handle-bar {
+	width: 2px;
+	height: var(--moka-spacing-xl);
+}
+
+.mt-panes ::deep .mt-pane-split.moka-split-pane--vertical > .moka-split-pane-handle > .moka-split-pane-handle-bar {
+	width: var(--moka-spacing-xl);
+	height: 2px;
+}

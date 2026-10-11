@@ -6,11 +6,18 @@ namespace Mokaterm.Maui.Services;
 /// <summary>Native pickers for uploads and downloads. Folder picking and save dialogs are per platform.</summary>
 internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 {
+	/// <summary>What a download is called until it is complete, so a partial file never passes for a finished one.</summary>
+	private const string PartialSuffix = ".part";
+
+	private const int WriteBufferSize = 128 * 1024;
+
 	private readonly ISettingsService _settings;
 
 	public MauiLocalFileAccess(ISettingsService settings) => _settings = settings;
 
 	public bool CanPickFolders => PlatformCanPickFolders;
+
+	public bool CanResumeSaves => true;
 
 	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default)
 	{
@@ -67,6 +74,72 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 		}
 	}
 
+	/// <summary>
+	/// Writes into a .part file beside where the download goes and gives it the real name once it is complete. A failed
+	/// attempt keeps the .part file, and the next one opens it again and carries on after its last byte.
+	/// </summary>
+	public async ValueTask<bool> SaveFileAsync(LocalSave save, Func<Stream, long, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(save);
+		ArgumentNullException.ThrowIfNull(writeAsync);
+
+		// A .part file left by something else must not pass for this download's beginning, so the first attempt starts empty.
+		bool firstAttempt = save.PartialPath is null || save.TargetPath is null;
+		if (save.TargetPath is null)
+		{
+			string safeName = SanitizeFileName(save.SuggestedName);
+			string? directory = _settings.Get<FileTransferSettings>().DownloadDirectory;
+			if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+			{
+				save.TargetPath = UniquePath(Path.Combine(directory, safeName));
+			}
+			else
+			{
+				// The save dialog already asked about replacing an existing file.
+				save.TargetPath = await MainThread.InvokeOnMainThreadAsync(() => PickSavePathAsync(safeName));
+				save.ReplaceTarget = true;
+			}
+
+			if (save.TargetPath is null)
+			{
+				return false;
+			}
+		}
+
+		string partial = save.PartialPath ??= save.TargetPath + PartialSuffix;
+		FileStream stream = new(partial, firstAttempt ? FileMode.Create : FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, WriteBufferSize, FileOptions.Asynchronous);
+		await using (stream)
+		{
+			long existing = stream.Length;
+			stream.Seek(existing, SeekOrigin.Begin);
+			await writeAsync(stream, existing, cancellationToken);
+		}
+
+		string target = save.TargetPath;
+		if (!save.ReplaceTarget && File.Exists(target))
+		{
+			// Something took the name in the download folder while this ran; the download is not the one to lose.
+			target = UniquePath(target);
+		}
+
+		File.Move(partial, target, overwrite: save.ReplaceTarget);
+		save.TargetPath = target;
+		save.PartialPath = null;
+		return true;
+	}
+
+	public ValueTask DiscardAsync(LocalSave save)
+	{
+		ArgumentNullException.ThrowIfNull(save);
+		if (save.PartialPath is { } partial)
+		{
+			TryDelete(partial);
+			save.PartialPath = null;
+		}
+
+		return ValueTask.CompletedTask;
+	}
+
 	private static string SanitizeFileName(string name)
 	{
 		string cleaned = string.Concat(name.Select(c => Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 ? '_' : c)).Trim();
@@ -75,7 +148,7 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 
 	private static string UniquePath(string path)
 	{
-		if (!File.Exists(path))
+		if (!File.Exists(path) && !File.Exists(path + PartialSuffix))
 		{
 			return path;
 		}
@@ -86,7 +159,7 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 		for (int i = 1; ; i++)
 		{
 			string candidate = Path.Combine(directory, $"{stem} ({i}){extension}");
-			if (!File.Exists(candidate))
+			if (!File.Exists(candidate) && !File.Exists(candidate + PartialSuffix))
 			{
 				return candidate;
 			}

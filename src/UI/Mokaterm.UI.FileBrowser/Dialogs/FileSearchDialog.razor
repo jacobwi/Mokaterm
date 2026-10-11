@@ -1,0 +1,105 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+@using Mokaterm.UI.Common.Components
+
+@{
+	RenderFragment TextCell(RemoteFileEntry entry, string text, string? title) =>
+		@<div class="fs-cell fs-mono" title="@title" @ondblclick="() => Choose(entry)">@text</div>;
+}
+
+<DialogFrame Heading="Heading">
+	<ChildContent>
+		<div class="fs">
+			<div class="fs-fields">
+				<MokaTextField Value="@_pattern"
+							   ValueChanged="OnPatternChanged"
+							   Label="Name"
+							   Size="MokaSize.Sm"
+							   Placeholder="*.log, or part of a name"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-dialog-focus="true" />
+				<MokaTextField Value="@_folder"
+							   ValueChanged="OnFolderChanged"
+							   Label="Look in"
+							   Size="MokaSize.Sm"
+							   Placeholder="/path/to/folder or ~"
+							   spellcheck="false"
+							   autocomplete="off" />
+			</div>
+
+			<div class="fs-options">
+				<MokaSegmentedControl Size="MokaSize.Xs" Value="@KindsValue" ValueChanged="OnKindsChanged" AriaLabel="Find">
+					<MokaSegment Value="@AllKinds" Text="Files and folders" />
+					<MokaSegment Value="@FileKinds" Text="Files" />
+					<MokaSegment Value="@FolderKinds" Text="Folders" />
+				</MokaSegmentedControl>
+				<MokaCheckbox Label="Match case" Value="@_matchCase" ValueChanged="@(value => _matchCase = value)" Size="MokaSize.Sm" />
+				<MokaCheckbox Label="Include hidden" Value="@_includeHidden" ValueChanged="@(value => _includeHidden = value)" Size="MokaSize.Sm" />
+			</div>
+
+			<div class="fs-status">
+				@if (_running)
+				{
+					<MokaSpinner SizeValue="12px" />
+				}
+				@if (_error is not null)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Color="MokaColor.Error" Truncate title="@_error">@_error</MokaText>
+				}
+				else
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted" Truncate title="@StatusText">@StatusText</MokaText>
+				}
+			</div>
+
+			@* Enter on a row goes to it, so it must not reach the dialog's own Enter, which presses Find. *@
+			<div class="fs-results" data-no-submit="true" @onkeydown="OnResultsKeyDown">
+				<MokaTable TItem="RemoteFileEntry"
+						   Items="_results"
+						   ItemKey="EntryKey"
+						   ShowToolbar="false"
+						   ShowPagination="false"
+						   Dense="true"
+						   FixedHeader="true"
+						   Height="300px"
+						   Virtualize="@(_results.Count > VirtualizeThreshold)"
+						   VirtualRowHeight="RowHeight"
+						   SelectedItems="_selectedItems"
+						   OnRowClick="Select">
+					<ChildContent>
+						<MokaColumn TItem="RemoteFileEntry" Title="Name" Sortable="false" MinWidth="140px">
+							<CellTemplate Context="entry">
+								<div class="fs-cell fs-name" title="@entry.Path" @ondblclick="() => Choose(entry)">
+									<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Size="MokaSize.Sm" Color="@EntryVisuals.ColorFor(entry)" />
+									<span class="fs-name-text">@entry.Name</span>
+								</div>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="RemoteFileEntry" Title="Folder" Sortable="false" Width="200px">
+							<CellTemplate Context="entry">@TextCell(entry, FolderText(entry), RemotePath.GetParent(entry.Path))</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="RemoteFileEntry" Title="Size" Sortable="false" Width="76px" Align="MokaTextAlign.Right">
+							<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.SizeText(entry), null)</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="RemoteFileEntry" Title="Modified" Sortable="false" Width="124px">
+							<CellTemplate Context="entry">@TextCell(entry, DisplayFormat.Timestamp(entry.LastModified), null)</CellTemplate>
+						</MokaColumn>
+					</ChildContent>
+					<EmptyContent>
+						<MokaEmptyState Icon="MokaIcons.Action.Search" Title="@EmptyTitle" Description="@EmptyDescription" />
+					</EmptyContent>
+				</MokaTable>
+			</div>
+		</div>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Close">Close</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="@(_selected is null)"
+					OnClick="ChooseSelected" title="Go to the selected result (Enter)">Go to</MokaButton>
+		@if (_running)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Stop">Stop</MokaButton>
+		}
+		<MokaButton Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Search" Disabled="@(!CanFind)" OnClick="FindAsync" data-dialog-default="true">Find</MokaButton>
+	</Actions>
+</DialogFrame>

@@ -80,6 +80,12 @@
 	}
 }
 
+/* Rows picked together for a command run: the selected-row glow, so the set reads as one selection. */
+.mt-tree-item--marked ::deep .moka-list-item {
+	background: var(--moka-color-surface-hover);
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow);
+}
+
 .mt-tree-item--drop ::deep .moka-list-item,
 .mt-tree-filler--drop {
 	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 12px var(--moka-color-primary-glow);

@@ -1,0 +1,193 @@
+.mt-run {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.mt-run-command {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* A command is code: monospace, and no spell checking or smart punctuation from the browser. */
+.mt-run-command ::deep .mt-run-command__input textarea {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	letter-spacing: 0.02em;
+}
+
+.mt-run-label {
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-run-count {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-run-logins {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-run-logins__head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.mt-run-logins__tools {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+
+.mt-run-logins__list {
+	display: flex;
+	flex-direction: column;
+	max-height: 260px;
+	overflow: auto;
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-run-login {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	cursor: pointer;
+	min-width: 0;
+	transition: background var(--moka-transition-fast);
+}
+
+.mt-run-login:last-child {
+	border-bottom: none;
+}
+
+.mt-run-login:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mt-run-login:focus-visible {
+	outline: none;
+	box-shadow: var(--moka-focus-ring);
+}
+
+.mt-run-login--on {
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+.mt-run-login--off {
+	cursor: default;
+	opacity: 0.55;
+}
+
+.mt-run-login--off:hover {
+	background: none;
+}
+
+.mt-run-login__box {
+	display: flex;
+	align-items: center;
+}
+
+.mt-run-login__main {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+}
+
+.mt-run-login__name {
+	font-size: var(--moka-font-size-sm);
+	color: var(--moka-color-on-surface);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-run-login__meta {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-run-empty {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-lg) var(--moka-spacing-md);
+}
+
+.mt-run-options {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--moka-spacing-md);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.mt-run-options__skip {
+	flex: 1 1 260px;
+	min-width: 0;
+	padding-bottom: var(--moka-spacing-xxs);
+}
+
+.mt-run-summary {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+	min-width: 0;
+}
+
+.mt-run-summary__command {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	letter-spacing: 0.02em;
+	color: var(--moka-color-on-surface);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-run-results__tools {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm);
+	flex-wrap: wrap;
+}
+
+.mt-run-results {
+	display: flex;
+	flex-direction: column;
+	max-height: 52vh;
+	overflow: auto;
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+	min-width: 0;
+}

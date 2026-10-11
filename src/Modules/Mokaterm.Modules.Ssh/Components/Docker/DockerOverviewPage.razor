@@ -1,0 +1,108 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-toolbar">
+	<span class="mt-dk-label">Engine</span>
+	<span class="mt-dk-spacer"></span>
+	<MokaButton Variant="MokaVariant.Outlined"
+				Color="MokaColor.Error"
+				Size="MokaSize.Xs"
+				StartIcon="DockerIcons.Prune"
+				Disabled="@(IsBusy || IsFirstLoad)"
+				OnClick="PruneAsync">
+		Prune
+	</MokaButton>
+	<MokaButton Variant="MokaVariant.Text"
+				Color="MokaColor.Surface"
+				Size="MokaSize.Xs"
+				StartIcon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading"
+				OnClick="RefreshAsync"
+				title="Look again"
+				aria-label="Look again" />
+</div>
+
+@LoadErrorPanel(RefreshAsync)
+@ChangePanel
+
+<div class="mt-dk-scroll">
+	@if (Feature?.Status is { } status)
+	{
+		<div class="mt-dk-stats">
+			<div class="mt-dk-stat">
+				<span class="mt-dk-label">Containers</span>
+				<span class="mt-dk-stat-value">@Count(status.Info?.Containers)</span>
+				<span class="mt-dk-note">@ContainerSplit(status)</span>
+			</div>
+			<div class="mt-dk-stat">
+				<span class="mt-dk-label">Images</span>
+				<span class="mt-dk-stat-value">@Count(status.Info?.Images)</span>
+			</div>
+			<div class="mt-dk-stat">
+				<span class="mt-dk-label">CPUs</span>
+				<span class="mt-dk-stat-value">@Count(status.Info?.Cpus)</span>
+			</div>
+			<div class="mt-dk-stat">
+				<span class="mt-dk-label">Memory</span>
+				<span class="mt-dk-stat-value">@(status.Info is { MemoryBytes: > 0 } info ? DisplayFormat.Bytes(info.MemoryBytes) : "-")</span>
+			</div>
+		</div>
+
+		<dl class="mt-dk-facts">
+			<dt>Server</dt><dd>@Join(status.Version?.ServerVersion, status.Version?.Platform)</dd>
+			<dt>API</dt><dd>@status.Version?.ServerApiVersion</dd>
+			<dt>Client</dt><dd>@Join(status.Version?.ClientVersion, status.Version?.Context is { Length: > 0 } context ? $"context {context}" : null)</dd>
+			<dt>Host</dt><dd>@Join(status.Info?.Name, status.Info?.OperatingSystem)</dd>
+			<dt>Kernel</dt><dd>@Join(status.Info?.KernelVersion ?? status.Version?.KernelVersion, status.Info?.Architecture)</dd>
+			<dt>Storage</dt><dd>@Join(status.Info?.StorageDriver, status.Info?.RootDirectory)</dd>
+			<dt>Mode</dt><dd>@ModeText(status)</dd>
+		</dl>
+
+		<div class="mt-dk-section">
+			<span class="mt-dk-label">Compose</span>
+			<dl class="mt-dk-facts">
+				<dt>Plugin</dt><dd>@InstallText(status.Compose.Plugin, "docker compose")</dd>
+				<dt>Standalone</dt><dd>@InstallText(status.Compose.Standalone, "docker-compose")</dd>
+				<dt>In use</dt><dd>@(Feature.Compose is { } compose ? $"{compose.Display}{(compose.SupportsList ? "" : ", projects from container labels")}" : "none")</dd>
+			</dl>
+			<div class="mt-dk-toolbar">
+				<span class="mt-dk-note">Compose commands use</span>
+				<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
+					<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
+					<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
+					<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
+				</MokaSegmentedControl>
+			</div>
+			<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>
+		</div>
+	}
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Disk usage</span>
+			<span class="mt-dk-cell">docker system df</span>
+		</div>
+		@if (IsFirstLoad)
+		{
+			<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+		}
+		else if (_usage.Count > 0)
+		{
+			<table class="mt-dk-table">
+				<thead><tr><th>Type</th><th>Total</th><th>Active</th><th>Size</th><th>Reclaimable</th></tr></thead>
+				<tbody>
+					@foreach (DockerDiskUsage row in _usage)
+					{
+						<tr @key="row.Type">
+							<td>@row.Type</td>
+							<td>@row.TotalCount</td>
+							<td>@row.Active</td>
+							<td>@row.Size</td>
+							<td>@row.Reclaimable</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+</div>

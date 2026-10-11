@@ -107,4 +107,27 @@ public static class RemotePath
 			|| normalizedPath == normalizedAncestor
 			|| normalizedPath.StartsWith(normalizedAncestor + Separator, StringComparison.Ordinal);
 	}
+
+	/// <summary>
+	/// The part of <paramref name="path"/> below <paramref name="ancestor"/>, with no leading '/': <c>css/app.css</c> for
+	/// <c>/srv/site/css/app.css</c> under <c>/srv/site</c>, and empty for the folder itself. Null when it lies outside.
+	/// </summary>
+	public static string? GetRelativePath(string ancestor, string path)
+	{
+		string normalizedPath = Normalize(path);
+		string normalizedAncestor = Normalize(ancestor);
+		if (normalizedPath == normalizedAncestor)
+		{
+			return "";
+		}
+
+		if (normalizedAncestor == Root)
+		{
+			return normalizedPath[1..];
+		}
+
+		return normalizedPath.StartsWith(normalizedAncestor + Separator, StringComparison.Ordinal)
+			? normalizedPath[(normalizedAncestor.Length + 1)..]
+			: null;
+	}
 }

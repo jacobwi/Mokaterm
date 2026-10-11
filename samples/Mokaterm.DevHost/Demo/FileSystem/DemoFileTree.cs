@@ -147,7 +147,7 @@ internal sealed class DemoFileTree
 				throw Denied(target);
 			}
 
-			return new DemoFileData(node.Size, node.Content, node.Modified);
+			return new DemoFileData(node.Size, node.Content, node.Modified, node.ContentLost);
 		}
 	}
 
@@ -296,6 +296,63 @@ internal sealed class DemoFileTree
 		}
 	}
 
+	/// <summary>
+	/// Copies like <c>cp -a</c>: a folder with everything in it, links as links, modes and times kept. The copy belongs to
+	/// the account unless that is root, which keeps the owners. A folder copied over a folder merges into it.
+	/// </summary>
+	public void Copy(string sourcePath, string destinationPath, bool overwrite, DemoAccount account)
+	{
+		string source = RemotePath.Normalize(sourcePath);
+		string destination = RemotePath.Normalize(destinationPath);
+		lock (_gate)
+		{
+			(_, DemoNode? entry, _) = Locate(source, account);
+			if (entry is null)
+			{
+				throw NotFound(source);
+			}
+
+			(DemoNode targetParent, DemoNode? existing, string name) = Locate(destination, account);
+			RequireChangeable(targetParent, account, destination);
+			if (entry.Kind == RemoteEntryKind.Directory && IsSameOrInside(targetParent, entry))
+			{
+				throw InvalidArgument(destination);
+			}
+
+			RequireCopyable(entry, account, source);
+			if (existing is not null)
+			{
+				if (ReferenceEquals(existing, entry) || !overwrite)
+				{
+					throw AlreadyExists(destination);
+				}
+
+				if (entry.Kind == RemoteEntryKind.Directory)
+				{
+					if (existing.Kind != RemoteEntryKind.Directory)
+					{
+						throw NotDirectory(destination);
+					}
+
+					Merge(entry, existing, account);
+					existing.Modified = Now;
+					return;
+				}
+
+				if (existing.Kind == RemoteEntryKind.Directory)
+				{
+					throw IsDirectory(destination);
+				}
+
+				RequireRemovable(targetParent, existing, account, destination);
+				targetParent.Remove(existing);
+			}
+
+			targetParent.Add(Clone(entry, name, account));
+			targetParent.Modified = Now;
+		}
+	}
+
 	public void SetPermissions(string path, UnixFileMode permissions, bool recursive, DemoAccount account)
 	{
 		string target = RemotePath.Normalize(path);
@@ -383,6 +440,7 @@ internal sealed class DemoFileTree
 
 				file.Size = 0;
 				file.Content = [];
+				file.ContentLost = false;
 				file.Modified = Now;
 				if (permissions is { } mode && (account.IsRoot || file.Owner == account.Name))
 				{
@@ -400,12 +458,37 @@ internal sealed class DemoFileTree
 		}
 	}
 
+	/// <summary>
+	/// Opens an existing file to write after its last byte, the way FTP's APPE continues an upload, and returns it with its
+	/// size. Writing through a link writes what it points at.
+	/// </summary>
+	public (DemoNode File, long Size) BeginAppend(string path, DemoAccount account)
+	{
+		string target = RemotePath.Normalize(path);
+		lock (_gate)
+		{
+			DemoNode file = Walk(target, account, followLast: true);
+			if (file.Kind == RemoteEntryKind.Directory)
+			{
+				throw IsDirectory(target);
+			}
+
+			if (!Can(file, account, Access.Write))
+			{
+				throw Denied(target);
+			}
+
+			return (file, file.Size);
+		}
+	}
+
 	public void Append(DemoNode file, ReadOnlySpan<byte> data)
 	{
 		lock (_gate)
 		{
+			// Bytes after a gap in what is stored would land at the wrong place, so a file already past the cap keeps none.
 			int stored = file.Content.Length;
-			int keep = Math.Min(data.Length, MaxStoredBytes - stored);
+			int keep = file.Content.Length < file.Size ? 0 : Math.Min(data.Length, MaxStoredBytes - stored);
 			if (keep > 0)
 			{
 				byte[] content = new byte[stored + keep];
@@ -414,6 +497,7 @@ internal sealed class DemoFileTree
 				file.Content = content;
 			}
 
+			file.ContentLost |= keep < data.Length;
 			file.Size += data.Length;
 			file.Modified = Now;
 		}
@@ -473,6 +557,63 @@ internal sealed class DemoFileTree
 			{
 				RequireTreeRemovable(child, account, childPath);
 			}
+		}
+	}
+
+	// A copy reads every file and lists every folder it takes; links are copied as links, so what they point at is not read.
+	private static void RequireCopyable(DemoNode node, DemoAccount account, string path)
+	{
+		if (node.Kind == RemoteEntryKind.SymbolicLink)
+		{
+			return;
+		}
+
+		if (!Can(node, account, Access.Read) || (node.Kind == RemoteEntryKind.Directory && !Can(node, account, Access.Search)))
+		{
+			throw Denied(path);
+		}
+
+		foreach (DemoNode child in node.Children)
+		{
+			RequireCopyable(child, account, RemotePath.Combine(path, child.Name));
+		}
+	}
+
+	private static DemoNode Clone(DemoNode node, string name, DemoAccount account)
+	{
+		string owner = account.IsRoot ? node.Owner : account.Name;
+		string group = account.IsRoot ? node.Group : account.Group;
+		switch (node.Kind)
+		{
+			case RemoteEntryKind.Directory:
+				DemoNode folder = DemoNode.NewDirectory(name, owner, group, node.Mode, node.Modified);
+				foreach (DemoNode child in node.Children)
+				{
+					folder.Add(Clone(child, child.Name, account));
+				}
+
+				return folder;
+			case RemoteEntryKind.SymbolicLink:
+				return DemoNode.NewLink(name, node.LinkTarget ?? "", owner, group, node.Modified);
+			default:
+				DemoNode file = DemoNode.NewFile(name, owner, group, node.Mode, node.Modified, node.Size, node.Content);
+				file.ContentLost = node.ContentLost;
+				return file;
+		}
+	}
+
+	private static void Merge(DemoNode source, DemoNode target, DemoAccount account)
+	{
+		foreach (DemoNode child in source.Children.ToList())
+		{
+			DemoNode? existing = target.Child(child.Name);
+			if (existing is { Kind: RemoteEntryKind.Directory } && child.Kind == RemoteEntryKind.Directory)
+			{
+				Merge(child, existing, account);
+				continue;
+			}
+
+			target.Add(Clone(child, child.Name, account));
 		}
 	}
 

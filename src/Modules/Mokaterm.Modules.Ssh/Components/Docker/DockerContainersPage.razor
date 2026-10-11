@@ -1,0 +1,105 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-toolbar">
+	<div class="mt-dk-toolbar-search">
+		<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, image, port or project" Debounce="100" aria-label="Filter containers" />
+	</div>
+	<MokaSegmentedControl Size="MokaSize.Xs" Value="@_filter" ValueChanged="OnFilterChanged" AriaLabel="Which containers">
+		<MokaSegment Value="all" Text="@($"All {_containers.Count.ToString(CultureInfo.CurrentCulture)}")" />
+		<MokaSegment Value="running" Text="@($"Up {RunningCount.ToString(CultureInfo.CurrentCulture)}")" />
+		<MokaSegment Value="stopped" Text="@($"Down {(_containers.Count - RunningCount).ToString(CultureInfo.CurrentCulture)}")" />
+	</MokaSegmentedControl>
+	<MokaButton Variant="MokaVariant.Text"
+				Color="MokaColor.Surface"
+				Size="MokaSize.Xs"
+				StartIcon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading"
+				OnClick="RefreshAsync"
+				title="Refresh (the list also refreshes every five seconds)"
+				aria-label="Refresh" />
+</div>
+
+@LoadErrorPanel(RefreshAsync)
+@ChangePanel
+@if (_shellProblem is { } shellProblem)
+{
+	<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@shellProblem</MokaAlert>
+}
+
+<div class="@(_selected is null ? "mt-dk-split" : "mt-dk-split mt-dk-split--open")">
+	<div class="mt-dk-split-list" role="list" aria-label="Containers">
+		@if (IsFirstLoad)
+		{
+			<div class="mt-dk-center"><MokaSpinner Label="Listing containers" /></div>
+		}
+		else if (_groups.Count == 0)
+		{
+			<MokaEmptyState Icon="DockerIcons.Container"
+							Title="@(_containers.Count == 0 ? "No containers" : "Nothing matches")"
+							Description="@(_containers.Count == 0 ? "docker ps -a lists nothing on this host." : "No container matches the filter.")" />
+		}
+		else
+		{
+			@foreach (ContainerGroup group in _groups)
+			{
+				bool open = !_collapsed.Contains(group.Key);
+				<button type="button" class="mt-dk-group" @key="group.Key" aria-expanded="@(open ? "true" : "false")" @onclick="@(() => ToggleGroup(group.Key))">
+					<MokaIcon Icon="@(open ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronRight)" Size="MokaSize.Xs" />
+					<span class="mt-dk-label">@group.Title</span>
+					<span class="mt-dk-mono mt-dk-muted">@group.Running.ToString(CultureInfo.InvariantCulture)/@group.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
+				</button>
+				@if (open)
+				{
+					@foreach (DockerContainer container in group.Containers)
+					{
+						<div class="@(container.Id == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="container.Id">
+							<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(container, "logs"))" title="@container.Status">
+								<MokaStatusDot Size="MokaSize.Xs"
+											   Color="@DockerStateDisplay.Color(container.State, container.Health)"
+											   Pulse="@DockerStateDisplay.IsMoving(container.State, container.Health)" />
+								<span class="mt-dk-cell-name mt-dk-cell--w30">@ShortName(container)</span>
+								<span class="mt-dk-cell mt-dk-cell--grow" title="@container.Image">@container.Image</span>
+								<span class="mt-dk-cell mt-dk-cell--optional" title="@Ports(container)">@Ports(container)</span>
+							</button>
+							<span class="mt-dk-hover">
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.File.FileText"
+											OnClick="@(() => Select(container, "logs"))" title="Logs" aria-label="@($"Logs of {container.Name}")" />
+								@if (container.IsRunning)
+								{
+									<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
+												Disabled="@(IsBusy || Session.Terminal is null)"
+												OnClick="@(() => ShellAsync(container))" title="Open a shell in the session's terminal" aria-label="@($"Open a shell in {container.Name}")" />
+								}
+								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(container.IsAlive ? MokatermIcons.Reconnect : MokatermIcons.Play)"
+											Disabled="IsBusy"
+											OnClick="@(() => container.IsAlive ? RestartAsync(container) : StartAsync(container))"
+											title="@(container.IsAlive ? "Restart" : "Start")" aria-label="@($"{(container.IsAlive ? "Restart" : "Start")} {container.Name}")" />
+								<DockerContainerMenu Name="@container.Name"
+													 Id="@container.Id"
+													 State="@container.State"
+													 Disabled="IsBusy"
+													 HasTerminal="@(Session.Terminal is not null)"
+													 OnAction="@(action => OnMenuAsync(container, action))" />
+							</span>
+						</div>
+					}
+				}
+			}
+		}
+	</div>
+
+	@if (_selected is { } selected && _containers.Any(container => container.Id == selected))
+	{
+		<div class="mt-dk-split-panel">
+			<DockerContainerPanel @key="selected"
+								  Session="Session"
+								  ContainerId="@selected"
+								  Tab="@_tab"
+								  TabChanged="OnTabChanged"
+								  Visible="Visible"
+								  OnClose="ClosePanel"
+								  OnChanged="RefreshAsync" />
+		</div>
+	}
+</div>

@@ -1,8 +1,9 @@
 @namespace Mokaterm.UI.FileBrowser.Dialogs
 @using Mokaterm.UI.Common.Components
+@using Mokaterm.UI.FileBrowser.Editing
 
 @* Setting the box's value leaves the caret at the end of the file, so the editor would open at its last line. *@
-<DialogFrame SelectionStart="0" SelectionEnd="0">
+<DialogFrame Heading="Heading" SelectionStart="0" SelectionEnd="0">
 	<ChildContent>
 		<div class="mt-edit-head">
 			<div class="mt-edit-path">
@@ -10,7 +11,7 @@
 				<CopyButton Text="@Path" Label="Copy path" />
 			</div>
 			<div class="mt-edit-facts">
-				@foreach (string fact in Facts)
+				@foreach (string fact in _facts)
 				{
 					<MokaTag Text="@fact" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 				}
@@ -29,44 +30,178 @@
 			<MokaAlert Severity="MokaToastSeverity.Error" Title="Could not save" Dense>@error</MokaAlert>
 		}
 
-		<div class="@FrameClass" @ref="_frame">
-			<div class="mt-edit-sheet">
-				@* The numbers are printed by the page. A long file's gutter is one node per line, which is worth a
-				   textContent and not a render tree. *@
-				<div class="mt-edit-gutter" aria-hidden="true">
-					<div class="mt-edit-numbers" @ref="_numbers"></div>
+		<div class="mt-edit-stage">
+			@* Stays laid out under a diff rather than leaving the page: the box keeps its undo history, its scroll position
+			   and the page's wiring, and inert keeps the keyboard out of it meanwhile. *@
+			<div class="@FrameClass" @ref="_frame" inert="@ShowsDiff">
+				<div class="mt-edit-sheet">
+					@* The numbers are printed by the page. A long file's gutter is one node per line, which is worth a
+					   textContent and not a render tree. *@
+					<div class="mt-edit-gutter" aria-hidden="true">
+						<div class="mt-edit-numbers" @ref="_numbers"></div>
+					</div>
+					<div class="mt-edit-text">
+						@* The coloured copy of the text, filled by the page and drawn under the box, whose own text turns
+						   transparent while this layer is painted. The box stays the element that is read and typed in. *@
+						<div class="mt-edit-paint" aria-hidden="true">
+							<div class="mt-edit-lines" @ref="_lines"></div>
+						</div>
+						<textarea class="mt-edit-area"
+								  @ref="_area"
+								  value="@_text"
+								  @oninput="OnInput"
+								  spellcheck="false"
+								  autocomplete="off"
+								  autocapitalize="off"
+								  wrap="off"
+								  aria-label="@("Contents of " + FileName)"
+								  data-dialog-focus="true"
+								  data-no-submit="true"></textarea>
+					</div>
 				</div>
-				<textarea class="mt-edit-area"
-						  @ref="_area"
-						  value="@_text"
-						  @oninput="OnInput"
-						  spellcheck="false"
-						  autocomplete="off"
-						  autocapitalize="off"
-						  wrap="off"
-						  aria-label="@("Contents of " + FileName)"
-						  data-dialog-focus="true"
-						  data-no-submit="true"></textarea>
-			</div>
-			<div class="mt-edit-status">
-				<div class="mt-edit-where">
-					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Muted">@CaretText</MokaText>
-					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Muted">@LineCountText</MokaText>
+				<div class="mt-edit-status">
+					<div class="mt-edit-where">
+						<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Muted">@CaretText</MokaText>
+						<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Muted">@LineCountText</MokaText>
+					</div>
+					<span class="mt-edit-hint">
+						<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.MicroLabel">@Hint</MokaText>
+					</span>
+					<div class="mt-edit-language">
+						@if (ShowsTooLarge)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted" title="@TooLargeTitle">Too large to highlight</MokaText>
+						}
+						<MokaContextMenuTrigger Trigger="MokaContextMenuTriggerType.LeftClick" Items="_languageMenu">
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										EndIcon="MokaIcons.Navigation.ChevronUp"
+										title="Highlighting"
+										aria-label="@LanguageLabel"
+										aria-haspopup="menu">
+								@_language.Name
+							</MokaButton>
+						</MokaContextMenuTrigger>
+					</div>
 				</div>
-				<span class="mt-edit-hint">
-					<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.MicroLabel">@Hint</MokaText>
-				</span>
 			</div>
+
+			@if (ShowsDiff)
+			{
+				<section class="mt-diff">
+					@if (_conflict is not null)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Warning" Title="Changed on the server" Dense>@ConflictMessage</MokaAlert>
+					}
+					<div class="mt-diff-head">
+						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Transform="MokaTextTransform.Uppercase" Style="@TextStyles.MicroLabel">@DiffTitle</MokaText>
+						@if (_diff is { IsTooDifferent: false, HasChanges: true } summary)
+						{
+							<span class="mt-diff-sum" title="@SummaryTitle(summary)">
+								<span class="mt-diff-plus">+@summary.Added</span>
+								<span class="mt-diff-minus">-@summary.Removed</span>
+							</span>
+						}
+					</div>
+					@* Focusable so the keyboard can scroll it, and Enter here does not press the dialog's default button. *@
+					<div class="mt-diff-body"
+						 @ref="_diffBody"
+						 tabindex="0"
+						 role="region"
+						 aria-label="@DiffTitle"
+						 data-no-submit="true"
+						 style="@DigitsStyle">
+						@if (_conflict is { ServerText: null })
+						{
+							<p class="mt-diff-note">@NoComparisonText</p>
+						}
+						else if (_diff is null)
+						{
+							<div class="mt-diff-note">
+								<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+								<span>Comparing...</span>
+							</div>
+						}
+						else if (_diff.IsTooDifferent)
+						{
+							<p class="mt-diff-note">These versions are too different to compare line by line.</p>
+						}
+						else if (!_diff.HasChanges)
+						{
+							<p class="mt-diff-note">@SameLinesText</p>
+						}
+						else
+						{
+							<div class="mt-diff-rows">
+								@foreach (DiffLine line in _diffRows)
+								{
+									if (line.Kind == DiffLineKind.Skipped)
+									{
+										<div class="mt-diff-gap"><span class="mt-diff-gap-text">@SkippedText(line.Count)</span></div>
+									}
+									else
+									{
+										<div class="@RowClass(line.Kind)">
+											<span class="mt-diff-number">@NumberText(line.OldNumber)</span>
+											<span class="mt-diff-number">@NumberText(line.NewNumber)</span>
+											<span class="mt-diff-sign">@Sign(line.Kind)</span>
+											<span class="mt-diff-text">@line.Text</span>
+										</div>
+									}
+								}
+							</div>
+							@if (_hiddenDiffLines > 0)
+							{
+								<p class="mt-diff-note">@HiddenText</p>
+							}
+						}
+					</div>
+				</section>
+			}
 		</div>
 	</ChildContent>
 	<Actions>
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_saving" OnClick="CancelAsync">Cancel</MokaButton>
-		<MokaButton Size="MokaSize.Sm"
-					Disabled="@(!_dirty || _saving)"
-					OnClick="SaveAsync"
-					title="Save (Ctrl+S)"
-					data-dialog-default="true">
-			@(_saving ? "Saving..." : "Save")
-		</MokaButton>
+		@if (_conflict is not null)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Sm"
+						Disabled="_saving"
+						OnClick="BackToEditing"
+						title="Keep editing on top of the server's copy"
+						data-dialog-default="true">
+				Back to editing
+			</MokaButton>
+			<MokaButton Size="MokaSize.Sm" Color="MokaColor.Error" Disabled="_saving" OnClick="OverwriteAsync" title="Write your edits over the server's copy">
+				@(_saving ? "Saving..." : "Overwrite")
+			</MokaButton>
+		}
+		else
+		{
+			@if (_reviewing)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_saving" OnClick="BackToEditing">Back to editing</MokaButton>
+			}
+			else
+			{
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Sm"
+							Disabled="@(!_dirty || _saving)"
+							OnClick="ReviewAsync"
+							title="Compare the edits with the file as it was read">
+					Review changes
+				</MokaButton>
+			}
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_saving" OnClick="CancelAsync">Cancel</MokaButton>
+			<MokaButton Size="MokaSize.Sm"
+						Disabled="@(!_dirty || _saving)"
+						OnClick="SaveAsync"
+						title="Save (Ctrl+S)"
+						data-dialog-default="true">
+				@(_saving ? "Saving..." : "Save")
+			</MokaButton>
+		}
 	</Actions>
 </DialogFrame>

@@ -23,9 +23,12 @@ public sealed partial class SessionLogSettingsPage : SettingsSectionBase<Session
 	[
 		new(SessionLogFormat.PlainText, "Plain text"),
 		new(SessionLogFormat.Raw, "Raw"),
+		new(SessionLogFormat.Asciicast, "Timed"),
 	];
 
 	private IReadOnlyList<SessionLogFile> _files = [];
+	private SessionLogFile? _playing;
+	private bool _playerOpen;
 	private bool _busy;
 
 	[Inject]
@@ -73,6 +76,12 @@ public sealed partial class SessionLogSettingsPage : SettingsSectionBase<Session
 		SessionLogSettings.NormalizeFolder(value).Length > 0 ? null : SessionLogSettings.FolderRequirement;
 
 	private void Reload() => _files = Recorder.ListFiles();
+
+	private void Play(SessionLogFile file)
+	{
+		_playing = file;
+		_playerOpen = true;
+	}
 
 	private Task SetFolderAsync(string value) =>
 		UpdateAsync(settings => settings with { Folder = SessionLogSettings.NormalizeFolder(value) });

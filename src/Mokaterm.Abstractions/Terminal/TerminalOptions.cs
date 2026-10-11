@@ -14,10 +14,18 @@ public enum TerminalBellStyle
 	Sound,
 }
 
+/// <summary>
+/// What a right-click inside a terminal does. Shift+right-click opens the menu whichever is chosen, and while a program
+/// reads the mouse itself (tmux, htop, vim) a plain right-click is the program's. Stored by name, so new modes go last.
+/// </summary>
 public enum TerminalRightClickAction
 {
 	ContextMenu,
+
 	Paste,
+
+	/// <summary>Windows Terminal's way: copy the selection and clear it, or paste when nothing is selected.</summary>
+	CopyOrPaste,
 }
 
 /// <summary>How the user, the machine and the folder of a <c>user@host:path$</c> prompt are colored.</summary>

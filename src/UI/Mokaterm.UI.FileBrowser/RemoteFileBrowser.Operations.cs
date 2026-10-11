@@ -1,3 +1,5 @@
+using Moka.Red.Icons;
+using Mokaterm.UI.Common.Icons;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Diagnostics;
@@ -6,6 +8,7 @@ using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Transfers;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.FileBrowser.Browsing;
@@ -190,12 +193,14 @@ public partial class RemoteFileBrowser
 	/// <summary>
 	/// Applies a change with <paramref name="fileSystem"/>, or the browser's current one, and lists the folder again, also
 	/// after a partial failure. A failure shows an alert, and a permission error offers to run the change again as root.
+	/// <paramref name="then"/> runs once the change went through and the folder was listed, after a retry as root too.
 	/// </summary>
 	private async Task RunChangeAsync(
 		string failureTitle,
 		Func<IRemoteFileSystem, CancellationToken, Task> change,
 		string? select = null,
-		IRemoteFileSystem? fileSystem = null)
+		IRemoteFileSystem? fileSystem = null,
+		Func<Task>? then = null)
 	{
 		if ((fileSystem ?? _fileSystem) is not { } target)
 		{
@@ -215,7 +220,7 @@ public partial class RemoteFileBrowser
 		{
 			if (!token.IsCancellationRequested && BelongsToConnection(target))
 			{
-				ShowAlert(failureTitle, ex, target.IsElevated ? null : root => RunChangeAsync(failureTitle, change, select, root));
+				ShowAlert(failureTitle, ex, target.IsElevated ? null : root => RunChangeAsync(failureTitle, change, select, root, then));
 			}
 		}
 		finally
@@ -226,6 +231,10 @@ public partial class RemoteFileBrowser
 		if (!token.IsCancellationRequested && BelongsToConnection(target))
 		{
 			await RefreshAsync(succeeded ? select : null);
+			if (succeeded && then is not null && !_disposed)
+			{
+				await then();
+			}
 		}
 	}
 
@@ -346,7 +355,7 @@ public partial class RemoteFileBrowser
 		{
 			string directory = _path;
 			HashSet<string> taken = TakenNames(except: null);
-			string? name = await Dialogs.AskNameAsync("New folder", "Folder name", UniqueName("New folder", taken), "Create", taken, selectBaseName: false);
+			string? name = await Dialogs.AskNameAsync("New folder", MokatermIcons.FolderPlus, "Folder name", EntryNames.Unique("New folder", taken, isFolder: true), "Create", taken, selectBaseName: false);
 			if (name is null)
 			{
 				return;
@@ -372,6 +381,7 @@ public partial class RemoteFileBrowser
 		{
 			string? name = await Dialogs.AskNameAsync(
 				"Rename",
+				MokaIcons.Action.Edit,
 				entry.IsDirectoryLike ? "Folder name" : "File name",
 				entry.Name,
 				"Rename",
@@ -533,6 +543,46 @@ public partial class RemoteFileBrowser
 		}
 	}
 
+	/// <summary>
+	/// Asks the server for a file's checksum and copies it the way checksum tools print it, hash then name, so it can be
+	/// held against a published one by eye or with <c>sha256sum -c</c>.
+	/// </summary>
+	private async Task CopyChecksumAsync(RemoteFileEntry entry)
+	{
+		if (_fileSystem is not { ServerChecksum: { } algorithm } fileSystem)
+		{
+			return;
+		}
+
+		string? checksum;
+		try
+		{
+			checksum = await fileSystem.ComputeChecksumAsync(entry.Path, ConnectionToken);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+		catch (Exception ex)
+		{
+			ShowAlert("Could not compute the checksum of " + entry.Name, ex, retryAsRoot: _ => CopyChecksumAsync(entry));
+			return;
+		}
+
+		if (checksum is null)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "The server cannot compute checksums.", entry.Name);
+			return;
+		}
+
+		await CopyAsync(checksum + "  " + entry.Name, FileChecksums.Name(algorithm) + " of " + entry.Name + " copied");
+	}
+
+	/// <summary>Copies the paths of <paramref name="entries"/>, one per line, or the current folder's when there are none.</summary>
+	private Task CopyPathsAsync(List<RemoteFileEntry> entries) => entries.Count == 0
+		? CopyAsync(_path, "Folder path copied")
+		: CopyAsync(string.Join('\n', entries.Select(entry => entry.Path)), entries.Count == 1 ? "Path copied" : "Paths copied");
+
 	private async Task CopyAsync(string text, string notice)
 	{
 		try
@@ -661,6 +711,7 @@ public partial class RemoteFileBrowser
 	/// <summary>
 	/// Uploads dropped files into the current folder. With <see cref="FileTransferSettings.ConfirmDrop"/> the user first
 	/// sees what goes where and picks the account; choosing root opens the root file system without switching the view.
+	/// Without it a drop uploads at once as the browser's account, unless that account is root.
 	/// </summary>
 	private async Task HandleDropAsync(FileDropEvent drop)
 	{
@@ -683,7 +734,10 @@ public partial class RemoteFileBrowser
 
 		string directory = _path;
 		bool asRoot = current.IsElevated;
-		if (Settings.Get<FileTransferSettings>().ConfirmDrop)
+		bool confirm = Settings.Get<FileTransferSettings>().ConfirmDrop;
+
+		// Files written as root belong to root, so turning the everyday question off never turns this one off with it.
+		if (confirm || asRoot)
 		{
 			long? totalBytes = 0;
 			foreach (LocalFileItem item in drop.Items)
@@ -694,7 +748,7 @@ public partial class RemoteFileBrowser
 				}
 			}
 
-			UploadRunAs? choice = await Dialogs.ConfirmUploadAsync(
+			UploadConfirmation? choice = await Dialogs.ConfirmUploadAsync(
 				drop.Items.Count(item => !item.IsDirectory),
 				drop.Items.Count(item => item.IsDirectory),
 				totalBytes,
@@ -702,13 +756,23 @@ public partial class RemoteFileBrowser
 				Session.Host.Address,
 				_userFileSystem?.UserName ?? current.UserName,
 				CanElevate,
-				asRoot);
+				asRoot,
+				offerOptOut: confirm);
 			if (choice is null || _disposed)
 			{
 				return;
 			}
 
-			asRoot = choice == UploadRunAs.Root;
+			asRoot = choice.RunAs == UploadRunAs.Root;
+			if (choice.StopAsking)
+			{
+				await PromptOptOut.ApplyAsync<FileTransferSettings>(
+					Settings,
+					Interaction,
+					Logger,
+					settings => settings with { ConfirmDrop = false },
+					"Dropped files now upload without asking, except as root. Settings, Files and transfers turns it back on.");
+			}
 		}
 
 		if (await GetFileSystemAsync(asRoot) is { } fileSystem)
@@ -722,7 +786,8 @@ public partial class RemoteFileBrowser
 	/// screen. Files refused for lack of permission can be retried as root from the alert; this method returns only
 	/// once that alert is gone, so dropped files stay readable while the retry is possible.
 	/// </summary>
-	private async Task UploadAsync(IRemoteFileSystem fileSystem, string directory, IReadOnlyList<LocalFileItem> items)
+	/// <param name="overwrite">Replaces the overwrite setting, retries included, when the caller already asked.</param>
+	private async Task UploadAsync(IRemoteFileSystem fileSystem, string directory, IReadOnlyList<LocalFileItem> items, OverwriteBehavior? overwrite = null)
 	{
 		if (items.Count == 0 || _disposed)
 		{
@@ -736,7 +801,7 @@ public partial class RemoteFileBrowser
 		StateHasChanged();
 		try
 		{
-			batch = await Transfers.UploadAsync(ForTransfers(fileSystem), Origin, directory, items, token);
+			batch = await Transfers.UploadAsync(ForTransfers(fileSystem), Origin, directory, items, overwrite, token);
 		}
 		catch (Exception ex)
 		{
@@ -758,7 +823,7 @@ public partial class RemoteFileBrowser
 				BrowserAlert alert = ShowAlert(
 					"Could not upload to " + directory,
 					failure,
-					fileSystem.IsElevated ? null : root => UploadAsync(root, directory, items));
+					fileSystem.IsElevated ? null : root => UploadAsync(root, directory, items, overwrite));
 				await alert.Closed;
 			}
 
@@ -792,7 +857,7 @@ public partial class RemoteFileBrowser
 			BrowserAlert alert = ShowAlert(title, "Permission denied in " + directory + ".", root =>
 			{
 				Transfers.Remove(denied.Select(batch.TransferFor).OfType<ITransferItem>());
-				return UploadAsync(root, directory, denied);
+				return UploadAsync(root, directory, denied, overwrite);
 			});
 			await alert.Closed;
 		}
@@ -810,17 +875,6 @@ public partial class RemoteFileBrowser
 		}
 
 		return names;
-	}
-
-	private static string UniqueName(string name, HashSet<string> taken)
-	{
-		string candidate = name;
-		for (int number = 2; taken.Contains(candidate); number++)
-		{
-			candidate = string.Create(CultureInfo.InvariantCulture, $"{name} {number}");
-		}
-
-		return candidate;
 	}
 
 	private static string ChangeFailureTitle(string action, List<RemoteFileEntry> entries) => entries.Count == 1

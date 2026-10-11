@@ -8,8 +8,8 @@
 	}
 	@if (Username is { Length: > 0 } user)
 	{
-		<span class="mt-label-user">@user</span>
-		<span class="mt-label-at">@@</span>
+		@* One line: a tab runs the label as inline text, where a line break between the two would show as a space. *@
+		<span class="mt-label-user">@user</span><span class="mt-label-at">@@</span>
 	}
 	<span class="mt-label-host" style="color:@Accent">@Address</span>
 	@if (Port is { } port)

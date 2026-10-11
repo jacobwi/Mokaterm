@@ -87,6 +87,13 @@ internal static class SshPrivateKeys
 		}
 	}
 
+	/// <summary>
+	/// True for an OpenSSH security key file (<c>ssh-keygen -t ecdsa-sk</c> or <c>ed25519-sk</c>). Its public half is
+	/// readable without the passphrase, so this needs none.
+	/// </summary>
+	public static bool IsSecurityKey(ReadOnlySpan<byte> keyText) =>
+		keyText.Length <= MaxKeyBytes && PrivateKeyEnvelope.Detect(keyText).IsSecurityKey;
+
 	/// <summary>The key type, such as <c>ssh-ed25519</c>, <c>ssh-rsa</c> or <c>ecdsa-sha2-nistp256</c>.</summary>
 	public static string AlgorithmOf(PrivateKeyFile keyFile) =>
 		keyFile.Key.ToString() ?? keyFile.HostKeyAlgorithms.First().Name;

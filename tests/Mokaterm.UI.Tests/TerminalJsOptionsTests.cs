@@ -58,4 +58,11 @@ public sealed class TerminalJsOptionsTests
 	[InlineData("{};")]
 	public void From_BlankOrUnusableFontFamily_FallsBackToMonospace(string fonts) =>
 		Assert.Equal("monospace", TerminalJsOptions.From(new TerminalSettings { FontFamily = fonts }, Theme).FontFamily);
+
+	[Theory]
+	[InlineData(TerminalRightClickAction.ContextMenu, "menu")]
+	[InlineData(TerminalRightClickAction.Paste, "paste")]
+	[InlineData(TerminalRightClickAction.CopyOrPaste, "copy-or-paste")]
+	public void From_RightClickAction_IsTheNameTerminalJsReads(TerminalRightClickAction action, string expected) =>
+		Assert.Equal(expected, TerminalJsOptions.From(new TerminalSettings { RightClickAction = action }, Theme).RightClickAction);
 }

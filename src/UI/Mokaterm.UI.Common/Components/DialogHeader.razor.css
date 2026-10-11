@@ -1,0 +1,46 @@
+/* Moka's own dialog header, with room for an icon and a context: same padding, same rule underneath, same title. */
+.mt-dialog-head {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	background: var(--moka-color-surface);
+}
+
+.mt-dialog-head-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--moka-color-primary);
+}
+
+.mt-dialog-head-title {
+	flex-shrink: 0;
+	max-width: 60%;
+	overflow: hidden;
+	margin: 0;
+	font-size: var(--moka-font-size-base);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.04em;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+/* The detail gives way first when the dialog is narrow; the title stays readable. */
+.mt-dialog-head-detail {
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+	padding-inline-start: var(--moka-spacing-sm);
+	border-inline-start: 1px solid var(--moka-color-outline-variant);
+	overflow: hidden;
+	font-size: var(--moka-font-size-sm);
+	white-space: nowrap;
+}
+
+.mt-dialog-head-spacer {
+	flex: 1;
+}

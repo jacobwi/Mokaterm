@@ -1,0 +1,23 @@
+<div class="mt-panes">
+	@RenderNode(Layout)
+</div>
+
+@code {
+	private RenderFragment RenderNode(PaneNode node)
+	{
+		if (node is PaneSplit split)
+		{
+			bool sideBySide = split.Axis == PaneAxis.SideBySide;
+			return @<MokaSplitPane @key="split.Id"
+								   Orientation="@(sideBySide ? MokaSplitOrientation.Horizontal : MokaSplitOrientation.Vertical)"
+								   InitialSize="50%"
+								   MinSize="@(sideBySide ? MinWidth : MinHeight)"
+								   Class="mt-pane-split">
+				<FirstContent>@RenderNode(split.First)</FirstContent>
+				<SecondContent>@RenderNode(split.Second)</SecondContent>
+			</MokaSplitPane>;
+		}
+
+		return node is PaneLeaf leaf && Pane is not null ? Pane(leaf.PaneId) : Nothing;
+	}
+}

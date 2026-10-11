@@ -41,6 +41,16 @@
 					</MokaStatusBarItem>
 				}
 
+				@* What the session's module says is on, such as agent or X11 forwarding: a chip each, the module's own words. *@
+				@foreach (SessionIndicator indicator in _indicators)
+				{
+					<MokaStatusBarItem Class="mt-status-indicator" Tooltip="@indicator.Description">
+						<span class="mt-status-chip @IndicatorClass(indicator.State)">
+							<span class="mt-status-chip-dot" aria-hidden="true"></span>@indicator.Label
+						</span>
+					</MokaStatusBarItem>
+				}
+
 				@if (ShowsBroadcast)
 				{
 					<MokaStatusBarItem Class="mt-status-broadcast"

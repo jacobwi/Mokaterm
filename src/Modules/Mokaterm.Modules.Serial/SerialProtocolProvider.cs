@@ -10,7 +10,7 @@ using Mokaterm.Modules.Serial.Sessions;
 namespace Mokaterm.Modules.Serial;
 
 /// <summary>Opens serial sessions: the port, its line settings and the terminal on it all run here.</summary>
-internal sealed class SerialProtocolProvider : IProtocolProvider
+internal sealed class SerialProtocolProvider : IProtocolProvider, IQuickConnectSuggestions
 {
 	public const string ProtocolId = "serial";
 
@@ -38,6 +38,7 @@ internal sealed class SerialProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "Serial",
 		Description = "A console over a serial port. The machine's address is the port name, such as COM3 or /dev/ttyUSB0.",
+		QuickConnectExample = "COM3",
 		DefaultPort = NoPort,
 		UsesPort = false,
 		Capabilities = ProtocolCapabilities.Terminal,
@@ -49,11 +50,18 @@ internal sealed class SerialProtocolProvider : IProtocolProvider
 		Order = 60,
 	};
 
+	/// <summary>The ports this machine lists right now, which is a registry read on Windows and a folder read elsewhere.</summary>
+	public IReadOnlyList<QuickConnectSuggestion> GetQuickConnectSuggestions() =>
+		[.. SerialPortNames.List().Select(name => new QuickConnectSuggestion(name))];
+
+	/// <summary>The same rule the connect applies, so a name the driver would refuse is caught in the box.</summary>
+	public string? ValidateQuickConnectAddress(string address) => SerialPortNames.Validate(address);
+
 	public async Task<IProtocolSession> ConnectAsync(ProtocolConnectContext context, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(context);
 		SerialSettings settings = _settings.Get<SerialSettings>().Clamped();
-		SerialConnectionOptions options = SerialConnectionOptions.From(context.Connection.Options);
+		SerialConnectionOptions options = SerialConnectionOptions.ForConnect(context.Connection.Options, settings);
 		string portName = options.ResolvePortName(context.Host.Address);
 		if (SerialPortNames.Validate(portName) is { } badName)
 		{

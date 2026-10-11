@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<!-- The settings page and the options editor are rendered for real with Blazor's static HtmlRenderer. -->
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+		<PackageReference Include="Microsoft.Extensions.Logging" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Local\Mokaterm.Modules.Local.csproj" />
+	</ItemGroup>
+
+	<!-- FakeJsRuntime: Microsoft.JSInterop arrives with the module's UI.Common reference, which Core and Sessions tests have not. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\Interop\*.cs" LinkBase="Shared" />
+		<Compile Include="..\Shared\Rendering\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+</Project>

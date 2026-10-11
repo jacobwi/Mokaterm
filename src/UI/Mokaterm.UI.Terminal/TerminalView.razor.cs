@@ -1,12 +1,14 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Moka.Red.ContextMenu;
 using Moka.Red.Core.Enums;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Terminal;
 using Mokaterm.UI.Common.Icons;
@@ -15,6 +17,7 @@ using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Terminal.Internal;
 using Mokaterm.UI.Terminal.Interop;
+using Mokaterm.UI.Terminal.Triggers;
 
 namespace Mokaterm.UI.Terminal;
 
@@ -48,6 +51,15 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 	private string? _hoverCommand;
 	private string? _hoverStyle;
+
+	private TerminalTriggerSettings? _triggerSettings;
+	private ITerminalStream? _triggerStream;
+	private bool _triggersPaused;
+	private IReadOnlyList<TerminalTrigger> _triggerRules = [];
+	private IReadOnlyList<TerminalJsTrigger> _jsTriggers = [];
+
+	private readonly TerminalFolderTracker _folders = new();
+	private bool _trackingFolder;
 
 	private bool _findOpen;
 	private bool _findFocusPending;
@@ -121,6 +133,17 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 	[Parameter]
 	public EventCallback<string> OnCommandSavedWithDetails { get; set; }
 
+	/// <summary>
+	/// While true and <see cref="OnFolderChanged"/> has a handler, the view reports where the shell is: from OSC 7 when the
+	/// server sends it, else from the folder a <c>user@host:path</c> prompt shows. Nothing is watched while it is false.
+	/// </summary>
+	[Parameter]
+	public bool TrackFolder { get; set; }
+
+	/// <summary>The shell's folder changed while <see cref="TrackFolder"/> is on. Raised once as well when it turns on.</summary>
+	[Parameter]
+	public EventCallback<TerminalFolder> OnFolderChanged { get; set; }
+
 	[Parameter]
 	public string? Class { get; set; }
 
@@ -141,6 +164,15 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 	[Inject]
 	private IMokaContextMenuService ContextMenu { get; set; } = default!;
+
+	[Inject]
+	private ISettingsService SettingsService { get; set; } = default!;
+
+	[Inject]
+	private TerminalTriggerSwitch TriggerSwitch { get; set; } = default!;
+
+	[Inject]
+	private IServiceProvider Services { get; set; } = default!;
 
 	[Inject]
 	private ILogger<TerminalView> Logger { get; set; } = default!;
@@ -251,6 +283,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 		_disposed = true;
 		GC.SuppressFinalize(this);
+		SettingsService.Changed -= OnSettingsChanged;
 		await _disposeCts.CancelAsync();
 		Detach();
 		_instance.TrySetCanceled();
@@ -272,10 +305,13 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		_disposeCts.Dispose();
 	}
 
+	// The rules are global settings rather than a parameter, so a session's view follows them without its parent knowing.
+	protected override void OnInitialized() => SettingsService.Changed += OnSettingsChanged;
+
 	protected override void OnParametersSet()
 	{
 		TerminalTheme theme = ThemeCatalog.Get(Settings.ThemeId);
-		_options = TerminalJsOptions.From(Settings, theme, AccentColor);
+		_options = BuildOptions(theme);
 
 		// Painting the theme background from the first render avoids a flash of the page color before xterm.js draws.
 		_hostStyle = CssValues.Color(theme.Background) is { } background ? $"background-color:{background};{Style}" : Style;
@@ -365,6 +401,18 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 			new() { Text = "Clear", Icon = MokatermIcons.Eraser, OnClick = () => ThenFocusAsync(ClearAsync) },
 		];
 
+		// Only offered while there is something to pause: a menu entry for rules nobody wrote would only puzzle.
+		if (_triggersPaused || _triggerRules.Count > 0)
+		{
+			items.Add(new()
+			{
+				Text = "Run triggers in this session",
+				Icon = MokaIcons.Status.Bell,
+				Checked = !_triggersPaused,
+				OnClick = () => ThenFocusAsync(ToggleTriggersAsync),
+			});
+		}
+
 		if (ExtraMenuItems is { Count: > 0 } extra)
 		{
 			items.Add(MokaContextMenuItems.Divider());
@@ -446,6 +494,44 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		StateHasChanged();
 	}
 
+	/// <summary>A rule with a notice matched a new line. terminal.js already held it to one notice per rule per interval.</summary>
+	internal void HandleTriggerMatched(int rule, string line)
+	{
+		if (_disposed || (uint)rule >= (uint)_triggerRules.Count)
+		{
+			return;
+		}
+
+		TerminalTrigger trigger = _triggerRules[rule];
+		Interaction.Notify(TriggerNotice.Severity(trigger.Highlight), TriggerNotice.Line(line), TriggerNotice.Title(SessionTitle()));
+	}
+
+	/// <summary>A rule took too long on one line, and terminal.js stopped running it in this view.</summary>
+	internal void HandleTriggerSlow(int rule)
+	{
+		if (_disposed || (uint)rule >= (uint)_triggerRules.Count)
+		{
+			return;
+		}
+
+		Interaction.Notify(NoticeSeverity.Warning, TriggerNotice.Slow(_triggerRules[rule].Pattern), TriggerNotice.Title(SessionTitle()));
+	}
+
+	/// <summary>
+	/// terminal.js saw an OSC 7 (<paramref name="source"/> <c>osc7</c>) or a prompt's folder (<c>prompt</c>, with the
+	/// prompt's user and machine). Only a change reaches <see cref="OnFolderChanged"/>.
+	/// </summary>
+	internal Task HandleFolderReportAsync(string source, string value, string? user, string? machine)
+	{
+		if (_disposed || !_trackingFolder)
+		{
+			return Task.CompletedTask;
+		}
+
+		TerminalFolder? folder = source == "osc7" ? _folders.FromOsc7(value) : _folders.FromPrompt(value, user, machine);
+		return folder is null ? Task.CompletedTask : OnFolderChanged.InvokeAsync(folder);
+	}
+
 	internal void HandleSearchResults(int index, int count)
 	{
 		if (_disposed || !_findOpen || _findTerm.Length == 0)
@@ -477,7 +563,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 	private async Task CreateTerminalAsync()
 	{
-		TerminalJsOptions options = _options ?? TerminalJsOptions.From(Settings, ThemeCatalog.Get(Settings.ThemeId), AccentColor);
+		TerminalJsOptions options = _options ?? BuildOptions(ThemeCatalog.Get(Settings.ThemeId));
 		ITerminalStream stream = Stream;
 		_callbacks = DotNetObjectReference.Create(new TerminalJsCallbacks(this));
 		TerminalCreateResult created = await Interop.CreateAsync(_host, _screen, _callbacks, options, stream.Size);
@@ -501,6 +587,70 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		{
 			Attach(stream);
 		}
+	}
+
+	private TerminalJsOptions BuildOptions(TerminalTheme theme)
+	{
+		UpdateTriggers();
+		return TerminalJsOptions.From(Settings, theme, AccentColor, _jsTriggers);
+	}
+
+	// The settings hand out the same section until it changes, so the rules are only rebuilt when they did, or when the
+	// stream or its pause did.
+	private void UpdateTriggers()
+	{
+		TerminalTriggerSettings settings = SettingsService.Get<TerminalTriggerSettings>();
+		bool paused = Stream is not null && TriggerSwitch.IsPaused(Stream);
+		if (ReferenceEquals(settings, _triggerSettings) && ReferenceEquals(Stream, _triggerStream) && paused == _triggersPaused)
+		{
+			return;
+		}
+
+		_triggerSettings = settings;
+		_triggerStream = Stream;
+		_triggersPaused = paused;
+		_triggerRules = paused ? [] : [.. settings.Active];
+		_jsTriggers = [.. _triggerRules.Select(TerminalJsTrigger.From)];
+	}
+
+	private void OnSettingsChanged(string sectionKey)
+	{
+		if (sectionKey != TerminalTriggerSettings.SectionKey)
+		{
+			return;
+		}
+
+		_ = InvokeAsync(() =>
+		{
+			if (!_disposed)
+			{
+				_options = BuildOptions(ThemeCatalog.Get(Settings.ThemeId));
+				StateHasChanged();
+			}
+		});
+	}
+
+	private ValueTask ToggleTriggersAsync()
+	{
+		if (_disposed || Stream is null)
+		{
+			return ValueTask.CompletedTask;
+		}
+
+		TriggerSwitch.SetPaused(Stream, !_triggersPaused);
+		_options = BuildOptions(ThemeCatalog.Get(Settings.ThemeId));
+		StateHasChanged();
+		return ValueTask.CompletedTask;
+	}
+
+	/// <summary>
+	/// The title of the session this view shows, for a notice that may pop up while another tab is in front. Looked up
+	/// rather than passed in, because the view only knows its stream; null where there is no session manager.
+	/// </summary>
+	private string? SessionTitle()
+	{
+		ITerminalStream? stream = _attachedStream ?? Stream;
+		return Services.GetService<ISessionManager>()?.Sessions.FirstOrDefault(session => ReferenceEquals(session.Terminal, stream))?.Title;
 	}
 
 	private async Task ApplyPendingChangesAsync()
@@ -544,6 +694,14 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 			{
 				await Interop.SetOptionsAsync(id, changes);
 			}
+		}
+
+		bool trackFolder = TrackFolder && OnFolderChanged.HasDelegate;
+		if (trackFolder != _trackingFolder)
+		{
+			_trackingFolder = trackFolder;
+			_folders.Reset();
+			await Interop.SetFolderTrackingAsync(id, trackFolder);
 		}
 
 		if (_activatePending)

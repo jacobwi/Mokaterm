@@ -1,11 +1,12 @@
 @* Asks whether to trust an unknown server identity, or warns loudly when a known one changed. *@
 @inherits PromptDialogBase
 
-<MokaDialog Open="true"
-			Title="@(IsChanged ? "Host identity changed" : "Unknown host")"
-			DialogSize="MokaDialogSize.Medium"
-			CloseOnBackdropClick="false"
-			OnClose="() => AnswerAsync(OnDecision, HostTrustDecision.Reject)">
+<HeadedDialog Open="true"
+			  Title="@(IsChanged ? "Host identity changed" : "Unknown host")"
+			  Icon="@(IsChanged ? MokaIcons.Status.Warning : MokatermIcons.Shield)"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false"
+			  OnClose="() => AnswerAsync(OnDecision, HostTrustDecision.Reject)">
 	<ChildContent>
 		<PromptBody @ref="Body" AutofocusSelf="@(!IsChanged)">
 			@if (IsChanged)
@@ -84,7 +85,7 @@
 			Trust and save
 		</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>
 
 @code {
 	[Parameter, EditorRequired]

@@ -1,0 +1,36 @@
+@namespace Mokaterm.UI.FileBrowser.Dialogs
+
+<DialogFrame Heading="Heading">
+	<ChildContent>
+		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
+			<MokaText Size="MokaSize.Sm" Style="overflow-wrap:anywhere">@Summary</MokaText>
+			@if (Names.Count > 1)
+			{
+				<MokaScrollArea Height="140px">
+					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xxs">
+						@foreach (string name in Names.Take(MaxListed))
+						{
+							<MokaText @key="name" Element="span" Size="MokaSize.Xs" Mono Truncate title="@name">@name</MokaText>
+						}
+						@if (Names.Count > MaxListed)
+						{
+							<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">@MoreText</MokaText>
+						}
+					</MokaFlexbox>
+				</MokaScrollArea>
+			}
+			<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+				Keep both pastes each copy under a new name. Overwrite replaces what is there, and a folder is merged into the one of the same name.
+			</MokaText>
+			@if (AsRoot)
+			{
+				<MokaTag Text="Copying as root" Icon="MokatermIcons.Root" Color="MokaColor.Error" />
+			}
+		</MokaFlexbox>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Sm" OnClick="Overwrite">Overwrite</MokaButton>
+		<MokaButton Size="MokaSize.Sm" StartIcon="MokaIcons.Content.Copy" OnClick="KeepBoth" data-dialog-default="true">Keep both</MokaButton>
+	</Actions>
+</DialogFrame>

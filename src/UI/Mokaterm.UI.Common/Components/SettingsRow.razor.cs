@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Components;
 
 namespace Mokaterm.UI.Common.Components;
 
-/// <summary>One setting: label and helper text on the left, the control on the right (or below when <see cref="Stacked"/>).</summary>
+/// <summary>
+/// One setting: label and helper text on the left, the control on the right (or below when <see cref="Stacked"/>). The
+/// settings search finds the row by the label and description its page's markup writes out, so a row added to any page
+/// can be searched for without being listed anywhere else.
+/// </summary>
 public sealed partial class SettingsRow : ComponentBase
 {
 	[Parameter, EditorRequired]
@@ -22,7 +26,17 @@ public sealed partial class SettingsRow : ComponentBase
 	[Parameter]
 	public string? ControlWidth { get; set; }
 
+	/// <summary>
+	/// False keeps the row out of the settings search and gives it no anchor, for a row that shows what is loaded (a
+	/// module, a credit) or a message rather than a setting.
+	/// </summary>
+	[Parameter]
+	public bool Searchable { get; set; } = true;
+
 	private string RowClass => Stacked ? "settings-row settings-row--stacked" : "settings-row";
+
+	// What a settings search result scrolls to.
+	private string? Anchor => Searchable ? SettingsAnchor.Of(Label) : null;
 
 	// Block layout lets fields and sliders fill the width; natural-size controls such as switches stay flex items.
 	private string ControlClass => Stacked || ControlWidth is not null

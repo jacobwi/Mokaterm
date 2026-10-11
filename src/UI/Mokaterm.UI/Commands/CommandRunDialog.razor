@@ -1,0 +1,246 @@
+@namespace Mokaterm.UI.Commands
+@using Mokaterm.Abstractions.Commands
+@inherits ShellEditorBase<CommandRunEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="Run a command on several hosts"
+				   Icon="MokatermIcons.Command"
+				   DialogSize="MokaDialogSize.Large"
+				   Busy="IsBusy"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			<PromptBody @ref="Body">
+				<div class="mt-run">
+					@if (_error is not null)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+					}
+
+					@if (_run is null)
+					{
+						<div class="mt-run-command">
+							@if (_snippets.Count > 0)
+							{
+								<MokaSelect TValue="CommandSnippet"
+											Label="Start from a saved command"
+											Items="_snippets"
+											Value="null"
+											ValueChanged="PickSnippet"
+											ValueSelector="SnippetLabel"
+											Placeholder="Pick one, or type the command below"
+											Searchable="@(_snippets.Count > 8)"
+											Disabled="_starting"
+											Size="MokaSize.Sm" />
+							}
+
+							@* Enter is a line break in a script, so the field opts out of the dialog's Enter and runs on Ctrl+Enter. *@
+							<MokaTextArea Label="Command"
+										  Value="@_command"
+										  ValueChanged="OnCommandChanged"
+										  Rows="3"
+										  Placeholder="uptime"
+										  HelperText="Runs once on every picked login, through its login shell and without a terminal. Ctrl+Enter runs it."
+										  ErrorText="@CommandProblem"
+										  Disabled="_starting"
+										  Class="mt-run-command__input"
+										  spellcheck="false"
+										  autocomplete="off"
+										  data-autofocus="true"
+										  data-no-submit="true"
+										  @onkeydown="OnCommandKeyDownAsync" />
+						</div>
+
+						<div class="mt-run-logins">
+							<div class="mt-run-logins__head">
+								<span class="mt-run-label">Logins</span>
+								<span class="mt-run-count">@SelectionSummary</span>
+								<div class="mt-run-logins__tools">
+									<EnumSegmentedControl TEnum="LoginListView"
+														  Value="_listView"
+														  ValueChanged="SetListView"
+														  Options="ListViews"
+														  AriaLabel="Which logins to list" />
+									<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="_starting" OnClick="PickShown">Pick shown</MokaButton>
+									<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="@(_starting || _selected.Count == 0)" OnClick="ClearPicked">Clear</MokaButton>
+								</div>
+							</div>
+
+							<MokaSearchInput Value="@_filter"
+											 ValueChanged="OnFilterChanged"
+											 Placeholder="Filter by name, address, user or tag"
+											 Size="MokaSize.Sm"
+											 Debounce="0"
+											 aria-label="Filter logins" />
+
+							<div class="mt-run-logins__list">
+								@if (!Catalog.IsLoaded)
+								{
+									<div class="mt-run-empty">
+										<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+									</div>
+								}
+								else if (VisibleLogins is { Count: 0 })
+								{
+									<div class="mt-run-empty">
+										<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+											@(_logins.Count == 0 ? "No saved logins yet." : _listView == LoginListView.Selected ? "Nothing picked yet. Switch to All logins to pick some." : "Nothing matches the filter.")
+										</MokaText>
+									</div>
+								}
+								else
+								{
+									@foreach (LoginRow row in VisibleLogins)
+									{
+										bool picked = _selected.Contains(row.Login.Id);
+										@* The whole row is the control and the box only pictures it; a login that cannot run a command says why. *@
+										<div @key="row.Login.Id"
+											 class="@RowClass(row)"
+											 role="checkbox"
+											 tabindex="@(row.Unavailable is null ? "0" : "-1")"
+											 aria-checked="@(picked ? "true" : "false")"
+											 aria-disabled="@(row.Unavailable is null ? null : "true")"
+											 data-no-submit="true"
+											 title="@row.Unavailable"
+											 @onclick="() => Toggle(row)"
+											 @onkeydown="e => OnLoginKeyDown(e, row)">
+											<span class="mt-run-login__box">
+												<MokaCheckbox Value="@picked" Disabled="@(row.Unavailable is not null)" DisplayOnly />
+											</span>
+											<ProtocolIcon ProtocolId="@row.Login.ProtocolId" Size="MokaSize.Xs" />
+											<span class="mt-run-login__main">
+												<span class="mt-run-login__name">@row.Title</span>
+												<span class="mt-run-login__meta">@(row.Unavailable ?? row.Meta)</span>
+											</span>
+											@if (HostEnvironmentDisplay.Tag(row.Host.Environment) is { } environment)
+											{
+												<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(row.Host.Environment)" />
+											}
+										</div>
+									}
+								}
+							</div>
+						</div>
+
+						<div class="mt-run-options">
+							<NumberSetting TValue="int"
+										   Label="At once"
+										   Value="_options.ParallelHosts"
+										   ValueChanged="SetParallelAsync"
+										   Min="CommandRunSettings.MinParallelHosts"
+										   Max="CommandRunSettings.MaxParallelHosts"
+										   Suffix="hosts"
+										   Width="72px"
+										   Disabled="_starting" />
+							<NumberSetting TValue="int"
+										   Label="Time per host"
+										   Value="_options.TimeoutSeconds"
+										   ValueChanged="SetTimeoutAsync"
+										   Min="CommandRunSettings.MinTimeoutSeconds"
+										   Max="CommandRunSettings.MaxTimeoutSeconds"
+										   Suffix="s"
+										   Width="72px"
+										   Disabled="_starting" />
+							<NumberSetting TValue="int"
+										   Label="Output kept"
+										   Value="_options.OutputKilobytes"
+										   ValueChanged="SetOutputAsync"
+										   Min="CommandRunSettings.MinOutputKilobytes"
+										   Max="CommandRunSettings.MaxOutputKilobytes"
+										   Suffix="KB per stream"
+										   Width="72px"
+										   Disabled="_starting" />
+							<div class="mt-run-options__skip">
+								<MokaCheckbox Label="Skip hosts that would ask for a password, a passphrase or a host key"
+											  Value="_options.SkipHostsThatAsk"
+											  ValueChanged="SetSkipAsync"
+											  Disabled="_starting" />
+							</div>
+						</div>
+					}
+					else
+					{
+						<div class="mt-run-summary">
+							<code class="mt-run-summary__command" title="@_run.Command">@CommandRunDisplay.FirstLine(_run.Command)</code>
+							<span class="mt-run-count">@ResultsSummary()</span>
+						</div>
+
+						<div class="mt-run-results__tools">
+							<EnumSegmentedControl TEnum="ResultView"
+												  Value="_resultView"
+												  ValueChanged="SetResultView"
+												  Options="ResultViews"
+												  AriaLabel="Which hosts to show" />
+							<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="@(_results.Count == 0)" OnClick="ToggleAllOutput">
+								@(AllCollapsed ? "Show all output" : "Fold all output")
+							</MokaButton>
+						</div>
+
+						<div class="mt-run-results">
+							@if (VisibleResults is { Count: 0 })
+							{
+								<div class="mt-run-empty">
+									<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+										@(IsRunning ? "Nothing has gone wrong so far." : "Every host ran the command and returned 0.")
+									</MokaText>
+								</div>
+							}
+							else
+							{
+								@foreach (CommandHostResult host in VisibleResults)
+								{
+									Guid id = host.ConnectionId;
+									<CommandRunHostRow @key="id"
+													   Result="host"
+													   Collapsed="@_collapsed.Contains(id)"
+													   OnToggle="() => ToggleHost(id)" />
+								}
+							}
+						</div>
+					}
+				</div>
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		@if (_run is null)
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_starting" OnClick="Close">Cancel</MokaButton>
+			<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" title="@SaveHint" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			<MokaButton data-primary="true" StartIcon="MokatermIcons.Command" Loading="_starting" Disabled="@(!CanRun)" OnClick="RunAsync">
+				@RunLabel
+			</MokaButton>
+		}
+		else
+		{
+			@if (IsRunning)
+			{
+				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Disabled="_stopRequested" OnClick="Stop">
+					@(_stopRequested ? "Stopping" : "Stop")
+				</MokaButton>
+			}
+			else
+			{
+				@if (RetryableCount > 0)
+				{
+					<MokaButton Variant="MokaVariant.Text" Loading="_retrying" OnClick="RetryFailedAsync">
+						@($"Retry failed ({RetryableCount})")
+					</MokaButton>
+				}
+				@if (SkippedCount > 0)
+				{
+					<MokaButton Variant="MokaVariant.Text"
+								Loading="_retrying"
+								title="Runs the skipped hosts again and asks what each one needs, one prompt at a time."
+								OnClick="RetrySkippedAsync">
+						@($"Run skipped, asking ({SkippedCount})")
+					</MokaButton>
+				}
+				<MokaButton Variant="MokaVariant.Text" OnClick="EditAgain">Change and run again</MokaButton>
+			}
+			<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" title="@SaveHint" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			<MokaButton data-primary="true" Disabled="IsBusy" OnClick="Close">Close</MokaButton>
+		}
+	</Actions>
+</ShellEditorDialog>

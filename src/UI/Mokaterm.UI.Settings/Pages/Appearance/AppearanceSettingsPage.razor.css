@@ -18,3 +18,30 @@
 	max-width: 360px;
 	padding: var(--moka-spacing-lg);
 }
+
+/* Two columns of switches where there is room, one where there is not. */
+.toolbar-buttons {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--moka-spacing-xs) var(--moka-spacing-lg);
+	width: 100%;
+}
+
+.toolbar-button {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: 2px 0;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.toolbar-button__title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	font-size: var(--moka-font-size-sm);
+	color: var(--moka-color-on-surface);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -71,3 +71,32 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* A fact the session's module reported, such as forwarding being on: a chip with a glowing dot in its state's colour. */
+.mt-status-chip {
+	--mt-chip: var(--moka-color-on-surface-variant);
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.06em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-status-chip--active {
+	--mt-chip: var(--moka-color-success);
+}
+
+.mt-status-chip--problem {
+	--mt-chip: var(--moka-color-warning);
+	color: var(--moka-color-warning);
+}
+
+.mt-status-chip-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--mt-chip);
+	box-shadow: 0 0 6px var(--mt-chip);
+}

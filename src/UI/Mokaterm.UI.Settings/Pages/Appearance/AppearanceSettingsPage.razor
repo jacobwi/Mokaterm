@@ -1,4 +1,6 @@
+@using Mokaterm.Abstractions.Platform
 @using Mokaterm.Abstractions.Presentation
+@using Mokaterm.UI.Common.Contributions
 @inherits SettingsSectionBase<AppearanceSettings>
 
 @{
@@ -7,7 +9,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale and status bar back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, font scale, status bar and session toolbar back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms.">
 			<EnumSegmentedControl TEnum="ThemeMode"
@@ -55,6 +57,43 @@
 						ValueChanged="value => UpdateAsync(s => s with { ShowStatusBar = value })"
 						aria-label="Show status bar" />
 		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Session toolbar" Description="The bar above every session, with its buttons and the tools modules add.">
+		<SettingsRow Label="Toolbar layout"
+					 Description="Grouped puts a line between panels, view, session, a menu of tools and closing. Flat shows every button in one row. Compact keeps one menu for everything.">
+			<EnumSegmentedControl TEnum="SessionToolbarLayout"
+								  Value="settings.ToolbarLayout"
+								  ValueChanged="value => UpdateAsync(s => s with { ToolbarLayout = value })"
+								  Options="ToolbarLayoutOptions"
+								  AriaLabel="Session toolbar layout" />
+		</SettingsRow>
+		<SettingsRow Label="Toolbar buttons"
+					 Description="Turn off the buttons you never use. They stay in the toolbar's menu and in the command palette."
+					 Stacked>
+			<div class="toolbar-buttons">
+				@foreach (SessionToolbarButton button in ToolbarButtons)
+				{
+					string id = button.Id;
+					<div class="toolbar-button">
+						<MokaIcon Icon="button.Icon" SizeValue="14px" />
+						<span class="toolbar-button__title">@button.Title</span>
+						<MokaSwitch Value="@(!settings.HiddenToolbarButtons.Contains(id))"
+									ValueChanged="shown => SetButtonShownAsync(id, shown)"
+									aria-label="@($"Show {button.Title} on the toolbar")" />
+					</div>
+				}
+			</div>
+		</SettingsRow>
+		@if (AppEnvironment.Kind == HostKind.Desktop)
+		{
+			<SettingsRow Label="Open tools in their own window"
+						 Description="Session tools such as Docker and System open as windows you can move beside the terminal or to another screen. Off, they open over the session.">
+				<MokaSwitch Value="settings.ToolsInOwnWindow"
+							ValueChanged="value => UpdateAsync(s => s with { ToolsInOwnWindow = value })"
+							aria-label="Open tools in their own window" />
+			</SettingsRow>
+		}
 	</SettingsSection>
 
 	<SettingsSection Title="Preview" Description="Follows the settings above as you change them.">

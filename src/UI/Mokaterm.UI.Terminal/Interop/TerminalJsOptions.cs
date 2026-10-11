@@ -34,6 +34,7 @@ internal sealed record TerminalJsOptions
 
 	public required bool CopyOnSelect { get; init; }
 
+	/// <summary>"menu", "paste" or "copy-or-paste".</summary>
 	public required string RightClickAction { get; init; }
 
 	public required bool ConfirmMultiLinePaste { get; init; }
@@ -46,10 +47,20 @@ internal sealed record TerminalJsOptions
 	/// <summary>The machine's color for a prompt the server leaves plain: a CSS color, or a <c>var(...)</c> the page resolves.</summary>
 	public string? PromptHostColor { get; init; }
 
+	/// <summary>The trigger rules this terminal runs, in order; empty while they are paused for its session.</summary>
+	public IReadOnlyList<TerminalJsTrigger> Triggers { get; init; } = [];
+
+	/// <summary>The shortest time between two notices from one rule.</summary>
+	public int TriggerNotifyMs { get; init; } = TerminalTriggerSettings.NotifyIntervalSeconds * 1000;
+
 	// xterm.js throws on a line height below 1 or negative scrollback, and a zero font size breaks rendering,
 	// so values a hand-edited settings file could hold are clamped here. Its DOM renderer copies the font family into a
 	// style element as it is, where a '}' would start rules of its own for the whole page.
-	public static TerminalJsOptions From(TerminalSettings settings, TerminalTheme theme, string? promptHostColor = null) => new()
+	public static TerminalJsOptions From(
+		TerminalSettings settings,
+		TerminalTheme theme,
+		string? promptHostColor = null,
+		IReadOnlyList<TerminalJsTrigger>? triggers = null) => new()
 	{
 		FontFamily = CssValues.FontFamily(settings.FontFamily),
 		FontSize = Math.Clamp(settings.FontSize, 6, 72),
@@ -74,7 +85,12 @@ internal sealed record TerminalJsOptions
 			_ => "visual",
 		},
 		CopyOnSelect = settings.CopyOnSelect,
-		RightClickAction = settings.RightClickAction == TerminalRightClickAction.Paste ? "paste" : "menu",
+		RightClickAction = settings.RightClickAction switch
+		{
+			TerminalRightClickAction.Paste => "paste",
+			TerminalRightClickAction.CopyOrPaste => "copy-or-paste",
+			_ => "menu",
+		},
 		ConfirmMultiLinePaste = settings.ConfirmMultiLinePaste,
 		AllowClipboardWrite = settings.AllowRemoteClipboardWrite,
 		PromptColors = settings.PromptColors switch
@@ -84,6 +100,7 @@ internal sealed record TerminalJsOptions
 			_ => "plain",
 		},
 		PromptHostColor = string.IsNullOrWhiteSpace(promptHostColor) ? null : promptHostColor.Trim(),
+		Triggers = triggers ?? [],
 	};
 
 	/// <summary>The options that differ from <paramref name="previous"/>, keyed by their JavaScript names.</summary>
@@ -108,6 +125,14 @@ internal sealed record TerminalJsOptions
 		AddIfChanged(changes, nameof(AllowClipboardWrite), AllowClipboardWrite, previous.AllowClipboardWrite);
 		AddIfChanged(changes, nameof(PromptColors), PromptColors, previous.PromptColors);
 		AddIfChanged(changes, nameof(PromptHostColor), PromptHostColor, previous.PromptHostColor);
+		AddIfChanged(changes, nameof(TriggerNotifyMs), TriggerNotifyMs, previous.TriggerNotifyMs);
+
+		// A list compares by reference, and a rebuilt list of the same rules must not make the page compile them again.
+		if (!Triggers.SequenceEqual(previous.Triggers))
+		{
+			changes[JsonNamingPolicy.CamelCase.ConvertName(nameof(Triggers))] = Triggers;
+		}
+
 		return changes;
 	}
 

@@ -1,0 +1,60 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (_viewing is { } viewing)
+{
+	<div class="mt-dk-panel-head">
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowLeft" OnClick="CloseViewer">
+			Mounts
+		</MokaButton>
+	</div>
+	<DockerFileViewer @key="viewing" Session="Session" Root="@viewing" Visible="Visible" />
+}
+else if (Mounts.Count == 0)
+{
+	<span class="mt-dk-note">Nothing is mounted into this container.</span>
+}
+else
+{
+	@foreach (DockerMount mount in Mounts)
+	{
+		<div class="mt-dk-section" @key="mount.Destination">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">@mount.Type</span>
+				<span class="mt-dk-mono">@mount.Destination</span>
+				<MokaTag Text="@(mount.ReadWrite ? "RW" : "RO")" Size="MokaSize.Xs" Color="@(mount.ReadWrite ? MokaColor.Surface : MokaColor.Info)" />
+				@if (mount.Name.Length > 0)
+				{
+					<span class="mt-dk-cell">volume @mount.Name</span>
+				}
+				<span class="mt-dk-spacer"></span>
+				@if (CanView(mount))
+				{
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Toggle.Eye" OnClick="@(() => View(mount))">
+						View
+					</MokaButton>
+				}
+			</div>
+			@if (mount.Source.Length > 0)
+			{
+				@PathLine(mount.Source, "Copy the host path")
+			}
+		</div>
+	}
+	<span class="mt-dk-note">The view is read-only. Docker's own folders usually need root, which goes through sudo.</span>
+}
+
+@code {
+	private string? _viewing;
+
+	/// <summary>The container's mounts, from its inspect output.</summary>
+	[Parameter, EditorRequired]
+	public IReadOnlyList<DockerMount> Mounts { get; set; } = [];
+
+	/// <summary>A volume or a bind mount has files on the docker host to look at; tmpfs and named pipes do not.</summary>
+	private static bool CanView(DockerMount mount) => mount.Type is "volume" or "bind" && mount.Source.StartsWith('/');
+
+	private void View(DockerMount mount) => _viewing = mount.Source;
+
+	private void CloseViewer() => _viewing = null;
+}

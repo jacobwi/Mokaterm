@@ -1,0 +1,6 @@
+.mt-tool-session {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}

@@ -1,6 +1,15 @@
 @namespace Mokaterm.UI.FileBrowser.Dialogs
+@using Mokaterm.UI.Common.Components
 
-<div @ref="_element">
+<div class="mt-frame" @ref="_element">
+	@if (Heading is { } heading)
+	{
+		@* The service opens these dialogs without a title, so this is their header: flush with the box's edges and
+		   staying put while the body scrolls. *@
+		<div class="mt-frame-head">
+			<DialogHeader Icon="heading.Icon" Title="@heading.Title" TitleId="@_titleId" />
+		</div>
+	}
 	<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Lg">
 		@ChildContent
 		<MokaFlexbox Direction="MokaDirection.Row" Justify="MokaJustify.End" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">

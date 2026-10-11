@@ -1,6 +1,7 @@
 @namespace Mokaterm.UI.FileBrowser.Dialogs
+@using Mokaterm.UI.Common.Interaction
 
-<DialogFrame>
+<DialogFrame Heading="Heading">
 	<ChildContent>
 		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Md">
@@ -34,6 +35,11 @@
 				<MokaCallout Type="MokaCalloutType.Warning" Title="Root">
 					Files are written by root and owned by root. You may be asked for the sudo password first.
 				</MokaCallout>
+			}
+
+			@if (ShowOptOut)
+			{
+				<MokaCheckbox Value="_stopAsking" ValueChanged="value => _stopAsking = value" Label="@PromptOptOut.Label" />
 			}
 		</MokaFlexbox>
 	</ChildContent>

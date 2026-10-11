@@ -1,0 +1,312 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Network
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Network"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@(_view == "interfaces" && Selected is not null ? InterfacePanel : null)">
+	<Chips>
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; })" AriaLabel="Network details to show" />
+	</Chips>
+	<ChildContent>
+		@if (_snapshot is { } snapshot)
+		{
+			@switch (_view)
+			{
+				case "interfaces":
+					@if (!Capabilities.HasNetworkTools)
+					{
+						<MokaEmptyState Icon="SshIcons.Network" Title="No ip command" Description="iproute2 is not installed, so interfaces cannot be listed. Name servers and listening ports still can." />
+					}
+					else if (snapshot.Interfaces.Count == 0)
+					{
+						<MokaEmptyState Icon="SshIcons.Network" Title="No interfaces" Description="ip listed none." />
+					}
+					else
+					{
+						<div class="mta-table" style="--mta-cols: 14px minmax(0, 0.8fr) minmax(0, 1.6fr) 56px 28px; --mta-cols-narrow: 14px minmax(0, 1fr) 28px">
+							<div class="mta-row mta-row--head">
+								<span></span>
+								<span>Interface</span>
+								<span class="mta-wide">Addresses</span>
+								<span class="mta-wide">MTU</span>
+								<span></span>
+							</div>
+							@foreach (NetInterface networkInterface in snapshot.Interfaces.Where(item => Matches(item.Name) || item.Addresses.Any(address => Matches(address.Address))))
+							{
+								<div class="@(networkInterface.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+									 @key="networkInterface.Name"
+									 role="button"
+									 tabindex="0"
+									 @onclick="@(() => Select(networkInterface.Name))"
+									 @onkeydown="@(args => OnRowKey(args, networkInterface.Name))"
+									 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(networkInterface)))"
+									 @oncontextmenu:preventDefault="true">
+									<MokaStatusDot Size="MokaSize.Xs" Color="@LinkColor(networkInterface)" Glow="networkInterface.IsUp" />
+									<span class="mta-cell">
+										<span class="mta-mono">@networkInterface.Name</span>
+										@if (CarriesSession(networkInterface))
+										{
+											<span class="mta-after" title="This SSH session arrives on this interface"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+										}
+									</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide" title="@string.Join("\n", networkInterface.Addresses.Select(address => address.Cidr))">
+										@(networkInterface.Addresses.Count == 0 ? "no address" : string.Join("  ", networkInterface.Addresses.Select(address => address.Cidr)))
+									</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide">@networkInterface.Mtu</span>
+									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+										<MokaButton Variant="MokaVariant.Text"
+													Color="MokaColor.Surface"
+													Size="MokaSize.Xs"
+													StartIcon="MokaIcons.Navigation.MoreHorizontal"
+													OnClick="@(args => ShowRowMenu(args, MenuFor(networkInterface)))"
+													aria-label="@($"Actions for {networkInterface.Name}")" />
+									</span>
+								</div>
+							}
+						</div>
+						@if (snapshot.FromText)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Read from plain ip output: this ip prints no JSON.</MokaText>
+						}
+					}
+					break;
+
+				case "routes":
+					<div class="mta-table" style="--mta-cols: minmax(0, 1.2fr) minmax(0, 1fr) 76px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) 64px">
+						<div class="mta-row mta-row--head">
+							<span>Destination</span>
+							<span>Via</span>
+							<span>Device</span>
+							<span class="mta-wide">Source, protocol, metric</span>
+						</div>
+						@foreach (NetRoute route in snapshot.Routes.Where(route => Matches(route.Destination) || Matches(route.Device) || Matches(route.Gateway)))
+						{
+							<div class="mta-row" @key="@($"{route.Destination}|{route.Device}|{route.Gateway}|{route.Metric}")">
+								<span class="mta-cell mta-mono">@route.Destination</span>
+								<span class="mta-cell mta-mono mta-dim">@(route.Gateway.Length > 0 ? route.Gateway : "direct")</span>
+								<span class="mta-cell mta-mono">@route.Device</span>
+								<span class="mta-cell mta-mono mta-dim mta-wide">@string.Join(" ", new[] { route.Source, route.Protocol, route.Metric?.ToString(CultureInfo.InvariantCulture) ?? "" }.Where(part => part.Length > 0))</span>
+							</div>
+						}
+					</div>
+					break;
+
+				case "dns":
+					@if (snapshot.Dns.Count == 0)
+					{
+						<MokaEmptyState Icon="SshIcons.Network" Title="No name servers" Description="Neither resolvectl nor /etc/resolv.conf names one." />
+					}
+					else
+					{
+						<div class="mta-table" style="--mta-cols: 120px minmax(0, 1fr)">
+							<div class="mta-row mta-row--head">
+								<span>Where</span>
+								<span>Name servers</span>
+							</div>
+							@foreach ((string scope, IReadOnlyList<string> servers) in snapshot.Dns)
+							{
+								<div class="mta-row" @key="scope">
+									<span class="mta-cell mta-mono">@scope</span>
+									<span class="mta-cell mta-mono" title="@string.Join("\n", servers)">@string.Join("  ", servers)</span>
+								</div>
+							}
+							@if (snapshot.SearchDomains.Count > 0)
+							{
+								<div class="mta-row">
+									<span class="mta-cell mta-dim">search</span>
+									<span class="mta-cell mta-mono">@string.Join("  ", snapshot.SearchDomains)</span>
+								</div>
+							}
+						</div>
+					}
+					break;
+
+				case "ports":
+					@if (snapshot.ListeningSource.Length == 0)
+					{
+						<MokaEmptyState Icon="SshIcons.Network" Title="No socket tool" Description="Neither ss nor netstat is installed." />
+					}
+					else
+					{
+						@if (!ReadAsRoot)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Processes show for this login's own sockets. Root mode shows them all.</MokaText>
+						}
+						<div class="mta-table" style="--mta-cols: 56px minmax(0, 1.2fr) 64px minmax(0, 1fr); --mta-cols-narrow: 48px minmax(0, 1fr) 56px">
+							<div class="mta-row mta-row--head">
+								<AdminSortHeader Text="Proto" Key="proto" Sort="_portSort" OnChanged="StateHasChanged" />
+								<AdminSortHeader Text="Address" Key="address" Sort="_portSort" OnChanged="StateHasChanged" />
+								<AdminSortHeader Text="Port" Key="port" Sort="_portSort" OnChanged="StateHasChanged" />
+								<AdminSortHeader Text="Process" Key="process" Sort="_portSort" OnChanged="StateHasChanged" Class="mta-wide" />
+							</div>
+							@foreach (ListeningSocket socket in SortedPorts(snapshot.Listening.Where(socket => Matches(socket.Process) || Matches(socket.Address) || Matches(socket.Port.ToString(CultureInfo.InvariantCulture)))))
+							{
+								<div class="mta-row" @key="@($"{socket.Protocol}|{socket.Address}|{socket.Port}|{socket.Pid}")">
+									<span class="mta-cell mta-mono mta-dim">@socket.Protocol</span>
+									<span class="mta-cell mta-mono">@socket.Address</span>
+									<span class="mta-cell mta-mono">
+										@socket.Port
+										@if (socket.Port == Profile.Facts.SshServerPort && !socket.IsUdp)
+										{
+											<span class="mta-after" title="This session arrived on this port"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Warning" Glow /></span>
+										}
+									</span>
+									<span class="mta-cell mta-mono mta-dim mta-wide">@(socket.Process.Length > 0 ? $"{socket.Process} ({socket.Pid})" : "")</span>
+								</div>
+							}
+						</div>
+					}
+					break;
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private NetworkSnapshot? _snapshot;
+	private string _view = "interfaces";
+	private string _filter = "";
+	private string? _selected;
+	private readonly AdminSort _portSort = new("port");
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private string Summary => _snapshot is { } snapshot
+		? $"{snapshot.Interfaces.Count} interfaces, {snapshot.Interfaces.Count(item => item.IsUp)} up · {snapshot.Routes.Count} routes · {snapshot.Listening.Count} listening sockets"
+		: "";
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("interfaces", "Interfaces", _snapshot?.Interfaces.Count),
+		new("routes", "Routes", _snapshot?.Routes.Count),
+		new("dns", "DNS"),
+		new("ports", "Listening", _snapshot?.Listening.Count),
+	];
+
+	private NetInterface? Selected => _selected is { } name ? _snapshot?.Interfaces.FirstOrDefault(item => item.Name == name) : null;
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		AdminOutcome outcome = await ReadAsync(NetworkCommands.Read(ReadAsRoot), cancellationToken);
+		_snapshot = NetworkParser.Parse(outcome.Output);
+	}
+
+	private RenderFragment InterfacePanel => __builder =>
+	{
+		if (Selected is not { } networkInterface)
+		{
+			return;
+		}
+
+		<AdminDetailPanel Title="@networkInterface.Name"
+						  Subtitle="@($"{networkInterface.LinkType} · {(networkInterface.State.Length > 0 ? networkInterface.State : "state unknown")}")"
+						  DotColor="@LinkColor(networkInterface)"
+						  DotGlow="networkInterface.IsUp"
+						  OnClose="@(() => _selected = null)">
+			<Actions>
+				@if (!networkInterface.IsLoopback)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="@(networkInterface.IsUp ? MokaColor.Error : MokaColor.Primary)"
+								Size="MokaSize.Xs"
+								Disabled="@(Busy || Context.RootChangeBlocked is not null || AdminNames.CheckInterface(networkInterface.Name) is not null)"
+								title="@Context.RootChangeBlocked"
+								OnClick="@(() => SetLinkAsync(networkInterface, !networkInterface.IsUp))">
+						@(networkInterface.IsUp ? "Bring down" : "Bring up")
+					</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				@if (CarriesSession(networkInterface))
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>This SSH session arrives on this interface. Bringing it down cuts the session.</MokaAlert>
+				}
+				<dl class="mta-kv">
+					<dt>Addresses</dt>
+					<dd>
+						@if (networkInterface.Addresses.Count == 0)
+						{
+							<span class="mta-dim">none</span>
+						}
+						@foreach (NetAddress address in networkInterface.Addresses)
+						{
+							<div class="mta-mono" @key="address.Cidr">@address.Cidr<span class="mta-dim mta-after">@address.Scope</span></div>
+						}
+					</dd>
+					<dt>MAC</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(networkInterface.Mac.Length > 0 ? networkInterface.Mac : "none")</MokaText></dd>
+					<dt>MTU</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@networkInterface.Mtu</MokaText></dd>
+					<dt>Flags</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@string.Join(" ", networkInterface.Flags)</MokaText></dd>
+					@if (_snapshot?.Routes.Any(route => route.IsDefault && route.Device == networkInterface.Name) == true)
+					{
+						<dt>Routes</dt>
+						<dd>The default route leaves through this interface.</dd>
+					}
+				</dl>
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private static MokaColor LinkColor(NetInterface networkInterface) => networkInterface.IsUp
+		? networkInterface.State is "DOWN" or "LOWERLAYERDOWN" ? MokaColor.Warning : MokaColor.Success
+		: MokaColor.Surface;
+
+	private bool CarriesSession(NetInterface networkInterface) => NetworkParser.Holds(networkInterface, Profile.Facts.SshServerAddress);
+
+	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private IEnumerable<ListeningSocket> SortedPorts(IEnumerable<ListeningSocket> sockets) => _portSort.Key switch
+	{
+		"proto" => _portSort.Apply(sockets, socket => socket.Protocol),
+		"address" => _portSort.Apply(sockets, socket => socket.Address),
+		"process" => _portSort.Apply(sockets, socket => socket.Process),
+		_ => _portSort.Apply(sockets, socket => (double)socket.Port),
+	};
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(NetInterface networkInterface)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => _selected = networkInterface.Name }];
+		if (!networkInterface.IsLoopback)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = networkInterface.IsUp ? "Bring down" : "Bring up",
+				DividerBefore = true,
+				Disabled = Busy || Context.RootChangeBlocked is not null || AdminNames.CheckInterface(networkInterface.Name) is not null,
+				OnClick = () => SetLinkAsync(networkInterface, !networkInterface.IsUp),
+			});
+		}
+
+		return items;
+	}
+
+	private void Select(string name) => _selected = _selected == name ? null : name;
+
+	private void OnRowKey(KeyboardEventArgs args, string name)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(name);
+		}
+	}
+
+	private async Task SetLinkAsync(NetInterface networkInterface, bool up)
+	{
+		if (_snapshot is { } snapshot)
+		{
+			_selected = networkInterface.Name;
+			await RunAsync(NetworkCommands.SetLink(networkInterface, up, snapshot, Profile.Facts.SshServerAddress));
+		}
+	}
+}

@@ -1,0 +1,211 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Processes
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Processes"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="@(value => _filter = value)"
+				SearchPlaceholder="Filter by command, user or PID"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				ListPage
+				Detail="@(Selected is null ? null : ProcessPanel)">
+	<Chips>
+		@if (Capabilities.HasProcessTools)
+		{
+			<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => _view = value)" AriaLabel="Processes to show" />
+		}
+	</Chips>
+	<ChildContent>
+		@if (!Capabilities.HasProcessTools)
+		{
+			<MokaEmptyState Icon="SshIcons.Chip" Title="No ps" Description="This machine has no ps command, so its processes cannot be listed." />
+		}
+		else
+		{
+			List<ProcessInfo> shown = Shown();
+			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 50px 50px 70px minmax(0, 2fr) 28px; --mta-cols-narrow: 54px 46px 46px minmax(0, 1fr) 28px">
+				<div class="mta-row mta-row--head">
+					<AdminSortHeader Text="PID" Key="pid" Sort="_sort" OnChanged="StateHasChanged" />
+					<AdminSortHeader Text="User" Key="user" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+					<AdminSortHeader Text="CPU" Key="cpu" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+					<AdminSortHeader Text="Mem" Key="mem" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+					<AdminSortHeader Text="RSS" Key="rss" Sort="_sort" StartDescending OnChanged="StateHasChanged" Class="mta-wide" />
+					<AdminSortHeader Text="Command" Key="command" Sort="_sort" OnChanged="StateHasChanged" />
+					<span></span>
+				</div>
+				@foreach (ProcessInfo process in shown)
+				{
+					<div class="@(process.Pid == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+						 @key="process.Pid"
+						 role="button"
+						 tabindex="0"
+						 @onclick="@(() => Select(process.Pid))"
+						 @onkeydown="@(args => OnRowKey(args, process.Pid))"
+						 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(process)))"
+						 @oncontextmenu:preventDefault="true">
+						<span class="mta-cell mta-mono">@process.Pid</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide">@process.User</span>
+						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Cpu, "0.0")</span>
+						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Memory, "0.0")</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide">@AdminFormat.Kb(process.ResidentKb)</span>
+						<span class="mta-cell mta-mono" title="@process.Command">@process.Command</span>
+						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+							<MokaButton Variant="MokaVariant.Text"
+										Color="MokaColor.Surface"
+										Size="MokaSize.Xs"
+										StartIcon="MokaIcons.Navigation.MoreHorizontal"
+										OnClick="@(args => ShowRowMenu(args, MenuFor(process)))"
+										aria-label="@($"Actions for process {process.Pid}")" />
+						</span>
+					</div>
+				}
+				@if (_matching > shown.Count)
+				{
+					<div class="mta-more">@($"The top {shown.Count} of {AdminFormat.Count(_matching)} by this column. Filter to find others.")</div>
+				}
+			</div>
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private const int MaxRows = 200;
+
+	private IReadOnlyList<ProcessInfo> _processes = [];
+	private readonly AdminSort _sort = new("cpu", descending: true);
+	private string _view = "all";
+	private string _filter = "";
+	private int? _selected;
+	private int _matching;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private string Summary => $"{AdminFormat.Count(_processes.Count)} processes, {AdminFormat.Count(_processes.Count(process => process.User == Context.LoginName))} of them {Context.LoginName}'s · CPU is ps's average over each process's life";
+
+	private IReadOnlyList<AdminChip> Chips =>
+	[
+		new("all", "All", _processes.Count),
+		new("mine", Context.LoginName, _processes.Count(process => process.User == Context.LoginName)),
+	];
+
+	private ProcessInfo? Selected => _selected is { } pid ? _processes.FirstOrDefault(process => process.Pid == pid) : null;
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		if (!Capabilities.HasProcessTools)
+		{
+			return;
+		}
+
+		AdminOutcome outcome = await ReadAsync(ProcessCommands.List(ReadAsRoot), cancellationToken);
+		_processes = ProcessCommands.Parse(outcome.Output);
+	}
+
+	private RenderFragment ProcessPanel => __builder =>
+	{
+		if (Selected is not { } process)
+		{
+			return;
+		}
+
+		string? blocked = Blocked(process);
+		<AdminDetailPanel Title="@($"{process.Name} ({process.Pid})")" Subtitle="@process.User" OnClose="@(() => _selected = null)">
+			<Actions>
+				@if (process.Pid > 1)
+				{
+					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" Disabled="@(Busy || blocked is not null)" title="@blocked" OnClick="@(() => SignalAsync(process, false))">Terminate</MokaButton>
+					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" Disabled="@(Busy || blocked is not null)" title="@blocked" OnClick="@(() => SignalAsync(process, true))">Kill</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				@if (process.Pid <= 1)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">PID 1 is the init process and cannot be ended here.</MokaText>
+				}
+				<dl class="mta-kv">
+					<dt>State</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@process.State</MokaText></dd>
+					<dt>CPU, memory</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{AdminFormat.Number(process.Cpu, "0.0")}% · {AdminFormat.Number(process.Memory, "0.0")}% · {AdminFormat.Kb(process.ResidentKb)}")</MokaText></dd>
+					<dt>Runs as</dt>
+					<dd>
+						<MokaText Element="span" Size="MokaSize.Sm" Mono>@process.User</MokaText>
+						@if (NeedsRoot(process))
+						{
+							<span class="mta-dim mta-after">ending it needs root</span>
+						}
+					</dd>
+				</dl>
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command line</MokaText>
+				<pre class="mta-pre">@process.Command</pre>
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private List<ProcessInfo> Shown()
+	{
+		string filter = _filter.Trim();
+		List<ProcessInfo> matching =
+		[
+			.. _processes.Where(process => (_view != "mine" || process.User == Context.LoginName)
+				&& (filter.Length == 0
+					|| process.Command.Contains(filter, StringComparison.OrdinalIgnoreCase)
+					|| process.User.Contains(filter, StringComparison.OrdinalIgnoreCase)
+					|| process.Pid.ToString(CultureInfo.InvariantCulture) == filter)),
+		];
+
+		_matching = matching.Count;
+		IEnumerable<ProcessInfo> sorted = _sort.Key switch
+		{
+			"pid" => _sort.Apply(matching, process => (double)process.Pid),
+			"user" => _sort.Apply(matching, process => process.User),
+			"mem" => _sort.Apply(matching, process => process.Memory ?? 0),
+			"rss" => _sort.Apply(matching, process => (double)(process.ResidentKb ?? 0)),
+			"command" => _sort.Apply(matching, process => process.Command),
+			_ => _sort.Apply(matching, process => process.Cpu ?? 0),
+		};
+
+		return [.. sorted.Take(MaxRows)];
+	}
+
+	/// <summary>Another user's process needs root; the login's own does not.</summary>
+	private bool NeedsRoot(ProcessInfo process) => !Profile.Facts.IsRoot && process.User != Context.LoginName;
+
+	private string? Blocked(ProcessInfo process) => NeedsRoot(process) ? Context.RootChangeBlocked : null;
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(ProcessInfo process)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => _selected = process.Pid }];
+		if (process.Pid > 1)
+		{
+			bool blocked = Busy || Blocked(process) is not null;
+			items.Add(new MokaContextMenuItem { Text = "Terminate", DividerBefore = true, Disabled = blocked, OnClick = () => SignalAsync(process, false) });
+			items.Add(new MokaContextMenuItem { Text = "Kill", Disabled = blocked, OnClick = () => SignalAsync(process, true) });
+		}
+
+		return items;
+	}
+
+	private void Select(int pid) => _selected = _selected == pid ? null : pid;
+
+	private void OnRowKey(KeyboardEventArgs args, int pid)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(pid);
+		}
+	}
+
+	private async Task SignalAsync(ProcessInfo process, bool force)
+	{
+		_selected = process.Pid;
+		if (await RunAsync(ProcessCommands.Signal(process, force, NeedsRoot(process))) is { Succeeded: true })
+		{
+			_selected = null;
+		}
+	}
+}

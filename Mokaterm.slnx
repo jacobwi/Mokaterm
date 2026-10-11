@@ -3,6 +3,7 @@
 		<File Path=".editorconfig" />
 		<File Path=".gitignore" />
 		<File Path="Directory.Build.props" />
+		<File Path="Directory.Build.targets" />
 		<File Path="Directory.Packages.props" />
 		<File Path="global.json" />
 	</Folder>
@@ -10,6 +11,7 @@
 		<Project Path="src/Mokaterm.Abstractions/Mokaterm.Abstractions.csproj" />
 		<Project Path="src/Mokaterm.Core/Mokaterm.Core.csproj" />
 		<Project Path="src/Mokaterm.Sessions/Mokaterm.Sessions.csproj" />
+		<Project Path="src/Mokaterm.Generators/Mokaterm.Generators.csproj" />
 	</Folder>
 	<Folder Name="/src/UI/">
 		<Project Path="src/UI/Mokaterm.UI.Common/Mokaterm.UI.Common.csproj" />
@@ -26,6 +28,7 @@
 		<Project Path="src/Modules/Mokaterm.Modules.Telnet/Mokaterm.Modules.Telnet.csproj" />
 		<Project Path="src/Modules/Mokaterm.Modules.Mqtt/Mokaterm.Modules.Mqtt.csproj" />
 		<Project Path="src/Modules/Mokaterm.Modules.Serial/Mokaterm.Modules.Serial.csproj" />
+		<Project Path="src/Modules/Mokaterm.Modules.Local/Mokaterm.Modules.Local.csproj" />
 	</Folder>
 	<Folder Name="/src/Hosts/">
 		<Project Path="src/Hosts/Mokaterm.Maui/Mokaterm.Maui.csproj">
@@ -49,5 +52,7 @@
 		<Project Path="tests/Mokaterm.Modules.Serial.Tests/Mokaterm.Modules.Serial.Tests.csproj" />
 		<Project Path="tests/Mokaterm.UI.FileBrowser.Tests/Mokaterm.UI.FileBrowser.Tests.csproj" />
 		<Project Path="tests/Mokaterm.UI.Tests/Mokaterm.UI.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Modules.Local.Tests/Mokaterm.Modules.Local.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Generators.Tests/Mokaterm.Generators.Tests.csproj" />
 	</Folder>
 </Solution>

@@ -36,6 +36,7 @@ public static class CoreServiceCollectionExtensions
 		services.TryAddSingleton(TimeProvider.System);
 		services.TryAddSingleton(new VaultOptions());
 		services.TryAddSingleton<ISshKeyGenerator, SshKeyGenerator>();
+		services.TryAddSingleton<ISshSecurityKeyReader, SshSecurityKeyReader>();
 
 		// Import sources only read; the importer they feed is scoped because it writes through the repository.
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IConnectionImportSource, OpenSshConfigImportSource>());
@@ -45,7 +46,9 @@ public static class CoreServiceCollectionExtensions
 
 		// Shared by every UI scope.
 		services.TryAddSingleton<IAppDataStore, FileAppDataStore>();
-		services.TryAddSingleton<ISettingsService, SettingsService>();
+		services.TryAddSingleton<SettingsService>();
+		services.TryAddSingleton<ISettingsService>(static provider => provider.GetRequiredService<SettingsService>());
+		services.TryAddSingleton<ISettingsBackup, SettingsBackup>();
 		services.TryAddSingleton<ITerminalThemeCatalog, TerminalThemeCatalog>();
 		services.TryAddSingleton<ITerminalThemeConverter, TerminalThemeConverter>();
 		services.TryAddSingleton<VaultHeaderStore>();

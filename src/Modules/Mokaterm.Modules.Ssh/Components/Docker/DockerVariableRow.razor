@@ -1,0 +1,70 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Mokaterm.Abstractions.Interaction
+@using Mokaterm.UI.Common.Platform
+
+@* One variable: its name, its value hidden until shown, and a copy that goes through the secret clipboard. *@
+<div class="mt-dk-variable">
+	<span class="mt-dk-variable-name" title="@Name">@Name</span>
+	<span class="mt-dk-variable-value">@Shown</span>
+	@if (Value is { Length: > 0 })
+	{
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="@(_revealed ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
+					OnClick="Toggle"
+					aria-pressed="@(_revealed ? "true" : "false")"
+					aria-label="@(_revealed ? $"Hide {Name}" : $"Show {Name}")" />
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Content.Copy"
+					OnClick="CopyAsync"
+					aria-label="@($"Copy the value of {Name}")" />
+	}
+</div>
+
+@code {
+	private bool _revealed;
+
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
+
+	[Inject]
+	private IUserInteraction Interaction { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string Name { get; set; } = "";
+
+	/// <summary>The value; null for a bare name that takes its value from the environment compose runs in.</summary>
+	[Parameter]
+	public string? Value { get; set; }
+
+	/// <summary>Text shown after a bare name.</summary>
+	[Parameter]
+	public string NoValueText { get; set; } = "(from the environment)";
+
+	private string Shown => Value switch
+	{
+		null => NoValueText,
+		"" => "(empty)",
+		_ when _revealed => Value,
+		_ => Mokaterm.Modules.Ssh.Docker.DockerInspectParser.Mask,
+	};
+
+	private void Toggle() => _revealed = !_revealed;
+
+	/// <summary>Through the secret path, so the clipboard is cleared again: a value is where passwords live.</summary>
+	private async Task CopyAsync()
+	{
+		try
+		{
+			await Clipboard.WriteSecretAsync(Value ?? "");
+			Interaction.Notify(NoticeSeverity.Success, $"Copied the value of {Name}. The clipboard clears itself shortly.");
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Interaction.Notify(NoticeSeverity.Error, "Could not copy to the clipboard.");
+		}
+	}
+}

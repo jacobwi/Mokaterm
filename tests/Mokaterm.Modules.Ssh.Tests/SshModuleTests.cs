@@ -5,6 +5,8 @@ using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.Components;
+using Mokaterm.Modules.Ssh.Components.Admin;
+using Mokaterm.Modules.Ssh.Components.Docker;
 using Mokaterm.Modules.Ssh.Keys;
 using Mokaterm.Modules.Ssh.Tests.Fakes;
 using Mokaterm.UI.Common.Contributions;
@@ -57,7 +59,7 @@ public sealed class SshModuleTests
 
 		Assert.Equal("SSH", ssh.DisplayName);
 		Assert.Equal(22, ssh.DefaultPort);
-		Assert.Equal(ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation, ssh.Capabilities);
+		Assert.Equal(ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands, ssh.Capabilities);
 		Assert.Equal(methods, ssh.AuthenticationMethods);
 		Assert.Null(ssh.VariantOf);
 		Assert.Equal(0, ssh.Order);
@@ -96,10 +98,28 @@ public sealed class SshModuleTests
 		Assert.Equal(MokatermIcons.Terminal.Name, ssh.Icon.Name);
 		Assert.Equal(MokatermIcons.FolderOpen.Name, sftp.Icon.Name);
 
-		SessionToolDescriptor tool = Assert.Single(contributions.FindSessionTools("ssh"));
-		Assert.Equal("Port forwarding", tool.Title);
+		IReadOnlyList<SessionToolDescriptor> tools = contributions.FindSessionTools("ssh");
+		SessionToolDescriptor tool = Assert.Single(tools, candidate => candidate.Title == "Port forwarding");
 		Assert.Equal(typeof(SshTunnelsView), tool.Component);
 		Assert.False(tool.ShowWhileDisconnected);
+
+		SessionToolDescriptor system = Assert.Single(tools, candidate => candidate.Title == "System");
+		Assert.Equal(typeof(SystemAdminView), system.Component);
+		Assert.False(system.ShowWhileDisconnected);
+
+		// The Docker manager runs docker over the session's own connection, so it needs the session connected too.
+		SessionToolDescriptor docker = Assert.Single(tools, candidate => candidate.Title == "Docker");
+		Assert.Equal(typeof(DockerManagerView), docker.Component);
+		Assert.False(docker.ShowWhileDisconnected);
+		Assert.Equal(3, tools.Count);
+
+		// The keys the palette commands, hidden buttons and window places are saved under; they must never change.
+		Assert.Equal(["port-forwarding", "system", "docker"], tools.Select(candidate => candidate.Key));
+
+		// A list with a detail panel beside it needs most of the window; the tunnels form does not.
+		Assert.Equal(SessionToolSize.Standard, tool.Size);
+		Assert.Equal(SessionToolSize.Wide, system.Size);
+		Assert.Equal(SessionToolSize.Wide, docker.Size);
 
 		// Nothing is inherited: an sftp session has no SSH client of its own to forward ports through.
 		Assert.Empty(contributions.FindSessionTools("sftp"));

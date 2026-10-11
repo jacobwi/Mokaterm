@@ -59,13 +59,14 @@
 @* The web host refuses a reset from here: anyone who reaches the page sees this screen. *@
 @if (CanReset)
 {
-	<MokaDialog Open="_resetOpen"
-				Title="Reset vault"
-				DialogSize="MokaDialogSize.Small"
-				CloseOnBackdropClick="false"
-				CloseOnEscape="@(!_resetting)"
-				ShowCloseButton="@(!_resetting)"
-				OnClose="CloseReset">
+	<HeadedDialog Open="_resetOpen"
+				  Title="Reset vault"
+				  Icon="MokaIcons.Status.Warning"
+				  DialogSize="MokaDialogSize.Small"
+				  CloseOnBackdropClick="false"
+				  CloseOnEscape="@(!_resetting)"
+				  ShowCloseButton="@(!_resetting)"
+				  OnClose="CloseReset">
 		<ChildContent>
 			<PromptBody @ref="_resetBody">
 				<MokaAlert Severity="MokaToastSeverity.Error" Title="This cannot be undone">
@@ -95,5 +96,5 @@
 				Reset vault
 			</MokaButton>
 		</Actions>
-	</MokaDialog>
+	</HeadedDialog>
 }

@@ -1,4 +1,5 @@
 @inherits ConnectionOptionsEditorBase<SshConnectionOptions>
+@using Mokaterm.Modules.Ssh.Forwarding
 
 <MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
 	@if (IsTerminalProtocol)
@@ -147,6 +148,45 @@
 				 CanSaveProxyPassword="CanSaveProxyPassword"
 				 Disabled="Disabled" />
 </div>
+
+@if (IsTerminalProtocol)
+{
+	<div class="mt-ssh-section">
+		<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">Agent and X11 forwarding</MokaText>
+
+		<MokaSwitch Label="Forward SSH agent"
+					Value="@Current.Forwarding.ForwardAgent"
+					ValueChanged="SetForwardAgentAsync"
+					HelperText="@AgentForwardingHelp"
+					Disabled="Disabled" />
+
+		@if (Current.Forwarding.ForwardAgent)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+				Anyone with root on that server can use your keys while you are connected.
+			</MokaAlert>
+		}
+
+		<MokaSwitch Label="X11 forwarding"
+					Value="@Current.Forwarding.ForwardX11"
+					ValueChanged="SetForwardX11Async"
+					HelperText="@X11Help"
+					Disabled="@(Disabled || (!OffersX11 && !Current.Forwarding.ForwardX11))" />
+
+		@if (Current.Forwarding.ForwardX11 && OffersX11)
+		{
+			<MokaTextField Label="X display"
+						   Value="@_display.Show(Current.Forwarding.Display ?? "")"
+						   ValueChanged="SetDisplayAsync"
+						   ErrorText="@_display.Error"
+						   Placeholder="@X11Display.DefaultText"
+						   HelperText="Where the X server listens. Display N is TCP port 6000 + N."
+						   Disabled="Disabled"
+						   Size="MokaSize.Sm"
+						   spellcheck="false" />
+		}
+	</div>
+}
 
 <div class="mt-ssh-section">
 	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-ssh-heading">Port forwarding</MokaText>

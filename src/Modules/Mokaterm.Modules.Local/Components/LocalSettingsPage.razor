@@ -1,0 +1,52 @@
+@inherits SettingsSectionBase<LocalSettings>
+
+@{
+	LocalSettings settings = Settings;
+}
+
+<SettingsPage Title="Local shell" OnReset="ResetAsync" ResetMessage="Put every local shell setting back to its default?">
+	<SettingsSection Title="What a login runs"
+					 Description="A login runs the shell its options pick, or else the one its host's address names. A host called localhost, or by this computer's name, runs the default.">
+		<SettingsRow Label="Default shell" Description="The shell a host called localhost runs when its login picks none." ControlWidth="240px">
+			<MokaSelect TValue="string"
+						Items="DefaultChoices"
+						Value="@settings.DefaultShell"
+						ValueChanged="OnDefaultShellChangedAsync"
+						ValueSelector="DefaultShellLabel"
+						Size="MokaSize.Sm"
+						aria-label="Default shell" />
+		</SettingsRow>
+		<SettingsRow Label="Starting folder"
+					 Description="Where a shell starts when its login names no folder. Empty is your profile folder, and your Linux home in WSL. A leading ~ and %VARIABLES% are expanded."
+					 ControlWidth="340px">
+			<TextSetting Value="@settings.StartingFolder"
+						 ValueChanged="value => SaveAsync(s => s with { StartingFolder = value })"
+						 AllowEmpty
+						 Placeholder="Your profile folder"
+						 AriaLabel="Starting folder" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="When a shell exits">
+		<SettingsRow Label="Show a failing exit code"
+					 Description="Writes the code into the terminal when a shell exits with anything but 0, which is how a program that fails at once says why. Typing exit after a failed command can show one too.">
+			<MokaSwitch Value="settings.ReportExitCode"
+						ValueChanged="value => SaveAsync(s => s with { ReportExitCode = value })"
+						aria-label="Show a failing exit code" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Found on this computer"
+					 Description="What a host's address can name. A local shell runs on the machine this app runs on, so only the desktop app offers it, and closing its tab ends the shell and everything started from it, windows included.">
+		@if (_shells.Count == 0)
+		{
+			<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">No shell was found on this computer.</MokaText>
+		}
+		@foreach (LocalShell shell in _shells)
+		{
+			<SettingsRow @key="shell.Id" Label="@shell.DisplayName" Description="@shell.Program" Searchable="false">
+				<MokaText Size="MokaSize.Xs" Mono>@shell.Address</MokaText>
+			</SettingsRow>
+		}
+	</SettingsSection>
+</SettingsPage>

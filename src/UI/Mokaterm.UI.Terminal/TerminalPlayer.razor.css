@@ -1,0 +1,48 @@
+.mt-player {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	height: 100%;
+	min-height: 0;
+}
+
+/* The grid keeps the size the recording was made at, so a wide one scrolls here instead of reflowing. */
+.mt-player-viewport {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-background);
+	/* Keeps xterm.js z-indexes local to the player. */
+	isolation: isolate;
+}
+
+.mt-player-screen {
+	display: inline-block;
+	min-width: 100%;
+}
+
+.mt-player-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 13;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--moka-color-background);
+}
+
+.mt-player-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-player-seek {
+	flex: 1 1 160px;
+	min-width: 120px;
+}

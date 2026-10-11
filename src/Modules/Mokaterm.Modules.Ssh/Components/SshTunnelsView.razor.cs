@@ -2,6 +2,7 @@ using System.Globalization;
 using Moka.Red.Core.Enums;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.Modules.Ssh.Forwarding;
 using Mokaterm.Modules.Ssh.Tunnels;
 using Mokaterm.UI.Common.Components;
 
@@ -17,6 +18,7 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 	private ISessionHandle? _handle;
 	private IProtocolSession? _attached;
 	private ISshTunnelFeature? _feature;
+	private ISshForwardingFeature? _forwarding;
 	private SshTunnelDefinition? _draft;
 	private string? _error;
 	private bool _busy;
@@ -31,6 +33,12 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 			return failed == 0 ? text : string.Create(CultureInfo.CurrentCulture, $"{text}, {failed} failed");
 		}
 	}
+
+	/// <summary>Agent and X11 forwarding, which belong with the tunnels: each is a way in from the server.</summary>
+	private IReadOnlyList<(string Kind, SshForwardingLine Line)> ForwardingLines =>
+		_forwarding is not { } forwarding
+			? []
+			: [.. new (string Kind, SshForwardingLine Line)[] { ("AGENT", forwarding.Agent), ("X11", forwarding.X11) }.Where(entry => entry.Line.State != SshForwardingState.Off)];
 
 	public void Dispose()
 	{
@@ -66,6 +74,17 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 		_ => MokaColor.Surface,
 	};
 
+	private static MokaColor ForwardingColor(SshForwardingLine line) => line.State switch
+	{
+		SshForwardingState.Requested when line.Problem is null => MokaColor.Success,
+		SshForwardingState.Requested => MokaColor.Warning,
+		_ => MokaColor.Error,
+	};
+
+	private static string DescribeForwarding(SshForwardingLine line) => line.State == SshForwardingState.Requested
+		? string.Create(CultureInfo.CurrentCulture, $"asked for, {line.OpenChannels} open")
+		: "not available";
+
 	private void Attach()
 	{
 		IProtocolSession? session = Session.Session;
@@ -77,6 +96,12 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 		Detach();
 		_attached = session;
 		_feature = session?.GetFeature<ISshTunnelFeature>();
+		_forwarding = session?.GetFeature<ISshForwardingFeature>();
+		if (_forwarding is { } forwarding)
+		{
+			forwarding.Changed += OnTunnelsChanged;
+		}
+
 		if (_feature is { } feature)
 		{
 			feature.Changed += OnTunnelsChanged;
@@ -95,7 +120,13 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 			feature.Changed -= OnTunnelsChanged;
 		}
 
+		if (_forwarding is { } forwarding)
+		{
+			forwarding.Changed -= OnTunnelsChanged;
+		}
+
 		_feature = null;
+		_forwarding = null;
 		_attached = null;
 	}
 

@@ -36,4 +36,7 @@ public sealed class ProtocolConnectContext
 
 	/// <summary>Initial pseudo-terminal size for protocols with a terminal.</summary>
 	public TerminalSize TerminalSize { get; init; } = TerminalSize.Default;
+
+	/// <summary>What the session is for. Only providers that declare <see cref="ProtocolCapabilities.Commands"/> are ever asked for anything but a tab.</summary>
+	public ConnectPurpose Purpose { get; init; } = ConnectPurpose.Interactive;
 }

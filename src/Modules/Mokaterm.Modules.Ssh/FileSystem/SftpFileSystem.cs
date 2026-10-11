@@ -48,6 +48,8 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 	private readonly SemaphoreSlim _gate = new(1, 1);
 	private string? _startDirectory;
 	private bool _shellLinksUnavailable;
+	private int _checksumUnavailable;
+	private int _commandsUnavailable;
 	private int _closed;
 
 	/// <param name="shell">The session's connected SSH client when there is one; used to read link targets in one round trip.</param>
@@ -60,11 +62,13 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		_logger = logger;
 	}
 
-	// Accounts are read with a command, so an account limited to SFTP gets an empty list rather than none at all.
+	// Accounts are read with a command, so an account limited to SFTP gets an empty list rather than none at all. Copies
+	// and archives are commands with nothing to fall back on, so they are only offered while commands can run.
 	public RemoteFileSystemFeatures Features =>
 		RemoteFileSystemFeatures.Permissions | RemoteFileSystemFeatures.Ownership | RemoteFileSystemFeatures.SymbolicLinks
 		| RemoteFileSystemFeatures.Accounts
-		| (_options.SupportsElevation ? RemoteFileSystemFeatures.Elevation : RemoteFileSystemFeatures.None);
+		| (_options.SupportsElevation ? RemoteFileSystemFeatures.Elevation : RemoteFileSystemFeatures.None)
+		| (CanRunCommands ? RemoteFileSystemFeatures.Copy | RemoteFileSystemFeatures.Archives : RemoteFileSystemFeatures.None);
 
 	public string UserName => _options.UserName;
 
@@ -382,18 +386,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 	public async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
 	{
 		string target = RemotePath.Normalize(path);
-		SftpFileStream stream = await RunAsync(target, async (client, token) =>
-		{
-			SftpFileAttributes attributes = await client.GetAttributesAsync(target, token);
-			if (attributes.IsDirectory)
-			{
-				throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"{target} is a directory.", target);
-			}
-
-			return await client.OpenAsync(target, FileMode.Open, FileAccess.Read, token);
-		}, cancellationToken);
-
-		return new SftpReadStream(stream, _gate, target);
+		return new SftpReadStream(await OpenAtAsync(target, 0, cancellationToken), _gate, target);
 	}
 
 	public async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
@@ -402,11 +395,16 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		ArgumentNullException.ThrowIfNull(options);
 		string target = RemotePath.Normalize(path);
 
+		if (options.Resume is { } resume && await TryUploadResumableAsync(target, source, options, resume, progress, cancellationToken))
+		{
+			return;
+		}
+
 		// Writing in place truncates the old file before a byte of the new one arrived, and a failure then deletes what is
 		// left. A temporary file beside it takes its place only once the upload is complete.
 		if (options.Overwrite && await TryOpenReplacementAsync(target, options.Permissions, cancellationToken) is { } replacement)
 		{
-			await ReplaceAsync(replacement.Destination, replacement.Temporary, replacement.Stream, source, options, progress, cancellationToken);
+			await PlaceAsync(replacement, source, options, resume: null, replace: true, progress, cancellationToken);
 			return;
 		}
 
@@ -450,10 +448,15 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		}
 	}
 
-	public async ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
+
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(destination);
-		Stream source = await OpenReadAsync(path, cancellationToken);
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
+		string target = RemotePath.Normalize(path);
+		Stream source = new SftpReadStream(await OpenAtAsync(target, offset, cancellationToken), _gate, target);
 		await using (source)
 		{
 			byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
@@ -473,6 +476,63 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 				ArrayPool<byte>.Shared.Return(buffer);
 			}
 		}
+	}
+
+	// The checksum runs as a command on the session's SSH connection, which an SFTP-only session does not have.
+	public ChecksumAlgorithm? ServerChecksum =>
+		Volatile.Read(ref _checksumUnavailable) == 0 && _shell() is not null ? ChecksumAlgorithm.Sha256 : null;
+
+	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	{
+		string target = RemotePath.Normalize(path);
+		if (Volatile.Read(ref _checksumUnavailable) != 0 || _shell() is not { } shell)
+		{
+			return null;
+		}
+
+		RemoteCommandResult result;
+		try
+		{
+			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(RemoteScripts.Checksum, [target]), null, cancellationToken);
+		}
+		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, target, out RemoteFileSystemException? mapped))
+		{
+			throw mapped;
+		}
+
+		// No marker: an account limited to SFTP runs no commands. Exit 105: no SHA-256 tool. Neither changes later.
+		if (!RemoteOutput.TryGetPayload(result.Output, out ReadOnlyMemory<byte> payload) || result.ExitStatus == RemoteScripts.ExitUnsupported)
+		{
+			return MarkChecksumUnavailable();
+		}
+
+		if (result.ExitStatus != 0)
+		{
+			throw RemoteCommandErrors.ToException(result.ExitStatus, result.Error, target);
+		}
+
+		return RemoteOutput.ReadSha256(payload.Span) ?? MarkChecksumUnavailable();
+	}
+
+	public async ValueTask CopyAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
+	{
+		string source = RemotePath.Normalize(sourcePath);
+		string destination = RemotePath.Normalize(destinationPath);
+		await RunScriptAsync(RemoteScripts.Copy, RemoteScriptArguments.Copy(source, destination, overwrite), source, destination, "copying", cancellationToken);
+	}
+
+	public async ValueTask CompressAsync(string directory, IReadOnlyList<string> names, string archivePath, CancellationToken cancellationToken = default)
+	{
+		string folder = RemotePath.Normalize(directory);
+		string archive = RemotePath.Normalize(archivePath);
+		await RunScriptAsync(RemoteScripts.Compress, RemoteScriptArguments.Compress(folder, names, archive), folder, archive, "making an archive", cancellationToken);
+	}
+
+	public async ValueTask ExtractAsync(string archivePath, string destinationDirectory, CancellationToken cancellationToken = default)
+	{
+		string archive = RemotePath.Normalize(archivePath);
+		string destination = RemotePath.Normalize(destinationDirectory);
+		await RunScriptAsync(RemoteScripts.Extract, RemoteScriptArguments.Extract(archive, destination), archive, destination, "unpacking an archive", cancellationToken);
 	}
 
 	/// <summary>The session owns this file system and closes it with <see cref="CloseAsync"/>; disposing a shared instance does nothing.</summary>
@@ -700,6 +760,236 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		}
 	}
 
+	/// <summary>Opens a file for reading at <paramref name="offset"/>, refusing a folder and a file shorter than that.</summary>
+	private Task<SftpFileStream> OpenAtAsync(string target, long offset, CancellationToken cancellationToken) =>
+		RunAsync(target, async (client, token) =>
+		{
+			SftpFileAttributes attributes = await client.GetAttributesAsync(target, token);
+			if (attributes.IsDirectory)
+			{
+				throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"{target} is a directory.", target);
+			}
+
+			if (attributes.Size < offset)
+			{
+				throw TransferStreams.ShorterThanCopied(target, offset);
+			}
+
+			SftpFileStream stream = await client.OpenAsync(target, FileMode.Open, FileAccess.Read, token);
+			if (offset > 0)
+			{
+				stream.Seek(offset, SeekOrigin.Begin);
+			}
+
+			return stream;
+		}, cancellationToken);
+
+	/// <summary>
+	/// Uploads through a temporary file beside where the upload ends up, which a failed attempt keeps and the next one
+	/// continues. False when no temporary file can be used here (the folder takes no new files, or the old file's owner
+	/// cannot be kept, which only root may change); the upload then goes the way it always did, without resuming.
+	/// </summary>
+	private async Task<bool> TryUploadResumableAsync(string target, Stream source, UploadOptions options, UploadResume resume, IProgress<long>? progress, CancellationToken cancellationToken)
+	{
+		if (resume is { PartialPath: { } partial, IsTemporary: true })
+		{
+			if (await TryOpenPartialAsync(partial, cancellationToken) is { } continued)
+			{
+				await ContinueAsync(target, partial, continued, source, options, resume, progress, cancellationToken);
+				return true;
+			}
+
+			// Someone removed it, or the server was cleaned up meanwhile: there is nothing to continue.
+			resume.Clear();
+		}
+
+		RemoteFileEntry? existing = await StatAsync(target, cancellationToken);
+		if (existing is not null && !options.Overwrite)
+		{
+			// Found before a byte is sent, rather than after the whole file went into a temporary one.
+			throw RemoteFileErrors.AlreadyExists(target);
+		}
+
+		if ((existing is not null
+				? await TryOpenReplacementAsync(target, options.Permissions, cancellationToken)
+				: await TryOpenNewPartialAsync(target, options.Permissions, cancellationToken)) is not { } placement)
+		{
+			return false;
+		}
+
+		resume.Record(placement.Temporary, isTemporary: true);
+		await PlaceAsync(placement, source, options, resume, replace: existing is not null || options.Overwrite, progress, cancellationToken);
+		return true;
+	}
+
+	/// <summary>Carries on with what an earlier attempt left in <paramref name="partial"/>, then moves it into place.</summary>
+	private async Task ContinueAsync(
+		string target,
+		string partial,
+		(SftpFileStream Stream, long Length) continued,
+		Stream source,
+		UploadOptions options,
+		UploadResume resume,
+		IProgress<long>? progress,
+		CancellationToken cancellationToken)
+	{
+		string destination;
+		bool replace;
+
+		// Set only for the two outcomes that make the partial file useless; anything else, a dropped connection among
+		// them, leaves it for the next attempt.
+		bool abandon = false;
+		try
+		{
+			// Where it goes is looked up again: the old file may have gone, or a link on the way been changed.
+			(destination, replace) = await RunAsync(target, async (client, token) =>
+				await GetOrNullAsync(client, target, token) is { Attributes.IsRegularFile: true } file
+					? (file.FullName, true)
+					: (target, options.Overwrite), cancellationToken);
+
+			if (!replace && await StatAsync(target, cancellationToken) is not null)
+			{
+				abandon = true;
+				throw RemoteFileErrors.AlreadyExists(target);
+			}
+
+			if (!await TransferStreams.TrySkipAsync(source, continued.Length, cancellationToken))
+			{
+				abandon = true;
+				throw new RemoteFileSystemException(
+					RemoteFileErrorKind.Unknown,
+					$"The upload to {target} could not carry on: the file being sent is now shorter than what the last attempt wrote. The next try starts over.",
+					target);
+			}
+		}
+		catch
+		{
+			await CloseStreamAsync(continued.Stream, partial, written: false);
+			if (abandon)
+			{
+				await DeleteTemporaryAsync(partial);
+				resume.Clear();
+			}
+
+			throw;
+		}
+
+		resume.NotifyResumed(continued.Length);
+		await PlaceAsync((destination, partial, continued.Stream), source, options, resume, replace, progress, cancellationToken);
+	}
+
+	/// <summary>Opens what an earlier attempt left for writing after its last byte, or null when it is no longer a regular file.</summary>
+	private Task<(SftpFileStream Stream, long Length)?> TryOpenPartialAsync(string partial, CancellationToken cancellationToken) =>
+		RunAsync<(SftpFileStream Stream, long Length)?>(partial, async (client, token) =>
+		{
+			if (await LocateAsync(client, partial, token) is not { Attributes.IsRegularFile: true } file)
+			{
+				return null;
+			}
+
+			// Open and seek rather than append: SFTP writes carry their own offset, and servers differ on what append means.
+			SftpFileStream stream = await client.OpenAsync(partial, FileMode.Open, FileAccess.Write, token);
+			long length = file.Attributes.Size;
+			stream.Seek(length, SeekOrigin.Begin);
+			return (stream, length);
+		}, cancellationToken);
+
+	/// <summary>
+	/// Opens a temporary file beside where a new file will go, with <paramref name="permissions"/> set before any data
+	/// arrives. Null when the folder takes no new files that way, and the upload then writes in place.
+	/// </summary>
+	private Task<(string Destination, string Temporary, SftpFileStream Stream)?> TryOpenNewPartialAsync(string target, UnixFileMode? permissions, CancellationToken cancellationToken) =>
+		RunAsync<(string Destination, string Temporary, SftpFileStream Stream)?>(target, async (client, token) =>
+		{
+			string temporary = TemporaryBeside(target);
+			SftpFileStream stream;
+			try
+			{
+				stream = await client.OpenAsync(temporary, FileMode.CreateNew, FileAccess.Write, token);
+			}
+			catch (SftpException ex)
+			{
+				_logger.LogDebug("No temporary file could be made for a resumable upload; writing in place: {Error}", LogSafe.Describe(ex));
+				return null;
+			}
+
+			if (permissions is not { } mode)
+			{
+				return (target, temporary, stream);
+			}
+
+			try
+			{
+				SftpFileAttributes attributes = await client.GetAttributesAsync(temporary, token);
+				UnixModes.ApplyTo(attributes, mode);
+				await Task.Run(() => client.SetAttributes(temporary, attributes), token);
+				return (target, temporary, stream);
+			}
+			catch (SftpException ex)
+			{
+				_logger.LogDebug("The temporary file of a resumable upload cannot take its permissions; writing in place: {Error}", LogSafe.Describe(ex));
+				await DiscardTemporaryAsync(client, stream, temporary);
+				return null;
+			}
+		}, cancellationToken);
+
+	private static string TemporaryBeside(string destination) =>
+		RemotePath.Combine(RemotePath.GetParent(destination), ".mokaterm-" + RandomNumberGenerator.GetHexString(16, lowercase: true) + ".part");
+
+	private bool CanRunCommands => Volatile.Read(ref _commandsUnavailable) == 0 && _shell() is not null;
+
+	/// <summary>
+	/// Runs one of <see cref="RemoteScripts"/> as the logged-in user on the session's SSH connection. A script that never
+	/// printed its marker ran nothing at all, which is an account that may only use SFTP, and that does not change while
+	/// the session lives.
+	/// </summary>
+	private async Task RunScriptAsync(string script, string[] arguments, string path, string? destination, string action, CancellationToken cancellationToken)
+	{
+		ThrowIfClosed();
+		if (!CanRunCommands || _shell() is not { } shell)
+		{
+			throw CommandsUnavailable(action, path);
+		}
+
+		RemoteCommandResult result;
+		try
+		{
+			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(script, arguments), null, cancellationToken);
+		}
+		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, path, out RemoteFileSystemException? mapped))
+		{
+			throw mapped;
+		}
+
+		if (!RemoteOutput.TryGetPayload(result.Output, out _))
+		{
+			if (Interlocked.Exchange(ref _commandsUnavailable, 1) == 0)
+			{
+				_logger.LogDebug("The account runs no commands; copies and archives are off for this session");
+			}
+
+			throw CommandsUnavailable(action, path);
+		}
+
+		if (result.ExitStatus != 0)
+		{
+			throw RemoteCommandErrors.ToException(result.ExitStatus, result.Error, path, destination);
+		}
+	}
+
+	private static RemoteFileSystemException CommandsUnavailable(string action, string path) =>
+		new(RemoteFileErrorKind.NotSupported, $"This connection cannot run commands on the server, which {action} needs.", path);
+
+	private string? MarkChecksumUnavailable()
+	{
+		if (Interlocked.Exchange(ref _checksumUnavailable, 1) == 0)
+		{
+			_logger.LogDebug("The server cannot compute SHA-256 checksums for this account; transfers stay unverified");
+		}
+
+		return null;
+	}
+
 	private async Task CopyToRemoteAsync(Stream source, SftpFileStream stream, string target, IProgress<long>? progress, CancellationToken cancellationToken)
 	{
 		byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
@@ -748,7 +1038,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 			}
 
 			string destination = file.FullName;
-			string temporary = RemotePath.Combine(RemotePath.GetParent(destination), ".mokaterm-" + RandomNumberGenerator.GetHexString(16, lowercase: true) + ".part");
+			string temporary = TemporaryBeside(destination);
 			SftpFileStream stream;
 			try
 			{
@@ -787,11 +1077,24 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 			}
 		}, cancellationToken);
 
-	/// <summary>Uploads into the temporary file and moves it over the old one. The old file stays as it was until then.</summary>
-	private async Task ReplaceAsync(string destination, string temporary, SftpFileStream stream, Stream source, UploadOptions options, IProgress<long>? progress, CancellationToken cancellationToken)
+	/// <summary>
+	/// Uploads into the temporary file and moves it to <c>Destination</c>. Whatever was there stays as it was until then.
+	/// <paramref name="replace"/> false refuses a destination that appeared meanwhile. A resumable upload keeps the
+	/// temporary file when the copy fails, for the next attempt to continue.
+	/// </summary>
+	private async Task PlaceAsync(
+		(string Destination, string Temporary, SftpFileStream Stream) placement,
+		Stream source,
+		UploadOptions options,
+		UploadResume? resume,
+		bool replace,
+		IProgress<long>? progress,
+		CancellationToken cancellationToken)
 	{
+		(string destination, string temporary, SftpFileStream stream) = placement;
 		bool placed = false;
 		bool oldFileRemoved = false;
+		bool keepTemporary = resume is not null;
 		try
 		{
 			bool written = false;
@@ -813,12 +1116,33 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 			// Not cancellable from here: once the old file starts to go, the new one has to arrive.
 			await RunAsync(destination, async (client, _) =>
 			{
-				if (!await TryPosixRenameAsync(client, temporary, destination, CancellationToken.None))
+				if (replace && await TryPosixRenameAsync(client, temporary, destination, CancellationToken.None))
+				{
+					placed = true;
+					return true;
+				}
+
+				if (replace && await LocateAsync(client, destination, CancellationToken.None) is not null)
 				{
 					// Plain SFTP rename refuses an existing target, so the old file goes first; the new one is complete by now.
 					await client.DeleteFileAsync(destination, CancellationToken.None);
 					oldFileRemoved = true;
+				}
+
+				try
+				{
 					await client.RenameFileAsync(temporary, destination, CancellationToken.None);
+				}
+				catch (SftpException) when (!replace)
+				{
+					if (await LocateAsync(client, destination, CancellationToken.None) is null)
+					{
+						throw;
+					}
+
+					// Told not to overwrite, and something took the name while the upload ran: this copy has nowhere to go.
+					keepTemporary = false;
+					throw RemoteFileErrors.AlreadyExists(destination);
 				}
 
 				placed = true;
@@ -836,9 +1160,15 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		finally
 		{
 			// After the old file was removed the temporary file is the only copy, so it stays.
-			if (!placed && !oldFileRemoved)
+			if (!placed && !oldFileRemoved && !keepTemporary)
 			{
 				await DeleteTemporaryAsync(temporary);
+				resume?.Clear();
+			}
+
+			if (placed)
+			{
+				resume?.Clear();
 			}
 		}
 	}

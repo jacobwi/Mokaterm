@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.FileBrowser.Interop;
 
@@ -13,12 +14,17 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 /// </summary>
 public sealed partial class DialogFrame : ComponentBase, IAsyncDisposable
 {
+	private readonly string _titleId = $"mt-frame-title-{Guid.NewGuid():N}";
 	private ElementReference _element;
 	private IJSObjectReference? _binding;
 	private bool _disposed;
 
 	[Inject]
 	private FileBrowserInterop Interop { get; set; } = default!;
+
+	/// <summary>The dialog's icon and title, drawn as its header. The page names the dialog after it.</summary>
+	[Parameter]
+	public DialogHeading? Heading { get; set; }
 
 	[Parameter]
 	public RenderFragment? ChildContent { get; set; }

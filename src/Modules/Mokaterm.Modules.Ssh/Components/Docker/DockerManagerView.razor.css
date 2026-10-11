@@ -1,0 +1,805 @@
+/* The tool is registered wide, so the dialog or window around it has a fixed height and the manager fills it: the
+   navigation stays put and each page scrolls on its own. Every page renders inside this component, so the shared
+   styles live here behind ::deep. The look is lines and micro-labels rather than boxes: rows have no border, sections
+   are a label and some air. */
+.mt-dk {
+	container-type: inline-size;
+	container-name: mt-dk;
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	height: 100%;
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk-head {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dk-body {
+	display: flex;
+	flex: 1;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk-nav {
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	gap: 2px;
+	width: 112px;
+	padding-right: var(--moka-spacing-xs);
+	border-right: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-dk-nav ::deep .mt-dk-nav-item {
+	justify-content: flex-start;
+	width: 100%;
+	font-size: 10px;
+	letter-spacing: 0.08em;
+}
+
+.mt-dk-nav ::deep .mt-dk-nav-item--active {
+	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+@container mt-dk (max-width: 600px) {
+	.mt-dk-nav {
+		width: auto;
+	}
+
+	.mt-dk-nav ::deep .mt-dk-nav-label {
+		display: none;
+	}
+}
+
+/* On a phone-sized dialog the navigation becomes a row above the page. */
+@container mt-dk (max-width: 420px) {
+	.mt-dk-body {
+		flex-direction: column;
+	}
+
+	.mt-dk-nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding-right: 0;
+		padding-bottom: var(--moka-spacing-xxs);
+		border-right: none;
+		border-bottom: 1px solid var(--moka-color-outline-variant);
+	}
+
+	.mt-dk-nav ::deep .mt-dk-nav-item {
+		width: auto;
+	}
+
+	.mt-dk-nav ::deep .mt-dk-nav-item--active {
+		box-shadow: inset 0 -2px 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+	}
+}
+
+/* Pages and the panels inside them are child components, so these rules reach them through ::deep. */
+.mt-dk ::deep .mt-dk-page {
+	container-type: inline-size;
+	container-name: mt-dk-page;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk ::deep .mt-dk-center {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+	padding: var(--moka-spacing-md);
+}
+
+.mt-dk ::deep .mt-dk-meta,
+.mt-dk ::deep .mt-dk-muted {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-dk ::deep .mt-dk-spacer {
+	flex: 1;
+}
+
+/* Micro-labels: what CLAUDE.md asks for section titles and keys. */
+.mt-dk ::deep .mt-dk-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-dk ::deep .mt-dk-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
+
+.mt-dk ::deep .mt-dk-toolbar {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-toolbar-search {
+	flex: 1 1 160px;
+	min-width: 120px;
+}
+
+.mt-dk ::deep .mt-dk-scroll {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* What sits in a scrolling column keeps its height and the column scrolls; a control with overflow of its own would
+   otherwise be squeezed to a sliver. */
+.mt-dk ::deep .mt-dk-scroll > * {
+	flex-shrink: 0;
+}
+
+.mt-dk ::deep .mt-dk-padded {
+	padding: var(--moka-spacing-xxs);
+}
+
+/* A list with a panel under it (or beside it, when the page is wide enough for both). */
+.mt-dk ::deep .mt-dk-split {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk ::deep .mt-dk-split-list {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+	min-height: 0;
+	overflow: auto;
+}
+
+.mt-dk ::deep .mt-dk-split-list > * {
+	flex-shrink: 0;
+}
+
+.mt-dk ::deep .mt-dk-split--open .mt-dk-split-list {
+	flex: 0 1 34%;
+	min-height: 96px;
+}
+
+.mt-dk ::deep .mt-dk-split-panel {
+	display: flex;
+	flex: 1 1 66%;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 0;
+	padding-top: var(--moka-spacing-xs);
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+@container mt-dk-page (min-width: 900px) {
+	.mt-dk ::deep .mt-dk-split--open {
+		flex-direction: row;
+	}
+
+	.mt-dk ::deep .mt-dk-split--open .mt-dk-split-list {
+		flex: 0 1 42%;
+	}
+
+	.mt-dk ::deep .mt-dk-split-panel {
+		padding-top: 0;
+		padding-left: var(--moka-spacing-sm);
+		border-top: none;
+		border-left: 1px solid var(--moka-color-outline-variant);
+	}
+}
+
+/* A group header: a chevron, the name as a micro-label and its counts. A button, so the keyboard folds it too. */
+.mt-dk ::deep .mt-dk-group {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	margin-top: var(--moka-spacing-xs);
+	padding: 2px var(--moka-spacing-xxs);
+	border: none;
+	border-radius: var(--moka-radius-sm);
+	background: none;
+	color: var(--moka-color-on-surface-tertiary);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mt-dk ::deep .mt-dk-group:first-child {
+	margin-top: 0;
+}
+
+.mt-dk ::deep .mt-dk-group:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+/* A row: no border, a raise on hover and a glow when selected. The main part is a button; actions sit beside it. */
+.mt-dk ::deep .mt-dk-row {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+	min-height: 26px;
+	padding: 0 var(--moka-spacing-xxs);
+	border-radius: var(--moka-radius-sm);
+	transition: background var(--moka-transition-fast);
+}
+
+.mt-dk ::deep .mt-dk-row:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mt-dk ::deep .mt-dk-row--selected {
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow), inset 2px 0 0 var(--moka-color-primary);
+}
+
+.mt-dk ::deep .mt-dk-row--nested {
+	padding-left: 22px;
+}
+
+.mt-dk ::deep .mt-dk-row-main {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	padding: 3px 0;
+	border: none;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mt-dk ::deep .mt-dk-row-main:focus-visible {
+	outline: none;
+	border-radius: var(--moka-radius-sm);
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mt-dk ::deep .mt-dk-row-static {
+	cursor: default;
+}
+
+/* Cells: the name keeps its width, what follows shrinks and cuts. */
+.mt-dk ::deep .mt-dk-cell-name {
+	flex: 0 1 auto;
+	min-width: 48px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+	font-size: 12px;
+}
+
+.mt-dk ::deep .mt-dk-cell {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	color: var(--moka-color-on-surface-variant);
+}
+
+/* Prose wraps; only data is cut to one line. */
+.mt-dk ::deep .mt-dk-note {
+	min-width: 0;
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--moka-color-on-surface-variant);
+	overflow-wrap: anywhere;
+}
+
+/* The minimum keeps an image name readable when a long port list sits beside it: the ports give way first. */
+.mt-dk ::deep .mt-dk-cell--grow {
+	flex: 1 1 0;
+	min-width: 30%;
+}
+
+.mt-dk ::deep .mt-dk-cell--error {
+	color: var(--moka-color-error);
+}
+
+.mt-dk ::deep .mt-dk-row-actions {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+/* Actions that appear on hover or focus, and stay for the selected row; a screen with no hover always shows them. */
+.mt-dk ::deep .mt-dk-hover {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	opacity: 0;
+	transition: opacity var(--moka-transition-fast);
+}
+
+.mt-dk ::deep .mt-dk-row:hover .mt-dk-hover,
+.mt-dk ::deep .mt-dk-row:focus-within .mt-dk-hover,
+.mt-dk ::deep .mt-dk-row--selected .mt-dk-hover {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.mt-dk ::deep .mt-dk-hover {
+		opacity: 1;
+	}
+}
+
+.mt-dk ::deep .mt-dk-panel-head {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* Labelled buttons fold into the menu beside them when the page has no room for them. */
+@container mt-dk-page (max-width: 520px) {
+	.mt-dk ::deep .mt-dk-wide-only {
+		display: none;
+	}
+}
+
+.mt-dk ::deep .mt-dk-tabs {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-dk ::deep .mt-dk-tab {
+	padding: 4px 2px;
+	border: none;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--moka-color-on-surface-tertiary);
+	font-family: inherit;
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: color var(--moka-transition-fast);
+}
+
+.mt-dk ::deep .mt-dk-tab:hover {
+	color: var(--moka-color-on-surface);
+}
+
+.mt-dk ::deep .mt-dk-tab--active {
+	border-bottom-color: var(--moka-color-primary);
+	color: var(--moka-color-on-surface);
+	box-shadow: 0 6px 12px -8px var(--moka-color-primary-glow-strong);
+}
+
+.mt-dk ::deep .mt-dk-tab:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mt-dk ::deep .mt-dk-section {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding-top: var(--moka-spacing-xs);
+}
+
+.mt-dk ::deep .mt-dk-section-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* A path with its copy button: mono, cut at its end, never wrapped. */
+.mt-dk ::deep .mt-dk-path {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-path-text {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+}
+
+.mt-dk ::deep .mt-dk-box {
+	margin: 0;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	max-height: 360px;
+	overflow: auto;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-background);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	line-height: 1.5;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-box--short {
+	max-height: 160px;
+}
+
+.mt-dk ::deep .mt-dk-box--fill {
+	flex: 1;
+	min-height: 120px;
+	max-height: none;
+}
+
+.mt-dk ::deep .mt-dk-box--tall {
+	min-height: 120px;
+	max-height: 420px;
+}
+
+.mt-dk ::deep .mt-dk-box--nowrap {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+
+.mt-dk ::deep .mt-dk-box--error {
+	color: var(--moka-color-warning);
+}
+
+/* The last change: a line on the left in its outcome's colour, the command, and its output folded away. */
+.mt-dk ::deep .mt-dk-change {
+	display: flex;
+	flex-shrink: 0;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding: 2px var(--moka-spacing-xs);
+	border-left: 2px solid var(--moka-color-outline);
+}
+
+.mt-dk ::deep .mt-dk-change--ok {
+	border-left-color: var(--moka-color-success);
+}
+
+.mt-dk ::deep .mt-dk-change--failed {
+	border-left-color: var(--moka-color-error);
+	box-shadow: inset 12px 0 16px -16px var(--moka-color-error);
+}
+
+.mt-dk ::deep .mt-dk-change--running {
+	border-left-color: var(--moka-color-warning);
+}
+
+.mt-dk ::deep .mt-dk-change-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-change-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.mt-dk ::deep .mt-dk-change-command {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-dk ::deep .mt-dk-alert-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-xs);
+}
+
+/* Key and value pairs that wrap the value rather than the key. */
+.mt-dk ::deep .mt-dk-facts {
+	display: grid;
+	grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
+	gap: 1px var(--moka-spacing-sm);
+	margin: 0;
+	min-width: 0;
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-dk ::deep .mt-dk-facts > dt {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: 1.8;
+}
+
+.mt-dk ::deep .mt-dk-facts > dd {
+	margin: 0;
+	min-width: 0;
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	line-height: 1.8;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-dk ::deep .mt-dk-stat {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-stat-value {
+	font-family: var(--moka-font-family-mono);
+	font-size: 18px;
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-bar {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: var(--moka-color-surface-variant);
+}
+
+.mt-dk ::deep .mt-dk-bar > span {
+	display: block;
+	height: 100%;
+	background: var(--moka-color-primary);
+	box-shadow: 0 0 8px var(--moka-color-primary-glow-strong);
+	transition: width var(--moka-transition-slow);
+}
+
+.mt-dk ::deep .mt-dk-spark {
+	width: 100%;
+	height: 24px;
+}
+
+.mt-dk ::deep .mt-dk-spark polyline {
+	fill: none;
+	stroke: var(--moka-color-primary);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+}
+
+/* Column-reverse anchors the scroll at the newest line, so a followed log stays at its end without any script. */
+.mt-dk ::deep .mt-dk-logbox {
+	display: flex;
+	flex-direction: column-reverse;
+}
+
+.mt-dk ::deep .mt-dk-log {
+	display: flex;
+	flex-direction: column;
+}
+
+.mt-dk ::deep .mt-dk-log-line {
+	display: block;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-log-line--error {
+	color: var(--moka-color-warning);
+}
+
+.mt-dk ::deep .mt-dk-log-time {
+	margin-right: 1ch;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-dk ::deep .mt-dk-log-source {
+	margin-right: 1ch;
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+/* One colour per service in a merged log: the shell's eight host colours, which already read well on this ground. */
+/* The host palette from mokaterm.css, numbered from 1: one hue per service, the same eight a tab uses for a machine. */
+.mt-dk ::deep .mt-dk-src-0 { color: var(--mt-host-1); }
+.mt-dk ::deep .mt-dk-src-1 { color: var(--mt-host-2); }
+.mt-dk ::deep .mt-dk-src-2 { color: var(--mt-host-3); }
+.mt-dk ::deep .mt-dk-src-3 { color: var(--mt-host-4); }
+.mt-dk ::deep .mt-dk-src-4 { color: var(--mt-host-5); }
+.mt-dk ::deep .mt-dk-src-5 { color: var(--mt-host-6); }
+.mt-dk ::deep .mt-dk-src-6 { color: var(--mt-host-7); }
+.mt-dk ::deep .mt-dk-src-7 { color: var(--mt-host-8); }
+
+.mt-dk ::deep .mt-dk-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-dk ::deep .mt-dk-table th {
+	padding: 2px var(--moka-spacing-xs) 2px 0;
+	text-align: left;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+.mt-dk ::deep .mt-dk-table td {
+	padding: 2px var(--moka-spacing-xs) 2px 0;
+	border-top: 1px solid var(--moka-color-outline-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-form {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-form-field {
+	flex: 1 1 200px;
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-variable {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 22px;
+}
+
+.mt-dk ::deep .mt-dk-variable-name {
+	flex: 0 1 auto;
+	max-width: 42%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+.mt-dk ::deep .mt-dk-variable-value {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-dk ::deep .mt-dk-panel {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk ::deep .mt-dk-list {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+
+/* Menu entries that repeat a labelled button: hidden while the button shows, shown once it folds away. */
+.mt-dk ::deep .mt-dk-narrow-only {
+	display: none;
+}
+
+@container mt-dk-page (max-width: 520px) {
+	.mt-dk ::deep .mt-dk-narrow-only {
+		display: flex;
+	}
+}
+
+/* Fixed shares for the first columns, so rows line up under each other however long a name is. */
+.mt-dk ::deep .mt-dk-cell--w45 {
+	flex: 0 0 45%;
+}
+
+.mt-dk ::deep .mt-dk-cell--w30 {
+	flex: 0 0 30%;
+}
+
+.mt-dk ::deep .mt-dk-cell--w20 {
+	flex: 0 0 20%;
+}
+
+.mt-dk ::deep .mt-dk-cell--w12 {
+	flex: 0 0 12%;
+}
+
+.mt-dk ::deep .mt-dk-cell--count {
+	flex: 0 0 32px;
+	text-align: right;
+}
+
+.mt-dk ::deep .mt-dk-cell--size {
+	flex: 0 0 64px;
+	text-align: right;
+}
+
+.mt-dk ::deep .mt-dk-cell--time {
+	flex: 0 0 96px;
+}
+
+@container mt-dk-page (max-width: 520px) {
+	.mt-dk ::deep .mt-dk-cell--optional {
+		display: none;
+	}
+}
+
+/* A command or a file being edited is code: it reads in the monospace font, the way the result under it does. */
+.mt-dk ::deep .mt-dk-code textarea {
+	font-family: var(--moka-font-family-mono);
+	font-size: 12px;
+}

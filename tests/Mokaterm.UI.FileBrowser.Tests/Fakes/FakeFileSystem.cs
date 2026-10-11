@@ -30,6 +30,26 @@ internal sealed class FakeFileSystem : IRemoteFileSystem
 	/// <summary>Links to folders, keyed by the link's own path; resolving and stat follow them.</summary>
 	public Dictionary<string, string> FolderLinks { get; } = new(StringComparer.Ordinal);
 
+	/// <summary>What uploads wrote and what downloads read, by path. Partial files of resumable uploads are in here too.</summary>
+	public Dictionary<string, byte[]> Contents { get; } = new(StringComparer.Ordinal);
+
+	public ChecksumAlgorithm? ServerChecksum { get; set; }
+
+	/// <summary>Answers to give instead of hashing <see cref="Contents"/>, by path; a null answer is a server that cannot.</summary>
+	public Dictionary<string, string?> ChecksumAnswers { get; } = new(StringComparer.Ordinal);
+
+	/// <summary>The next upload loses its connection after this many bytes of its own; it applies once.</summary>
+	public long? UploadDropAfter { get; set; }
+
+	/// <summary>The next download loses its connection after this many bytes of its own; it applies once.</summary>
+	public long? DownloadDropAfter { get; set; }
+
+	/// <summary>
+	/// Where a resumable upload keeps what it wrote: a file of its own beside the target, the way SFTP does, or the target
+	/// itself, the way FTP does.
+	/// </summary>
+	public bool PartialBesideTarget { get; set; } = true;
+
 	public static RemoteFileEntry File(string path, long size = 0, UnixFileMode mode = (UnixFileMode)0x1A4, string owner = "abc", string group = "abc") => new()
 	{
 		Name = RemotePath.GetName(path),
@@ -128,7 +148,13 @@ internal sealed class FakeFileSystem : IRemoteFileSystem
 		return ValueTask.CompletedTask;
 	}
 
-	public ValueTask DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+	public ValueTask DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default)
+	{
+		Calls.Add("rm " + path);
+		return Contents.Remove(path)
+			? ValueTask.CompletedTask
+			: ValueTask.FromException(new RemoteFileSystemException(RemoteFileErrorKind.NotFound, "No such file", path));
+	}
 
 	/// <summary>Records the move and, like a server, refuses to replace an existing entry unless told to.</summary>
 	public ValueTask RenameAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
@@ -139,16 +165,116 @@ internal sealed class FakeFileSystem : IRemoteFileSystem
 			: ValueTask.CompletedTask;
 	}
 
+	/// <summary>The failure a copy to a destination meets, by its path; null lets it through.</summary>
+	public Func<string, Exception?>? CopyFailure { get; set; }
+
+	/// <summary>Records the copy and, like the server's script, refuses to replace an existing entry unless told to.</summary>
+	public ValueTask CopyAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
+	{
+		Calls.Add($"cp{(overwrite ? " -f" : "")} {sourcePath} {destinationPath}");
+		if (CopyFailure?.Invoke(destinationPath) is { } failure)
+		{
+			return ValueTask.FromException(failure);
+		}
+
+		return !overwrite && Find(destinationPath) is not null
+			? ValueTask.FromException(new RemoteFileSystemException(RemoteFileErrorKind.AlreadyExists, "Already exists", destinationPath))
+			: ValueTask.CompletedTask;
+	}
+
 	public ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-	public ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	/// <summary>
+	/// Reads the whole source into <see cref="Contents"/>. A resumable upload keeps what it wrote when it fails, and the next
+	/// attempt with the same resume carries on from there after skipping as many bytes of its source.
+	/// </summary>
+	public async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		Calls.Add($"put{(options.Overwrite ? " -f" : "")} {path}");
-		return UploadFailures.TryDequeue(out Exception? failure) ? ValueTask.FromException(failure) : ValueTask.CompletedTask;
+		if (UploadFailures.TryDequeue(out Exception? failure))
+		{
+			throw failure;
+		}
+
+		string partial = PartialBesideTarget ? path + ".part" : path;
+		using MemoryStream received = new();
+		if (options.Resume is { PartialPath: { } recorded } resume && recorded == partial && Contents.TryGetValue(partial, out byte[]? existing))
+		{
+			if (!await TransferStreams.TrySkipAsync(source, existing.Length, cancellationToken))
+			{
+				throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, "The source is shorter than the partial file.", path);
+			}
+
+			received.Write(existing);
+			resume.NotifyResumed(existing.Length);
+		}
+
+		options.Resume?.Record(partial, PartialBesideTarget);
+		byte[] buffer = new byte[1000];
+		long sent = 0;
+		int read;
+		while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+		{
+			if (UploadDropAfter is { } drop && sent + read > drop)
+			{
+				UploadDropAfter = null;
+				received.Write(buffer, 0, (int)(drop - sent));
+				if (options.Resume is not null)
+				{
+					Contents[partial] = received.ToArray();
+				}
+
+				throw new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The connection was lost.", path);
+			}
+
+			received.Write(buffer, 0, read);
+			sent += read;
+			progress?.Report(sent);
+		}
+
+		_ = Contents.Remove(partial);
+		Contents[path] = received.ToArray();
+		options.Resume?.Clear();
 	}
 
 	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
-		throw new NotSupportedException();
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
+
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	{
+		Calls.Add(offset == 0 ? "get " + path : $"get {path} from {offset}");
+		byte[] content = Contents.TryGetValue(path, out byte[]? stored)
+			? stored
+			: throw new RemoteFileSystemException(RemoteFileErrorKind.NotFound, "No such file", path);
+
+		long sent = 0;
+		foreach (byte[] chunk in content[(int)offset..].Chunk(1000))
+		{
+			if (DownloadDropAfter is { } drop && sent + chunk.Length > drop)
+			{
+				DownloadDropAfter = null;
+				await destination.WriteAsync(chunk.AsMemory(0, (int)(drop - sent)), cancellationToken);
+				throw new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The connection was lost.", path);
+			}
+
+			await destination.WriteAsync(chunk, cancellationToken);
+			sent += chunk.Length;
+			progress?.Report(sent);
+		}
+	}
+
+	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	{
+		Calls.Add("sum " + path);
+		if (ChecksumAnswers.TryGetValue(path, out string? answer))
+		{
+			return answer;
+		}
+
+		return ServerChecksum is { } algorithm && Contents.TryGetValue(path, out byte[]? content)
+			? await FileChecksums.ComputeAsync(new MemoryStream(content), algorithm, cancellationToken)
+			: null;
+	}
 
 	public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 

@@ -1,0 +1,74 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Feedback.Dropdown
+@using Moka.Red.Feedback.Popover
+
+@* Every action on one container, in one menu: the row and the panel show only the two or three used most. *@
+<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
+	<ChildContent>
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokaIcons.Navigation.MoreHorizontal"
+					Disabled="Disabled"
+					title="More actions"
+					aria-label="@($"Actions for {Name}")" />
+	</ChildContent>
+	<Items>
+		@if (IsAlive)
+		{
+			<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" OnClick="@(() => OnAction.InvokeAsync("restart"))" />
+			<MokaDropdownItem Text="Stop" Icon="DockerIcons.Stop" OnClick="@(() => OnAction.InvokeAsync("stop"))" />
+			@if (State == "paused")
+			{
+				<MokaDropdownItem Text="Unpause" Icon="MokatermIcons.Play" OnClick="@(() => OnAction.InvokeAsync("unpause"))" />
+			}
+			else
+			{
+				<MokaDropdownItem Text="Pause" Icon="MokatermIcons.Pause" OnClick="@(() => OnAction.InvokeAsync("pause"))" />
+			}
+			<MokaDropdownItem Text="Kill" Icon="DockerIcons.Kill" OnClick="@(() => OnAction.InvokeAsync("kill"))" />
+		}
+		else
+		{
+			<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => OnAction.InvokeAsync("start"))" />
+		}
+		<MokaDropdownItem Divider />
+		<MokaDropdownItem Text="Open shell in the terminal" Icon="MokatermIcons.Terminal" Disabled="@(State != "running" || !HasTerminal)" OnClick="@(() => OnAction.InvokeAsync("shell"))" />
+		<MokaDropdownItem Text="Run a command" Icon="MokatermIcons.Command" Disabled="@(State != "running")" OnClick="@(() => OnAction.InvokeAsync("run"))" />
+		<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => OnAction.InvokeAsync("logs"))" />
+		<MokaDropdownItem Text="Inspect" Icon="MokaIcons.File.Code" OnClick="@(() => OnAction.InvokeAsync("inspect"))" />
+		<MokaDropdownItem Text="Stats" Icon="DockerIcons.Stats" OnClick="@(() => OnAction.InvokeAsync("stats"))" />
+		<MokaDropdownItem Text="Mounts" Icon="DockerIcons.Volume" OnClick="@(() => OnAction.InvokeAsync("mounts"))" />
+		<MokaDropdownItem Divider />
+		<MokaDropdownItem Text="Copy name" Icon="MokaIcons.Content.Copy" OnClick="@(() => OnAction.InvokeAsync("copy-name"))" />
+		<MokaDropdownItem Text="Copy id" Icon="MokaIcons.Content.Copy" OnClick="@(() => OnAction.InvokeAsync("copy-id"))" />
+		<MokaDropdownItem Divider />
+		<MokaDropdownItem Text="Remove" Icon="MokaIcons.Action.Delete" OnClick="@(() => OnAction.InvokeAsync("remove"))" />
+		<MokaDropdownItem Text="Remove with its volumes" Icon="MokaIcons.Action.Delete" OnClick="@(() => OnAction.InvokeAsync("remove-volumes"))" />
+	</Items>
+</MokaDropdown>
+
+@code {
+	[Parameter, EditorRequired]
+	public string Name { get; set; } = "";
+
+	[Parameter]
+	public string Id { get; set; } = "";
+
+	/// <summary>Docker's state, lower case: what decides between start and stop.</summary>
+	[Parameter]
+	public string State { get; set; } = "";
+
+	[Parameter]
+	public bool Disabled { get; set; }
+
+	/// <summary>False for a session with no terminal to type a shell into.</summary>
+	[Parameter]
+	public bool HasTerminal { get; set; }
+
+	/// <summary>The action picked: <c>start</c>, <c>stop</c>, <c>remove-volumes</c> and so on.</summary>
+	[Parameter]
+	public EventCallback<string> OnAction { get; set; }
+
+	private bool IsAlive => State is "running" or "paused" or "restarting";
+}

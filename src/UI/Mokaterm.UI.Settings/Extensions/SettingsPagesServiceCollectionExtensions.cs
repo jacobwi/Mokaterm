@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Moka.Red.Icons;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Settings.Pages.About;
@@ -11,6 +12,7 @@ using Mokaterm.UI.Settings.Pages.KnownHosts;
 using Mokaterm.UI.Settings.Pages.Security;
 using Mokaterm.UI.Settings.Pages.SessionLogs;
 using Mokaterm.UI.Settings.Pages.Terminal;
+using Mokaterm.UI.Settings.Pages.Triggers;
 
 namespace Mokaterm.UI.Settings.Extensions;
 
@@ -23,12 +25,13 @@ public static class SettingsPagesServiceCollectionExtensions
 		{
 			Id = "general",
 			Title = "General",
-			Description = "Closing sessions, reconnecting and the recent connections list.",
+			Description = "Closing sessions, reconnecting, reopening tabs at start, the recent connections list, and a backup of every setting.",
 			Icon = MokatermIcons.Sliders,
 			Component = typeof(GeneralSettingsPage),
 			Group = SettingsPageGroup.Application,
 			Order = 0,
-			Keywords = "confirm close sessions tabs reconnect automatic retry delay recent connections history",
+			Keywords = "confirm close sessions tabs reconnect automatic retry delay reopen restore start recent connections history "
+				+ "backup export import settings file json copy move another machine",
 		});
 
 		services.AddSettingsPage(new SettingsPageDescriptor
@@ -90,7 +93,8 @@ public static class SettingsPagesServiceCollectionExtensions
 			Component = typeof(SessionLogSettingsPage),
 			Group = SettingsPageGroup.Application,
 			Order = 35,
-			Keywords = "session log logging record transcript capture output file folder size limit plain text raw escape sequences save download",
+			Keywords = "session log logging record transcript capture output file folder size limit plain text raw escape sequences save download "
+				+ "timed asciicast asciinema cast play playback replay",
 		});
 
 		services.AddSettingsPage(new SettingsPageDescriptor
@@ -140,6 +144,18 @@ public static class SettingsPagesServiceCollectionExtensions
 			Group = SettingsPageGroup.About,
 			Order = 0,
 			Keywords = "about version platform runtime dotnet modules protocols credits licenses data folder",
+		});
+
+		services.AddSettingsPage(new SettingsPageDescriptor
+		{
+			Id = "triggers",
+			Title = "Triggers",
+			Description = "Patterns that run on what every terminal prints, to color a match or to tell you about it in a notice.",
+			Icon = MokaIcons.Status.Bell,
+			Component = typeof(TriggerSettingsPage),
+			Group = SettingsPageGroup.Application,
+			Order = 22,
+			Keywords = "triggers highlight color regex regular expression pattern match error fatal notify notice alert output",
 		});
 
 		return services;

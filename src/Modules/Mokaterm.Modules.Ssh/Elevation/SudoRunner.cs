@@ -1,9 +1,14 @@
+using System.Security.Cryptography;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.FileSystem;
+using Mokaterm.Modules.Ssh.Sessions;
 using Mokaterm.Modules.Ssh.Shell;
 using Renci.SshNet;
+using LoginMethod = Mokaterm.Abstractions.Connections.AuthenticationMethod;
 
 namespace Mokaterm.Modules.Ssh.Elevation;
 
@@ -27,6 +32,28 @@ internal sealed record SudoLogin
 
 	/// <summary>Show "Remember for this session" on the password prompt.</summary>
 	public required bool OfferRemember { get; init; }
+
+	/// <summary>
+	/// The session's own sudo: the sudo command from the settings, the login password when the login used one, and
+	/// the password the user chose to remember for this session.
+	/// </summary>
+	public static SudoLogin ForSession(ISshSessionHost host, SshClient client)
+	{
+		ArgumentNullException.ThrowIfNull(host);
+		ArgumentNullException.ThrowIfNull(client);
+		return new SudoLogin
+		{
+			Client = client,
+			SudoCommand = host.Connector.Settings.EffectiveSudoCommand,
+			Account = host.Context.Account,
+			LoginPassword = host.Context.Credentials.Method is LoginMethod.Password or LoginMethod.KeyboardInteractive
+				? host.Context.Credentials.Password
+				: null,
+			Cache = host.SudoPasswords,
+			Interaction = host.Context.Interaction,
+			OfferRemember = host.Connector.SettingsService.Get<SecuritySettings>().RememberSudoPasswordForSession,
+		};
+	}
 }
 
 /// <summary>
@@ -188,7 +215,71 @@ internal sealed class SudoRunner : IDisposable
 		}
 	}
 
+	/// <summary>
+	/// Runs a script as root the way a command run does (<see cref="CommandExecution"/>): stdout and stderr read side by
+	/// side and each kept up to the request's cap, so a chatty command still reports how it ended, and cancelling stops
+	/// it. stderr starts with whatever sudo printed, up to <see cref="RemoteScripts.ElevatedMarker"/>;
+	/// <see cref="SudoErrors.Split"/> takes it apart. <paramref name="input"/> follows the password line on stdin; with
+	/// neither, stdin closes at once so a command that reads it ends. The caller keeps <paramref name="input"/>.
+	/// </summary>
+	public async Task<RemoteCommandOutcome> ExecuteAsync(
+		string script,
+		IEnumerable<string> arguments,
+		SecretBuffer? input,
+		RemoteCommandRequest request,
+		TimeProvider time,
+		CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(request);
+		string command = BuildCommand(_sudoCommand, _password is not null, script, arguments);
+		await _slots.WaitAsync(cancellationToken);
+		try
+		{
+			return await CommandExecution.RunAsync(token => StartExecutionAsync(command, input, token), request, time, cancellationToken);
+		}
+		finally
+		{
+			_slots.Release();
+		}
+	}
+
 	public void Dispose() => Interlocked.Exchange(ref _password, null)?.Dispose();
+
+	private async Task<IExecChannel> StartExecutionAsync(string command, SecretBuffer? input, CancellationToken cancellationToken)
+	{
+		using SecretBuffer? stdin = JoinInput(input);
+		RemoteCommand started = await RemoteCommand.StartAsync(_client, command, stdin, cancellationToken);
+		if (stdin is null)
+		{
+			// Nothing was written, and SSH.NET sends EOF only after data, so stdin has to be closed by hand.
+			started.CloseInput();
+		}
+
+		return started;
+	}
+
+	/// <summary>sudo -S reads the first line; the rest of stdin belongs to the script.</summary>
+	private SecretBuffer? JoinInput(SecretBuffer? input)
+	{
+		SecretBuffer? password = _password;
+		if (password is null || input is null)
+		{
+			return (password ?? input)?.Copy();
+		}
+
+		byte[] joined = GC.AllocateArray<byte>(password.Length + 1 + input.Length, pinned: true);
+		try
+		{
+			password.Span.CopyTo(joined);
+			joined[password.Length] = (byte)'\n';
+			input.Span.CopyTo(joined.AsSpan(password.Length + 1));
+			return SecretBuffer.FromBytes(joined);
+		}
+		finally
+		{
+			CryptographicOperations.ZeroMemory(joined);
+		}
+	}
 
 	private static async Task<SudoRunner?> TryPasswordAsync(SudoLogin login, SecretBuffer password, CancellationToken cancellationToken)
 	{

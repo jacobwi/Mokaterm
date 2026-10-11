@@ -6,6 +6,18 @@ namespace Mokaterm.Abstractions.FileSystem;
 /// </summary>
 internal static class RemoteFileSystemDefaults
 {
+	public static IAsyncEnumerable<RemoteFileEntry> SearchAsync(
+		IRemoteFileSystem fileSystem,
+		string root,
+		RemoteSearchQuery query,
+		IProgress<RemoteSearchProgress>? progress,
+		CancellationToken cancellationToken) =>
+		RemoteTreeWalker.SearchAsync(fileSystem, root, query, progress, cancellationToken);
+
+	/// <summary>The failure of a member this file system does not offer. <paramref name="action"/> reads after "cannot".</summary>
+	public static ValueTask NotSupported(string action, string path) =>
+		ValueTask.FromException(new RemoteFileSystemException(RemoteFileErrorKind.NotSupported, $"This connection cannot {action}.", path));
+
 	public static async ValueTask SetGroupAsync(IRemoteFileSystem fileSystem, string path, string group, bool recursive, CancellationToken cancellationToken)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(group);

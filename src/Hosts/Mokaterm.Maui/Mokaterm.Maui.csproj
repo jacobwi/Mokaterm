@@ -47,6 +47,11 @@
 		<DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
 	</PropertyGroup>
 
+	<!-- webauthn.dll takes nested structures by pointer; LibraryImport and the fixed blocks that pin them need unsafe code. -->
+	<PropertyGroup>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
 	<!--
 		MAUI's generated icon holds one 64x64 image, which Explorer draws small inside an empty square at desktop and Start
 		menu sizes. build/make-app-icon.ps1 draws this one at every size; MAUI only fills ApplicationIcon when it is empty.
@@ -90,6 +95,7 @@
 		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Telnet\Mokaterm.Modules.Telnet.csproj" />
 		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Mqtt\Mokaterm.Modules.Mqtt.csproj" />
 		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Serial\Mokaterm.Modules.Serial.csproj" />
+		<ProjectReference Include="..\..\Modules\Mokaterm.Modules.Local\Mokaterm.Modules.Local.csproj" />
 	</ItemGroup>
 
 </Project>

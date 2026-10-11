@@ -1,10 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Windowing;
 using Microsoft.Windows.AppLifecycle;
 using MauiApplication = Microsoft.Maui.Controls.Application;
-using WinUIWindow = Microsoft.UI.Xaml.Window;
 
 namespace Mokaterm.Maui.Platforms.Windows;
 
@@ -104,16 +102,9 @@ internal static class SingleInstance
 	private static void BringToFront()
 	{
 		IReadOnlyList<Microsoft.Maui.Controls.Window>? windows = MauiApplication.Current?.Windows;
-		if (windows is not { Count: > 0 } || windows[0].Handler?.PlatformView is not WinUIWindow window)
+		if (windows is { Count: > 0 })
 		{
-			return;
+			WindowFront.Bring(windows[0]);
 		}
-
-		if (window.AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } presenter)
-		{
-			presenter.Restore();
-		}
-
-		window.Activate();
 	}
 }

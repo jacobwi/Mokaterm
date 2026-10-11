@@ -1,0 +1,42 @@
+@namespace Mokaterm.UI.Workspace
+
+@* The whole page of a session tool's own window on the desktop: the shared header, the tool, and the overlays a tool
+   can raise. It runs on the services of the window that opened it, so the session, the vault and the settings are
+   that window's; only what belongs to a page (scripts, menus, dialogs, its prompts and toasts) is its own. *@
+<MokaThemeProvider Theme="_theme">
+	<div class="mt-toolwin">
+		@if (_session is { } session && _tool is { } tool)
+		{
+			<SessionToolHeader Tool="tool" Session="session" />
+			<div class="mt-toolwin-body @(tool.Size == SessionToolSize.Wide ? "mt-toolwin-body--fill" : null)">
+				@if (Tools.Available(session).Contains(tool))
+				{
+					<ViewBoundary Name="@tool.Title" Fill>
+						<DynamicComponent Type="tool.Component" Parameters="Parameters(session)" />
+					</ViewBoundary>
+				}
+				else
+				{
+					<MokaEmptyState Icon="MokatermIcons.Disconnect"
+									Title="@($"{tool.Title} needs the session")"
+									Description="@SessionIdleText.For(session.State, $"Reconnect the session to use {tool.Title} again.")" />
+				}
+			</div>
+		}
+		else
+		{
+			<MokaEmptyState Icon="MokatermIcons.Disconnect"
+							Title="This session is closed"
+							Description="The tool went with it. This window closes on its own." />
+		}
+	</div>
+
+	<MokaToastHost />
+	<ViewBoundary Name="A dialog" NotifyOnly OnFailed="CloseServiceDialogs">
+		<MokaDialogHost />
+	</ViewBoundary>
+	<ViewBoundary Name="A menu command" NotifyOnly>
+		<MokaContextMenuHost />
+	</ViewBoundary>
+	<InteractionHost />
+</MokaThemeProvider>

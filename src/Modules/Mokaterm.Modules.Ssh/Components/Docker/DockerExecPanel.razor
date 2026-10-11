@@ -1,0 +1,105 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (!Running)
+{
+	<span class="mt-dk-note">A command runs only in a running container. Start it first.</span>
+}
+else
+{
+	<form class="mt-dk-section" @onsubmit="RunAsync" @onsubmit:preventDefault="true">
+		<MokaTextArea Class="mt-dk-code" Label="Command"
+					  Value="@_command"
+					  ValueChanged="OnCommandChanged"
+					  Rows="2"
+					  Placeholder="@CommandPlaceholder"
+					  Disabled="_running"
+					  Size="MokaSize.Sm"
+					  spellcheck="false"
+					  @onkeydown="OnCommandKeyDown" />
+		<div class="mt-dk-toolbar">
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_shell.ToString()" ValueChanged="OnShellChanged" AriaLabel="Run it with">
+				<MokaSegment Value="@nameof(DockerExecShell.Sh)" Text="sh -c" />
+				<MokaSegment Value="@nameof(DockerExecShell.Bash)" Text="bash -c" />
+				<MokaSegment Value="@nameof(DockerExecShell.None)" Text="No shell" />
+			</MokaSegmentedControl>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
+						StartIcon="@(_options ? MokaIcons.Navigation.ChevronUp : MokaIcons.Navigation.ChevronDown)"
+						OnClick="ToggleOptions" aria-expanded="@(_options ? "true" : "false")">
+				Options
+			</MokaButton>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play" Loading="_running" Disabled="_running">
+				Run
+			</MokaButton>
+		</div>
+		@if (_options)
+		{
+			<div class="mt-dk-form">
+				<div class="mt-dk-form-field">
+					<MokaTextField Label="User (-u)" Value="@_user" ValueChanged="OnUserChanged" Placeholder="the image's own" Size="MokaSize.Sm" Disabled="_running" spellcheck="false" autocomplete="off" />
+				</div>
+				<div class="mt-dk-form-field">
+					<MokaTextField Label="Working directory (-w)" Value="@_directory" ValueChanged="OnDirectoryChanged" Placeholder="the image's own" Size="MokaSize.Sm" Disabled="_running" spellcheck="false" autocomplete="off" />
+				</div>
+			</div>
+			<MokaTextArea Class="mt-dk-code" Label="Environment (-e)"
+						  Value="@_environment"
+						  ValueChanged="OnEnvironmentChanged"
+						  Rows="2"
+						  Placeholder="NAME=value, one per line"
+						  Disabled="_running"
+						  Size="MokaSize.Sm"
+						  spellcheck="false" />
+		}
+		<span class="mt-dk-note">@WhoNote Ctrl+Enter runs it. Nothing typed here is saved or logged.</span>
+	</form>
+
+	@if (_problem is { } problem)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@problem</MokaAlert>
+	}
+
+	@if (_result is { } result)
+	{
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Result</span>
+				<MokaTag Text="@result.ExitText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@(result.Succeeded ? MokaColor.Success : MokaColor.Error)" />
+				<span class="mt-dk-cell">@Duration(result)</span>
+				<span class="mt-dk-spacer"></span>
+				<CopyButton Text="@result.Command" Label="Copy the command" />
+			</div>
+			<span class="mt-dk-change-command mt-dk-mono" title="@result.Command">$ @result.Command</span>
+			@if (result.Output.Length > 0 || result.Error.Length == 0)
+			{
+				<span class="mt-dk-label">stdout</span>
+				<pre class="mt-dk-box">@(result.Output.Length == 0 ? "(nothing)" : DockerText.Plain(result.Output))</pre>
+			}
+			@if (result.Error.Length > 0)
+			{
+				<span class="mt-dk-label">stderr</span>
+				<pre class="mt-dk-box mt-dk-box--short mt-dk-box--error">@DockerText.Plain(result.Error)</pre>
+			}
+			@if (result.OutputTruncated || result.ErrorTruncated)
+			{
+				<span class="mt-dk-note">Only the first @(DockerExecRequest.OutputLimitBytes / 1024) KB of each stream was kept.</span>
+			}
+		</div>
+	}
+
+	@if (History.Count > 0)
+	{
+		<div class="mt-dk-section">
+			<span class="mt-dk-label">This session</span>
+			@foreach ((DockerExecRequest entry, int index) in History.Select((entry, index) => (entry, index)))
+			{
+				<div class="mt-dk-row" @key="index">
+					<button type="button" class="mt-dk-row-main" disabled="@_running" @onclick="@(() => Load(entry))" title="Put it back in the box">
+						<span class="mt-dk-cell mt-dk-cell--grow">@HistoryLine(entry)</span>
+					</button>
+				</div>
+			}
+		</div>
+	}
+}

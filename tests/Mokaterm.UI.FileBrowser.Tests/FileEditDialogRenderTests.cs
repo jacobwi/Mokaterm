@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.FileBrowser.Dialogs;
+using Mokaterm.UI.FileBrowser.Editing;
 using Mokaterm.UI.FileBrowser.Extensions;
 
 namespace Mokaterm.UI.FileBrowser.Tests;
@@ -67,15 +69,79 @@ public sealed class FileEditDialogRenderTests
 		Assert.Contains(">Cancel<", html, StringComparison.Ordinal);
 	}
 
-	private static Task<string> RenderAsync(string content, string[] facts)
+	[Fact]
+	public async Task ReviewChangesWaitsForAnEdit_AndNoDiffIsShownYet()
+	{
+		string html = await RenderAsync("alpha", ["5 B", "UTF-8", "LF"]);
+
+		Assert.Contains("Review changes", html, StringComparison.Ordinal);
+		Assert.Contains("disabled title=\"Compare the edits with the file as it was read\"", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("mt-diff", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("inert", html, StringComparison.Ordinal);
+
+		// A conflict's own buttons only appear with a conflict.
+		Assert.DoesNotContain("Overwrite", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Back to editing", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task TheColouredLayerSitsUnderTheBox_AndTheStatusBarNamesTheLanguage()
+	{
+		string html = await RenderAsync("# Notes\n", ["8 B", "UTF-8", "LF"]);
+
+		// Hidden from assistive technology: the box is what is read.
+		Assert.Contains("<div class=\"mt-edit-paint\" aria-hidden=\"true\"", html, StringComparison.Ordinal);
+		Assert.Contains("mt-edit-lines", html, StringComparison.Ordinal);
+		Assert.True(
+			html.IndexOf("mt-edit-paint", StringComparison.Ordinal) < html.IndexOf("mt-edit-area", StringComparison.Ordinal),
+			"The layer has to come before the box, which paints over it.");
+
+		Assert.Contains("aria-label=\"Highlighting: Markdown\"", html, StringComparison.Ordinal);
+		Assert.Contains("aria-haspopup=\"menu\"", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Too large to highlight", html, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData("/srv/app/Dockerfile", "FROM alpine\n", "Dockerfile")]
+	[InlineData("/usr/local/bin/backup", "#!/bin/sh\necho hi\n", "Shell")]
+	[InlineData("/srv/app/notes.txt", "hello\n", "Plain text")]
+	public async Task TheLanguageComesFromTheFile(string path, string content, string expected)
+	{
+		string html = await RenderAsync(content, ["UTF-8", "LF"], path);
+
+		Assert.Contains($"aria-label=\"Highlighting: {expected}\"", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task PastThePaintCap_TheStatusBarSaysColouringStopped()
+	{
+		string content = string.Concat(Enumerable.Repeat("x = 1\n", FileEditDialog.MaxPaintLines + 1));
+
+		string html = await RenderAsync(content, ["UTF-8", "LF"], "/srv/app/big.py");
+
+		Assert.Contains("Too large to highlight", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task PlainTextPastThePaintCap_SaysNothingAboutColours()
+	{
+		string content = new('x', FileEditDialog.MaxPaintCharacters + 1);
+
+		string html = await RenderAsync(content, ["UTF-8", "LF"], "/srv/app/big.txt");
+
+		Assert.DoesNotContain("Too large to highlight", html, StringComparison.Ordinal);
+	}
+
+	private static Task<string> RenderAsync(string content, string[] facts, string path = "/home/abc/notes.md")
 	{
 		Dictionary<string, object?> parameters = new(StringComparer.Ordinal)
 		{
-			[nameof(FileEditDialog.FileName)] = "notes.md",
-			[nameof(FileEditDialog.Path)] = "/home/abc/notes.md",
+			[nameof(FileEditDialog.FileName)] = RemotePath.GetName(path),
+			[nameof(FileEditDialog.Path)] = path,
 			[nameof(FileEditDialog.Content)] = content,
 			[nameof(FileEditDialog.Facts)] = facts,
-			[nameof(FileEditDialog.Save)] = (Func<string, Task<string?>>)(_ => Task.FromResult<string?>(null)),
+			[nameof(FileEditDialog.Save)] = (Func<string, bool, Task<FileSaveResult>>)((_, _) => Task.FromResult(FileSaveResult.Saved)),
+			[nameof(FileEditDialog.AcceptServerCopy)] = (Action)(() => { }),
 			[nameof(FileEditDialog.ConfirmDiscard)] = (Func<Task<bool>>)(() => Task.FromResult(true)),
 		};
 

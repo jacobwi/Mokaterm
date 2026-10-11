@@ -1,11 +1,12 @@
 @* Answers server-driven keyboard-interactive questions, masking the ones that must not echo. *@
 @inherits PromptDialogBase
 
-<MokaDialog Open="true"
-			Title="@Prompt.Title"
-			DialogSize="MokaDialogSize.Small"
-			CloseOnBackdropClick="false"
-			OnClose="CancelAsync">
+<HeadedDialog Open="true"
+			  Title="@Prompt.Title"
+			  Icon="MokatermIcons.Keyboard"
+			  DialogSize="MokaDialogSize.Small"
+			  CloseOnBackdropClick="false"
+			  OnClose="CancelAsync">
 	<ChildContent>
 		<PromptBody @ref="Body" AutofocusSelf="@(Prompt.Questions.Count == 0)">
 			@if (!string.IsNullOrWhiteSpace(Prompt.Instruction))
@@ -40,7 +41,7 @@
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CancelAsync">Cancel</MokaButton>
 		<MokaButton data-primary="true" OnClick="SubmitAsync">Continue</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>
 
 @code {
 	private string[] _answers = [];

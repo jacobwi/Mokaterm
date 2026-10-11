@@ -43,6 +43,7 @@ public sealed record SshSettings : ISettingsSection
 	/// The SSH agent to talk to: a named pipe such as <c>\\.\pipe\openssh-ssh-agent</c> or a socket path. Empty looks
 	/// for one, starting with <c>SSH_AUTH_SOCK</c>.
 	/// </summary>
+	[MachineSpecific]
 	public string AgentEndpoint { get; init; } = "";
 
 	internal TimeSpan ConnectTimeout =>

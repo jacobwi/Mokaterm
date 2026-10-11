@@ -63,6 +63,16 @@ public sealed record SerialConnectionOptions
 		return options.Keys.Any(key => key.StartsWith(KeyPrefix, StringComparison.Ordinal));
 	}
 
+	/// <summary>
+	/// The options a connect runs with: the connection's own, or for one that carries none (a quick connect, which never
+	/// went through the options editor) the line the defaults page names, which is what the editor would have seeded.
+	/// </summary>
+	public static SerialConnectionOptions ForConnect(ProtocolOptions options, SerialSettings settings)
+	{
+		ArgumentNullException.ThrowIfNull(settings);
+		return HasAny(options) ? From(options) : settings.NewConnectionOptions;
+	}
+
 	public static SerialConnectionOptions From(ProtocolOptions options)
 	{
 		ArgumentNullException.ThrowIfNull(options);

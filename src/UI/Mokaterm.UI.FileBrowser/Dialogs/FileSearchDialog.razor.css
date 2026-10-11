@@ -1,0 +1,70 @@
+.fs {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.fs-fields {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: var(--moka-spacing-md);
+}
+
+.fs-options {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-md) var(--moka-spacing-lg);
+}
+
+/* Holds its height while empty, so the table does not jump when the first status line appears. */
+.fs-status {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 16px;
+}
+
+/* Fixed layout gives the name column whatever the sized columns leave, and long names truncate instead of widening it. */
+.fs-results ::deep .moka-table {
+	table-layout: fixed;
+}
+
+.fs-results ::deep tbody td {
+	user-select: none;
+}
+
+/* Cell content covers the cell padding, so a double click anywhere in a cell reaches its handler. */
+.fs-cell {
+	margin: calc(-1 * var(--moka-spacing-xs)) calc(-1 * var(--moka-spacing-sm));
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	overflow: hidden;
+	line-height: 16px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fs-name {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.fs-name-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.fs-mono {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
+}
+
+@media (max-width: 560px) {
+	.fs-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

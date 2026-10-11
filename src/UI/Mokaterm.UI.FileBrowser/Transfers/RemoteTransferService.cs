@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
@@ -44,11 +46,21 @@ internal sealed class RemoteTransferService
 	/// enqueues one upload per file.
 	/// </summary>
 	/// <exception cref="RemoteFileSystemException">A folder could not be created. Nothing was enqueued.</exception>
+	public Task<UploadBatch> UploadAsync(
+		TransferFileSystem target,
+		TransferOrigin origin,
+		string directory,
+		IReadOnlyList<LocalFileItem> items,
+		CancellationToken cancellationToken) =>
+		UploadAsync(target, origin, directory, items, overwriteBehavior: null, cancellationToken);
+
+	/// <param name="overwriteBehavior">Replaces <see cref="FileTransferSettings.Overwrite"/> for this batch, when the caller already asked.</param>
 	public async Task<UploadBatch> UploadAsync(
 		TransferFileSystem target,
 		TransferOrigin origin,
 		string directory,
 		IReadOnlyList<LocalFileItem> items,
+		OverwriteBehavior? overwriteBehavior,
 		CancellationToken cancellationToken)
 	{
 		FileTransferSettings settings = _settings.Get<FileTransferSettings>();
@@ -65,7 +77,7 @@ internal sealed class RemoteTransferService
 		}
 
 		UploadBatch batch = new();
-		OverwriteResolver resolver = new(_interaction, settings.Overwrite, files.Count > 1);
+		OverwriteResolver resolver = new(_interaction, overwriteBehavior ?? settings.Overwrite, files.Count > 1);
 		foreach ((LocalFileItem file, string relativePath, Func<CancellationToken, ValueTask<Stream>> open) in files)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
@@ -105,10 +117,18 @@ internal sealed class RemoteTransferService
 		return batch;
 	}
 
-	/// <summary>Queues a download of one file through <see cref="ILocalFileAccess.SaveFileAsync"/>.</summary>
+	/// <summary>
+	/// Queues a download of one file through <see cref="ILocalFileAccess"/>. Where the host can keep a partial file, a retry
+	/// continues from it, unless the file on the server changed since the attempt that left it.
+	/// </summary>
 	public ITransferItem EnqueueDownload(TransferFileSystem source, TransferOrigin origin, RemoteFileEntry entry)
 	{
 		long? size = entry.Kind == RemoteEntryKind.File ? entry.Size : null;
+		FileTransferSettings settings = _settings.Get<FileTransferSettings>();
+		LocalSave? save = settings.ResumeTransfers && _localFiles.CanResumeSaves ? new LocalSave(entry.Name, size) : null;
+
+		// What the file on the server looked like when the last attempt began, so a resume notices a different file.
+		RemoteFileEntry? lastSeen = null;
 		return _queue.Enqueue(new TransferRequest
 		{
 			Name = entry.Name,
@@ -118,15 +138,28 @@ internal sealed class RemoteTransferService
 			TotalBytes = size,
 			Group = origin.Group,
 			Elevated = source.IsElevated,
-			ExecuteAsync = context => SaveAsync(
-				entry.Name,
-				size,
-				context,
-				async (stream, cancellationToken) =>
+			ExecuteAsync = save is null
+				? context => SaveAsync(entry.Name, size, context, async (stream, cancellationToken) =>
 				{
 					IRemoteFileSystem fileSystem = await source.GetAsync(cancellationToken);
-					await fileSystem.DownloadAsync(entry.Path, stream, context.Progress, cancellationToken);
+					await DownloadAsync(fileSystem, entry, stream, 0, settings.VerifyTransfers, context, damaged: null, cancellationToken);
+				})
+				: context => SaveResumableAsync(save, context, async (stream, existing, cancellationToken) =>
+				{
+					IRemoteFileSystem fileSystem = await source.GetAsync(cancellationToken);
+					RemoteFileEntry? current = await fileSystem.StatAsync(entry.Path, cancellationToken);
+					long offset = existing > 0 && current is not null && SameContent(lastSeen, current) && current.Size >= existing ? existing : 0;
+					lastSeen = current;
+					if (offset == 0 && existing > 0)
+					{
+						// What is here came from a different file, so it goes before this attempt writes anything.
+						stream.SetLength(0);
+					}
+
+					// A damaged copy must not be what the next attempt continues from.
+					await DownloadAsync(fileSystem, entry, stream, offset, settings.VerifyTransfers, context, damaged: () => stream.SetLength(0), cancellationToken);
 				}),
+			DiscardAsync = save is null ? null : () => _localFiles.DiscardAsync(save).AsTask(),
 		});
 	}
 
@@ -250,7 +283,7 @@ internal sealed class RemoteTransferService
 		return -1;
 	}
 
-	private static TransferRequest CreateUploadRequest(
+	private TransferRequest CreateUploadRequest(
 		TransferFileSystem target,
 		TransferOrigin origin,
 		LocalFileItem file,
@@ -259,8 +292,25 @@ internal sealed class RemoteTransferService
 		UploadOptions options,
 		UploadBatch batch)
 	{
-		// Set once an attempt failed after it may have created the file, so the next attempt replaces the partial file.
+		FileTransferSettings settings = _settings.Get<FileTransferSettings>();
+
+		// Set once an attempt failed after it may have written the target itself, so the next attempt replaces what it left.
 		bool replaceLeftover = false;
+
+		// One per upload, kept across its attempts. The file system says where an attempt resumes, and that point goes to
+		// the progress of whichever attempt runs now.
+		(TransferContext Context, OffsetProgress Progress)? attempt = null;
+		UploadResume? resume = settings.ResumeTransfers && file.Length is not < FileTransferSettings.MinResumableBytes
+			? new UploadResume(offset =>
+			{
+				if (attempt is { } current)
+				{
+					current.Progress.Offset = offset;
+					current.Context.ReportResumed(offset);
+				}
+			})
+			: null;
+
 		return new TransferRequest
 		{
 			Name = file.Name,
@@ -272,7 +322,9 @@ internal sealed class RemoteTransferService
 			Elevated = target.IsElevated,
 			ExecuteAsync = async context =>
 			{
-				UploadOptions attemptOptions = Volatile.Read(ref replaceLeftover) ? options with { Overwrite = true } : options;
+				UploadOptions attemptOptions = (Volatile.Read(ref replaceLeftover) ? options with { Overwrite = true } : options) with { Resume = resume };
+				OffsetProgress progress = new(context.Progress);
+				attempt = (context, progress);
 
 				IRemoteFileSystem fileSystem = await target.GetAsync(context.CancellationToken);
 				Stream source = await open(context.CancellationToken);
@@ -283,16 +335,29 @@ internal sealed class RemoteTransferService
 						context.SetTotalBytes(source.Length);
 					}
 
+					// The file here changed size since the attempt that left the partial file, which is then not its beginning.
+					if (resume?.PartialPath is not null && source.CanSeek && file.Length is { } length && source.Length != length)
+					{
+						await AbandonPartialAsync(fileSystem, resume);
+					}
+
+					ChecksumAlgorithm? algorithm = settings.VerifyTransfers ? fileSystem.ServerChecksum : null;
+					using IncrementalHash? hash = algorithm is { } chosen ? FileChecksums.CreateHash(chosen) : null;
 					try
 					{
-						await fileSystem.UploadAsync(remotePath, source, attemptOptions, context.Progress, context.CancellationToken);
+						await fileSystem.UploadAsync(remotePath, hash is null ? source : new HashingStream(source, hash), attemptOptions, progress, context.CancellationToken);
 						batch.ClearPermissionDenied(file);
 					}
 					catch (Exception ex) when (ex is not RemoteFileSystemException { Kind: RemoteFileErrorKind.AlreadyExists })
 					{
 						// A refusal to replace comes before anything is written, and the file it found belongs to someone
-						// else: retrying that one must ask again, not overwrite. Any other failure can come mid-write.
-						Volatile.Write(ref replaceLeftover, true);
+						// else: retrying that one must ask again, not overwrite. Any other failure can come mid-write, unless
+						// the attempt wrote into a partial file of our own beside the target, which leaves the target alone.
+						if (resume is not { PartialPath: not null, IsTemporary: true })
+						{
+							Volatile.Write(ref replaceLeftover, true);
+						}
+
 						if (ex is RemoteFileSystemException { Kind: RemoteFileErrorKind.PermissionDenied })
 						{
 							batch.MarkPermissionDenied(file);
@@ -300,9 +365,156 @@ internal sealed class RemoteTransferService
 
 						throw;
 					}
+
+					if (algorithm is { } used && hash is not null && !await VerifyAsync(fileSystem, remotePath, used, FileChecksums.ToHex(hash), context))
+					{
+						// The damaged copy is in place now, so the next attempt has to replace it.
+						Volatile.Write(ref replaceLeftover, true);
+						throw new RemoteFileSystemException(
+							RemoteFileErrorKind.Unknown,
+							$"{file.Name} arrived damaged: the {FileChecksums.Name(used)} the server computed does not match what was sent. Retry to send it again.",
+							remotePath);
+					}
 				}
 			},
+			DiscardAsync = resume is null ? null : () => AbandonPartialAsync(target, resume),
 		};
+	}
+
+	/// <summary>
+	/// Downloads into <paramref name="destination"/> from <paramref name="offset"/> on, checking the whole file against the
+	/// server's checksum when asked. A resumed attempt hashes the part already here by reading it back, which a host that
+	/// resumes makes possible; one that cannot leaves the copy unchecked rather than half checked.
+	/// </summary>
+	private async Task DownloadAsync(
+		IRemoteFileSystem fileSystem,
+		RemoteFileEntry entry,
+		Stream destination,
+		long offset,
+		bool verify,
+		TransferContext context,
+		Action? damaged,
+		CancellationToken cancellationToken)
+	{
+		ChecksumAlgorithm? algorithm = verify ? fileSystem.ServerChecksum : null;
+		using IncrementalHash? hash = algorithm is { } chosen ? FileChecksums.CreateHash(chosen) : null;
+		bool checkable = hash is not null && (offset == 0 || await TryHashExistingAsync(destination, offset, hash, cancellationToken));
+
+		OffsetProgress progress = new(context.Progress) { Offset = offset };
+		if (offset > 0)
+		{
+			context.ReportResumed(offset);
+		}
+
+		await fileSystem.DownloadAsync(entry.Path, checkable ? new HashingStream(destination, hash!) : destination, offset, progress, cancellationToken);
+		if (!checkable)
+		{
+			context.ReportVerification(hash is null ? TransferVerification.NotChecked : TransferVerification.Unavailable);
+			return;
+		}
+
+		if (!await VerifyAsync(fileSystem, entry.Path, algorithm!.Value, FileChecksums.ToHex(hash!), context))
+		{
+			damaged?.Invoke();
+			throw new RemoteFileSystemException(
+				RemoteFileErrorKind.Unknown,
+				$"{entry.Name} arrived damaged: its {FileChecksums.Name(algorithm.Value)} does not match the server's, or the file changed on the server while it was read. Retry to download it again.",
+				entry.Path);
+		}
+	}
+
+	/// <summary>Hashes the first <paramref name="count"/> bytes already in <paramref name="destination"/> and leaves it after them.</summary>
+	private static async Task<bool> TryHashExistingAsync(Stream destination, long count, IncrementalHash hash, CancellationToken cancellationToken)
+	{
+		if (!destination.CanRead || !destination.CanSeek)
+		{
+			return false;
+		}
+
+		destination.Position = 0;
+		HashingStream reader = new(destination, hash);
+		bool complete = await TransferStreams.TrySkipAsync(reader, count, cancellationToken);
+		destination.Position = count;
+		return complete;
+	}
+
+	/// <summary>
+	/// Compares a finished transfer with the checksum the server computes. False when the two differ. A server that cannot
+	/// compute one leaves the copy unchecked, and so does one that fails while trying: the bytes arrived, only the check did
+	/// not run.
+	/// </summary>
+	private async Task<bool> VerifyAsync(IRemoteFileSystem fileSystem, string path, ChecksumAlgorithm algorithm, string local, TransferContext context)
+	{
+		context.ReportVerification(TransferVerification.Checking);
+		string? remote = null;
+		try
+		{
+			remote = await fileSystem.ComputeChecksumAsync(path, context.CancellationToken);
+		}
+		catch (RemoteFileSystemException ex)
+		{
+			_logger.LogWarning("A finished transfer could not be checked against the server's {Algorithm}: {Error}", FileChecksums.Name(algorithm), LogSafe.Describe(ex));
+		}
+
+		if (remote is null)
+		{
+			context.ReportVerification(TransferVerification.Unavailable);
+			return true;
+		}
+
+		bool same = string.Equals(remote, local, StringComparison.Ordinal);
+		context.ReportVerification(same ? TransferVerification.Verified : TransferVerification.NotChecked);
+		return same;
+	}
+
+	/// <summary>Size and time together: a file that kept both is taken to be the same file it was.</summary>
+	private static bool SameContent(RemoteFileEntry? before, RemoteFileEntry now) =>
+		before is not null && before.Size == now.Size && before.LastModified == now.LastModified;
+
+	/// <summary>
+	/// Lets go of what an upload kept for resuming. Only a partial file of our own beside the target is deleted: FTP writes
+	/// in place, so its partial file is the target, and may be all that is left of the file the upload was replacing.
+	/// </summary>
+	private static async Task AbandonPartialAsync(IRemoteFileSystem fileSystem, UploadResume resume)
+	{
+		(string? partial, bool temporary) = (resume.PartialPath, resume.IsTemporary);
+		resume.Clear();
+		if (partial is null || !temporary)
+		{
+			return;
+		}
+
+		try
+		{
+			await fileSystem.DeleteAsync(partial, recursive: false, CancellationToken.None);
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotFound)
+		{
+			// Already gone.
+		}
+	}
+
+	private async Task AbandonPartialAsync(TransferFileSystem target, UploadResume resume)
+	{
+		if (resume is not { PartialPath: not null, IsTemporary: true })
+		{
+			resume.Clear();
+			return;
+		}
+
+		IRemoteFileSystem fileSystem;
+		try
+		{
+			fileSystem = await target.GetAsync(CancellationToken.None);
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.ConnectionLost)
+		{
+			// The session closed first. The partial file stays on the server, hidden beside where the upload was going.
+			_logger.LogDebug("An abandoned upload's partial file could not be removed: {Error}", LogSafe.Describe(ex));
+			return;
+		}
+
+		await AbandonPartialAsync(fileSystem, resume);
 	}
 
 	private async Task SaveAsync(string name, long? size, TransferContext context, Func<Stream, CancellationToken, Task> write)
@@ -318,6 +530,25 @@ internal sealed class RemoteTransferService
 			},
 			context.CancellationToken);
 
+		EnsureSaved(saved);
+	}
+
+	private async Task SaveResumableAsync(LocalSave save, TransferContext context, Func<Stream, long, CancellationToken, Task> write)
+	{
+		bool saved = await _localFiles.SaveFileAsync(
+			save,
+			async (stream, existing, saveToken) =>
+			{
+				using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(saveToken, context.CancellationToken);
+				await write(stream, existing, linked.Token);
+			},
+			context.CancellationToken);
+
+		EnsureSaved(saved);
+	}
+
+	private static void EnsureSaved(bool saved)
+	{
 		if (!saved)
 		{
 			throw new OperationCanceledException("The download was cancelled.");

@@ -1,0 +1,52 @@
+<div class="@PaneClass" @onfocusin="FocusThisPane" @onpointerdown="FocusThisPane">
+	<div class="mt-workspace-tabs">
+		@if (_tabs.Count > 0)
+		{
+			<MokaTabStrip TValue="Guid"
+						  Tabs="_tabs"
+						  ActiveTabId="@ActiveTabId"
+						  OnTabActivated="OnTabActivated"
+						  OnTabClosed="OnTabClosedAsync"
+						  OnTabReordered="OnTabReordered"
+						  ShowPinButton="false"
+						  OnTabContextMenu="ShowTabMenu"
+						  IconProvider="IconProvider" />
+		}
+	</div>
+
+	<div class="mt-workspace-pane-body">
+		@foreach (ISessionHandle session in _views)
+		{
+			bool active = session.Id == _activeId && !Shell.SettingsOpen;
+			<div @key="session.Id" class="mt-workspace-session" style="@(active ? null : "display:none")">
+				@* A terminal, file browser or remote desktop that fails takes only its own tab down. *@
+				<ViewBoundary Name="This tab" Fill Hint="The connection may still be open. Try again reloads the view.">
+					<ChildContent>
+						<SessionView Session="session" IsActive="active" />
+					</ChildContent>
+					<Actions>
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="() => CloseTabAsync(session.Id)">
+							Close tab
+						</MokaButton>
+					</Actions>
+				</ViewBoundary>
+			</div>
+		}
+
+		@* A pane is empty when nothing is open at all, or for a moment while a restore fills it; only the first gets the welcome. *@
+		@if (_views.Count == 0 && _alone)
+		{
+			<WelcomeView />
+		}
+	</div>
+</div>
+
+@code {
+	@* The strip takes a plain string for its title, so the whole label rides in the icon slot and the title stays empty. *@
+	private static RenderFragment TabIcon(ISessionHandle session) =>
+		@<span class="mt-tab-icon">
+			<MokaStatusDot Size="MokaSize.Xs" Color="@SessionStateDisplay.Color(session.State)" Pulse="@(session.State == SessionState.Connecting)" />
+			<ProtocolIcon ProtocolId="@session.Protocol.Id" Size="MokaSize.Xs" />
+			<SessionLabel Session="session" Tooltip="" />
+		</span>;
+}

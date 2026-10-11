@@ -1,0 +1,156 @@
+@using Mokaterm.Modules.Ssh.Admin.SystemLogs
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Logs" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" ListPage>
+	<Chips>
+		@if (Capabilities.HasJournal)
+		{
+			<AdminChips Items="Sources" Value="@_source" ValueChanged="OnSourceChangedAsync" AriaLabel="Where to read logs" />
+		}
+	</Chips>
+	<ChildContent>
+		<div class="mta-section" style="height:100%">
+			<div class="mta-inline">
+				@if (_source == "journal")
+				{
+					<div class="mta-grow">
+						<TextSetting Value="@_unit"
+									 ValueChanged="@(value => _unit = value)"
+									 Validate="AdminNames.CheckService"
+									 AllowEmpty
+									 Placeholder="Every unit, or one such as nginx"
+									 AriaLabel="Unit" />
+					</div>
+					<MokaSelect TValue="string"
+								Items="PriorityChoices"
+								Value="@_priority"
+								ValueChanged="@(value => _priority = value ?? "")"
+								ValueSelector="PriorityLabel"
+								Size="MokaSize.Sm"
+								aria-label="Priority" />
+				}
+				else
+				{
+					<div class="mta-grow">
+						<MokaSelect TValue="string"
+									Items="_files"
+									Value="@_file"
+									ValueChanged="@(value => _file = value)"
+									Searchable
+									Loading="_filesLoading"
+									Placeholder="@(_files.Count == 0 ? "No log files listed" : "Pick a log file")"
+									Size="MokaSize.Sm"
+									aria-label="Log file" />
+					</div>
+				}
+				<MokaSelect TValue="int"
+							Items="LogCommands.LineCounts"
+							Value="_lines"
+							ValueChanged="@(value => _lines = value)"
+							ValueSelector="@(count => $"last {count} lines")"
+							Size="MokaSize.Sm"
+							aria-label="Lines" />
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Loading || !CanRead)" OnClick="ReloadAsync">Read</MokaButton>
+			</div>
+
+			@if (_text is { } text)
+			{
+				<pre class="mta-pre mta-pre--fill">@(text.Length == 0 ? "(no lines)" : text)</pre>
+				@if (_truncated)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The output passed the size this view keeps; only its start is shown.</MokaText>
+				}
+			}
+			else if (_source == "files" && _files.Count == 0 && !_filesLoading)
+			{
+				<MokaEmptyState Icon="SshIcons.Log" Title="No log files" Description="Nothing readable was found under /var/log. Root mode can read files this login cannot." />
+			}
+		</div>
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private static readonly IReadOnlyList<string> PriorityChoices = ["", .. LogCommands.Priorities];
+
+	private string _source = "journal";
+	private string _unit = "";
+	private string _priority = "";
+	private int _lines = 200;
+	private IReadOnlyList<string> _files = [];
+	private bool _filesLoading;
+	private string? _file;
+	private string? _text;
+	private bool _truncated;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private bool CanRead => _source == "journal" || _file is not null;
+
+	private IReadOnlyList<AdminChip> Sources => [new("journal", "Journal"), new("files", "Files in /var/log", _files.Count > 0 ? _files.Count : null)];
+
+	private string Summary => _source == "journal"
+		? $"journalctl{(_unit.Length > 0 ? $" -u {_unit}" : "")}{(_priority.Length > 0 ? $" -p {_priority}" : "")} -n {_lines}{(ReadAsRoot ? "" : " · without root mode the journal may show only this login's messages")}"
+		: $"{_file ?? "/var/log"} · last {_lines} lines{(ReadAsRoot ? "" : " · without root mode only readable files open")}";
+
+	protected override void OnInitialized()
+	{
+		if (!Capabilities.HasJournal)
+		{
+			_source = "files";
+		}
+	}
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		if (_source == "files")
+		{
+			if (_files.Count == 0)
+			{
+				await LoadFilesAsync(cancellationToken);
+			}
+
+			if (_file is null)
+			{
+				_text = null;
+				return;
+			}
+		}
+
+		AdminScript script = _source == "journal"
+			? LogCommands.Journal(_unit.Length == 0 ? null : _unit, _priority.Length == 0 ? null : _priority, _lines, ReadAsRoot)
+			: LogCommands.ReadFile(_file!, _lines, ReadAsRoot);
+		AdminOutcome outcome = await ReadAsync(script, cancellationToken);
+		string text = AdminText.Clean(outcome.Output).TrimEnd();
+		if (!outcome.Succeeded && text.Length == 0)
+		{
+			throw new AdminException(outcome.Problem());
+		}
+
+		_text = text;
+		_truncated = outcome.IsTruncated;
+	}
+
+	private static string PriorityLabel(string priority) => priority.Length == 0 ? "any priority" : $"{priority} and worse";
+
+	private async Task LoadFilesAsync(CancellationToken cancellationToken)
+	{
+		_filesLoading = true;
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(LogCommands.ListFiles(ReadAsRoot), cancellationToken);
+			_files = LogCommands.ParseFiles(outcome.Output);
+			_file ??= _files.FirstOrDefault(path => path is "/var/log/syslog" or "/var/log/messages") ?? _files.FirstOrDefault();
+		}
+		finally
+		{
+			_filesLoading = false;
+		}
+	}
+
+	private async Task OnSourceChangedAsync(string value)
+	{
+		_source = value;
+		_text = null;
+		await ReloadAsync();
+	}
+}

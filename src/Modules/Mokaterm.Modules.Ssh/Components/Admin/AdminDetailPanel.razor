@@ -1,0 +1,59 @@
+@namespace Mokaterm.Modules.Ssh.Components.Admin
+
+<aside class="mta-detail" aria-label="@Title">
+	<header class="mta-detail-head">
+		@if (DotColor is { } color)
+		{
+			<MokaStatusDot Size="MokaSize.Xs" Color="color" Glow="DotGlow" />
+		}
+		<div class="mta-detail-title">
+			<MokaText Element="h4" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Mono="Mono" Truncate title="@Title">@Title</MokaText>
+			@if (Subtitle is { Length: > 0 } subtitle)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Truncate Class="mta-dim" title="@subtitle">@subtitle</MokaText>
+			}
+		</div>
+		@if (OnClose.HasDelegate)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Navigation.Close"
+						OnClick="OnClose"
+						title="Close the details"
+						aria-label="Close the details" />
+		}
+	</header>
+	@if (Actions is not null)
+	{
+		<div class="mta-detail-actions">@Actions</div>
+	}
+	<div class="mta-detail-body">@ChildContent</div>
+</aside>
+
+@code {
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = "";
+
+	[Parameter]
+	public string? Subtitle { get; set; }
+
+	/// <summary>Names, units and paths read best in mono; a form's title does not.</summary>
+	[Parameter]
+	public bool Mono { get; set; } = true;
+
+	[Parameter]
+	public MokaColor? DotColor { get; set; }
+
+	[Parameter]
+	public bool DotGlow { get; set; }
+
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+}

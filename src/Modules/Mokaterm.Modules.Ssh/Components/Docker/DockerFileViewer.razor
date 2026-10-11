@@ -1,0 +1,70 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-panel-head">
+	@if (_path != Root)
+	{
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp"
+					Disabled="_busy" OnClick="UpAsync" title="Up one folder" aria-label="Up one folder" />
+	}
+	<span class="mt-dk-path-text" title="@_path">@_path</span>
+	@if (_asRoot)
+	{
+		<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Read through sudo" />
+	}
+	<span class="mt-dk-spacer"></span>
+	<CopyButton Text="@_path" Label="Copy the path" />
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+				Disabled="_busy" OnClick="ReloadAsync" title="Read again" aria-label="Read again" />
+</div>
+
+@if (_busy && _entries is null && _file is null)
+{
+	<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+}
+
+@if (_problem is { } problem)
+{
+	<MokaAlert Severity="@(_needsRoot ? MokaToastSeverity.Warning : MokaToastSeverity.Error)" Dense>
+		<div class="mt-dk-alert-line">
+			<span>@problem</span>
+			@if (_needsRoot && CanUseRoot)
+			{
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root" Disabled="_busy" OnClick="UseRootAsync">
+					Read as root
+				</MokaButton>
+			}
+		</div>
+	</MokaAlert>
+	@if (_needsRoot)
+	{
+		<span class="mt-dk-note">@RootNote</span>
+	}
+}
+
+@if (_file is { } file)
+{
+	<span class="mt-dk-cell">@FileLine(file)</span>
+	<pre class="mt-dk-box mt-dk-box--nowrap">@file.Text</pre>
+}
+else if (_entries is { } entries)
+{
+	@if (entries.Count == 0)
+	{
+		<span class="mt-dk-cell">Empty.</span>
+	}
+	<div class="mt-dk-list" role="list" aria-label="Files">
+		@foreach (RemoteFileEntry entry in entries)
+		{
+			<div class="mt-dk-row" role="listitem" @key="entry.Path">
+				<button type="button" class="mt-dk-row-main" disabled="@_busy" @onclick="@(() => OpenAsync(entry))">
+					<MokaIcon Icon="@(entry.IsDirectoryLike ? MokatermIcons.Folder : entry.Kind == RemoteEntryKind.SymbolicLink ? MokatermIcons.Symlink : MokatermIcons.File)" Size="MokaSize.Xs" />
+					<span class="mt-dk-cell-name">@entry.Name</span>
+					<span class="mt-dk-cell mt-dk-cell--grow">@(entry.LinkTarget is { Length: > 0 } target ? $"→ {target}" : "")</span>
+					<span class="mt-dk-cell">@(entry.IsDirectoryLike ? "" : DisplayFormat.Bytes(entry.Size))</span>
+					<span class="mt-dk-cell">@DisplayFormat.Timestamp(entry.LastModified)</span>
+				</button>
+			</div>
+		}
+	</div>
+}

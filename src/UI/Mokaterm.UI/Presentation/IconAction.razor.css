@@ -1,0 +1,12 @@
+/* Inside the tooltip's trigger, which is positioned, so the dot sits on the button's corner. */
+.mt-icon-dot {
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--mt-icon-dot);
+	box-shadow: 0 0 6px var(--mt-icon-dot);
+	pointer-events: none;
+}

@@ -23,7 +23,8 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 	/// <summary>Rows the settings page is given. A folder nobody ever emptied must not turn into a page that never renders.</summary>
 	internal const int MaxListedFiles = 200;
 
-	private const string Extension = ".log";
+	/// <summary>What the listing and <see cref="OpenRead"/> take: the text formats, then timed recordings.</summary>
+	private static readonly string[] Extensions = [".log", Asciicast.Extension];
 
 	private readonly ISessionManager _sessions;
 	private readonly ISettingsService _settings;
@@ -105,7 +106,8 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 		{
 			DirectoryInfo directory = new(Folder);
 			return directory.Exists
-				? [.. directory.EnumerateFiles('*' + Extension, SearchOption.TopDirectoryOnly)
+				? [.. directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+					.Where(file => IsLogName(file.Name))
 					.Select(Describe)
 					.OrderByDescending(file => file.WrittenAt)
 					.Take(MaxListedFiles)]
@@ -121,7 +123,7 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 	public Stream OpenRead(string name)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(name);
-		if (name != Path.GetFileName(name) || !name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
+		if (name != Path.GetFileName(name) || !IsLogName(name))
 		{
 			// Only a name the listing gave out: nothing that reads a file must be able to walk out of the folder.
 			throw new ArgumentException("That is not a session log file name.", nameof(name));
@@ -161,6 +163,9 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 			await recording.Writer.DisposeAsync();
 		}
 	}
+
+	private static bool IsLogName(string name) =>
+		Extensions.Any(extension => name.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
 
 	private static SessionLogFile Describe(FileInfo file) => new()
 	{
@@ -247,6 +252,8 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 			Endpoint(handle),
 			TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _time.LocalTimeZone),
 			settings,
+			() => stream.Size,
+			_time,
 			_logger);
 		writer.Changed += Raise;
 		_recordings[handle.Id] = new Recording(writer, stream.Attach(writer));

@@ -1,0 +1,223 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-panel-head">
+	@if (_details is { } header)
+	{
+		<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(header.Status, HealthOf(header))" Pulse="@DockerStateDisplay.IsMoving(header.Status, HealthOf(header))" />
+		<span class="mt-dk-cell-name" title="@header.Id">@header.Name</span>
+		<span class="mt-dk-label">@header.Status</span>
+		@if (header.Status == "running" && header.Health is { Status: not DockerHealth.None } health)
+		{
+			<MokaTag Text="@DockerStateDisplay.HealthLabel(health.Status)" Size="MokaSize.Xs" Color="@DockerStateDisplay.HealthColor(health.Status)" />
+		}
+	}
+	<span class="mt-dk-spacer"></span>
+	@if (_details is { } actions)
+	{
+		@if (actions.Status == "running")
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
+						Disabled="@(IsBusy || Session.Terminal is null)" OnClick="ShellAsync" title="Open a shell in the session's terminal" aria-label="Open a shell" />
+		}
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(IsAlive(actions) ? MokatermIcons.Reconnect : MokatermIcons.Play)"
+					Disabled="IsBusy" OnClick="@(() => OnMenuAsync(IsAlive(actions) ? "restart" : "start"))"
+					title="@(IsAlive(actions) ? "Restart" : "Start")" aria-label="@(IsAlive(actions) ? "Restart" : "Start")" />
+		<DockerContainerMenu Name="@Name" Id="@actions.Id" State="@actions.Status" Disabled="IsBusy" HasTerminal="@(Session.Terminal is not null)" OnAction="OnMenuAsync" />
+	}
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="OnClose" aria-label="Close the panel" />
+</div>
+
+@if (_details is { } meta)
+{
+	<span class="mt-dk-cell" title="@meta.Image">@MetaLine(meta)</span>
+}
+
+@LoadErrorPanel(LoadDetailsAsync)
+@ChangePanel
+@if (_shellProblem is { } shellProblem)
+{
+	<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@shellProblem</MokaAlert>
+}
+
+@if (_details is { } details)
+{
+	<DockerTabs Tabs="Tabs" Active="@Tab" ActiveChanged="OnTabChangedAsync" Label="Container views" />
+
+	@* The log scrolls inside its own box, so following stays at its end; the other views scroll as a whole. *@
+	@switch (Tab)
+	{
+		case "inspect":
+			<div class="mt-dk-scroll">@InspectContent(details)</div>
+			break;
+		case "stats":
+			<div class="mt-dk-scroll">
+				<DockerStatsPanel @key="details.Id" Session="Session" ContainerId="@details.Id" Visible="Visible" />
+			</div>
+			break;
+		case "env":
+			<div class="mt-dk-scroll">@EnvironmentContent(details)</div>
+			break;
+		case "mounts":
+			<div class="mt-dk-scroll">
+				<DockerMountsPanel @key="details.Id" Session="Session" Mounts="@MountsOf(details)" Visible="Visible" />
+			</div>
+			break;
+		case "run":
+			<div class="mt-dk-scroll">
+				<DockerExecPanel @key="details.Id" Session="Session" Container="@Name" Running="@(details.Status == "running")" Visible="Visible" />
+			</div>
+			break;
+		default:
+			<DockerLogsPanel @key="details.Id" Session="Session" ContainerId="@details.Id" Visible="Visible" />
+			break;
+	}
+}
+else if (IsFirstLoad)
+{
+	<div class="mt-dk-center"><MokaSpinner Label="Inspecting the container" /></div>
+}
+
+@code {
+	private RenderFragment InspectContent(DockerContainerDetails details) => @<text>
+		<div class="mt-dk-toolbar">
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_raw ? "raw" : "summary")" ValueChanged="OnInspectViewChanged" AriaLabel="Inspect view">
+				<MokaSegment Value="summary" Text="Summary" />
+				<MokaSegment Value="raw" Text="Raw JSON" />
+			</MokaSegmentedControl>
+			@if (_raw)
+			{
+				<MokaCheckbox Label="Show environment values" Value="_revealRaw" ValueChanged="OnRevealRawChanged" />
+				<span class="mt-dk-spacer"></span>
+				<CopyButton Text="@RawJson(details)" Label="Copy the JSON as shown" />
+			}
+		</div>
+
+		@if (_raw)
+		{
+			<pre class="mt-dk-box mt-dk-box--nowrap">@RawJson(details)</pre>
+		}
+		else
+		{
+			<dl class="mt-dk-facts">
+				<dt>Status</dt><dd>@details.Status@(details.ExitCode is { } exit && details.Status != "running" ? $" (exit {exit})" : "")@(details.OomKilled ? ", killed out of memory" : "")</dd>
+				@if (details.Error.Length > 0)
+				{
+					<dt>Error</dt><dd>@details.Error</dd>
+				}
+				<dt>Created</dt><dd>@When(details.Created)</dd>
+				<dt>Started</dt><dd>@When(details.StartedAt)</dd>
+				@if (details.Status != "running")
+				{
+					<dt>Finished</dt><dd>@When(details.FinishedAt)</dd>
+				}
+				<dt>Restart</dt><dd>@details.RestartPolicy, restarted @details.RestartCount.ToString(CultureInfo.CurrentCulture) @(details.RestartCount == 1 ? "time" : "times")</dd>
+				@if (details.Health is { } health)
+				{
+					<dt>Health</dt><dd>@HealthText(health)</dd>
+				}
+				<dt>Image</dt><dd>@details.Image</dd>
+				@if (details.Entrypoint.Count > 0)
+				{
+					<dt>Entrypoint</dt><dd>@string.Join(' ', details.Entrypoint)</dd>
+				}
+				@if (details.Command.Count > 0)
+				{
+					<dt>Command</dt><dd>@string.Join(' ', details.Command)</dd>
+				}
+				<dt>Working dir</dt><dd>@Or(details.WorkingDirectory, "/")</dd>
+				<dt>User</dt><dd>@Or(details.User, "the image's own (root unless it says otherwise)")</dd>
+				<dt>Hostname</dt><dd>@details.Hostname</dd>
+				<dt>Network mode</dt><dd>@details.NetworkMode</dd>
+				@if (details.Pid is { } pid)
+				{
+					<dt>PID</dt><dd>@pid.ToString(CultureInfo.InvariantCulture)</dd>
+				}
+				@if (details.Privileged)
+				{
+					<dt>Privileged</dt><dd>yes, with every capability and every device</dd>
+				}
+			</dl>
+
+			@if (details.Health is { Probes.Count: > 0 } checks && checks.Probes[^1] is { Output.Length: > 0 } last)
+			{
+				<div class="mt-dk-section">
+					<span class="mt-dk-label">Last health check</span>
+					<pre class="mt-dk-box mt-dk-box--short">@last.Output</pre>
+				</div>
+			}
+
+			<div class="mt-dk-section">
+				<span class="mt-dk-label">Ports</span>
+				@if (details.Ports.Count == 0)
+				{
+					<span class="mt-dk-note">None published or exposed.</span>
+				}
+				else
+				{
+					<table class="mt-dk-table">
+						<tbody>
+							@foreach (DockerPort port in details.Ports)
+							{
+								<tr>
+									<td>@port.ContainerPort/@port.Protocol</td>
+									<td>@(port.HostPort is { } hostPort ? $"{Or(port.HostAddress, "0.0.0.0")}:{hostPort}" : "exposed only")</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</div>
+
+			<div class="mt-dk-section">
+				<span class="mt-dk-label">Networks</span>
+				@if (details.Networks.Count == 0)
+				{
+					<span class="mt-dk-cell">None.</span>
+				}
+				else
+				{
+					<table class="mt-dk-table">
+						<tbody>
+							@foreach (DockerNetworkAttachment network in details.Networks)
+							{
+								<tr>
+									<td>@network.Network</td>
+									<td>@network.IpAddress@(network.Ipv6Address.Length > 0 ? $" {network.Ipv6Address}" : "")</td>
+									<td>@string.Join(", ", network.Aliases)</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</div>
+
+			@if (details.Labels.Count > 0)
+			{
+				<div class="mt-dk-section">
+					<span class="mt-dk-label">Labels</span>
+					<table class="mt-dk-table">
+						<tbody>
+							@foreach ((string key, string value) in details.Labels.OrderBy(label => label.Key, StringComparer.Ordinal))
+							{
+								<tr><td>@key</td><td>@value</td></tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		}
+	</text>;
+
+	private RenderFragment EnvironmentContent(DockerContainerDetails details) => @<text>
+		<span class="mt-dk-note">Values are hidden until shown one at a time; copying one clears the clipboard again shortly.</span>
+		@if (details.Environment.Count == 0)
+		{
+			<span class="mt-dk-note">No variables.</span>
+		}
+		@foreach ((DockerVariable variable, int index) in details.Environment.Select((variable, index) => (variable, index)))
+		{
+			<DockerVariableRow @key="index" Name="@variable.Name" Value="@variable.Value" />
+		}
+	</text>;
+}

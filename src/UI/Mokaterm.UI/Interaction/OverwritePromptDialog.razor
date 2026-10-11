@@ -1,11 +1,12 @@
 @* Asks what to do when a transfer target already exists. *@
 @inherits PromptDialogBase
 
-<MokaDialog Open="true"
-			Title="File already exists"
-			DialogSize="MokaDialogSize.Medium"
-			CloseOnBackdropClick="false"
-			OnClose="() => AnswerAsync(OnDecision, OverwriteDecision.Cancel)">
+<HeadedDialog Open="true"
+			  Title="File already exists"
+			  Icon="MokatermIcons.File"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false"
+			  OnClose="() => AnswerAsync(OnDecision, OverwriteDecision.Cancel)">
 	<ChildContent>
 		<PromptBody @ref="Body" AutofocusSelf="true">
 			<MokaText Element="div" Mono Size="MokaSize.Sm" Class="mt-break">@Prompt.Path</MokaText>
@@ -40,7 +41,7 @@
 			Overwrite
 		</MokaButton>
 	</Actions>
-</MokaDialog>
+</HeadedDialog>
 
 @code {
 	[Parameter, EditorRequired]

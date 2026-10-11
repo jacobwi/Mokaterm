@@ -1,0 +1,82 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@if (Context is { } context)
+{
+	<div class="mt-dk-toolbar">
+		<MokaSegmentedControl Size="MokaSize.Xs" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Which configuration">
+			<MokaSegment Value="@ResolvedView" Text="Resolved" />
+			@foreach (string file in context.Project.ConfigFiles)
+			{
+				<MokaSegment @key="file" Value="@file" Text="@DockerHostPaths.NameOf(file)" />
+			}
+		</MokaSegmentedControl>
+		<span class="mt-dk-spacer"></span>
+		@if (_text is { } shown)
+		{
+			<CopyButton Text="@shown" Label="Copy" />
+		}
+	</div>
+	<span class="mt-dk-note">@Note</span>
+	@if (LoadError is null && _text is null)
+	{
+		<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+	}
+	@LoadErrorPanel(LoadViewAsync)
+	@if (_text is { } text)
+	{
+		<pre class="mt-dk-box mt-dk-box--nowrap">@text</pre>
+	}
+}
+
+@code {
+	private const string ResolvedView = "";
+
+	private string _view = ResolvedView;
+	private string? _text;
+	private string? _loadedFor;
+
+	[CascadingParameter]
+	private ComposeProjectContext? Context { get; set; }
+
+	private string Note => _view == ResolvedView
+		? "docker compose config: every file merged and every variable filled in, so env values show here as they will run."
+		: "The file as it is on the docker host, read-only here; edit it from the session's file browser, then Up.";
+
+	protected override Task OnParametersSetAsync() =>
+		Context is { } context && context.Project.Name != _loadedFor ? LoadViewAsync() : Task.CompletedTask;
+
+	private Task OnViewChangedAsync(string? value)
+	{
+		_view = value ?? ResolvedView;
+		return LoadViewAsync();
+	}
+
+	private Task LoadViewAsync() => LoadAsync(async (client, token) =>
+	{
+		if (Context is not { } context)
+		{
+			return;
+		}
+
+		_loadedFor = context.Project.Name;
+		_text = null;
+		if (_view == ResolvedView)
+		{
+			_text = context.Target is { HasFiles: true } target
+				? DockerText.Plain(await client.ComposeConfigAsync(target, token))
+				: throw new DockerCommandException(DockerFailure.Other, "Compose needs the project's files to resolve it, and they are not known.");
+			return;
+		}
+
+		DockerHostFiles files = HostFiles ?? throw new DockerCommandException(DockerFailure.ConnectionLost, "This session has no file system to read the file with.");
+		try
+		{
+			_text = (await files.ReadTextAsync(_view, asRoot: false, token)).Text;
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.PermissionDenied && files.CanUseRoot)
+		{
+			_text = (await files.ReadTextAsync(_view, asRoot: true, token)).Text;
+		}
+	});
+}

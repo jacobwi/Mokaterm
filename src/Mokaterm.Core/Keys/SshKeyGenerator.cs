@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Security;
 using Mokaterm.Core.Security;
 using Org.BouncyCastle.Math.EC.Rfc8032;
 
@@ -8,12 +9,17 @@ namespace Mokaterm.Core.Keys;
 
 /// <summary>
 /// Creates key pairs in OpenSSH format. RSA comes from the framework; ed25519 comes from BouncyCastle because
-/// .NET 10 has no Ed25519 API.
+/// .NET 10 has no Ed25519 API. Security keys come from the host's authenticator, when it has one.
 /// </summary>
 internal sealed class SshKeyGenerator : ISshKeyGenerator
 {
 	private const string Ed25519Algorithm = "ssh-ed25519";
 	private const string RsaAlgorithm = "ssh-rsa";
+
+	private readonly ISecurityKeyAuthenticator? _authenticator;
+
+	/// <param name="authenticator">The desktop host's security key access; null where there is none.</param>
+	public SshKeyGenerator(ISecurityKeyAuthenticator? authenticator = null) => _authenticator = authenticator;
 
 	public Task<GeneratedSshKey> GenerateAsync(SshKeyRequest request, CancellationToken cancellationToken = default)
 	{
@@ -21,6 +27,11 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 		if (!Enum.IsDefined(request.Type))
 		{
 			throw new ArgumentOutOfRangeException(nameof(request), request.Type, "Unknown key type.");
+		}
+
+		if (request.IsSecurityKey)
+		{
+			return SecurityKeyEnrollment.GenerateAsync(_authenticator, request, CleanComment(request.Comment), cancellationToken);
 		}
 
 		// RSA primes and the bcrypt KDF both take seconds; neither belongs on the renderer's thread.
@@ -136,7 +147,7 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 		}
 	}
 
-	private static GeneratedSshKey Build(
+	internal static GeneratedSshKey Build(
 		string fileName,
 		ReadOnlySpan<byte> publicBlob,
 		ReadOnlySpan<byte> privateBlob,

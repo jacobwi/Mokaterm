@@ -7,6 +7,7 @@ using Mokaterm.DevHost.Demo.Telnet;
 using Mokaterm.DevHost.Demo.Vnc;
 using Mokaterm.DevHost.Hosting;
 using Mokaterm.Modules.Ftp;
+using Mokaterm.Modules.Local;
 using Mokaterm.Modules.Mqtt;
 using Mokaterm.Modules.Rdp;
 using Mokaterm.Modules.Serial;
@@ -41,8 +42,9 @@ builder.Services.AddSingleton<DemoMqttServer>();
 builder.Services.AddSingleton<DevVaultSeeder>();
 
 // Serial is registered so its editor, settings page and session panel can be looked at. It opens a real port on this
-// machine, and there is no demo device to seed a login against: plug something in, or add a virtual pair.
-builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddModule(new DemoModule()));
+// machine, and there is no demo device to seed a login against: plug something in, or add a virtual pair. The local
+// shell runs a real shell on this machine for whoever opens the page, which this host only allows in Development.
+builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddModule(new DemoModule()));
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
 

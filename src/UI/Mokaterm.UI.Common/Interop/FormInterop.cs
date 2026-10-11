@@ -27,5 +27,18 @@ public sealed class FormInterop : IAsyncDisposable
 	public ValueTask<bool> FocusPreferredAsync(ElementReference root, bool selectText = false) =>
 		_module.TryInvokeVoidAsync("focusPreferred", root, selectText);
 
+	/// <summary>Where the focused element is in the viewport, or null when only the page has focus or it cannot say.</summary>
+	public async ValueTask<ElementBox?> FocusedBoxAsync()
+	{
+		try
+		{
+			return await _module.InvokeAsync<ElementBox?>("focusedBox");
+		}
+		catch (Exception ex) when (JsModule.IsExpected(ex))
+		{
+			return null;
+		}
+	}
+
 	public ValueTask DisposeAsync() => _module.DisposeAsync();
 }

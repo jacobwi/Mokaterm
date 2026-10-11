@@ -20,4 +20,11 @@ public enum ProtocolCapabilities
 
 	/// <summary>Reserved for message broker modules such as MQTT.</summary>
 	Messaging = 1 << 4,
+
+	/// <summary>
+	/// Sessions expose <see cref="Commands.IRemoteCommandFeature"/>: a command runs to completion without a terminal,
+	/// so the provider also honours <see cref="ConnectPurpose.Commands"/>. A protocol whose only way to run anything is
+	/// typing into a login (telnet, a serial console) never declares it.
+	/// </summary>
+	Commands = 1 << 5,
 }

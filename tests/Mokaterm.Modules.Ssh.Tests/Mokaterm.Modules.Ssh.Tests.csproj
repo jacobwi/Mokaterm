@@ -6,6 +6,14 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Ssh\Mokaterm.Modules.Ssh.csproj" />
+
+		<!-- Security key files are read by Core, which a login reaches through ISshSecurityKeyReader in the hosts. -->
+		<ProjectReference Include="..\..\src\Mokaterm.Core\Mokaterm.Core.csproj" />
+	</ItemGroup>
+
+	<!-- SoftwareSecurityKey signs Ed25519 with BouncyCastle, which SSH.NET brings along. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\SecurityKeys\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
 </Project>

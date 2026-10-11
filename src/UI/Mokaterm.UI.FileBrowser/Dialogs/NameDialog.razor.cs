@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Feedback.Dialog;
 using Mokaterm.Abstractions.FileSystem;
+using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.FileBrowser.Browsing;
 
 namespace Mokaterm.UI.FileBrowser.Dialogs;
 
-/// <summary>Asks for a file or folder name, for renaming and for new folders. Closes with the name as a string.</summary>
+/// <summary>Asks for a file or folder name, for renaming, new entries and archives. Closes with the name as a string.</summary>
 public sealed partial class NameDialog : ComponentBase
 {
 	private string _name = "";
@@ -12,6 +14,10 @@ public sealed partial class NameDialog : ComponentBase
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
+
+	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
+	[Parameter]
+	public DialogHeading? Heading { get; set; }
 
 	[Parameter]
 	public string Label { get; set; } = "Name";
@@ -43,9 +49,9 @@ public sealed partial class NameDialog : ComponentBase
 	protected override void OnInitialized()
 	{
 		_name = InitialName;
-		int extension = InitialName.LastIndexOf('.');
-		// ".bashrc" has no base name to keep, so it is selected whole.
-		_selectionEnd = SelectBaseName && extension > 0 ? extension : InitialName.Length;
+
+		// ".bashrc" has no base name to keep, so it is selected whole, and "site.tar.gz" keeps its whole extension.
+		_selectionEnd = SelectBaseName ? EntryNames.Split(InitialName, isFolder: false).Stem.Length : InitialName.Length;
 	}
 
 	private void OnNameChanged(string value) => _name = value;

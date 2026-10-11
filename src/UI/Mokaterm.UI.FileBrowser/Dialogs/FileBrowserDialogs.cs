@@ -1,12 +1,19 @@
+using Moka.Red.Core.Icons;
 using Moka.Red.Feedback.Dialog;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.FileSystem;
+using Mokaterm.Abstractions.Platform;
+using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Properties;
 
 namespace Mokaterm.UI.FileBrowser.Dialogs;
 
 /// <summary>
 /// Opens the file browser's dialogs and returns their results typed. Call only from the browser itself: awaiting a
-/// service dialog from inside another service dialog waits forever.
+/// service dialog from inside another service dialog waits forever. The service takes its title as a plain string, so
+/// every dialog opens without one and draws the header itself from the <see cref="DialogHeading"/> it is handed.
 /// </summary>
 internal sealed class FileBrowserDialogs
 {
@@ -17,6 +24,7 @@ internal sealed class FileBrowserDialogs
 	/// <returns>The new name, or null when cancelled.</returns>
 	public async Task<string?> AskNameAsync(
 		string title,
+		MokaIconDefinition icon,
 		string label,
 		string initialName,
 		string confirmText,
@@ -24,9 +32,10 @@ internal sealed class FileBrowserDialogs
 		bool selectBaseName)
 	{
 		object? result = await _dialogs.ShowComponentAsync<NameDialog>(
-			title,
+			"",
 			parameters =>
 			{
+				parameters[nameof(NameDialog.Heading)] = new DialogHeading(title, icon);
 				parameters[nameof(NameDialog.Label)] = label;
 				parameters[nameof(NameDialog.InitialName)] = initialName;
 				parameters[nameof(NameDialog.ConfirmText)] = confirmText;
@@ -37,12 +46,80 @@ internal sealed class FileBrowserDialogs
 		return result as string;
 	}
 
+	/// <param name="folder">Where the search starts. The dialog lets the user change it.</param>
+	/// <param name="initialQuery">The pattern and options the fields start with.</param>
+	/// <param name="resolveFolder">Turns a typed folder into an absolute path.</param>
+	/// <param name="search">Runs a search on the browser's file system.</param>
+	/// <returns>The entry the user chose, or null when the dialog closed without one.</returns>
+	public async Task<RemoteFileEntry?> FindFilesAsync(
+		string folder,
+		RemoteSearchQuery initialQuery,
+		Func<string, CancellationToken, Task<string>> resolveFolder,
+		Func<string, RemoteSearchQuery, IProgress<RemoteSearchProgress>, CancellationToken, IAsyncEnumerable<RemoteFileEntry>> search)
+	{
+		object? result = await _dialogs.ShowComponentAsync<FileSearchDialog>(
+			"",
+			parameters =>
+			{
+				parameters[nameof(FileSearchDialog.Heading)] = new DialogHeading("Find files", MokaIcons.Action.Search);
+				parameters[nameof(FileSearchDialog.Folder)] = folder;
+				parameters[nameof(FileSearchDialog.InitialQuery)] = initialQuery;
+				parameters[nameof(FileSearchDialog.ResolveFolder)] = resolveFolder;
+				parameters[nameof(FileSearchDialog.Search)] = search;
+			},
+			options =>
+			{
+				options.Size = MokaDialogSize.Large;
+				options.ShowCloseButton = false;
+			});
+		return result as RemoteFileEntry;
+	}
+
+	/// <param name="picked">What the folder picker returned. The caller releases it.</param>
+	/// <param name="destination"><c>user@host:/path</c> of <paramref name="remoteFolder"/>.</param>
+	/// <param name="readRemote">Walks <paramref name="remoteFolder"/> for every file in it.</param>
+	/// <param name="checkContents">Hashes both copies of the rows it gets; null when the server cannot compute checksums.</param>
+	/// <returns>The files to upload, each renamed to its path below <paramref name="remoteFolder"/>, or null when cancelled.</returns>
+	public async Task<IReadOnlyList<LocalFileItem>?> CompareFoldersAsync(
+		IReadOnlyList<LocalFileItem> picked,
+		string localName,
+		string remoteFolder,
+		string destination,
+		bool asRoot,
+		Func<IProgress<RemoteSearchProgress>, CancellationToken, IAsyncEnumerable<RemoteFileEntry>> readRemote,
+		Func<IReadOnlyList<(string Path, LocalFileItem Local, RemoteFileEntry Remote)>, IProgress<int>, CancellationToken, Task<IReadOnlySet<string>>>? checkContents)
+	{
+		object? result = await _dialogs.ShowComponentAsync<FolderCompareDialog>(
+			"",
+			parameters =>
+			{
+				parameters[nameof(FolderCompareDialog.Heading)] = new DialogHeading("Compare with local folder", MokatermIcons.SplitView);
+				parameters[nameof(FolderCompareDialog.LocalItems)] = picked;
+				parameters[nameof(FolderCompareDialog.LocalName)] = localName;
+				parameters[nameof(FolderCompareDialog.RemoteFolder)] = remoteFolder;
+				parameters[nameof(FolderCompareDialog.Destination)] = destination;
+				parameters[nameof(FolderCompareDialog.AsRoot)] = asRoot;
+				parameters[nameof(FolderCompareDialog.ReadRemote)] = readRemote;
+				if (checkContents is not null)
+				{
+					parameters[nameof(FolderCompareDialog.CheckContents)] = checkContents;
+				}
+			},
+			options =>
+			{
+				options.Size = MokaDialogSize.Large;
+				options.ShowCloseButton = false;
+			});
+		return result as IReadOnlyList<LocalFileItem>;
+	}
+
 	public async Task<bool> ConfirmDeleteAsync(IReadOnlyList<RemoteFileEntry> entries, bool asRoot)
 	{
 		object? result = await _dialogs.ShowComponentAsync<DeleteDialog>(
-			"Delete",
+			"",
 			parameters =>
 			{
+				parameters[nameof(DeleteDialog.Heading)] = new DialogHeading("Delete", MokaIcons.Action.Delete);
 				parameters[nameof(DeleteDialog.Entries)] = entries;
 				parameters[nameof(DeleteDialog.AsRoot)] = asRoot;
 			},
@@ -66,9 +143,10 @@ internal sealed class FileBrowserDialogs
 		Func<Action<TreeSize>, CancellationToken, Task<TreeSize>> measureSize)
 	{
 		object? result = await _dialogs.ShowComponentAsync<PropertiesDialog>(
-			"Properties",
+			"",
 			parameters =>
 			{
+				parameters[nameof(PropertiesDialog.Heading)] = new DialogHeading("Properties", MokatermIcons.Sliders);
 				parameters[nameof(PropertiesDialog.Entries)] = entries;
 				parameters[nameof(PropertiesDialog.Section)] = section;
 				parameters[nameof(PropertiesDialog.UserName)] = userName;
@@ -90,8 +168,9 @@ internal sealed class FileBrowserDialogs
 		return result as PropertiesChange;
 	}
 
-	/// <returns>The account to upload as, or null when cancelled.</returns>
-	public async Task<UploadRunAs?> ConfirmUploadAsync(
+	/// <param name="offerOptOut">Offers "Don't ask again", for the question the drop setting turns off.</param>
+	/// <returns>The account to upload as and whether to stop asking, or null when cancelled.</returns>
+	public async Task<UploadConfirmation?> ConfirmUploadAsync(
 		int fileCount,
 		int folderCount,
 		long? totalBytes,
@@ -99,12 +178,14 @@ internal sealed class FileBrowserDialogs
 		string host,
 		string userName,
 		bool supportsElevation,
-		bool asRoot)
+		bool asRoot,
+		bool offerOptOut)
 	{
 		object? result = await _dialogs.ShowComponentAsync<UploadConfirmDialog>(
-			"Upload",
+			"",
 			parameters =>
 			{
+				parameters[nameof(UploadConfirmDialog.Heading)] = new DialogHeading("Upload", MokatermIcons.FileUpload);
 				parameters[nameof(UploadConfirmDialog.FileCount)] = fileCount;
 				parameters[nameof(UploadConfirmDialog.FolderCount)] = folderCount;
 				if (totalBytes is { } bytes)
@@ -117,12 +198,34 @@ internal sealed class FileBrowserDialogs
 				parameters[nameof(UploadConfirmDialog.UserName)] = userName;
 				parameters[nameof(UploadConfirmDialog.SupportsElevation)] = supportsElevation;
 				parameters[nameof(UploadConfirmDialog.AsRoot)] = asRoot;
+				parameters[nameof(UploadConfirmDialog.OfferOptOut)] = offerOptOut;
 			},
 			Small);
-		return result is UploadRunAs runAs ? runAs : null;
+		return result as UploadConfirmation;
 	}
 
-	/// <param name="save">Writes the file and returns the message to show when it failed, or null once it is saved.</param>
+	/// <param name="names">The pasted names <paramref name="directory"/> already holds.</param>
+	/// <returns>What to do with them, or null when the paste was cancelled.</returns>
+	public async Task<PasteConflictChoice?> AskPasteConflictAsync(IReadOnlyList<string> names, string directory, bool asRoot)
+	{
+		object? result = await _dialogs.ShowComponentAsync<PasteConflictDialog>(
+			"",
+			parameters =>
+			{
+				parameters[nameof(PasteConflictDialog.Heading)] = new DialogHeading("Paste", MokaIcons.Content.Paste);
+				parameters[nameof(PasteConflictDialog.Names)] = names;
+				parameters[nameof(PasteConflictDialog.Directory)] = directory;
+				parameters[nameof(PasteConflictDialog.AsRoot)] = asRoot;
+			},
+			Small);
+		return result is PasteConflictChoice choice ? choice : null;
+	}
+
+	/// <param name="save">
+	/// Writes the text, or with the flag set writes it over whatever the server has now. Answers a conflict instead of
+	/// writing when the file changed on the server since it was last read.
+	/// </param>
+	/// <param name="acceptServerCopy">Makes the server copy the last conflict showed the one the next save compares against.</param>
 	/// <param name="confirmDiscard">Asked before throwing away unsaved edits.</param>
 	/// <returns>True once a save went through.</returns>
 	public async Task<bool> EditFileAsync(
@@ -130,18 +233,21 @@ internal sealed class FileBrowserDialogs
 		string path,
 		string content,
 		IReadOnlyList<string> facts,
-		Func<string, Task<string?>> save,
+		Func<string, bool, Task<Editing.FileSaveResult>> save,
+		Action acceptServerCopy,
 		Func<Task<bool>> confirmDiscard)
 	{
 		object? result = await _dialogs.ShowComponentAsync<FileEditDialog>(
-			fileName,
+			"",
 			parameters =>
 			{
+				parameters[nameof(FileEditDialog.Heading)] = new DialogHeading(fileName, MokaIcons.Action.Edit);
 				parameters[nameof(FileEditDialog.FileName)] = fileName;
 				parameters[nameof(FileEditDialog.Path)] = path;
 				parameters[nameof(FileEditDialog.Content)] = content;
 				parameters[nameof(FileEditDialog.Facts)] = facts;
 				parameters[nameof(FileEditDialog.Save)] = save;
+				parameters[nameof(FileEditDialog.AcceptServerCopy)] = acceptServerCopy;
 				parameters[nameof(FileEditDialog.ConfirmDiscard)] = confirmDiscard;
 			},
 			options =>

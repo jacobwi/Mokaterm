@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Components;
 using Moka.Red.Icons;
+using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Presentation;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Common.Icons;
 
 namespace Mokaterm.UI.Settings.Pages.Appearance;
 
@@ -30,7 +34,23 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		new(UiDensity.Comfortable, "Comfortable"),
 	];
 
+	private static readonly IReadOnlyList<EnumOption<SessionToolbarLayout>> ToolbarLayoutOptions =
+	[
+		new(SessionToolbarLayout.Grouped, "Grouped", MokatermIcons.Tools),
+		new(SessionToolbarLayout.Flat, "Flat", MokaIcons.Navigation.MoreHorizontal),
+		new(SessionToolbarLayout.Compact, "Compact", MokaIcons.Navigation.Menu),
+	];
+
 	private string _previewHost = "";
+
+	[Inject]
+	private IUiContributions Contributions { get; set; } = default!;
+
+	[Inject]
+	private IAppEnvironment AppEnvironment { get; set; } = default!;
+
+	/// <summary>The shell's buttons, then one per tool the loaded modules add.</summary>
+	private IReadOnlyList<SessionToolbarButton> ToolbarButtons => SessionToolbarButtons.All(Contributions);
 
 	private static string? SelectedPreset(string accent) =>
 		Array.Find(AccentPresets, preset => string.Equals(preset, accent, StringComparison.OrdinalIgnoreCase));
@@ -44,4 +64,11 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		SaveAsync(s => s with { FontScale = Math.Round(value, 2) });
 
 	private Task SaveAsync(Func<AppearanceSettings, AppearanceSettings> change) => UpdateAsync(s => change(s).Clamped());
+
+	private Task SetButtonShownAsync(string id, bool shown) => UpdateAsync(s => s with
+	{
+		HiddenToolbarButtons = shown
+			? [.. s.HiddenToolbarButtons.Where(hidden => hidden != id)]
+			: [.. s.HiddenToolbarButtons.Where(hidden => hidden != id), id],
+	});
 }

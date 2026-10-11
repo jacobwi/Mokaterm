@@ -5,6 +5,7 @@ using Moka.Red.ContextMenu;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Workspace;
@@ -21,6 +22,10 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 	private const int IndentPixels = 14;
 
 	private readonly HashSet<Guid> _expanded = [];
+
+	// Rows picked together with Ctrl or Shift, for a command run on all of them. The selected row is still the one the
+	// keys move and Enter opens; these only ride along.
+	private readonly HashSet<string> _marked = new(StringComparer.Ordinal);
 	private ElementReference _tree;
 	private List<ConnectionTreeRow> _rows = [];
 	private Dictionary<Guid, SessionState> _sessionStates = [];
@@ -49,7 +54,7 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 	private IProtocolRegistry Protocols { get; set; } = default!;
 
 	[Inject]
-	private IMokaContextMenuService Menu { get; set; } = default!;
+	private MenuPlacement Menu { get; set; } = default!;
 
 	[Inject]
 	private ShellInterop Interop { get; set; } = default!;
@@ -121,10 +126,17 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 		_ => 0,
 	};
 
-	private string RowClass(ConnectionTreeRow row) =>
-		row.Key == _dropTargetKey ? "mt-tree-item mt-tree-item--drop" : "mt-tree-item";
+	private string RowClass(ConnectionTreeRow row) => row.Key == _dropTargetKey
+		? "mt-tree-item mt-tree-item--drop"
+		: _marked.Contains(row.Key) ? "mt-tree-item mt-tree-item--marked" : "mt-tree-item";
 
-	private void Rebuild() => _rows = ConnectionTreeBuilder.Build(Catalog.Catalog, _expanded, _query, Protocols.DisplayName);
+	private void Rebuild()
+	{
+		_rows = ConnectionTreeBuilder.Build(Catalog.Catalog, _expanded, _query, Protocols.DisplayName);
+
+		// A row folded away or filtered out is no longer in view, so it no longer rides along with a run.
+		_marked.IntersectWith(_rows.Select(row => row.Key));
+	}
 
 	private void ReadSessionStates()
 	{
@@ -153,6 +165,47 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 	}
 
 	private void Select(ConnectionTreeRow row) => _selectedKey = row.Key;
+
+	/// <summary>A plain click selects one row; Ctrl adds or drops a row and Shift picks the range from the selected one.</summary>
+	private void OnRowClick(MouseEventArgs e, ConnectionTreeRow row)
+	{
+		if (e.CtrlKey || e.MetaKey)
+		{
+			ToggleMark(row);
+			_selectedKey = row.Key;
+			return;
+		}
+
+		int anchor = _rows.FindIndex(candidate => candidate.Key == _selectedKey);
+		if (e.ShiftKey && anchor >= 0)
+		{
+			int target = _rows.FindIndex(candidate => candidate.Key == row.Key);
+			_marked.Clear();
+			for (int index = Math.Min(anchor, target); index <= Math.Max(anchor, target); index++)
+			{
+				_ = _marked.Add(_rows[index].Key);
+			}
+
+			return;
+		}
+
+		_marked.Clear();
+		Select(row);
+	}
+
+	private void ToggleMark(ConnectionTreeRow row)
+	{
+		// The first Ctrl click carries the row that was already selected along, the way a file manager does.
+		if (_marked.Count == 0 && _selectedKey is { } selected && selected != row.Key && _rows.Exists(candidate => candidate.Key == selected))
+		{
+			_ = _marked.Add(selected);
+		}
+
+		if (!_marked.Remove(row.Key))
+		{
+			_ = _marked.Add(row.Key);
+		}
+	}
 
 	private void SelectIndex(int index)
 	{
@@ -255,6 +308,12 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 			case "ArrowLeft" when current is not null:
 				SelectParent(index);
 				break;
+			case " " when current is not null && (e.CtrlKey || e.MetaKey):
+				ToggleMark(current);
+				break;
+			case "Escape" when _marked.Count > 0:
+				_marked.Clear();
+				break;
 			case "Enter" or " " when current is not null:
 				await ActivateAsync(current);
 				break;
@@ -306,6 +365,14 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 
 	private void OnRowContextMenu(MouseEventArgs e, ConnectionTreeRow row)
 	{
+		if (_marked.Count > 1 && _marked.Contains(row.Key))
+		{
+			List<ConnectionTreeRow> picked = [.. _rows.Where(candidate => _marked.Contains(candidate.Key))];
+			Menu.Show(e, Actions.SelectionMenu(picked, ClearMarks));
+			return;
+		}
+
+		_marked.Clear();
 		_selectedKey = row.Key;
 		IReadOnlyList<MokaContextMenuItem> items = row switch
 		{
@@ -322,6 +389,13 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 	}
 
 	private void OnEmptyAreaContextMenu(MouseEventArgs e) => Menu.Show(e, Actions.EmptyAreaMenu());
+
+	// The menu runs this outside any event of this component, so it asks for its own render.
+	private void ClearMarks() => _ = InvokeAsync(() =>
+	{
+		_marked.Clear();
+		StateHasChanged();
+	});
 
 	private void OnDragStart(ConnectionTreeRow row) =>
 		_draggedHostId = row is { Kind: ConnectionTreeRowKind.Host, Host: { } host } ? host.Id : null;

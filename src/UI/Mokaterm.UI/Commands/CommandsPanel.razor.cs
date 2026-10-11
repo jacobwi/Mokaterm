@@ -6,6 +6,8 @@ using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.UI.Common.Commands;
+using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Shell;
 
@@ -52,6 +54,9 @@ public sealed partial class CommandsPanel : ComponentBase, IDisposable
 
 	[Inject]
 	private FormInterop Forms { get; set; } = default!;
+
+	[Inject]
+	private MenuPlacement Menu { get; set; } = default!;
 
 	[Inject]
 	private ILogger<CommandsPanel> Logger { get; set; } = default!;
@@ -228,4 +233,13 @@ public sealed partial class CommandsPanel : ComponentBase, IDisposable
 	}
 
 	private void Manage() => Shell.OpenSettings("commands");
+
+	private void ShowMenu(MouseEventArgs args, CommandSnippet snippet) => Menu.Show(args,
+	[
+		new() { Text = "Type at the prompt", Icon = MokatermIcons.Command, OnClick = () => ApplyAsync(snippet, run: false) },
+		new() { Text = "Run here", Icon = MokatermIcons.Terminal, Shortcut = "Ctrl+Enter", OnClick = () => ApplyAsync(snippet, run: true) },
+
+		// Opens the run with the command and the logins its scope names; nothing runs until the dialog says so.
+		new() { Text = "Run on several hosts...", Icon = MokatermIcons.Server, DividerBefore = true, OnClickSync = () => Actions.RunOnSeveralHosts(snippet) },
+	]);
 }

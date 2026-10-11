@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using Moka.Red.ContextMenu;
 using Moka.Red.Core.Icons;
 using Moka.Red.Data.Table;
 using Moka.Red.Feedback.Dialog;
@@ -17,6 +16,7 @@ using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.FileBrowser.Browsing;
@@ -124,7 +124,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private IMokaDialogService DialogService { get; set; } = default!;
 
 	[Inject]
-	private IMokaContextMenuService ContextMenu { get; set; } = default!;
+	private MenuPlacement ContextMenu { get; set; } = default!;
 
 	[Inject]
 	private IUserInteraction Interaction { get; set; } = default!;
@@ -223,6 +223,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 
 		Settings.Changed -= OnSettingsChanged;
+		Bookmarks.Changed -= OnBookmarksChanged;
 		_load?.Cancel();
 		CancelConnection();
 		_lifetime.Cancel();
@@ -250,11 +251,13 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	{
 		_receiver = DotNetObjectReference.Create(new FileBrowserJsReceiver(this));
 		Settings.Changed += OnSettingsChanged;
+		Bookmarks.Changed += OnBookmarksChanged;
 		_foldersFirst = Settings.Get<FileTransferSettings>().FoldersFirst;
 	}
 
 	protected override void OnParametersSet()
 	{
+		ApplyFollowParameters();
 		if (ReferenceEquals(Session, _session))
 		{
 			return;
@@ -417,6 +420,11 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_dragOver = false;
 		_history.Clear();
 		_selection.Reset();
+		_clipboard = null;
+		_pendingTerminalFolder = null;
+		_terminalHome = null;
+		_bookmarks = [];
+		_bookmarksLoaded = false;
 		RebuildView();
 		CloseAlert();
 	}
@@ -454,6 +462,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_userFileSystem = null;
 		_rootFileSystem = null;
 		_fileSystem = null;
+		_terminalHome = null;
 		_opening = false;
 		_openError = null;
 		_loading = false;
@@ -506,6 +515,10 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_opening = false;
 		_userFileSystem = fileSystem;
 		_fileSystem = fileSystem;
+		if (!_bookmarksLoaded)
+		{
+			_ = RunSafeAsync(LoadBookmarksAsync);
+		}
 
 		// A reconnect keeps the folder the user was in; the first connection starts where the settings say.
 		if (_loaded)
@@ -666,7 +679,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 	}
 
-	private async Task NavigateAsync(string path, NavigationKind kind = NavigationKind.Push, string? select = null)
+	/// <param name="reportFailure">False for a move the user did not ask for here, which fails without an alert.</param>
+	private async Task NavigateAsync(string path, NavigationKind kind = NavigationKind.Push, string? select = null, bool reportFailure = true)
 	{
 		if (_fileSystem is not { } fileSystem)
 		{
@@ -681,7 +695,15 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		LoadOutcome outcome = await LoadAsync(fileSystem, target, select);
 		if (outcome.Error is { } error)
 		{
-			ShowAlert("Could not open " + target, error, _ => NavigateAsync(target, kind, select));
+			if (reportFailure)
+			{
+				ShowAlert("Could not open " + target, error, _ => NavigateAsync(target, kind, select));
+			}
+			else
+			{
+				Logger.LogDebug("A folder the browser was sent to could not be listed: {Error}", LogSafe.Describe(error));
+			}
+
 			return;
 		}
 

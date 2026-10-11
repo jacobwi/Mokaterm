@@ -1,0 +1,14 @@
+@* A sample line as a terminal would color it. The colors come from TriggerPalette, never from what was typed. *@
+<div class="trigger-preview">
+	@foreach (TriggerPreviewSegment segment in TriggerPreviewSegment.Split(Text, Layers))
+	{
+		@if (segment.Color is { } color)
+		{
+			<span class="trigger-preview__match" style="@($"color:{color}")">@segment.Text</span>
+		}
+		else
+		{
+			<span>@segment.Text</span>
+		}
+	}
+</div>

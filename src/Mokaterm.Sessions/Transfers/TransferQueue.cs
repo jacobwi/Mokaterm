@@ -132,6 +132,7 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 	public void Remove(Guid id)
 	{
 		CancellationTokenSource? running;
+		TransferItem? discard = null;
 		lock (_lock)
 		{
 			TransferItem? item = FindItem(id);
@@ -147,26 +148,43 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 				item.Finish(TransferState.Canceled, null, _timeProvider.GetUtcNow());
 			}
 
+			discard = TakeForDiscard(item);
 			_ = _items.Remove(item);
 			_snapshot = null;
 		}
 
 		CancelQuietly(running);
+		StartDiscard(discard);
 		RaiseChanged();
 	}
 
 	public void ClearFinished()
 	{
+		List<TransferItem> discard = [];
 		int removed;
 		lock (_lock)
 		{
-			removed = _items.RemoveAll(item => item.IsFinished);
+			removed = _items.RemoveAll(item =>
+			{
+				if (!item.IsFinished)
+				{
+					return false;
+				}
+
+				if (TakeForDiscard(item) is { } abandoned)
+				{
+					discard.Add(abandoned);
+				}
+
+				return true;
+			});
 			if (removed > 0)
 			{
 				_snapshot = null;
 			}
 		}
 
+		discard.ForEach(StartDiscard);
 		if (removed > 0)
 		{
 			RaiseChanged();
@@ -176,6 +194,7 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 	public void Dispose()
 	{
 		List<CancellationTokenSource> running = [];
+		List<TransferItem> discard = [];
 		lock (_lock)
 		{
 			if (_disposed)
@@ -195,6 +214,11 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 				{
 					running.Add(cancellation);
 				}
+
+				if (TakeForDiscard(item) is { } abandoned)
+				{
+					discard.Add(abandoned);
+				}
 			}
 
 			_progressTimer?.Dispose();
@@ -205,6 +229,8 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 		{
 			CancelQuietly(cancellation);
 		}
+
+		discard.ForEach(StartDiscard);
 	}
 
 	private void StartQueued()
@@ -243,6 +269,8 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 			TransferContext context = new(
 				new InlineProgress<long>(transferred => ReportProgress(item, run, transferred)),
 				total => SetTotalBytes(item, run, total),
+				verification => SetVerification(item, run, verification),
+				offset => MarkResumed(item, run, offset),
 				cancellationToken);
 			await item.Request.ExecuteAsync(context);
 		}
@@ -264,6 +292,7 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 			_logger.LogWarning("Transfer {TransferId} failed: {Error}", item.Id, LogSafe.Describe(ex));
 		}
 
+		TransferItem? discard = null;
 		lock (_lock)
 		{
 			_running--;
@@ -271,8 +300,16 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 			{
 				item.Finish(state, error, _timeProvider.GetUtcNow());
 			}
+
+			// Removed while it ran: what it kept for resuming can go now that nothing writes to it any more.
+			if (item.DiscardWhenStopped)
+			{
+				item.DiscardWhenStopped = false;
+				discard = TakeForDiscard(item);
+			}
 		}
 
+		StartDiscard(discard);
 		RaiseChanged();
 		StartQueued();
 	}
@@ -343,6 +380,79 @@ internal sealed class TransferQueue : ITransferQueue, IDisposable
 		}
 
 		RaiseChanged();
+	}
+
+	private void SetVerification(TransferItem item, int run, TransferVerification verification)
+	{
+		lock (_lock)
+		{
+			if (item.Run != run || item.State != TransferState.Running)
+			{
+				return;
+			}
+
+			item.SetVerification(verification);
+		}
+
+		RaiseChanged();
+	}
+
+	private void MarkResumed(TransferItem item, int run, long offset)
+	{
+		lock (_lock)
+		{
+			if (item.Run != run || item.State != TransferState.Running)
+			{
+				return;
+			}
+
+			item.MarkResumed(offset, _timeProvider.GetTimestamp());
+		}
+
+		RaiseChanged();
+	}
+
+	/// <summary>
+	/// The item to discard now, or null: one that completed has nothing left over, one still running is discarded by its
+	/// own work once it stops (deleting a partial file while the upload still writes to it would break that upload), and
+	/// none is discarded twice. Call while holding the lock.
+	/// </summary>
+	private static TransferItem? TakeForDiscard(TransferItem item)
+	{
+		if (item.Discarded || item.State == TransferState.Completed || item.Request.DiscardAsync is null)
+		{
+			return null;
+		}
+
+		if (item.State == TransferState.Running)
+		{
+			item.DiscardWhenStopped = true;
+			return null;
+		}
+
+		item.Discarded = true;
+		return item;
+	}
+
+	private void StartDiscard(TransferItem? item)
+	{
+		if (item?.Request.DiscardAsync is { } discard)
+		{
+			_ = DiscardAsync(item.Id, discard);
+		}
+	}
+
+	private async Task DiscardAsync(Guid id, Func<Task> discard)
+	{
+		try
+		{
+			await discard();
+		}
+		catch (Exception ex)
+		{
+			// Only leftovers are at stake: a partial file stays where it is.
+			_logger.LogWarning("Transfer {TransferId} could not remove what it kept for resuming: {Error}", id, LogSafe.Describe(ex));
+		}
 	}
 
 	private void CancelQuietly(CancellationTokenSource? cancellation)

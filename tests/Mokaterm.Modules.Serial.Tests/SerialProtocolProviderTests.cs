@@ -71,6 +71,32 @@ public sealed class SerialProtocolProviderTests
 		Assert.Equal(0, credentials.GetCount);
 	}
 
+	// Quick connect asks the module about a typed port name, so the box refuses what the connect would refuse.
+	[Theory]
+	[InlineData("COM3", true, true)]
+	[InlineData(@"\\.\COM12", true, true)]
+	[InlineData("/dev/ttyUSB0", false, true)]
+	[InlineData("COM 3", false, false)]
+	public void ValidateQuickConnectAddress_AppliesThePortNameRule(string name, bool onWindows, bool elsewhere)
+	{
+		IQuickConnectSuggestions provider = new SerialProtocolProvider(new FakeSettingsService(), TimeProvider.System, NullLoggerFactory.Instance);
+		bool expected = OperatingSystem.IsWindows() ? onWindows : elsewhere;
+
+		string? problem = provider.ValidateQuickConnectAddress(name);
+
+		Assert.Equal(expected, problem is null);
+		Assert.Equal(SerialPortNames.Validate(name), problem);
+	}
+
+	[Fact]
+	public void GetQuickConnectSuggestions_ListsThePortsThisMachineHas()
+	{
+		SerialProtocolProvider provider = new(new FakeSettingsService(), TimeProvider.System, NullLoggerFactory.Instance);
+
+		Assert.Equal(SerialPortNames.List(), provider.GetQuickConnectSuggestions().Select(suggestion => suggestion.Address));
+		Assert.All(provider.GetQuickConnectSuggestions(), suggestion => Assert.Null(suggestion.Description));
+	}
+
 	private static Task<IProtocolSession> Connect(
 		string hostAddress,
 		SerialConnectionOptions? options = null,

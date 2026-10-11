@@ -4,7 +4,7 @@
 
 <SettingsPage Title="About">
 	<SettingsSection Title="Mokaterm">
-		<SettingsRow Label="Version" Description="SSH, SFTP and FTP client.">
+		<SettingsRow Label="Version" Description="Terminals, file transfers and remote desktops in one client.">
 			<MokaText Element="span" Size="MokaSize.Sm" Mono>@AppEnvironment.AppVersion</MokaText>
 		</SettingsRow>
 		<SettingsRow Label="Platform" Description="@HostDescription">
@@ -37,11 +37,11 @@
 	<SettingsSection Title="Modules">
 		@if (_modules.Count == 0)
 		{
-			<SettingsRow Label="No modules loaded" Description="Protocols come from modules the host registers at startup." />
+			<SettingsRow Label="No modules loaded" Description="Protocols come from modules the host registers at startup." Searchable="false" />
 		}
 		@foreach (ModuleInfo module in _modules)
 		{
-			<SettingsRow Label="@module.Name" Description="@module.Description">
+			<SettingsRow Label="@module.Name" Description="@module.Description" Searchable="false">
 				<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
 					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@module.Id</MokaText>
 					<MokaTag Text="@module.Version" Size="MokaSize.Xs" />
@@ -53,11 +53,11 @@
 	<SettingsSection Title="Protocols">
 		@if (ProtocolRegistry.Protocols.Count == 0)
 		{
-			<SettingsRow Label="No protocols registered" Description="Load a protocol module such as SSH or FTP to open connections." />
+			<SettingsRow Label="No protocols registered" Description="Load a protocol module such as SSH or FTP to open connections." Searchable="false" />
 		}
 		@foreach (ProtocolDescriptor protocol in ProtocolRegistry.Protocols)
 		{
-			<SettingsRow Label="@protocol.DisplayName" Description="@ProtocolDescription(protocol)">
+			<SettingsRow Label="@protocol.DisplayName" Description="@ProtocolDescription(protocol)" Searchable="false">
 				<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Justify="MokaJustify.End" Gap="MokaSpacingScale.Xxs" Wrap>
 					@foreach (string capability in CapabilityNames(protocol))
 					{
@@ -71,7 +71,7 @@
 	<SettingsSection Title="Credits">
 		@foreach (Credit credit in Credits)
 		{
-			<SettingsRow Label="@credit.Name" Description="@credit.Description">
+			<SettingsRow Label="@credit.Name" Description="@credit.Description" Searchable="false">
 				<MokaButton Variant="MokaVariant.Text"
 							Size="MokaSize.Sm"
 							EndIcon="MokaIcons.Content.ExternalLink"

@@ -39,6 +39,7 @@ internal sealed class MqttProtocolProvider : IProtocolProvider
 		Id = ProtocolId,
 		DisplayName = "MQTT",
 		Description = "A message broker: subscribe to topics, watch what arrives and publish. Plain, TLS or WebSockets.",
+		QuickConnectExample = "broker:1883",
 		DefaultPort = DefaultPort,
 		Capabilities = ProtocolCapabilities.Messaging,
 

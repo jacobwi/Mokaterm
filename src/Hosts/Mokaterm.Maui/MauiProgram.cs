@@ -4,7 +4,9 @@ using Microsoft.Maui.Platform;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
 using Mokaterm.Maui.Services;
+using Mokaterm.Maui.ToolWindows;
 using Mokaterm.Modules.Ftp;
+using Mokaterm.Modules.Local;
 using Mokaterm.Modules.Mqtt;
 using Mokaterm.Modules.Rdp;
 using Mokaterm.Modules.Serial;
@@ -34,8 +36,16 @@ public static class MauiProgram
 		builder.Services.AddSingleton<DesktopSessions>();
 		builder.Services.AddScoped<ILocalFileAccess, MauiLocalFileAccess>();
 
-		// Serial belongs to a host that runs on the machine the ports are plugged into, which is this one.
-		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial());
+		// Session tools in windows of their own. Each window's page borrows the services of the window that opened it,
+		// which the manager works out from the finished registrations below, and its BlazorWebView needs the handler
+		// that hands Blazor that borrowed scope.
+		DesktopToolWindows toolWindows = new();
+		builder.Services.AddSingleton(toolWindows);
+		builder.Services.AddSingleton<IToolWindows>(toolWindows);
+		builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ToolWebView, ToolWebViewHandler>());
+
+		// Serial and the local shell belong to a host that runs on the machine they reach, which is this one.
+		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal());
 		builder.Services.AddMokatermSessions();
 		builder.Services.AddMokatermUI();
 
@@ -46,13 +56,21 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-		return builder.Build();
+		MauiApp app = builder.Build();
+		toolWindows.Prepare(
+			builder.Services,
+			MokatermUiServiceCollectionExtensions.PageServices,
+			app.Services.GetRequiredService<ILogger<DesktopToolWindows>>());
+		return app;
 	}
 
 	private static void AddPlatformServices(MauiAppBuilder builder)
 	{
 #if WINDOWS
 		builder.Services.AddSingleton<Abstractions.Security.IDeviceKeyProtector, Platforms.Windows.DpapiDeviceKeyProtector>();
+
+		// Security key logins and key creation. Only this host has one: the key is plugged into the machine the app runs on.
+		builder.Services.AddSingleton<Abstractions.Security.ISecurityKeyAuthenticator, Platforms.Windows.WindowsSecurityKeyAuthenticator>();
 
 		// Replaces the browser drop bridge: the window's own drop target hands us real paths, so uploads read
 		// straight from disk and dropped folders keep their structure.
@@ -87,6 +105,13 @@ public static class MauiProgram
 		// Both of these need the window itself, and its handler is connected by the time this runs.
 		builder.ConfigureLifecycleEvents(events => events.AddWindows(windows => windows.OnWindowCreated(window =>
 		{
+			// A tool window keeps the system's title bar and takes no file drops: both singletons serve the main window,
+			// and attaching either to a tool window would take it from the main one.
+			if (window.GetWindow() is ToolWindow)
+			{
+				return;
+			}
+
 			IServiceProvider? services = window.GetWindow()?.Handler?.MauiContext?.Services;
 			services?.GetService<Platforms.Windows.WindowChrome>()?.Attach(window);
 			services?.GetService<Platforms.Windows.NativeFileDrop>()?.Attach(window);

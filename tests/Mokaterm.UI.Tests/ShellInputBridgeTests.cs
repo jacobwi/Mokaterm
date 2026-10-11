@@ -4,6 +4,7 @@ using Moka.Red.Feedback.CommandPalette;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Tests.Fakes;
@@ -86,7 +87,7 @@ public sealed class ShellInputBridgeTests
 			SessionWorkspace workspace = new(Sessions);
 			UserInteractionService interaction = new();
 			SessionActions actions = new(Sessions, workspace, null!, null!, interaction, null!, shell, NullLogger<SessionActions>.Instance);
-			ShellCommandRegistry commands = new(new MokaCommandPaletteService(), shell, workspace, actions, null!, null!, null!, null!, null!, null!, interaction, null!);
+			ShellCommandRegistry commands = new(new MokaCommandPaletteService(), shell, workspace, actions, null!, null!, null!, null!, null!, new UiContributions([], [], []), interaction, null!, null!, new SessionViewRequests());
 			Bridge = new ShellInputBridge(new ShellInterop(Js), commands, null!, new FixedSettings(), new WebEnvironment(), Sessions, NullLogger<ShellInputBridge>.Instance);
 			SubscribersBeforeAttach = Sessions.SubscriberCount;
 		}

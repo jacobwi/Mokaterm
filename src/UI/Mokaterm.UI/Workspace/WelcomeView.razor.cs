@@ -1,10 +1,10 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
-using Moka.Red.ContextMenu;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Connections;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
@@ -47,7 +47,7 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 	private IUiContributions Contributions { get; set; } = default!;
 
 	[Inject]
-	private IMokaContextMenuService Menu { get; set; } = default!;
+	private MenuPlacement Menu { get; set; } = default!;
 
 	[Inject]
 	private TimeProvider Time { get; set; } = default!;

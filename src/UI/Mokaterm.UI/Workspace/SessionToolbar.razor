@@ -1,0 +1,62 @@
+@using Mokaterm.UI.Common.Interaction
+
+@* The buttons on the right of a session's bar, laid out by ToolbarPlan. Every action is also in the overflow menu,
+   which is the whole toolbar in the compact layout and catches what the others hide or fold away. *@
+@{
+	ToolbarPlan plan = ToolbarPlan.Build(Layout, Actions, Hidden);
+}
+
+<div class="mt-tb" role="toolbar" aria-label="Session actions">
+	@foreach (ToolbarSlot slot in plan.Slots)
+	{
+		ToolbarAction action = slot.Action;
+		@if (slot.Divider)
+		{
+			<span class="mt-tb-divider @slot.DividerFoldClass" aria-hidden="true"></span>
+		}
+		<span class="mt-tb-item @slot.FoldClass" data-button="@action.Id">
+			<IconAction Icon="action.Icon"
+						Title="@action.Title"
+						Shortcut="@action.Shortcut"
+						Active="action.Active"
+						DotColor="@DotColor(action.Dot)"
+						Size="MokaSize.Xs"
+						TooltipPosition="MokaTooltipPosition.Left"
+						OnClick="args => RunAsync(action, args)" />
+		</span>
+	}
+	<span class="mt-tb-item mt-tb-more @(plan.MoreAlways ? null : "mt-tb-more--fold")" data-button="more">
+		<IconAction Icon="MokaIcons.Navigation.MoreHorizontal"
+					Title="@MoreTitle"
+					Size="MokaSize.Xs"
+					TooltipPosition="MokaTooltipPosition.Left"
+					OnClick="ShowMore" />
+	</span>
+</div>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<ToolbarAction> Actions { get; set; } = [];
+
+	[Parameter]
+	public SessionToolbarLayout Layout { get; set; }
+
+	[Parameter]
+	public IReadOnlyCollection<string> Hidden { get; set; } = [];
+
+	[Inject]
+	private MenuPlacement Menu { get; set; } = default!;
+
+	private string MoreTitle => Layout == SessionToolbarLayout.Compact ? "Session actions" : "More actions";
+
+	internal static string? DotColor(ToolbarDot dot) => dot switch
+	{
+		ToolbarDot.Recording => "var(--moka-color-error)",
+		ToolbarDot.Warning => "var(--moka-color-warning)",
+		_ => null,
+	};
+
+	private static Task RunAsync(ToolbarAction action, MouseEventArgs args) => action.Run?.Invoke(args) ?? Task.CompletedTask;
+
+	private void ShowMore(MouseEventArgs args) => Menu.Show(args, ToolbarPlan.BuildMenu(Actions));
+}

@@ -1,0 +1,71 @@
+@namespace Mokaterm.UI.Terminal
+@using System.Globalization
+@using Moka.Red.Feedback.Alert
+@using Moka.Red.Feedback.Loading
+@using Moka.Red.Feedback.Toast
+@using Moka.Red.Forms.Slider
+@using Moka.Red.Primitives.SegmentedControl
+@using Mokaterm.UI.Common.Components
+@using Mokaterm.UI.Common.Formatting
+
+<div @ref="_host" class="mt-player">
+	<div class="mt-player-viewport">
+		@* xterm.js renders into this element, so Blazor must never give it child content. *@
+		<div @ref="_screen" class="mt-player-screen"></div>
+
+		@if (!_ready && _error is null)
+		{
+			<div class="mt-player-overlay">
+				<MokaSpinner Label="Loading the recording" />
+			</div>
+		}
+	</div>
+
+	@if (_error is not null)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+	}
+
+	@if (Recording.IsTimed)
+	{
+		<div class="mt-player-controls">
+			<MokaButton Variant="MokaVariant.Soft"
+						Size="MokaSize.Sm"
+						StartIcon="@(IsPlaying ? MokatermIcons.Pause : MokatermIcons.Play)"
+						Disabled="!_ready"
+						OnClick="TogglePlayAsync"
+						title="@PlayLabel"
+						aria-label="@PlayLabel" />
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="!_ready"
+						OnClick="RestartAsync"
+						title="Restart"
+						aria-label="Play from the beginning" />
+			<div class="mt-player-seek">
+				<MokaSlider Value="PositionSeconds"
+							ValueChanged="SeekAsync"
+							Min="0"
+							Max="DurationSeconds"
+							Step="0.1"
+							ShowValue="false"
+							Disabled="!_ready"
+							aria-label="Position in the recording" />
+			</div>
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@DisplayFormat.Duration(Position) / @DisplayFormat.Duration(Recording.Duration)</MokaText>
+			<MokaSegmentedControl Size="MokaSize.Sm"
+								  Value="@SpeedValue"
+								  ValueChanged="SetSpeed"
+								  AriaLabel="Playback speed">
+				@foreach (int speed in Speeds)
+				{
+					<MokaSegment @key="speed"
+								 Value="@speed.ToString(CultureInfo.InvariantCulture)"
+								 Text="@string.Create(CultureInfo.InvariantCulture, $"{speed}x")"
+								 Disabled="!_ready" />
+				}
+			</MokaSegmentedControl>
+		</div>
+	}
+</div>

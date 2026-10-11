@@ -73,9 +73,20 @@ public sealed partial class KeychainPage : VaultListPageBase<CredentialInfo>
 		base.Dispose(disposing);
 	}
 
-	private static string KindText(CredentialKind kind) => kind == CredentialKind.Password ? "Password" : "Private key";
+	private static string KindText(CredentialInfo credential) => credential.Kind switch
+	{
+		CredentialKind.Password => "Password",
+		_ when SecurityKeyTypes.IsSecurityKey(credential.KeyAlgorithm) => "Security key",
+		_ => "Private key",
+	};
 
-	private static MokaIconDefinition KindIcon(CredentialKind kind) => kind == CredentialKind.Password ? MokatermIcons.Lock : MokatermIcons.Key;
+	// A security key file signs only with its device plugged in, which is worth telling apart at a glance.
+	private static MokaIconDefinition KindIcon(CredentialInfo credential) => credential.Kind switch
+	{
+		CredentialKind.Password => MokatermIcons.Lock,
+		_ when SecurityKeyTypes.IsSecurityKey(credential.KeyAlgorithm) => MokatermIcons.Shield,
+		_ => MokatermIcons.Key,
+	};
 
 	private static string DeleteMessage(string name, int logins) => logins switch
 	{

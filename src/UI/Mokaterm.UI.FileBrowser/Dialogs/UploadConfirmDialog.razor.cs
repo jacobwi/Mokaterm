@@ -1,3 +1,4 @@
+using Mokaterm.UI.Common.Components;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Feedback.Dialog;
@@ -8,7 +9,7 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 
 /// <summary>
 /// Confirms dropped files before they upload: how much, where to, and whether as the logged-in user or as root.
-/// Enter confirms. Closes with the chosen account.
+/// Enter confirms. Closes with an <see cref="UploadConfirmation"/>.
 /// </summary>
 public sealed partial class UploadConfirmDialog : ComponentBase
 {
@@ -16,9 +17,14 @@ public sealed partial class UploadConfirmDialog : ComponentBase
 	private const string RootValue = "root";
 
 	private bool _asRoot;
+	private bool _stopAsking;
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
+
+	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
+	[Parameter]
+	public DialogHeading? Heading { get; set; }
 
 	[Parameter]
 	public int FileCount { get; set; }
@@ -48,6 +54,15 @@ public sealed partial class UploadConfirmDialog : ComponentBase
 	[Parameter]
 	public bool AsRoot { get; set; }
 
+	/// <summary>
+	/// Offers "Don't ask again" while the question is the everyday one. It hides while root is picked: a drop as root asks
+	/// either way, so ticking it there would promise something the next root drop does not do.
+	/// </summary>
+	[Parameter]
+	public bool OfferOptOut { get; set; }
+
+	private bool ShowOptOut => OfferOptOut && !_asRoot;
+
 	private string RunAsValue => _asRoot ? RootValue : UserValue;
 
 	private string Destination => TransferOrigin.Format(_asRoot ? "root" : UserName, Host, Directory);
@@ -66,7 +81,8 @@ public sealed partial class UploadConfirmDialog : ComponentBase
 
 	private void OnRunAsChanged(string value) => _asRoot = SupportsElevation && value == RootValue;
 
-	private void Confirm() => Dialog?.Close(_asRoot ? UploadRunAs.Root : UploadRunAs.User);
+	// Only a confirmed upload reports the check box, so a question that was cancelled cannot also turn itself off.
+	private void Confirm() => Dialog?.Close(new UploadConfirmation(_asRoot ? UploadRunAs.Root : UploadRunAs.User, ShowOptOut && _stopAsking));
 
 	private void Cancel() => Dialog?.Cancel();
 }

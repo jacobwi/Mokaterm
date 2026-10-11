@@ -39,17 +39,32 @@ internal sealed class FileBrowserInterop : IAsyncDisposable
 		_module.InvokeAsync<IJSObjectReference>("bindDialog", cancellationToken, root, selectionStart, selectionEnd);
 
 	/// <summary>
-	/// Wires the file editor's box: the line-number gutter, which the page fills and scrolls, Tab and Shift+Tab
-	/// indenting, Ctrl+S, and the caret reported through <see cref="FileEditorJsReceiver.OnCaretMoved"/>. Dispose the
-	/// result to detach.
+	/// Wires the file editor's box: the line-number gutter, which the page fills and scrolls, the coloured layer under
+	/// the text in <paramref name="language"/>, Tab and Shift+Tab indenting, Ctrl+S, and the caret reported through
+	/// <see cref="FileEditorJsReceiver.OnCaretMoved"/>. The page stops colouring past <paramref name="maxCharacters"/>
+	/// or <paramref name="maxLines"/>. The result exposes <c>setLanguage</c> and <c>dispose</c>.
 	/// </summary>
 	public ValueTask<IJSObjectReference> AttachEditorAsync(
 		ElementReference frame,
 		ElementReference area,
 		ElementReference numbers,
+		ElementReference lines,
 		DotNetObjectReference<FileEditorJsReceiver> receiver,
+		string language,
+		int maxCharacters,
+		int maxLines,
 		CancellationToken cancellationToken) =>
-		_module.InvokeAsync<IJSObjectReference>("attachEditor", cancellationToken, frame, area, numbers, receiver);
+		_module.InvokeAsync<IJSObjectReference>(
+			"attachEditor",
+			cancellationToken,
+			frame,
+			area,
+			numbers,
+			lines,
+			receiver,
+			language,
+			maxCharacters,
+			maxLines);
 
 	/// <summary>Scrolls the option marked <c>aria-selected</c> inside <paramref name="list"/> into view.</summary>
 	public ValueTask<bool> ScrollSelectedIntoViewAsync(ElementReference list) =>

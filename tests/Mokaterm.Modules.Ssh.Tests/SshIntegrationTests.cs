@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Protocols;
@@ -45,6 +46,53 @@ public sealed class SshIntegrationTests
 			IFileSystemFeature files = session.GetFeature<IFileSystemFeature>() ?? throw new InvalidOperationException("No file system.");
 			IRemoteFileSystem fileSystem = await files.OpenAsync(token);
 			await RoundTripFileAsync(fileSystem, token);
+		}
+
+		await session.Completion;
+	}
+
+	[Fact]
+	public async Task Ssh_ForCommands_RunsACommandWithoutAShell_AndCapsItsOutput()
+	{
+		LiveEndpoint server = RequireServer();
+		using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+		timeout.CancelAfter(TimeSpan.FromMinutes(2));
+		CancellationToken token = timeout.Token;
+
+		SshConnector connector = new(new FakeSettingsService());
+		ProtocolConnectContext context = CreateContext(server, SshProtocolIds.Ssh, FakeHostVerifier.Accepting());
+		IProtocolSession session = await new SshProtocolProvider(connector).ConnectAsync(
+			new ProtocolConnectContext
+			{
+				SessionId = context.SessionId,
+				Host = context.Host,
+				Connection = context.Connection,
+				Port = context.Port,
+				Credentials = context.Credentials,
+				HostVerifier = context.HostVerifier,
+				Interaction = context.Interaction,
+				Purpose = ConnectPurpose.Commands,
+			},
+			token);
+
+		await using (session)
+		{
+			Assert.Null(session.GetFeature<ITerminalChannel>());
+			IRemoteCommandFeature commands = session.GetFeature<IRemoteCommandFeature>() ?? throw new InvalidOperationException("No commands.");
+
+			RemoteCommandOutcome echoed = await commands.RunAsync(new RemoteCommandRequest { Command = "echo mokaterm-$((6*7)); echo oops >&2; exit 3" }, token);
+			Assert.Equal(3, echoed.ExitCode);
+			Assert.Equal("mokaterm-42", Encoding.UTF8.GetString(echoed.Output.Bytes.Span).TrimEnd());
+			Assert.Equal("oops", Encoding.UTF8.GetString(echoed.Error.Bytes.Span).TrimEnd());
+
+			// stdin is closed at once, so a command that reads it ends instead of waiting for the timeout.
+			RemoteCommandOutcome cat = await commands.RunAsync(new RemoteCommandRequest { Command = "cat" }, token);
+			Assert.Equal(0, cat.ExitCode);
+
+			RemoteCommandOutcome flood = await commands.RunAsync(new RemoteCommandRequest { Command = "seq 1 200000", OutputLimitBytes = 4096 }, token);
+			Assert.Equal(0, flood.ExitCode);
+			Assert.True(flood.Output.IsTruncated);
+			Assert.Equal(4096, flood.Output.Bytes.Length);
 		}
 
 		await session.Completion;

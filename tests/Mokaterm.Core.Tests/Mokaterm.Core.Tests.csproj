@@ -9,4 +9,9 @@
 		<ProjectReference Include="..\..\src\Mokaterm.Core\Mokaterm.Core.csproj" />
 	</ItemGroup>
 
+	<!-- SoftwareSecurityKey signs Ed25519 with BouncyCastle, which Core brings along. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\SecurityKeys\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
 </Project>

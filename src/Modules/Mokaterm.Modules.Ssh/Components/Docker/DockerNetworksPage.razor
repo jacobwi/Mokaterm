@@ -1,0 +1,74 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-toolbar">
+	<div class="mt-dk-toolbar-search">
+		<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, driver or id" Debounce="100" aria-label="Filter networks" />
+	</div>
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add"
+				OnClick="ToggleCreate" aria-expanded="@(_creating ? "true" : "false")">
+		New
+	</MokaButton>
+	<MokaButton Variant="MokaVariant.Text"
+				Color="MokaColor.Error"
+				Size="MokaSize.Xs"
+				StartIcon="DockerIcons.Prune"
+				Disabled="@(IsBusy || Removable.Count == 0)"
+				OnClick="RemoveUnusedAsync">
+		@($"Remove unused ({Removable.Count.ToString(CultureInfo.CurrentCulture)})")
+	</MokaButton>
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+</div>
+
+@if (_creating)
+{
+	<form class="mt-dk-form" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+		<div class="mt-dk-form-field">
+			<MokaTextField Value="@_name"
+						   ValueChanged="OnNameChanged"
+						   ErrorText="@_nameError"
+						   Placeholder="New bridge network: letters, digits, '_', '.' and '-'"
+						   Disabled="IsBusy"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   aria-label="New network name" />
+		</div>
+		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
+	</form>
+}
+
+@LoadErrorPanel(RefreshAsync)
+@ChangePanel
+
+<div class="mt-dk-scroll">
+	@if (IsFirstLoad)
+	{
+		<div class="mt-dk-center"><MokaSpinner Label="Listing networks" /></div>
+	}
+	else if (Shown.Count == 0)
+	{
+		<MokaEmptyState Icon="DockerIcons.Network" Title="Nothing matches" Description="No network matches the filter." />
+	}
+	<div class="mt-dk-list" role="list" aria-label="Networks">
+		@foreach (DockerNetwork network in Shown)
+		{
+			<div class="mt-dk-row" role="listitem" @key="network.Id">
+				<div class="mt-dk-row-main mt-dk-row-static" title="@string.Join(", ", network.Containers)">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@(network.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="network.InUse" />
+					<span class="mt-dk-cell-name mt-dk-cell--w30">@network.Name</span>
+					<span class="mt-dk-label mt-dk-cell--w12">@(network.IsBuiltIn ? "built in" : network.Internal ? "internal" : "")</span>
+					<span class="mt-dk-cell mt-dk-cell--w12">@network.Driver</span>
+					<span class="mt-dk-cell mt-dk-cell--grow">@ContainersText(network)</span>
+					<span class="mt-dk-cell mt-dk-cell--optional">@network.ShortId</span>
+				</div>
+				<span class="mt-dk-hover">
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(IsBusy || !network.IsRemovable)" OnClick="@(() => RemoveAsync(network))"
+								title="@RemoveTitle(network)" aria-label="@($"Remove {network.Name}")" />
+				</span>
+			</div>
+		}
+	</div>
+</div>

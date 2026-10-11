@@ -20,9 +20,6 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 {
 	internal const int MaxAutoReconnectAttempts = 3;
 
-	/// <summary>How long closing waits for a protocol session to dispose before leaving it to finish on its own.</summary>
-	internal static readonly TimeSpan SessionDisposeTimeout = TimeSpan.FromSeconds(5);
-
 	/// <summary>How long an ended session waits for the terminal pump to flush the last output before the notice.</summary>
 	internal static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(1);
 
@@ -532,32 +529,8 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 		}
 	}
 
-	private async Task DisposeSessionAsync(Guid sessionId, IProtocolSession session)
-	{
-		// Some protocol libraries close synchronously over the network, so disposal runs on the pool where the wait
-		// can give up on it.
-		Task disposal = Task.Run(() => session.DisposeAsync().AsTask());
-		try
-		{
-			await disposal.WaitAsync(SessionDisposeTimeout, _timeProvider);
-		}
-		catch (TimeoutException)
-		{
-			_logger.LogWarning(
-				"Session {SessionId} did not close within {Seconds} seconds and keeps closing in the background.",
-				sessionId,
-				SessionDisposeTimeout.TotalSeconds);
-			_ = disposal.ContinueWith(
-				task => _logger.LogWarning(task.Exception, "Closing session {SessionId} failed.", sessionId),
-				CancellationToken.None,
-				TaskContinuationOptions.OnlyOnFaulted,
-				TaskScheduler.Default);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogWarning(ex, "Closing session {SessionId} failed.", sessionId);
-		}
-	}
+	private Task DisposeSessionAsync(Guid sessionId, IProtocolSession session) =>
+		SessionDisposal.DisposeAsync(session, sessionId, _logger, _timeProvider);
 
 	private SessionHandle? FindHandle(Guid sessionId)
 	{

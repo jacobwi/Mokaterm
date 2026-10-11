@@ -1,0 +1,49 @@
+.mt-workspace-pane,
+.mt-workspace-pane-body,
+.mt-workspace-session {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.mt-workspace-pane {
+	min-width: 0;
+}
+
+.mt-workspace-tabs {
+	flex-shrink: 0;
+}
+
+.mt-tab-icon {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}
+
+/*
+	The strip never shrinks its icon slot, so the label that lives there caps itself. In a tab it runs as one line of text
+	cut once at its end ("demo broker (MQTT) explo..."), rather than as parts that each give way and leave three cut
+	pieces behind a long name. The full label is the tab's tooltip.
+*/
+.mt-tab-icon ::deep .mt-label {
+	display: block;
+	max-width: 26ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-tab-icon ::deep .mt-label > span {
+	overflow: visible;
+}
+
+/* Production sessions get a red wash so the tab is recognisable before reading its title. */
+.mt-workspace-tabs ::deep .mt-tab--production {
+	background: color-mix(in srgb, var(--moka-color-error) 10%, transparent);
+}
+
+/* Which pane the commands act on. Only drawn while several are on screen. */
+.mt-workspace-pane--focused > .mt-workspace-tabs {
+	box-shadow: inset 0 -2px 0 var(--moka-color-primary-border);
+}
