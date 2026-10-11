@@ -1,7 +1,9 @@
-## What's new in 0.1.6
+## What's new in 0.1.7
 
 - On the desktop, System and Docker now show their content when opened in their own window. In 0.1.5 that window came up empty.
 - Closing a System or Docker view, or changing its page, no longer leaves errors in the crash log.
+- Built on Moka.Red 0.1.17, which now handles keyboard menus, dialog headers and nested split panes itself. Dialog
+  icons follow its header style.
 
 ## What's new in 0.1.5
 
