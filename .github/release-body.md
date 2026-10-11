@@ -1,3 +1,8 @@
+## What's new in 0.1.6
+
+- On the desktop, System and Docker now show their content when opened in their own window. In 0.1.5 that window came up empty.
+- Closing a System or Docker view, or changing its page, no longer leaves errors in the crash log.
+
 ## What's new in 0.1.5
 
 **Tools in every SSH session**
