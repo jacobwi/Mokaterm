@@ -187,10 +187,12 @@ public sealed class TransferQueueTests : IDisposable
 		await Eventually.TrueAsync(() => item.State == TransferState.Completed, "the transfer completes");
 		Assert.Equal(0, item.BytesPerSecond);
 
+		// The queue sets the byte count and then the rate, so a test that saw only the count could read the old rate.
 		async Task ReportAsync(long bytes)
 		{
+			double before = item.BytesPerSecond;
 			_ = reports.Writer.TryWrite(bytes);
-			await Eventually.TrueAsync(() => item.TransferredBytes == bytes, $"progress reaches {bytes} bytes");
+			await Eventually.TrueAsync(() => item.TransferredBytes == bytes && item.BytesPerSecond != before, $"progress reaches {bytes} bytes");
 		}
 	}
 

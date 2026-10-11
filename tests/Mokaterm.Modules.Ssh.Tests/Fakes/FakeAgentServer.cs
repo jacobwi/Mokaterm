@@ -21,7 +21,12 @@ internal sealed class FakeAgentServer : IAsyncDisposable
 	{
 		_respond = respond;
 		PipeName = "mokaterm-test-agent-" + Guid.NewGuid().ToString("N");
-		_loop = Task.Run(ServeAsync);
+
+		// The first instance exists before the constructor returns, and a client connects to an instance nobody waits on
+		// yet. Created inside the loop, it waited for a pool thread, which on a busy runner took longer than the 500 ms
+		// connect deadline some tests give the client.
+		NamedPipeServerStream first = NewInstance();
+		_loop = Task.Run(() => ServeAsync(first));
 	}
 
 	public string PipeName { get; }
@@ -74,26 +79,37 @@ internal sealed class FakeAgentServer : IAsyncDisposable
 		_stopping.Dispose();
 	}
 
-	private async Task ServeAsync()
+	private async Task ServeAsync(NamedPipeServerStream first)
 	{
-		while (!_stopping.IsCancellationRequested)
+		NamedPipeServerStream? listening = first;
+		try
 		{
-			using NamedPipeServerStream pipe = new(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances);
-			try
+			while (!_stopping.IsCancellationRequested)
 			{
-				await pipe.WaitForConnectionAsync(_stopping.Token);
-				await ServeOneAsync(pipe);
-			}
-			catch (Exception) when (_stopping.IsCancellationRequested)
-			{
-				return;
-			}
-			catch (IOException)
-			{
-				// The client hung up mid request; wait for the next one.
+				using NamedPipeServerStream pipe = listening ?? NewInstance();
+				listening = null;
+				try
+				{
+					await pipe.WaitForConnectionAsync(_stopping.Token);
+					await ServeOneAsync(pipe);
+				}
+				catch (Exception) when (_stopping.IsCancellationRequested)
+				{
+					return;
+				}
+				catch (IOException)
+				{
+					// The client hung up mid request; wait for the next one.
+				}
 			}
 		}
+		finally
+		{
+			listening?.Dispose();
+		}
 	}
+
+	private NamedPipeServerStream NewInstance() => new(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances);
 
 	private async Task ServeOneAsync(NamedPipeServerStream pipe)
 	{
