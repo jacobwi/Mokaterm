@@ -10,18 +10,26 @@ namespace Mokaterm.Maui.ToolWindows;
 /// </summary>
 internal sealed class ToolWebViewHandler : BlazorWebViewHandler
 {
+	// Kept here because MAUI hands the handler its context before its view, and the handler's own VirtualView throws
+	// while it has none, which is what left tool windows empty.
+	private ToolWebView? _view;
+
 	public override void SetMauiContext(IMauiContext mauiContext)
 	{
 		ArgumentNullException.ThrowIfNull(mauiContext);
-		base.SetMauiContext(VirtualView is ToolWebView view ? Wrap(mauiContext, view) : mauiContext);
+		base.SetMauiContext(_view is { } view ? Wrap(mauiContext, view) : mauiContext);
 	}
 
 	// The IElement overload is sealed in ViewHandler and passes the view on to this one.
 	public override void SetVirtualView(IView view)
 	{
-		if (view is ToolWebView tool && MauiContext is { } context and not ToolMauiContext)
+		if (view is ToolWebView tool)
 		{
-			base.SetMauiContext(Wrap(context, tool));
+			_view = tool;
+			if (MauiContext is { } context and not ToolMauiContext)
+			{
+				base.SetMauiContext(Wrap(context, tool));
+			}
 		}
 
 		base.SetVirtualView(view);

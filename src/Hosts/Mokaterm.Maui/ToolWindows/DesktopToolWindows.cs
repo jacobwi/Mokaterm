@@ -163,9 +163,38 @@ public sealed class DesktopToolWindows : IToolWindows
 			_windows.Add(created);
 		}
 
-		app.OpenWindow(created);
+		try
+		{
+			app.OpenWindow(created);
+		}
+		catch
+		{
+			Abandon(app, created);
+			throw;
+		}
+
 		Changed?.Invoke();
 		return true;
+	}
+
+	// A window MAUI failed to build must not stay listed: the next open would bring it forward instead of trying again,
+	// and the shell would count the tool as open in a window with nothing in it.
+	private void Abandon(Application app, ToolWindow window)
+	{
+		window.Destroying -= OnWindowDestroying;
+		lock (_gate)
+		{
+			_windows.Remove(window);
+		}
+
+		try
+		{
+			app.CloseWindow(window);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning("A tool window that failed to open could not be closed: {Failure}", LogSafe.Describe(ex));
+		}
 	}
 
 	// At once on the UI thread: the main window's close handler calls this and the process must not wait for a queue.

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
@@ -9,7 +10,8 @@ namespace Mokaterm.Modules.Ssh.Tests;
 
 /// <summary>
 /// The exec side of a command run over a fake channel: exit statuses and signals, both streams read side by side and
-/// capped, the 64 MB ceiling, a dropped connection, cancellation, and the channel closed on every way out.
+/// capped, the 64 MB ceiling, a dropped connection, cancellation, the channel closed on every way out, and nothing left
+/// faulting unobserved.
 /// </summary>
 public sealed class CommandExecutionTests
 {
@@ -115,21 +117,45 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_Cancelled_StopsWaiting_AndClosesTheChannel()
 	{
-		using BlockingStream stdout = new();
-		using BlockingStream stderr = new();
-		using FakeChannel channel = new(stdout, stderr, exitStatus: null, execution: new TaskCompletionSource().Task);
-		using CancellationTokenSource cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+		using FakeChannel channel = await CancelWhileReadingAsync();
 
-		Task<RemoteCommandOutcome> running = CommandExecution.RunAsync(
-			_ => Task.FromResult<IExecChannel>(channel),
-			new RemoteCommandRequest { Command = "sleep 100" },
-			TimeProvider.System,
-			cancel.Token);
-		await Eventually.TrueAsync(() => stdout.Reading, "the command is being read");
-		await cancel.CancelAsync();
-
-		await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
 		Assert.True(channel.IsDisposed);
+	}
+
+	[Fact]
+	public async Task RunAsync_Cancelled_LeavesNoFailureUnobserved()
+	{
+		// The System and Docker views cancel their reads whenever they close or change page. Closing the channel then
+		// faults the reads, and a task nobody looked at reached TaskScheduler.UnobservedTaskException (and the crash log).
+		ConcurrentQueue<AggregateException> unobserved = [];
+		void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
+		{
+			if (e.Exception.ToString().Contains(nameof(CommandExecution), StringComparison.Ordinal))
+			{
+				unobserved.Enqueue(e.Exception);
+			}
+		}
+
+		TaskScheduler.UnobservedTaskException += OnUnobserved;
+		try
+		{
+			using (await CancelWhileReadingAsync())
+			{
+			}
+
+			for (int pass = 0; pass < 5; pass++)
+			{
+				await Task.Delay(20, Ct);
+				GC.Collect();
+				GC.WaitForPendingFinalizers();
+			}
+		}
+		finally
+		{
+			TaskScheduler.UnobservedTaskException -= OnUnobserved;
+		}
+
+		Assert.Empty(unobserved);
 	}
 
 	[Fact]
@@ -164,6 +190,25 @@ public sealed class CommandExecutionTests
 			() => feature.RunAsync(new RemoteCommandRequest { Command = "uptime" }, Ct));
 
 		Assert.Equal("The SSH connection is closed.", failure.Message);
+	}
+
+	/// <summary>Starts a command that prints nothing and cancels it while both streams are being read.</summary>
+	private static async Task<FakeChannel> CancelWhileReadingAsync()
+	{
+		BlockingStream stdout = new();
+		FakeChannel channel = new(stdout, new BlockingStream(), exitStatus: null, execution: new TaskCompletionSource().Task);
+		using CancellationTokenSource cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+
+		Task<RemoteCommandOutcome> running = CommandExecution.RunAsync(
+			_ => Task.FromResult<IExecChannel>(channel),
+			new RemoteCommandRequest { Command = "sleep 100" },
+			TimeProvider.System,
+			cancel.Token);
+		await Eventually.TrueAsync(() => stdout.Reading, "the command is being read");
+		await cancel.CancelAsync();
+
+		await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+		return channel;
 	}
 
 	private static Task<RemoteCommandOutcome> RunAsync(FakeChannel channel, string command, int outputLimitBytes = 256 * 1024) =>

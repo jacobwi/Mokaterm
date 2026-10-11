@@ -35,9 +35,10 @@ internal static class CommandExecution
 
 		Task<CapturedOutput> output = OutputCapture.ReadAsync(channel.Output, keepBytes, RemoteCommand.MaxOutputBytes, "stdout", cancellationToken);
 		Task<CapturedOutput> error = OutputCapture.ReadAsync(channel.ErrorOutput, keepBytes, RemoteCommand.MaxOutputBytes, "stderr", cancellationToken);
+		Task finished = UntilAllOrFirstFailureAsync(output, error, channel.Execution);
 		try
 		{
-			await UntilAllOrFirstFailureAsync(output, error, channel.Execution).WaitAsync(cancellationToken);
+			await finished.WaitAsync(cancellationToken);
 			return new RemoteCommandOutcome
 			{
 				ExitCode = channel.ExitStatus,
@@ -54,6 +55,9 @@ internal static class CommandExecution
 		finally
 		{
 			channel.Dispose();
+
+			// A cancel stops only the wait: the closed channel then faults the reads, and this task with them.
+			Observe(finished);
 			Observe(output);
 			Observe(error);
 			Observe(channel.Execution);
