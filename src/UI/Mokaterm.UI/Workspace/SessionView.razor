@@ -152,19 +152,17 @@
 @if (Tools.DialogFor(Session) is { } openTool)
 {
 	@* The session's own tab stays where it is underneath, so the header names the session the tool works on. *@
+	bool wide = openTool.Size == SessionToolSize.Wide;
 	<HeadedDialog Open="true"
 				  OpenChanged="OnToolDialogOpenChanged"
+				  Icon="openTool.Icon"
 				  Title="@openTool.Title"
-				  DialogSize="MokaDialogSize.Large"
-				  Fill="@(openTool.Size == SessionToolSize.Wide)"
-				  Style="@ToolDialogStyle(openTool)">
-		<Header Context="titleId">
-			<SessionToolHeader Tool="openTool"
-							   Session="Session"
-							   TitleId="@titleId"
-							   OnClose="CloseToolDialog"
-							   OnPopOut="PopOutCallback(openTool)" />
-		</Header>
+				  DialogSize="@(wide ? MokaDialogSize.ExtraLarge : MokaDialogSize.Large)"
+				  Fill="wide"
+				  HeaderActions="PopOutAction(openTool)">
+		<HeaderDetail>
+			<SessionToolSubject Session="Session" />
+		</HeaderDetail>
 		<ChildContent>
 			<ViewBoundary @key="openTool" Name="@openTool.Title">
 				<DynamicComponent Type="openTool.Component" Parameters="ModuleParameters" />
@@ -174,6 +172,11 @@
 }
 
 @code {
+	// Only where a window can open: an empty actions slot would still take its gap in the header.
+	private RenderFragment? PopOutAction(SessionToolDescriptor tool) => PopOutCallback(tool) is { HasDelegate: true } popOut
+		? @<DialogHeaderButton Icon="MokatermIcons.PopOut" Title="Open in its own window" OnClick="popOut" />
+		: null;
+
 	private RenderFragment TerminalContent => @<text>
 		@if (TerminalStream is { } stream)
 		{

@@ -9,9 +9,10 @@ body,
 }
 
 /*
-	A popup placed past the edge (the tooltip of the right-most top bar button) makes body wider than the window, and a
-	focus or scrollIntoView then scrolls that hidden overflow sideways and cuts off the left edge. Clipped overflow cannot
-	be scrolled at all. html keeps hidden, since the viewport would turn clip into hidden anyway.
+	The shell never scrolls as a page; every view scrolls its own content. Anything that reaches past the window's edge
+	makes body wider than the window, and a focus or scrollIntoView can still scroll hidden overflow sideways, cutting
+	off the left edge. Clipped overflow cannot be scrolled at all. html keeps hidden, since the viewport would turn clip
+	into hidden anyway.
 */
 body,
 #app {

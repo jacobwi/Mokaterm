@@ -5,8 +5,6 @@ using Moka.Red.Extensions;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Contributions;
-using Mokaterm.UI.Common.Interaction;
-using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Workspace;
 
 namespace Mokaterm.UI.Tests;
@@ -105,7 +103,7 @@ public sealed partial class SessionToolbarTests
 
 	private static Task<string> RenderAsync(SessionToolbarLayout layout, IReadOnlyList<ToolbarAction> actions, IReadOnlyCollection<string> hidden) =>
 		StaticRender.RenderAsync<SessionToolbar>(
-			services => services.AddMokaRed().AddScoped<FormInterop>().AddScoped<MenuPlacement>(),
+			services => services.AddMokaRed(),
 			new Dictionary<string, object?>(StringComparer.Ordinal)
 			{
 				[nameof(SessionToolbar.Actions)] = actions,

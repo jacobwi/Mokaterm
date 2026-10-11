@@ -1,4 +1,3 @@
-using Mokaterm.UI.Common.Components;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Core.Enums;
@@ -80,10 +79,6 @@ public sealed partial class FolderCompareDialog : ComponentBase, IDisposable
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
-
-	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
-	[Parameter]
-	public DialogHeading? Heading { get; set; }
 
 	/// <summary>What the folder picker returned: the folder and everything inside it.</summary>
 	[Parameter, EditorRequired]

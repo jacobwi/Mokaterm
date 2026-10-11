@@ -54,7 +54,7 @@
 			<MokaRadioGroup TValue="HostKeyPolicy"
 							Value="settings.HostKeyPolicy"
 							ValueChanged="value => SaveAsync(s => s with { HostKeyPolicy = value })"
-							aria-label="Host key policy">
+							AriaLabel="Host key policy">
 				@foreach (PolicyOption option in HostKeyPolicies)
 				{
 					<MokaRadioItem TValue="HostKeyPolicy" @key="option.Value" Value="option.Value">

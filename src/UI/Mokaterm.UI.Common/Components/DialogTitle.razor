@@ -1,0 +1,19 @@
+@namespace Mokaterm.UI.Common.Components
+
+@* A title with what it is about after it (a session's label for a tool), inside a heading: Moka's dialog heading through
+   HeadedDialog, and a tool window's own header, so the two read the same. *@
+<span class="mt-dialog-title">
+	<span class="mt-dialog-title-text">@Title</span>
+	@if (Detail is not null)
+	{
+		<span class="mt-dialog-detail">@Detail</span>
+	}
+</span>
+
+@code {
+	[Parameter]
+	public string? Title { get; set; }
+
+	[Parameter]
+	public RenderFragment? Detail { get; set; }
+}

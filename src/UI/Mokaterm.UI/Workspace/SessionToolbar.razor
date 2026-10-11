@@ -1,4 +1,3 @@
-@using Mokaterm.UI.Common.Interaction
 
 @* The buttons on the right of a session's bar, laid out by ToolbarPlan. Every action is also in the overflow menu,
    which is the whole toolbar in the compact layout and catches what the others hide or fold away. *@
@@ -45,7 +44,7 @@
 	public IReadOnlyCollection<string> Hidden { get; set; } = [];
 
 	[Inject]
-	private MenuPlacement Menu { get; set; } = default!;
+	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	private string MoreTitle => Layout == SessionToolbarLayout.Compact ? "Session actions" : "More actions";
 

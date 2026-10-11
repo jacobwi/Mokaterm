@@ -1,0 +1,30 @@
+.mt-dialog-title {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dialog-title-text {
+	flex-shrink: 0;
+	max-width: 60%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The detail gives way first when the dialog is narrow. The heading is uppercase and spaced out, and a session's label
+   has to read as it was typed. */
+.mt-dialog-detail {
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+	padding-inline-start: var(--moka-spacing-sm);
+	border-inline-start: 1px solid var(--moka-color-outline-variant);
+	overflow: hidden;
+	font-size: var(--moka-font-size-sm);
+	font-weight: var(--moka-font-weight-normal);
+	letter-spacing: normal;
+	text-transform: none;
+	white-space: nowrap;
+}

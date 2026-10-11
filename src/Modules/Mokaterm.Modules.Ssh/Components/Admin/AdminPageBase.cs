@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Components.Web;
 using Moka.Red.ContextMenu;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
-using Mokaterm.UI.Common.Interaction;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
@@ -49,7 +48,7 @@ public abstract class AdminPageBase : ComponentBase, IDisposable
 	protected bool ReadAsRoot => Feature.CanActAsRoot;
 
 	[Inject]
-	private MenuPlacement Menu { get; set; } = default!;
+	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	public void Dispose()
 	{

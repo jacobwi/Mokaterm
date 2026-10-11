@@ -3,7 +3,6 @@ using Moka.Red.Feedback.Dialog;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Platform;
-using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Properties;
@@ -12,8 +11,7 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 
 /// <summary>
 /// Opens the file browser's dialogs and returns their results typed. Call only from the browser itself: awaiting a
-/// service dialog from inside another service dialog waits forever. The service takes its title as a plain string, so
-/// every dialog opens without one and draws the header itself from the <see cref="DialogHeading"/> it is handed.
+/// service dialog from inside another service dialog waits forever.
 /// </summary>
 internal sealed class FileBrowserDialogs
 {
@@ -32,17 +30,16 @@ internal sealed class FileBrowserDialogs
 		bool selectBaseName)
 	{
 		object? result = await _dialogs.ShowComponentAsync<NameDialog>(
-			"",
+			title,
 			parameters =>
 			{
-				parameters[nameof(NameDialog.Heading)] = new DialogHeading(title, icon);
 				parameters[nameof(NameDialog.Label)] = label;
 				parameters[nameof(NameDialog.InitialName)] = initialName;
 				parameters[nameof(NameDialog.ConfirmText)] = confirmText;
 				parameters[nameof(NameDialog.TakenNames)] = takenNames;
 				parameters[nameof(NameDialog.SelectBaseName)] = selectBaseName;
 			},
-			Small);
+			Small(icon));
 		return result as string;
 	}
 
@@ -58,10 +55,9 @@ internal sealed class FileBrowserDialogs
 		Func<string, RemoteSearchQuery, IProgress<RemoteSearchProgress>, CancellationToken, IAsyncEnumerable<RemoteFileEntry>> search)
 	{
 		object? result = await _dialogs.ShowComponentAsync<FileSearchDialog>(
-			"",
+			"Find files",
 			parameters =>
 			{
-				parameters[nameof(FileSearchDialog.Heading)] = new DialogHeading("Find files", MokaIcons.Action.Search);
 				parameters[nameof(FileSearchDialog.Folder)] = folder;
 				parameters[nameof(FileSearchDialog.InitialQuery)] = initialQuery;
 				parameters[nameof(FileSearchDialog.ResolveFolder)] = resolveFolder;
@@ -69,6 +65,7 @@ internal sealed class FileBrowserDialogs
 			},
 			options =>
 			{
+				options.Icon = MokaIcons.Action.Search;
 				options.Size = MokaDialogSize.Large;
 				options.ShowCloseButton = false;
 			});
@@ -90,10 +87,9 @@ internal sealed class FileBrowserDialogs
 		Func<IReadOnlyList<(string Path, LocalFileItem Local, RemoteFileEntry Remote)>, IProgress<int>, CancellationToken, Task<IReadOnlySet<string>>>? checkContents)
 	{
 		object? result = await _dialogs.ShowComponentAsync<FolderCompareDialog>(
-			"",
+			"Compare with local folder",
 			parameters =>
 			{
-				parameters[nameof(FolderCompareDialog.Heading)] = new DialogHeading("Compare with local folder", MokatermIcons.SplitView);
 				parameters[nameof(FolderCompareDialog.LocalItems)] = picked;
 				parameters[nameof(FolderCompareDialog.LocalName)] = localName;
 				parameters[nameof(FolderCompareDialog.RemoteFolder)] = remoteFolder;
@@ -107,6 +103,7 @@ internal sealed class FileBrowserDialogs
 			},
 			options =>
 			{
+				options.Icon = MokatermIcons.SplitView;
 				options.Size = MokaDialogSize.Large;
 				options.ShowCloseButton = false;
 			});
@@ -116,14 +113,13 @@ internal sealed class FileBrowserDialogs
 	public async Task<bool> ConfirmDeleteAsync(IReadOnlyList<RemoteFileEntry> entries, bool asRoot)
 	{
 		object? result = await _dialogs.ShowComponentAsync<DeleteDialog>(
-			"",
+			"Delete",
 			parameters =>
 			{
-				parameters[nameof(DeleteDialog.Heading)] = new DialogHeading("Delete", MokaIcons.Action.Delete);
 				parameters[nameof(DeleteDialog.Entries)] = entries;
 				parameters[nameof(DeleteDialog.AsRoot)] = asRoot;
 			},
-			Small);
+			Small(MokaIcons.Action.Delete));
 		return result is true;
 	}
 
@@ -143,10 +139,9 @@ internal sealed class FileBrowserDialogs
 		Func<Action<TreeSize>, CancellationToken, Task<TreeSize>> measureSize)
 	{
 		object? result = await _dialogs.ShowComponentAsync<PropertiesDialog>(
-			"",
+			"Properties",
 			parameters =>
 			{
-				parameters[nameof(PropertiesDialog.Heading)] = new DialogHeading("Properties", MokatermIcons.Sliders);
 				parameters[nameof(PropertiesDialog.Entries)] = entries;
 				parameters[nameof(PropertiesDialog.Section)] = section;
 				parameters[nameof(PropertiesDialog.UserName)] = userName;
@@ -162,6 +157,7 @@ internal sealed class FileBrowserDialogs
 			},
 			options =>
 			{
+				options.Icon = MokatermIcons.Sliders;
 				options.Size = MokaDialogSize.Medium;
 				options.ShowCloseButton = false;
 			});
@@ -182,10 +178,9 @@ internal sealed class FileBrowserDialogs
 		bool offerOptOut)
 	{
 		object? result = await _dialogs.ShowComponentAsync<UploadConfirmDialog>(
-			"",
+			"Upload",
 			parameters =>
 			{
-				parameters[nameof(UploadConfirmDialog.Heading)] = new DialogHeading("Upload", MokatermIcons.FileUpload);
 				parameters[nameof(UploadConfirmDialog.FileCount)] = fileCount;
 				parameters[nameof(UploadConfirmDialog.FolderCount)] = folderCount;
 				if (totalBytes is { } bytes)
@@ -200,7 +195,7 @@ internal sealed class FileBrowserDialogs
 				parameters[nameof(UploadConfirmDialog.AsRoot)] = asRoot;
 				parameters[nameof(UploadConfirmDialog.OfferOptOut)] = offerOptOut;
 			},
-			Small);
+			Small(MokatermIcons.FileUpload));
 		return result as UploadConfirmation;
 	}
 
@@ -209,15 +204,14 @@ internal sealed class FileBrowserDialogs
 	public async Task<PasteConflictChoice?> AskPasteConflictAsync(IReadOnlyList<string> names, string directory, bool asRoot)
 	{
 		object? result = await _dialogs.ShowComponentAsync<PasteConflictDialog>(
-			"",
+			"Paste",
 			parameters =>
 			{
-				parameters[nameof(PasteConflictDialog.Heading)] = new DialogHeading("Paste", MokaIcons.Content.Paste);
 				parameters[nameof(PasteConflictDialog.Names)] = names;
 				parameters[nameof(PasteConflictDialog.Directory)] = directory;
 				parameters[nameof(PasteConflictDialog.AsRoot)] = asRoot;
 			},
-			Small);
+			Small(MokaIcons.Content.Paste));
 		return result is PasteConflictChoice choice ? choice : null;
 	}
 
@@ -238,10 +232,9 @@ internal sealed class FileBrowserDialogs
 		Func<Task<bool>> confirmDiscard)
 	{
 		object? result = await _dialogs.ShowComponentAsync<FileEditDialog>(
-			"",
+			fileName,
 			parameters =>
 			{
-				parameters[nameof(FileEditDialog.Heading)] = new DialogHeading(fileName, MokaIcons.Action.Edit);
 				parameters[nameof(FileEditDialog.FileName)] = fileName;
 				parameters[nameof(FileEditDialog.Path)] = path;
 				parameters[nameof(FileEditDialog.Content)] = content;
@@ -252,6 +245,7 @@ internal sealed class FileBrowserDialogs
 			},
 			options =>
 			{
+				options.Icon = MokaIcons.Action.Edit;
 				options.Size = MokaDialogSize.FullScreen;
 				// The dialog asks about unsaved edits from its own Cancel, which a header X and Escape would skip.
 				options.ShowCloseButton = false;
@@ -261,9 +255,10 @@ internal sealed class FileBrowserDialogs
 	}
 
 	// The dialogs render their own Cancel buttons. Without the header X, the dialog's first field gets the initial focus.
-	private static void Small(MokaDialogOptions options)
+	private static Action<MokaDialogOptions> Small(MokaIconDefinition icon) => options =>
 	{
 		options.Size = MokaDialogSize.Small;
 		options.ShowCloseButton = false;
-	}
+		options.Icon = icon;
+	};
 }

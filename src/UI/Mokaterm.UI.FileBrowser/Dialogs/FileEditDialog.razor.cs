@@ -1,4 +1,3 @@
-using Mokaterm.UI.Common.Components;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -79,10 +78,6 @@ public sealed partial class FileEditDialog : ComponentBase, IAsyncDisposable
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
-
-	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
-	[Parameter]
-	public DialogHeading? Heading { get; set; }
 
 	[Parameter, EditorRequired]
 	public string FileName { get; set; } = "";

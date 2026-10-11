@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Moka.Red.Feedback.Dialog;
 using Mokaterm.Abstractions.FileSystem;
-using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Search;
 
@@ -52,10 +51,6 @@ public sealed partial class FileSearchDialog : ComponentBase, IDisposable
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
-
-	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
-	[Parameter]
-	public DialogHeading? Heading { get; set; }
 
 	/// <summary>The folder the search starts in, which the user can change.</summary>
 	[Parameter]

@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using Moka.Red.ContextMenu;
 using Moka.Red.Core.Enums;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.UI.Common.Commands;
 using Mokaterm.UI.Common.Icons;
-using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Shell;
 
@@ -56,7 +56,7 @@ public sealed partial class CommandsPanel : ComponentBase, IDisposable
 	private FormInterop Forms { get; set; } = default!;
 
 	[Inject]
-	private MenuPlacement Menu { get; set; } = default!;
+	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	[Inject]
 	private ILogger<CommandsPanel> Logger { get; set; } = default!;

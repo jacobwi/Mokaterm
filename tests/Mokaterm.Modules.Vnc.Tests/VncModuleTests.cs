@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
-using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Protocols;
@@ -71,7 +70,6 @@ public sealed class VncModuleTests
 
 		// The module's view services need the browser, which every host has and no test does.
 		builder.Services.AddScoped<IJSRuntime, FakeJsRuntime>();
-		builder.Services.AddMokaRed();
 		builder.AddVnc();
 		using ServiceProvider services = builder.Services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
 

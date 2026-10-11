@@ -5,14 +5,11 @@ using Moka.Red.Feedback.Dialog;
 namespace Mokaterm.UI.Common.Components;
 
 /// <summary>
-/// A <see cref="MokaDialog"/> under <see cref="DialogHeader"/>: the same parameters, plus an icon, a context after the
-/// title and buttons of its own in the header. Focus trapping, Escape and the backdrop stay Moka's; only the header
-/// and its Close are drawn here, and Close raises what Moka's own close button would.
+/// The <see cref="MokaDialog"/> every Mokaterm dialog opens in: an icon before the title, what the dialog is about after
+/// it, and <see cref="Fill"/> for a view that scrolls its own parts. Everything else is Moka's, passed straight through.
 /// </summary>
 public sealed partial class HeadedDialog : ComponentBase
 {
-	private readonly string _titleId = $"mt-dialog-title-{Guid.NewGuid():N}";
-
 	[Parameter]
 	public bool Open { get; set; }
 
@@ -37,13 +34,6 @@ public sealed partial class HeadedDialog : ComponentBase
 	[Parameter]
 	public RenderFragment? HeaderActions { get; set; }
 
-	/// <summary>
-	/// A header of the caller's own in place of <see cref="DialogHeader"/>, for one that other places draw too. It gets
-	/// the id its heading must carry, which the dialog is named by, and closes the dialog through its own callbacks.
-	/// </summary>
-	[Parameter]
-	public RenderFragment<string>? Header { get; set; }
-
 	[Parameter]
 	public MokaDialogSize DialogSize { get; set; } = MokaDialogSize.Medium;
 
@@ -60,7 +50,7 @@ public sealed partial class HeadedDialog : ComponentBase
 	public bool PreventScroll { get; set; } = true;
 
 	/// <summary>
-	/// The content fills the box edge to edge and scrolls its own parts, for views with a fixed height such as a wide
+	/// The content fills the body edge to edge and scrolls its own parts, for views with a fixed height such as a wide
 	/// session tool. Otherwise it gets the dialog's padding and scrolls as a whole.
 	/// </summary>
 	[Parameter]
@@ -80,17 +70,4 @@ public sealed partial class HeadedDialog : ComponentBase
 
 	[Parameter(CaptureUnmatchedValues = true)]
 	public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
-
-	private string BoxClass => Class is { Length: > 0 } extra ? "mt-dialog-box " + extra : "mt-dialog-box";
-
-	private Task OnMokaOpenChanged(bool open) => OpenChanged.InvokeAsync(open);
-
-	private Task OnMokaClose() => OnClose.InvokeAsync();
-
-	// Moka's own button raises both, in this order; the parent then passes Open false, or refuses by keeping it.
-	private async Task CloseAsync()
-	{
-		await OpenChanged.InvokeAsync(false);
-		await OnClose.InvokeAsync();
-	}
 }

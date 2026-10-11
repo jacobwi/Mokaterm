@@ -80,9 +80,6 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	[Inject]
-	private MenuPlacement Menus { get; set; } = default!;
-
-	[Inject]
 	private ShellState Shell { get; set; } = default!;
 
 	[Inject]
@@ -416,10 +413,6 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	/// The wide size: most of the window and a fixed height the tool fills. Moka's sizes stop at 720 px short of full
 	/// screen, so the width is set on the box itself.
 	/// </summary>
-	private static string? ToolDialogStyle(SessionToolDescriptor tool) => tool.Size == SessionToolSize.Wide
-		? "width:min(1200px, calc(100vw - 32px));max-width:none;height:min(900px, calc(100vh - 64px))"
-		: null;
-
 	private static Task Done(Action action)
 	{
 		action();
@@ -544,8 +537,6 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		? EventCallback.Factory.Create(this, () => Tools.PopOutAsync(Session, tool))
 		: default;
 
-	private void CloseToolDialog() => Tools.CloseDialog(Session.Id);
-
 	private void OnToolDialogOpenChanged(bool open)
 	{
 		if (!open)
@@ -573,7 +564,7 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 			});
 		}
 
-		Menus.Show(args, items);
+		Menu.Show(args, items);
 	}
 
 	/// <summary>A button pressed from the command palette, which still works when the button is hidden.</summary>
@@ -684,7 +675,7 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		_terminalSettings = _viewState.ThemeId is { } themeId ? settings with { ThemeId = themeId } : settings;
 	}
 
-	private void ShowThemeMenu(MouseEventArgs args) => Menus.Show(args, BuildThemeMenu());
+	private void ShowThemeMenu(MouseEventArgs args) => Menu.Show(args, BuildThemeMenu());
 
 	private List<MokaContextMenuItem> BuildThemeMenu()
 	{

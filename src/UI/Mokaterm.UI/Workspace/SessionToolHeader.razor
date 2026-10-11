@@ -1,23 +1,8 @@
-@* The header of a session tool, in its dialog and in its own window alike: the tool, then the session it works on,
-   drawn the way its tab draws it, so two windows of the same tool on two machines cannot be mistaken. *@
-<DialogHeader Icon="Tool.Icon"
-			  Title="@Tool.Title"
-			  TitleId="@TitleId"
-			  ShowClose="OnClose.HasDelegate"
-			  OnClose="OnClose"
-			  Class="@Class">
+@* The header of a session tool's own window. Its dialog draws the same icon, title and session in Moka's header. *@
+<DialogHeader Icon="Tool.Icon" Title="@Tool.Title" Class="@Class">
 	<Detail>
-		<span class="mt-tool-session">
-			<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
-			<SessionLabel Session="Session" ShowPort Tooltip="@EndpointFormat.Format(Session)" />
-		</span>
+		<SessionToolSubject Session="Session" />
 	</Detail>
-	<Actions>
-		@if (OnPopOut.HasDelegate)
-		{
-			<DialogHeaderButton Icon="MokatermIcons.PopOut" Title="Open in its own window" OnClick="OnPopOut" />
-		}
-	</Actions>
 </DialogHeader>
 
 @code {
@@ -26,17 +11,6 @@
 
 	[Parameter, EditorRequired]
 	public ISessionHandle Session { get; set; } = default!;
-
-	[Parameter]
-	public string? TitleId { get; set; }
-
-	/// <summary>Shows Close. A window has the system's own, so it leaves this unset.</summary>
-	[Parameter]
-	public EventCallback OnClose { get; set; }
-
-	/// <summary>Shows the button that moves the tool from its dialog to a window of its own.</summary>
-	[Parameter]
-	public EventCallback OnPopOut { get; set; }
 
 	[Parameter]
 	public string? Class { get; set; }

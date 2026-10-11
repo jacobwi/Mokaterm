@@ -1,0 +1,11 @@
+@* The session a tool works on, after the tool's title in its dialog and in its own window: drawn the way its tab draws it,
+   so two windows of the same tool on two machines cannot be mistaken. *@
+<span class="mt-tool-session">
+	<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
+	<SessionLabel Session="Session" ShowPort Tooltip="@EndpointFormat.Format(Session)" />
+</span>
+
+@code {
+	[Parameter, EditorRequired]
+	public ISessionHandle Session { get; set; } = default!;
+}

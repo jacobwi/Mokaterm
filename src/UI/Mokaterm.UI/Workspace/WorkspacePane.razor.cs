@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
 using Moka.Red.Core.Interactions;
 using Moka.Red.Navigation.Tabs.Models;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Sessions;
-using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 
@@ -15,7 +15,7 @@ namespace Mokaterm.UI.Workspace;
 /// </summary>
 /// <remarks>
 /// A pane follows the workspace itself rather than taking its tabs as a parameter. Its parameters are plain values, so a
-/// splitter that re-renders on every pointer move, which Moka's does, leaves the pane and its views alone.
+/// split that re-renders, as Moka's does when a drag ends, leaves the pane and its views alone.
 /// </remarks>
 public sealed partial class WorkspacePane : ComponentBase, IDisposable
 {
@@ -44,7 +44,7 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 	private ShellState Shell { get; set; } = default!;
 
 	[Inject]
-	private MenuPlacement Menu { get; set; } = default!;
+	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	[Inject]
 	private MokaTabIconProvider IconProvider { get; set; } = default!;

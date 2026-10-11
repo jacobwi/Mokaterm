@@ -5,7 +5,6 @@ using Moka.Red.ContextMenu;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Sessions;
-using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Workspace;
@@ -54,7 +53,7 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 	private IProtocolRegistry Protocols { get; set; } = default!;
 
 	[Inject]
-	private MenuPlacement Menu { get; set; } = default!;
+	private IMokaContextMenuService Menu { get; set; } = default!;
 
 	[Inject]
 	private ShellInterop Interop { get; set; } = default!;

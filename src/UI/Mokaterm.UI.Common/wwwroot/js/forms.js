@@ -168,13 +168,6 @@ export function prepareForm(anchor, options) {
  * default button does, so the focus ring shows what Enter will do. Dispose the result to detach.
  */
 export function bindDialog(element, selectionStart, selectionEnd) {
-	// The service opened the dialog without a title, so the header this content draws is what names it.
-	const heading = element && element.querySelector('.mt-dialog-head-title[id]');
-	const box = element && element.closest('[role="dialog"]');
-	if (heading && box && !box.hasAttribute('aria-labelledby')) {
-		box.setAttribute('aria-labelledby', heading.id);
-	}
-
 	const dispose = bindForm(element, {
 		focus: ['[data-dialog-focus]', '[data-dialog-default]:not([disabled])'],
 		submit: '[data-dialog-default]',
@@ -184,18 +177,4 @@ export function bindDialog(element, selectionStart, selectionEnd) {
 	});
 
 	return { dispose };
-}
-
-/**
- * The box of the focused element in viewport pixels, or null while only the page has focus. A click the keyboard caused
- * carries no pointer position, so a menu it opens goes under this element instead.
- */
-export function focusedBox() {
-	const element = document.activeElement;
-	if (!element || element === document.body || element === document.documentElement) {
-		return null;
-	}
-
-	const rect = element.getBoundingClientRect();
-	return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
 }

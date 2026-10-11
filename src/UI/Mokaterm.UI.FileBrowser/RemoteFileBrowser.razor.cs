@@ -1,3 +1,4 @@
+using Moka.Red.ContextMenu;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -16,7 +17,6 @@ using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
-using Mokaterm.UI.Common.Interaction;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.FileBrowser.Browsing;
@@ -124,7 +124,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private IMokaDialogService DialogService { get; set; } = default!;
 
 	[Inject]
-	private MenuPlacement ContextMenu { get; set; } = default!;
+	private IMokaContextMenuService ContextMenu { get; set; } = default!;
 
 	[Inject]
 	private IUserInteraction Interaction { get; set; } = default!;

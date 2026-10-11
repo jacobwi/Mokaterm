@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Feedback.Dialog;
 using Mokaterm.Abstractions.FileSystem;
-using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.FileBrowser.Browsing;
 
 namespace Mokaterm.UI.FileBrowser.Dialogs;
@@ -14,10 +13,6 @@ public sealed partial class NameDialog : ComponentBase
 
 	[CascadingParameter]
 	public MokaDialogContext? Dialog { get; set; }
-
-	/// <summary>The header the service's title-less dialog shows, from <see cref="FileBrowserDialogs"/>.</summary>
-	[Parameter]
-	public DialogHeading? Heading { get; set; }
 
 	[Parameter]
 	public string Label { get; set; } = "Name";
