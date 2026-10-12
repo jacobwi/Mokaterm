@@ -25,8 +25,6 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 /// </remarks>
 public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 {
-	private static readonly IReadOnlyList<AdminPage> AllPages = Enum.GetValues<AdminPage>();
-
 	private readonly CancellationTokenSource _closed = new();
 	private ISessionHandle? _handle;
 	private IProtocolSession? _attached;
@@ -134,32 +132,26 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	}
 
 	/// <summary>Every page, with the reason the detected system cannot use it. Such pages stay in the list, greyed.</summary>
-	private IEnumerable<AdminNavEntry> Entries(SystemProfile profile)
+	private List<ToolNavEntry<AdminPage>> NavEntries(SystemProfile profile)
 	{
 		SystemCapabilities capabilities = profile.Capabilities;
-		yield return new(AdminPage.Overview, "Overview", SshIcons.Pulse, null);
-		yield return new(AdminPage.Services, "Services", SshIcons.Gear, capabilities.Services is null ? capabilities.ServicesMissing : null);
-		yield return new(AdminPage.Packages, "Packages", SshIcons.Package, capabilities.Packages is null ? capabilities.PackagesMissing : null);
-		yield return new(AdminPage.Cron, "Cron", SshIcons.Calendar, capabilities.HasCrontab || capabilities.HasTimers ? null : "Neither cron nor systemd timers are installed.");
-		yield return new(AdminPage.Time, "Time", SshIcons.Clock, null);
-		yield return new(AdminPage.HostName, "Hostname", MokatermIcons.Tag, null);
-		yield return new(AdminPage.Network, "Network", SshIcons.Network, capabilities.HasNetworkTools ? null : "There is no ip command (iproute2), so only name servers and ports can be read.");
-		yield return new(AdminPage.Users, "Users", SshIcons.Users, null);
-		yield return new(AdminPage.Disks, "Disks", SshIcons.Disk, null);
-		yield return new(AdminPage.Processes, "Processes", SshIcons.Chip, capabilities.HasProcessTools ? null : "There is no ps command.");
-		yield return new(AdminPage.Logs, "Logs", SshIcons.Log, null);
-		yield return new(AdminPage.Firewall, "Firewall", MokatermIcons.Shield, capabilities.Firewall is null
-			? capabilities.FirewallMissing
-			: _feature?.RootBlockedReason is { } blocked ? $"The firewall only answers root. {blocked}" : null);
-	}
-
-	private string NavClass(AdminNavEntry entry) =>
-		"mta-nav-item" + (entry.Page == _page ? " mta-nav-item--active" : "") + (entry.Unavailable is not null ? " mta-nav-item--off" : "");
-
-	private string SelectLabel(SystemProfile profile, AdminPage page)
-	{
-		AdminNavEntry entry = Entries(profile).First(candidate => candidate.Page == page);
-		return entry.Unavailable is null ? entry.Label : $"{entry.Label} (not on this system)";
+		return
+		[
+			new(AdminPage.Overview, "Overview", SshIcons.Pulse, null),
+			new(AdminPage.Services, "Services", SshIcons.Gear, capabilities.Services is null ? capabilities.ServicesMissing : null),
+			new(AdminPage.Packages, "Packages", SshIcons.Package, capabilities.Packages is null ? capabilities.PackagesMissing : null),
+			new(AdminPage.Cron, "Cron", SshIcons.Calendar, capabilities.HasCrontab || capabilities.HasTimers ? null : "Neither cron nor systemd timers are installed."),
+			new(AdminPage.Time, "Time", SshIcons.Clock, null),
+			new(AdminPage.HostName, "Hostname", MokatermIcons.Tag, null),
+			new(AdminPage.Network, "Network", SshIcons.Network, capabilities.HasNetworkTools ? null : "There is no ip command (iproute2), so only name servers and ports can be read."),
+			new(AdminPage.Users, "Users", SshIcons.Users, null),
+			new(AdminPage.Disks, "Disks", SshIcons.Disk, null),
+			new(AdminPage.Processes, "Processes", SshIcons.Chip, capabilities.HasProcessTools ? null : "There is no ps command."),
+			new(AdminPage.Logs, "Logs", SshIcons.Log, null),
+			new(AdminPage.Firewall, "Firewall", MokatermIcons.Shield, capabilities.Firewall is null
+				? capabilities.FirewallMissing
+				: _feature?.RootBlockedReason is { } blocked ? $"The firewall only answers root. {blocked}" : null),
+		];
 	}
 
 	private static MokaColor ResultColor(AdminActionResult result) =>

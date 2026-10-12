@@ -18,7 +18,8 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// </summary>
 public sealed partial class DockerManagerView : SessionViewBase, IDisposable
 {
-	private static readonly DockerManagerPage[] Pages = Enum.GetValues<DockerManagerPage>();
+	private static readonly IReadOnlyList<ToolNavEntry<DockerManagerPage>> NavEntries =
+		[.. Enum.GetValues<DockerManagerPage>().Select(page => new ToolNavEntry<DockerManagerPage>(page, PageTitle(page), PageIcon(page)))];
 
 	private readonly CancellationTokenSource _lifetime = new();
 	private ISessionHandle? _handle;

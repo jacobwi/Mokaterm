@@ -9,7 +9,7 @@
 	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
 	min-width: 0;
 	container-type: inline-size;
-	container-name: mt-admin;
+	container-name: mt-admin mt-ssh-tool;
 }
 
 .mta-center {
@@ -44,73 +44,6 @@
 	letter-spacing: 0.02em;
 }
 
-.mta-body {
-	display: grid;
-	flex: 1;
-	grid-template-columns: 148px minmax(0, 1fr);
-	gap: var(--moka-spacing-md);
-	min-height: 0;
-}
-
-.mta-nav {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-height: 0;
-	overflow-y: auto;
-}
-
-.mta-nav-select {
-	display: none;
-}
-
-.mta-nav-item {
-	display: flex;
-	flex-shrink: 0;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	padding: 6px var(--moka-spacing-sm);
-	border: 0;
-	border-radius: var(--moka-radius-sm);
-	background: transparent;
-	color: var(--moka-color-on-surface-variant);
-	font: inherit;
-	font-size: var(--moka-font-size-sm);
-	text-align: left;
-	white-space: nowrap;
-	cursor: pointer;
-	transition: background var(--moka-transition-fast), color var(--moka-transition-fast);
-}
-
-.mta-nav-item:hover {
-	background: var(--moka-color-surface-hover);
-	color: var(--moka-color-on-surface);
-}
-
-.mta-nav-item:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
-}
-
-.mta-nav-item--active {
-	background: var(--moka-color-surface-2);
-	color: var(--moka-color-on-surface);
-	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
-}
-
-/* Greyed, never hidden: the page still opens and says why it has nothing to drive. */
-.mta-nav-item--off {
-	opacity: 0.45;
-}
-
-.mta-stage {
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	min-height: 0;
-}
-
 /* Size containment: the pages fill exactly this box, and their list and detail panel scroll inside it. */
 .mta-main {
 	display: flex;
@@ -122,39 +55,15 @@
 	container-name: mta-main;
 }
 
-/* Middle widths: icons only. */
+/* The navigation narrows to icons here (ToolNavigation), and the strip drops the kernel. */
 @container mt-admin (max-width: 899px) {
-	.mta-body {
-		grid-template-columns: 36px minmax(0, 1fr);
-		gap: var(--moka-spacing-sm);
-	}
-
-	.mta-nav-item {
-		justify-content: center;
-		padding: 8px 0;
-	}
-
-	.mta-nav-label,
 	.mt-admin ::deep .mta-strip-kernel {
 		display: none;
 	}
 }
 
-/* Narrow: a dropdown above the page. */
+/* And to a dropdown here, with the strip down to the distribution. */
 @container mt-admin (max-width: 559px) {
-	.mta-body {
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: auto minmax(0, 1fr);
-	}
-
-	.mta-nav {
-		display: none;
-	}
-
-	.mta-nav-select {
-		display: block;
-	}
-
 	.mta-strip-part {
 		display: none;
 	}

@@ -98,117 +98,90 @@
 			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _rootError = null)">@rootError</MokaAlert>
 		}
 
-		<div class="mta-body">
-			<nav class="mta-nav" aria-label="System pages">
-				@foreach (AdminNavEntry entry in Entries(profile))
-				{
-					<button type="button"
-							class="@NavClass(entry)"
-							aria-current="@(entry.Page == _page ? "page" : null)"
-							title="@(entry.Unavailable is { } reason ? $"{entry.Label}: {reason}" : entry.Label)"
-							@key="entry.Page"
-							@onclick="@(() => Show(entry.Page))">
-						<MokaIcon Icon="entry.Icon" Size="MokaSize.Xs" />
-						<span class="mta-nav-label">@entry.Label</span>
-					</button>
-				}
-			</nav>
-
-			<div class="mta-nav-select">
-				<MokaSelect TValue="AdminPage"
-							Items="AllPages"
-							Value="_page"
-							ValueChanged="Show"
-							ValueSelector="@(page => SelectLabel(profile, page))"
-							Size="MokaSize.Sm"
-							aria-label="System page" />
+		<ToolNavigation TPage="AdminPage" Entries="NavEntries(profile)" Current="_page" CurrentChanged="Show" Label="System pages">
+			<div class="mta-main">
+				<CascadingValue Value="_context" IsFixed="false">
+					@switch (_page)
+					{
+						case AdminPage.Overview:
+							<AdminOverviewPage @key="profile" />
+							break;
+						case AdminPage.Services:
+							<AdminServicesPage @key="profile" />
+							break;
+						case AdminPage.Packages:
+							<AdminPackagesPage @key="profile" />
+							break;
+						case AdminPage.Cron:
+							<AdminCronPage @key="profile" />
+							break;
+						case AdminPage.Time:
+							<AdminTimePage @key="profile" />
+							break;
+						case AdminPage.HostName:
+							<AdminHostNamePage @key="profile" />
+							break;
+						case AdminPage.Network:
+							<AdminNetworkPage @key="profile" />
+							break;
+						case AdminPage.Users:
+							<AdminUsersPage @key="profile" />
+							break;
+						case AdminPage.Disks:
+							<AdminDisksPage @key="profile" />
+							break;
+						case AdminPage.Processes:
+							<AdminProcessesPage @key="profile" />
+							break;
+						case AdminPage.Logs:
+							<AdminLogsPage @key="profile" />
+							break;
+						case AdminPage.Firewall:
+							<AdminFirewallPage @key="profile" />
+							break;
+					}
+				</CascadingValue>
 			</div>
 
-			<div class="mta-stage">
-				<div class="mta-main">
-					<CascadingValue Value="_context" IsFixed="false">
-						@switch (_page)
+			@if (_review is { } review)
+			{
+				<div class="mta-review-layer" @onkeydown="OnReviewKeyDown" @onkeydown:stopPropagation="true">
+					<div class="mta-review" role="alertdialog" aria-label="@review.Title" aria-describedby="mta-review-commands">
+						<MokaText Element="h3" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@review.Title</MokaText>
+						@if (review.Description is { Length: > 0 } description)
 						{
-							case AdminPage.Overview:
-								<AdminOverviewPage @key="profile" />
-								break;
-							case AdminPage.Services:
-								<AdminServicesPage @key="profile" />
-								break;
-							case AdminPage.Packages:
-								<AdminPackagesPage @key="profile" />
-								break;
-							case AdminPage.Cron:
-								<AdminCronPage @key="profile" />
-								break;
-							case AdminPage.Time:
-								<AdminTimePage @key="profile" />
-								break;
-							case AdminPage.HostName:
-								<AdminHostNamePage @key="profile" />
-								break;
-							case AdminPage.Network:
-								<AdminNetworkPage @key="profile" />
-								break;
-							case AdminPage.Users:
-								<AdminUsersPage @key="profile" />
-								break;
-							case AdminPage.Disks:
-								<AdminDisksPage @key="profile" />
-								break;
-							case AdminPage.Processes:
-								<AdminProcessesPage @key="profile" />
-								break;
-							case AdminPage.Logs:
-								<AdminLogsPage @key="profile" />
-								break;
-							case AdminPage.Firewall:
-								<AdminFirewallPage @key="profile" />
-								break;
+							<MokaText Element="p" Size="MokaSize.Sm" Class="mta-dim">@description</MokaText>
 						}
-					</CascadingValue>
-				</div>
-
-				@if (_review is { } review)
-				{
-					<div class="mta-review-layer" @onkeydown="OnReviewKeyDown" @onkeydown:stopPropagation="true">
-						<div class="mta-review" role="alertdialog" aria-label="@review.Title" aria-describedby="mta-review-commands">
-							<MokaText Element="h3" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@review.Title</MokaText>
-							@if (review.Description is { Length: > 0 } description)
+						@if (review.Warning is { Length: > 0 } warning)
+						{
+							<MokaAlert Severity="@(review.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
+						}
+						<div class="mta-review-runs">
+							<MokaStatusDot Size="MokaSize.Xs" Color="@(review.Script.AsRoot ? MokaColor.Error : MokaColor.Info)" Glow />
+							<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@RunsAs(review)</MokaText>
+						</div>
+						<pre id="mta-review-commands" class="mta-pre mta-pre--commands">@review.Script.Body</pre>
+						@if (_reviewInput is { } reviewInput)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">On stdin</MokaText>
+							<pre class="mta-pre">@reviewInput.Preview</pre>
+						}
+						<div class="mta-review-actions">
+							@if (review.Destructive)
 							{
-								<MokaText Element="p" Size="MokaSize.Sm" Class="mta-dim">@description</MokaText>
+								<button @ref="_reviewDefault" type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
+								<button type="button" class="mta-run-button mta-run-button--danger" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
 							}
-							@if (review.Warning is { Length: > 0 } warning)
+							else
 							{
-								<MokaAlert Severity="@(review.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
+								<button type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
+								<button @ref="_reviewDefault" type="button" class="mta-run-button" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
 							}
-							<div class="mta-review-runs">
-								<MokaStatusDot Size="MokaSize.Xs" Color="@(review.Script.AsRoot ? MokaColor.Error : MokaColor.Info)" Glow />
-								<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@RunsAs(review)</MokaText>
-							</div>
-							<pre id="mta-review-commands" class="mta-pre mta-pre--commands">@review.Script.Body</pre>
-							@if (_reviewInput is { } reviewInput)
-							{
-								<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">On stdin</MokaText>
-								<pre class="mta-pre">@reviewInput.Preview</pre>
-							}
-							<div class="mta-review-actions">
-								@if (review.Destructive)
-								{
-									<button @ref="_reviewDefault" type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
-									<button type="button" class="mta-run-button mta-run-button--danger" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
-								}
-								else
-								{
-									<button type="button" class="mta-plain-button" @onclick="@(() => AnswerReview(false))">Cancel</button>
-									<button @ref="_reviewDefault" type="button" class="mta-run-button" @onclick="@(() => AnswerReview(true))">@review.ConfirmText</button>
-								}
-							</div>
 						</div>
 					</div>
-				}
-			</div>
-		</div>
+				</div>
+			}
+		</ToolNavigation>
 
 		@if (Result is { } result)
 		{

@@ -48,23 +48,7 @@
 		@switch (_status.Availability)
 		{
 			case DockerAvailability.Ready:
-				<div class="mt-dk-body">
-					<nav class="mt-dk-nav" aria-label="Docker">
-						@foreach (DockerManagerPage page in Pages)
-						{
-							<MokaButton @key="page"
-										Variant="MokaVariant.Text"
-										Color="@(page == _page ? MokaColor.Primary : MokaColor.Surface)"
-										Size="MokaSize.Sm"
-										StartIcon="@PageIcon(page)"
-										Class="@(page == _page ? "mt-dk-nav-item mt-dk-nav-item--active" : "mt-dk-nav-item")"
-										OnClick="@(() => Show(page))"
-										title="@PageTitle(page)"
-										aria-current="@(page == _page ? "page" : null)">
-								<span class="mt-dk-nav-label">@PageTitle(page)</span>
-							</MokaButton>
-						}
-					</nav>
+				<ToolNavigation TPage="DockerManagerPage" Entries="NavEntries" Current="_page" CurrentChanged="Show" Label="Docker pages">
 					<div class="mt-dk-page" @key="(_feature.Client, _feature.ComposePreference)">
 						@switch (_page)
 						{
@@ -88,7 +72,7 @@
 								break;
 						}
 					</div>
-				</div>
+				</ToolNavigation>
 				break;
 
 			case DockerAvailability.PermissionDenied:

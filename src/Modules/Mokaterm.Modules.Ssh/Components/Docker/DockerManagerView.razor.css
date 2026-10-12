@@ -4,7 +4,7 @@
    are a label and some air. */
 .mt-dk {
 	container-type: inline-size;
-	container-name: mt-dk;
+	container-name: mt-dk mt-ssh-tool;
 	display: flex;
 	flex-direction: column;
 	gap: var(--moka-spacing-sm);
@@ -21,69 +21,6 @@
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
-}
-
-.mt-dk-body {
-	display: flex;
-	flex: 1;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-	min-height: 0;
-}
-
-.mt-dk-nav {
-	display: flex;
-	flex-direction: column;
-	flex-shrink: 0;
-	gap: 2px;
-	width: 112px;
-	padding-right: var(--moka-spacing-xs);
-	border-right: 1px solid var(--moka-color-outline-variant);
-}
-
-.mt-dk-nav ::deep .mt-dk-nav-item {
-	justify-content: flex-start;
-	width: 100%;
-	font-size: 10px;
-	letter-spacing: 0.08em;
-}
-
-.mt-dk-nav ::deep .mt-dk-nav-item--active {
-	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
-}
-
-@container mt-dk (max-width: 600px) {
-	.mt-dk-nav {
-		width: auto;
-	}
-
-	.mt-dk-nav ::deep .mt-dk-nav-label {
-		display: none;
-	}
-}
-
-/* On a phone-sized dialog the navigation becomes a row above the page. */
-@container mt-dk (max-width: 420px) {
-	.mt-dk-body {
-		flex-direction: column;
-	}
-
-	.mt-dk-nav {
-		flex-direction: row;
-		flex-wrap: wrap;
-		padding-right: 0;
-		padding-bottom: var(--moka-spacing-xxs);
-		border-right: none;
-		border-bottom: 1px solid var(--moka-color-outline-variant);
-	}
-
-	.mt-dk-nav ::deep .mt-dk-nav-item {
-		width: auto;
-	}
-
-	.mt-dk-nav ::deep .mt-dk-nav-item--active {
-		box-shadow: inset 0 -2px 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
-	}
 }
 
 /* Pages and the panels inside them are child components, so these rules reach them through ::deep. */
