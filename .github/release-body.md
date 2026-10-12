@@ -1,3 +1,33 @@
+## What's new in 0.1.9
+
+**Docker**
+
+- Compose and .env files open in the editor (highlighting, diff, conflict check). After a save, `compose config`
+  checks the project and Up is offered.
+- Check images for updates without pulling them, and update a Compose service or project in one step.
+- A Cleanup page that shows exactly what each prune would remove, a live Stats page for every running container, and
+  notices when a container turns unhealthy, stops on its own or keeps restarting.
+- Create a container from an image, with the exact `docker run` shown before it runs.
+- Open a container's published port in your browser: on the desktop through a tunnel over the session.
+- Open a container shell in a tab of its own, and browse a container's files in the file browser.
+
+**System view**
+
+- Live CPU, memory, network and disk charts on the Overview, and process CPU measured over a second, with a process
+  tree and renice.
+- See what is using disk space, find large files, and read a disk's SMART health.
+- Follow the journal and log files live.
+- Install a key from your keychain into a user's authorized_keys, and remove keys.
+- A Security page: effective sshd settings with fixes that are checked before sshd reloads, failed logins, fail2ban and
+  listening ports.
+- Security update counts, "reboot required", and a reboot that reconnects the session when the server is back.
+- Edit a service's override file, create and delete groups, and delete ufw and firewalld rules.
+
+**Fleet overview**
+
+- Every saved Linux login in one table: OS, uptime, load, memory, disk, pending updates, reboot required, failed
+  services and containers. Open it from the Connections panel or the command palette.
+
 ## What's new in 0.1.8
 
 - The Docker manager's side menu matches the System view's: the same icons and labels, icons only in a narrower
