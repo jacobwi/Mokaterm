@@ -1,3 +1,8 @@
+## What's new in 0.1.8
+
+- The Docker manager's side menu matches the System view's: the same icons and labels, icons only in a narrower
+  window and a page dropdown in a narrow one.
+
 ## What's new in 0.1.7
 
 - On the desktop, System and Docker now show their content when opened in their own window. In 0.1.5 that window came up empty.
