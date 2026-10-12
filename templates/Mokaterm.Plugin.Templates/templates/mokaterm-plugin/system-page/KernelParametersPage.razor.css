@@ -1,0 +1,7 @@
+/* Scoped to this component. The build bundles it as <AssemblyName>.bundle.scp.css, which the plugin package carries and
+   Mokaterm links for every loaded plugin. Values such as net.ipv4.tcp_rmem's three numbers wrap here, where the view's
+   own cells would cut them short. */
+.kp-value {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}

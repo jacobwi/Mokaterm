@@ -1,0 +1,29 @@
+@inherits SettingsSectionBase<PluginSettings>
+
+@{
+	PluginSettings settings = Settings.Clamped();
+}
+
+@* Built from the same fields as Mokaterm's own settings pages, and found by the settings search through each row's
+   label and description. *@
+<SettingsPage Title="MokatermPlugin1" OnReset="ResetAsync">
+	<SettingsSection Title="Kernel parameters">
+		<SettingsRow Label="Parameters" Description="The sysctl names the System view's Kernel parameters page reads, separated by spaces.">
+			<TextSetting Value="@settings.Parameters"
+						 ValueChanged="value => SaveAsync(s => s with { Parameters = value })"
+						 Validate="PluginSettings.ParametersProblem"
+						 AllowEmpty
+						 Width="360px"
+						 AriaLabel="Kernel parameters to read" />
+		</SettingsRow>
+		<SettingsRow Label="Refresh every" Description="How often the page reads them again while it is open.">
+			<NumberSetting TValue="int"
+						   Value="settings.RefreshSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { RefreshSeconds = value })"
+						   Min="PluginSettings.MinRefreshSeconds"
+						   Max="PluginSettings.MaxRefreshSeconds"
+						   Suffix="s"
+						   AriaLabel="Refresh in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

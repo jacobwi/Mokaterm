@@ -11,6 +11,9 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Set the repository secret to publish the plugin SDK to nuget.org; without it the packages are only attached to the
+  # GitHub release.
+  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
 
 jobs:
   release:
@@ -68,6 +71,19 @@ jobs:
           -GitHubRepoUrl ${{ github.server_url }}/${{ github.repository }}
           -GitHubToken ${{ github.token }}
 
+      # Packs the plugin SDK and the template at a test version into a local feed, generates and builds every kind of
+      # plugin the way an outside author would, and loads each through the real loader. A template that cannot produce
+      # a working plugin is not published.
+      - name: Check the plugin template
+        shell: powershell
+        run: ./build/test-plugin-template.ps1
+
+      # What plugin authors build against, at this release's version: plugins record the major.minor they compiled
+      # against, and the app only loads plugins built for its own.
+      - name: Pack the plugin SDK
+        shell: powershell
+        run: ./build/pack-nuget.ps1 -Version ${{ steps.version.outputs.version }}
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -80,3 +96,15 @@ jobs:
             artifacts/windows/releases.win.json
             artifacts/windows/assets.win.json
             artifacts/windows/RELEASES
+            artifacts/nuget/*.nupkg
+
+      # After the release, so a release that failed to publish never leaves packages on nuget.org without it.
+      # --skip-duplicate lets a re-run of the same tag finish instead of failing on what already went up.
+      - name: Publish the plugin SDK to nuget.org
+        if: env.NUGET_API_KEY != ''
+        shell: bash
+        run: >
+          dotnet nuget push "artifacts/nuget/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_API_KEY"
+          --skip-duplicate

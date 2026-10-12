@@ -1,0 +1,50 @@
+@inherits SystemPageBase
+
+@* A System view page from a plugin: the frame comes from UI.Common, and the rows use the view's own list styles
+   (mta-table, mta-row, mta-cell), so it looks like the pages around it. *@
+<ToolPageFrame Title="Kernel parameters"
+			   Summary="@Summary"
+			   Search="@_filter"
+			   SearchChanged="OnFilterChanged"
+			   SearchPlaceholder="Filter by name or value"
+			   Loading="Loading"
+			   Loaded="Loaded"
+			   Error="@LoadError"
+			   OnRefresh="ReloadAsync"
+			   ListPage>
+	@if (_names.Count == 0)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Sliders"
+						Title="No parameters chosen"
+						Description="Name the parameters to read in Settings, Plugins, MokatermPlugin1." />
+	}
+	else if (_shown.Count == 0)
+	{
+		<MokaEmptyState Icon="MokatermIcons.Sliders"
+						Title="Nothing matches"
+						Description="No parameter name or value matches the filter." />
+	}
+	else
+	{
+		<div class="mta-table" style="--mta-cols: minmax(0, 2fr) minmax(0, 3fr)">
+			<div class="mta-row mta-row--head">
+				<span>Parameter</span>
+				<span>Value</span>
+			</div>
+			@foreach (KernelParameter parameter in _shown)
+			{
+				<div class="mta-row" @key="parameter.Name">
+					<span class="mta-cell mta-mono" title="@parameter.Name">@parameter.Name</span>
+					@if (parameter.Value is { } value)
+					{
+						<span class="kp-value mta-mono">@value</span>
+					}
+					else
+					{
+						<span class="kp-value mta-dim">@parameter.Problem</span>
+					}
+				</div>
+			}
+		</div>
+	}
+</ToolPageFrame>

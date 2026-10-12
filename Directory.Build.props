@@ -50,7 +50,8 @@
 
 	<!--
 		Packages: only what plugin authors build against is packed (Mokaterm.Abstractions, Mokaterm.UI.Common and
-		Mokaterm.Plugin.Sdk), and each of those says so itself. Everything else is the app.
+		Mokaterm.Plugin.Sdk), plus the dotnet new template that starts a plugin (Mokaterm.Plugin.Templates), and each of
+		those says so itself. Everything else is the app.
 	-->
 	<PropertyGroup>
 		<IsPackable>false</IsPackable>

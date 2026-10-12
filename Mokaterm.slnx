@@ -37,6 +37,9 @@
 		</Project>
 		<Project Path="src/Hosts/Mokaterm.Web/Mokaterm.Web.csproj" />
 	</Folder>
+	<Folder Name="/templates/">
+		<Project Path="templates/Mokaterm.Plugin.Templates/Mokaterm.Plugin.Templates.csproj" />
+	</Folder>
 	<Folder Name="/samples/">
 		<Project Path="samples/Mokaterm.DevHost/Mokaterm.DevHost.csproj" />
 		<Project Path="samples/Mokaterm.Plugins.Sample/Mokaterm.Plugins.Sample.csproj" />

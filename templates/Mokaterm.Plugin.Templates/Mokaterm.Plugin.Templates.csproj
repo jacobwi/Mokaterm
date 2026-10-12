@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The dotnet new template for Mokaterm plugins: "dotnet new install Mokaterm.Plugin.Templates", then
+		"dotnet new mokaterm-plugin -n Acme.Proxmox". A template package carries files and nothing else; the template's own
+		project files are content here, never compiled. build/test-plugin-template.ps1 packs it with the SDK packages and
+		builds what it generates the way an outside author would.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<IsPackable>true</IsPackable>
+		<PackageType>Template</PackageType>
+		<PackageId>Mokaterm.Plugin.Templates</PackageId>
+		<Title>Mokaterm plugin template</Title>
+		<Description>dotnet new template for Mokaterm plugins: an app tool, a System view page or a theme pack, each building into a .mokaplugin package.</Description>
+		<PackageTags>dotnet-new;templates;mokaterm;plugin</PackageTags>
+		<EnableDefaultItems>false</EnableDefaultItems>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<IncludeContentInPack>true</IncludeContentInPack>
+		<ContentTargetFolders>content</ContentTargetFolders>
+		<NoDefaultExcludes>true</NoDefaultExcludes>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<_MokatermPluginTemplateJson>templates/mokaterm-plugin/.template.config/template.json</_MokatermPluginTemplateJson>
+	</PropertyGroup>
+
+	<!-- template.json goes in from _StampMokatermVersion instead, with the version written in. -->
+	<ItemGroup>
+		<Content Include="templates/**/*" Exclude="templates/**/bin/**;templates/**/obj/**;$(_MokatermPluginTemplateJson)" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_StampMokatermVersion</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<!--
+		A generated plugin references Mokaterm.UI.Common and Mokaterm.Plugin.Sdk at exactly the version this package is
+		packed with, and template content cannot read MSBuild properties. So the pack writes PackageVersion (VersionPrefix,
+		or what -p:Version says) over the {MokatermVersion} token in template.json's MokatermVersion symbol, and the template
+		engine puts that symbol into the generated project file. Property function results stay escaped, so the semicolons
+		and % escapes template.json holds come through WriteLinesToFile unchanged.
+	-->
+	<Target Name="_StampMokatermVersion">
+		<PropertyGroup>
+			<_MokatermStampedTemplateJson>$(IntermediateOutputPath)mokaterm-plugin/template.json</_MokatermStampedTemplateJson>
+			<_MokatermStampedText>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/$(_MokatermPluginTemplateJson)').Replace('{MokatermVersion}', '$(PackageVersion)').TrimEnd())</_MokatermStampedText>
+		</PropertyGroup>
+
+		<Error Condition="!$(_MokatermStampedText.Contains('&quot;$(PackageVersion)&quot;'))"
+			   Text="$(_MokatermPluginTemplateJson) has no {MokatermVersion} token for the pack to replace, so generated plugins would not know which Mokaterm packages to reference." />
+
+		<WriteLinesToFile File="$(_MokatermStampedTemplateJson)" Lines="$(_MokatermStampedText)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="$(_MokatermStampedTemplateJson)" PackagePath="content/templates/mokaterm-plugin/.template.config/" />
+			<FileWrites Include="$(_MokatermStampedTemplateJson)" />
+		</ItemGroup>
+	</Target>
+
+</Project>

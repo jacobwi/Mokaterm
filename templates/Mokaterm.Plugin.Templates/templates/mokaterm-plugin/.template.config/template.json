@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Moka",
+  "classifications": ["Mokaterm", "Plugin", "Blazor"],
+  "identity": "Mokaterm.Plugin",
+  "groupIdentity": "Mokaterm.Plugin",
+  "precedence": 100,
+  "name": "Mokaterm plugin",
+  "shortName": "mokaterm-plugin",
+  "description": "A Mokaterm plugin that builds into a .mokaplugin package: an app tool, a System view page or a theme pack, each with what it needs and nothing else.",
+  "defaultName": "MokatermPlugin1",
+  "sourceName": "MokatermPlugin1",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "kind": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "What the plugin starts with.",
+      "choices": [
+        { "choice": "tool", "description": "An app tool in the top bar's Tools menu (a password generator) and its settings page" },
+        { "choice": "system-page", "description": "A page in the System view of SSH sessions (kernel parameters) and its settings page" },
+        { "choice": "theme", "description": "A theme pack: terminal themes and no code" }
+      ],
+      "defaultValue": "tool",
+      "displayName": "Kind"
+    },
+    "id": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The plugin id: lower-case letters and digits joined by dots or dashes, such as acme.proxmox. It names the plugin's folder and its settings (plugin.<id>). Default: the project name in lower case, with anything other than a-z, 0-9, dots and dashes turned into dashes, and no dot or dash doubled or at either end.",
+      "displayName": "Plugin id"
+    },
+    "publisher": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Who publishes the plugin, shown when Mokaterm asks the user to trust it. Default: the project name up to its first dot.",
+      "displayName": "Publisher"
+    },
+    "description": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "One sentence for the Plugins page. Default: what the chosen kind adds.",
+      "displayName": "Description"
+    },
+    "hosts": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Where the plugin runs. On the web host a plugin's code runs on the server.",
+      "choices": [
+        { "choice": "both", "description": "The desktop app and the web host" },
+        { "choice": "desktop", "description": "The desktop app only" },
+        { "choice": "web", "description": "The web host only" }
+      ],
+      "defaultValue": "both",
+      "displayName": "Hosts"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, skips the automatic restore of the project on create.",
+      "defaultValue": "false"
+    },
+    "HostIdentifier": {
+      "type": "bind",
+      "binding": "HostIdentifier"
+    },
+    "nameLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      }
+    },
+    "idFromName": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "nameLower",
+        "steps": [
+          { "regex": "[^a-z0-9.-]+", "replacement": "-" },
+          { "regex": "([.-])[.-]+", "replacement": "$1" },
+          { "regex": "^[.-]+|[.-]+$", "replacement": "" }
+        ]
+      }
+    },
+    "pluginId": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "id",
+        "fallbackVariableName": "idFromName"
+      },
+      "replaces": "PLUGIN_ID"
+    },
+    "publisherFromName": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "name",
+        "steps": [
+          { "regex": "^([^.]+)[.].*$", "replacement": "$1" }
+        ]
+      }
+    },
+    "publisherText": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "publisher",
+        "fallbackVariableName": "publisherFromName"
+      }
+    },
+    "publisherValue": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "publisherText",
+        "steps": [
+          { "regex": "%", "replacement": "%25" },
+          { "regex": "[$]", "replacement": "%24" },
+          { "regex": "&", "replacement": "&amp;" },
+          { "regex": "<", "replacement": "&lt;" },
+          { "regex": ">", "replacement": "&gt;" }
+        ]
+      },
+      "replaces": "PLUGIN_PUBLISHER"
+    },
+    "descriptionForKind": {
+      "type": "generated",
+      "generator": "switch",
+      "parameters": {
+        "evaluator": "C++",
+        "cases": [
+          { "condition": "(kind == \"system-page\")", "value": "Adds a Kernel parameters page to the System view." },
+          { "condition": "(kind == \"theme\")", "value": "Terminal themes for Mokaterm." },
+          { "condition": "", "value": "Adds a password generator to the Tools menu." }
+        ]
+      }
+    },
+    "descriptionText": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "description",
+        "fallbackVariableName": "descriptionForKind"
+      }
+    },
+    "descriptionValue": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "descriptionText",
+        "steps": [
+          { "regex": "%", "replacement": "%25" },
+          { "regex": "[$]", "replacement": "%24" },
+          { "regex": "&", "replacement": "&amp;" },
+          { "regex": "<", "replacement": "&lt;" },
+          { "regex": ">", "replacement": "&gt;" }
+        ]
+      },
+      "replaces": "PLUGIN_DESCRIPTION"
+    },
+    "hostsValue": {
+      "type": "generated",
+      "generator": "switch",
+      "parameters": {
+        "evaluator": "C++",
+        "cases": [
+          { "condition": "(hosts == \"desktop\")", "value": "desktop" },
+          { "condition": "(hosts == \"web\")", "value": "web" },
+          { "condition": "", "value": "desktop;web" }
+        ]
+      },
+      "replaces": "PLUGIN_HOSTS"
+    },
+    "MokatermVersion": {
+      "type": "generated",
+      "generator": "constant",
+      "description": "The version of the Mokaterm packages a generated plugin references. Packing Mokaterm.Plugin.Templates writes its own package version into value.",
+      "parameters": {
+        "value": "{MokatermVersion}"
+      },
+      "replaces": "MOKATERM_VERSION"
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [".template.config/**", "tool/**", "system-page/**", "theme/**", "**/bin/**", "**/obj/**"]
+    },
+    {
+      "source": "./tool/",
+      "target": "./",
+      "condition": "(kind == \"tool\")"
+    },
+    {
+      "source": "./system-page/",
+      "target": "./",
+      "condition": "(kind == \"system-page\")"
+    },
+    {
+      "source": "./theme/",
+      "target": "./",
+      "condition": "(kind == \"theme\")"
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "MokatermPlugin1.csproj" }
+  ],
+  "postActions": [
+    {
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [{ "text": "Run 'dotnet restore'" }],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    },
+    {
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "description": "Opens the generated project in the IDE.",
+      "manualInstructions": [],
+      "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+      "args": { "files": "0" },
+      "continueOnError": true
+    }
+  ]
+}

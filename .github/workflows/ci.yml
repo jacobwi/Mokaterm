@@ -57,3 +57,14 @@ jobs:
         with:
           name: test-results
           path: '**/*.trx'
+
+      # The release packs these too; packing on every push finds a broken package before a tag does.
+      - name: Pack the plugin SDK
+        shell: powershell
+        run: ./build/pack-nuget.ps1
+
+      - name: Upload the plugin SDK packages
+        uses: actions/upload-artifact@v5
+        with:
+          name: plugin-sdk-packages
+          path: artifacts/nuget/*.nupkg

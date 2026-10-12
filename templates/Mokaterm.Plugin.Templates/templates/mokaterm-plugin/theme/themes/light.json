@@ -1,0 +1,23 @@
+{
+  "name": "MokatermPlugin1 Light",
+  "black": "#1a1a22",
+  "red": "#c62828",
+  "green": "#2e7d32",
+  "yellow": "#8d6e00",
+  "blue": "#1565c0",
+  "purple": "#7b1fa2",
+  "cyan": "#00838f",
+  "white": "#6a6a74",
+  "brightBlack": "#40404a",
+  "brightRed": "#d32f2f",
+  "brightGreen": "#388e3c",
+  "brightYellow": "#a07c00",
+  "brightBlue": "#1976d2",
+  "brightPurple": "#8e24aa",
+  "brightCyan": "#00979f",
+  "brightWhite": "#a0a0aa",
+  "background": "#f7f7f9",
+  "foreground": "#1a1a22",
+  "cursorColor": "#c62828",
+  "selectionBackground": "#d8d8e0"
+}

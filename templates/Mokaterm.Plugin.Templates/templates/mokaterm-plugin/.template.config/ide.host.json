@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json.schemastore.org/vs-2017.3.host",
+  "symbolInfo": [
+    {
+      "id": "kind",
+      "name": { "text": "Kind" },
+      "isVisible": true
+    },
+    {
+      "id": "id",
+      "name": { "text": "Plugin id" },
+      "isVisible": true
+    },
+    {
+      "id": "publisher",
+      "name": { "text": "Publisher" },
+      "isVisible": true
+    },
+    {
+      "id": "description",
+      "name": { "text": "Description" },
+      "isVisible": true
+    },
+    {
+      "id": "hosts",
+      "name": { "text": "Hosts" },
+      "isVisible": true
+    }
+  ]
+}

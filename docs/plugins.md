@@ -131,8 +131,14 @@ starts without them and says so. `MOKATERM_NO_PLUGINS=1` does the same on purpos
 
 ## SDK
 
-- NuGet packages (not published yet): `Mokaterm.Abstractions`, `Mokaterm.UI.Common`, and `Mokaterm.Plugin.Sdk`, which
-  holds the MSBuild targets that build a `.mokaplugin` and brings the settings search generator as an analyzer.
+- NuGet packages: `Mokaterm.Abstractions`, `Mokaterm.UI.Common`, `Mokaterm.Plugin.Sdk` (the MSBuild targets that build a
+  `.mokaplugin`, plus the settings search generator as an analyzer) and `Mokaterm.Plugin.Templates`
+  (`dotnet new mokaterm-plugin`).
+- `build/pack-nuget.ps1 -Version <version>` packs all four into `artifacts/nuget`, and `build/test-plugin-template.ps1`
+  checks them the way an outside author meets them (see Starting a plugin). CI packs them on every push, and the
+  release workflow packs them at the tag's version, attaches them to the GitHub release and pushes them to nuget.org when
+  the repository secret `NUGET_API_KEY` is set. Before the first push, reserve the `Mokaterm.` id prefix on nuget.org
+  so nobody else can publish under it.
 - The targets keep every assembly the host provides out of `lib` (decided from the restore graph), write `plugin.json`
   with the `sdk` of the Mokaterm.Abstractions the plugin compiled against, take only the project's own static assets plus
   its scoped CSS bundle, and zip deterministically to `<id>-<version>.mokaplugin`.
@@ -155,6 +161,23 @@ starts without them and says so. `MOKATERM_NO_PLUGINS=1` does the same on purpos
 - Compatibility while we are on 0.x: a plugin built against 0.2 loads in any 0.2.x and nothing else. From 1.0 the major
   version decides.
 
+### Starting a plugin
+
+```
+dotnet new install Mokaterm.Plugin.Templates
+dotnet new mokaterm-plugin -n Acme.Proxmox --kind system-page --publisher "Acme" --hosts both
+```
+
+- `--kind`: `tool` (default) is an app tool (a password generator) with its settings page, `system-page` a System view
+  page (kernel parameters read from `/proc/sys`) with its settings page, `theme` a theme pack with no code.
+- `--id` defaults to the project name in lower case with anything outside `a-z`, `0-9`, dots and dashes turned into
+  dashes; `--publisher` to the name up to its first dot; `--description` to a sentence about the kind; `--hosts` is
+  `both`, `desktop` or `web`.
+- The generated project references `Mokaterm.UI.Common` and `Mokaterm.Plugin.Sdk` at exactly the version the template
+  package was packed with, so the four packages are released together. `build/test-plugin-template.ps1` packs them into
+  a local feed, generates and builds every kind as an outside author would, checks each package and loads it through
+  the real loader.
+
 ## Settings page
 
 "Plugins" in the Application group: each plugin with its name, version, publisher, a CODE or DATA chip, the hosts it
@@ -167,14 +190,70 @@ desktop. On the web host the list is read-only and names the operator's folder.
 The listing has to say that Mokaterm supports plugins (policies 10.1.5 and 10.2.2). The data folder is writable in the
 MSIX build, and the Store build restarts through the platform.
 
+## Community plugins: the gallery
+
+Planned. Everything lives on GitHub, with no server of ours: a gallery repository, GitHub Actions to build and check,
+Releases for the packages and Pages for the index. Homebrew and Scoop run the same way.
+
+**Submitting.** An author adds a plugin, or a new version, with a pull request to the gallery repository
+(`jacobwi/mokaterm-plugins`) holding one small file per plugin:
+
+```json
+{
+  "id": "acme.proxmox",
+  "source": "https://github.com/acme/mokaterm-proxmox",
+  "tag": "v1.2.0",
+  "commit": "9f2c4e1",
+  "license": "MIT",
+  "categories": ["server-tools"]
+}
+```
+
+**Building from source.** The gallery's workflow checks out that exact commit, builds it with the published SDK and
+checks the result: the manifest against the file, the id against the folder, the `sdk` against current Mokaterm, the
+settings names, the size, and that `lib` holds nothing the host ships. It then publishes the `.mokaplugin` to the
+gallery's own Releases. What people install is always built from public source anyone can read, never a binary the
+author uploaded, which is the F-Droid rule.
+
+**Reviewing.** Code plugins run with Mokaterm's own access, so a person reads the diff of every new plugin and every
+update before merging; the checks make that quick, they do not replace it. Theme packs, and later script tools, run
+nothing on the user's machine and get a lighter review. Listing needs an open source license.
+
+**The index.** The workflow writes `index.json` (each plugin's versions, download address, SHA-256, publisher,
+categories, the source commit, and any version withdrawn) to GitHub Pages and signs it with an Ed25519 key whose public
+half is built into the app. A compromised repository, account or CDN cannot swap a package without the signature
+failing. Our own plugins are signed the same way and show as verified.
+
+**In the app.** A Browse tab on the Plugins page (desktop only; the web host lists, since its operator copies files by
+hand):
+
+- The index is fetched only when the tab is opened, never in the background, so nothing leaves the machine unasked.
+- Plugins by category and search, with the verified badge and a link to the source.
+- Install downloads the package, checks its SHA-256 and the index signature, and then opens the same install dialog as
+  a file does, adding "built from acme/mokaterm-proxmox at 9f2c4e1". The trust step does not change.
+- An installed plugin shows "Update available" when the index has a newer version built for this Mokaterm, and a
+  warning when its version was withdrawn.
+
+**Order of work.**
+
+1. Published packages and the template, so anyone can build a plugin at all (done for 0.2.0, waiting on the
+   `NUGET_API_KEY` secret and the first release).
+2. PublicApiAnalyzers on Abstractions and UI.Common, so the surface plugins build against only changes on purpose.
+3. The gallery repository: submission format, build and check workflow, the signing key kept as a GitHub secret.
+4. The Browse tab, signature check and update chips in the app.
+
+GitHub topic search (every repository tagged `mokaterm-plugin`) is not the source of truth: it has no hashes, no
+review and a low rate limit. It could later list unreviewed plugins behind a clear warning.
+
 ## Phase 1, built for 0.2.0
 
 - Package format, loader, safe start, trust, the Plugins page and the install dialog, "Restart now" on the desktop.
 - Static files and styles on the desktop (main window and tool windows) and both web hosts.
 - System pages, Docker pages and app tools as descriptors, with every built-in page moved onto them.
 - Theme packs.
-- The SDK targets and packages, and `samples/Mokaterm.Plugins.Sample`: a session tool with its own script and styles, a
-  fail2ban System page, a subnet calculator app tool and a theme. The tests install and load the package it builds.
+- The SDK targets and packages, the `dotnet new mokaterm-plugin` template (an app tool, a System page or a theme pack), and `samples/Mokaterm.Plugins.Sample`: a
+  session tool with its own script and styles, a fail2ban System page, a subnet calculator app tool, a settings page and
+  a theme. The tests install and load the package it builds.
 
 ## Phase 2
 
@@ -182,11 +261,9 @@ MSIX build, and the Store build restarts through the platform.
 - Script tools: a System or Docker page described by a manifest (scripts, how to read their output into a list, actions
   on a row) and drawn by one built-in component. Nothing runs on the user's machine, which is what makes them the right
   format for community plugins.
-- The gallery: an index in a GitHub repository with download addresses, hashes and Ed25519 publisher signatures, with
-  our key built into the app so our own plugins show as verified.
+- The gallery (see Community plugins above).
 - A credential source extension point (1Password and Bitwarden CLIs, KeePass).
-- PublicApiAnalyzers on Abstractions and UI.Common, and the release workflow packing and pushing the three NuGet
-  packages.
+- PublicApiAnalyzers on Abstractions and UI.Common.
 
 ## Known gaps
 

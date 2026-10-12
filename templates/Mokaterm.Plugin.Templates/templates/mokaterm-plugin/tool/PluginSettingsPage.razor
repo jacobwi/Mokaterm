@@ -1,0 +1,29 @@
+@inherits SettingsSectionBase<PluginSettings>
+
+@{
+	PluginSettings settings = Settings.Clamped();
+}
+
+@* Built from the same fields as Mokaterm's own settings pages, and found by the settings search through each row's
+   label and description. *@
+<SettingsPage Title="MokatermPlugin1" OnReset="ResetAsync">
+	<SettingsSection Title="Password generator">
+		<SettingsRow Label="Length" Description="How many characters a generated password has.">
+			<NumberSetting TValue="int"
+						   Value="settings.PasswordLength"
+						   ValueChanged="value => SaveAsync(s => s with { PasswordLength = value })"
+						   Min="PluginSettings.MinPasswordLength"
+						   Max="PluginSettings.MaxPasswordLength"
+						   Suffix="characters"
+						   AriaLabel="Password length" />
+		</SettingsRow>
+		<SettingsRow Label="Symbols" Description="The punctuation a password may use besides letters and digits. Clear it for letters and digits only.">
+			<TextSetting Value="@settings.Symbols"
+						 ValueChanged="value => SaveAsync(s => s with { Symbols = value })"
+						 Validate="PluginSettings.SymbolsProblem"
+						 AllowEmpty
+						 Width="220px"
+						 AriaLabel="Symbols a password may use" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>
