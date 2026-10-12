@@ -27,4 +27,10 @@ public enum ProtocolCapabilities
 	/// typing into a login (telnet, a serial console) never declares it.
 	/// </summary>
 	Commands = 1 << 5,
+
+	/// <summary>
+	/// A session opened for <see cref="ConnectPurpose.Commands"/> exposes <see cref="Fleet.IHostSummaryFeature"/>: what
+	/// the machine runs and how it is doing, read in one go, which is what the fleet overview lists.
+	/// </summary>
+	HostSummary = 1 << 6,
 }

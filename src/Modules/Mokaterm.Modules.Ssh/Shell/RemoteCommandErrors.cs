@@ -18,7 +18,7 @@ internal static class RemoteCommandErrors
 
 	private static RemoteFileSystemException FromMessage(string error, string path)
 	{
-		string line = SudoErrors.FirstLine(error);
+		string line = RemoteText.FirstLine(error);
 		RemoteFileErrorKind kind =
 			Has(line, "No such file or directory") || Has(line, "Not a directory") ? RemoteFileErrorKind.NotFound
 			: Has(line, "Permission denied") || Has(line, "Operation not permitted") || Has(line, "Read-only file system") ? RemoteFileErrorKind.PermissionDenied
@@ -35,7 +35,7 @@ internal static class RemoteCommandErrors
 	private static string MissingTool(string error) => StatedOr(error, "The server has no tool for this.");
 
 	private static string StatedOr(string error, string fallback) =>
-		SudoErrors.FirstLine(error) is { Length: > 0 } line ? line : fallback;
+		RemoteText.FirstLine(error) is { Length: > 0 } line ? line : fallback;
 
 	private static bool Has(string text, string value) => text.Contains(value, StringComparison.OrdinalIgnoreCase);
 }

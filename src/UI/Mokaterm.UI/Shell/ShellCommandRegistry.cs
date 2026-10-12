@@ -213,7 +213,8 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 		new(ShellCommandIds.SavedCommands, "Saved commands", "Sessions", MokatermIcons.Command, OpenSavedCommands, "Pick a saved command and type or run it here", "snippets notes history run"),
 		new(ShellCommandIds.BroadcastInput, "Type into several sessions", "Sessions", MokatermIcons.Broadcast, ToggleBroadcast, "Turn this on in each session that should get what you type", "broadcast sync input multi"),
 		new(ShellCommandIds.LockVault, "Lock vault", "Security", MokatermIcons.Lock, Sync(() => _vault.Lock(LockReason.User)), "Hide everything until the master password is entered", "security"),
-		new(ShellCommandIds.RunCommand, "Run a command on several hosts", "Connections", MokatermIcons.Command, Sync(() => _connections.RunCommand([])), "Run one command on saved logins without opening their tabs", "exec batch fleet many servers ssh script"),
+		new(ShellCommandIds.RunCommand, "Run a command on several hosts", "Connections", MokatermIcons.Command, Sync(() => _connections.RunCommand([])), "Run one command on saved logins without opening their tabs", "exec batch many servers ssh script"),
+		new(ShellCommandIds.FleetOverview, "Fleet overview", "Connections", MokatermIcons.Fleet, Sync(() => _connections.OpenFleet()), "Every saved machine in one table: system, load, memory, disk, updates and failed services", "servers machines dashboard health status inventory uptime reboot docker"),
 
 		// The toolbar's own buttons, so one the user hid from the bar is still a few keystrokes away.
 		new(ShellCommandIds.ToggleFileBrowser, "Show or hide the file browser", "Sessions", MokatermIcons.SplitView, () => Press(SessionToolbarButtons.FileBrowser), "The file panel beside the active session's terminal", "sftp files panel"),

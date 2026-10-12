@@ -2,6 +2,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -14,6 +15,11 @@
 	<!-- SoftwareSecurityKey signs Ed25519 with BouncyCastle, which SSH.NET brings along. -->
 	<ItemGroup>
 		<Compile Include="..\Shared\SecurityKeys\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!-- Eventually.AdvanceUntilAsync, for the page poller. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
 </Project>

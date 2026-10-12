@@ -65,10 +65,17 @@ internal sealed partial class DemoShell
 	}
 
 	/// <summary>The prompt, led by the window title update that bash's default prompt sends.</summary>
-	public string Prompt => Ansi.Title($"{_account.Name}@{_hostName}: {DisplayDirectory}") + VisiblePrompt;
+	public string Prompt => Ansi.Title($"{PromptUser}@{PromptHost}: {PromptDirectory}") + VisiblePrompt;
 
 	public string VisiblePrompt =>
-		$"{Ansi.BoldGreen}{_account.Name}@{_hostName}{Ansi.Reset}:{Ansi.BoldBlue}{DisplayDirectory}{Ansi.Reset}{(_account.IsRoot ? "# " : "$ ")}";
+		$"{Ansi.BoldGreen}{PromptUser}@{PromptHost}{Ansi.Reset}:{Ansi.BoldBlue}{PromptDirectory}{Ansi.Reset}{(_container is not null || _account.IsRoot ? "# " : "$ ")}";
+
+	// Inside a container the prompt is the image's root shell's: root, the container's short id and the plain path.
+	private string PromptUser => _container is null ? _account.Name : DemoAccount.Root.Name;
+
+	private string PromptHost => _container is null ? _hostName : ContainerId;
+
+	private string PromptDirectory => _container is null ? DisplayDirectory : _directory;
 
 	private string DisplayDirectory
 	{
@@ -209,6 +216,11 @@ internal sealed partial class DemoShell
 				break;
 			case "sudo":
 				return await SudoAsync(args, output, cancellationToken);
+			case "exec":
+				return await ExecAsync(args, output, cancellationToken);
+			case "docker":
+				Docker(args, output);
+				break;
 			case "exit" or "logout":
 				return Exit(output);
 			default:
@@ -257,6 +269,11 @@ internal sealed partial class DemoShell
 
 	private bool Exit(ShellOutput output)
 	{
+		if (_container is not null)
+		{
+			return LeaveContainer(output);
+		}
+
 		if (_loginDirectory is { } loginDirectory)
 		{
 			output.WriteLine("exit");

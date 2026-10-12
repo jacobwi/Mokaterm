@@ -34,6 +34,7 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 	private readonly SshTerminalChannel _terminal;
 	private readonly CompanionConnection<SftpClient> _sftp;
 	private readonly SshFileSystemFeature _fileSystem;
+	private readonly SessionRootFiles _rootFiles;
 	private readonly SshTunnelManager _tunnels;
 	private readonly SshCommandFeature _commands;
 	private readonly SshForwarding? _forwarding;
@@ -58,15 +59,20 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 		SudoPasswords = new SudoPasswordCache();
 		_sftp = new CompanionConnection<SftpClient>(cancellationToken => connector.ConnectCompanionAsync(Context, SftpClients.Create, cancellationToken));
 		_fileSystem = new SshFileSystemFeature(this, logger);
+		_rootFiles = new SessionRootFiles(_fileSystem);
 		_tunnels = new SshTunnelManager(_client, Context.SessionId, Context.Interaction, logger);
 		_commands = new SshCommandFeature(GetSshClientAsync, connector.Time);
-		_admin = new SystemAdminFeature(new SshAdminShell(this, logger), connector.Time, logger);
+		_admin = new SystemAdminFeature(new SshAdminShell(this, logger), connector.Time, logger, _rootFiles);
 		_docker = new DockerSessionFeature(
 			new UserDockerShell(_commands),
 			Context.Options.Elevation == SshElevationMode.None ? null : AuthenticateSudoAsync,
 			connector.Time,
 			Context.Host,
-			Context.Credentials.Username);
+			Context.Credentials.Username,
+			_fileSystem,
+			() => connector.Settings.EffectiveStagingDirectory,
+			logger,
+			_rootFiles);
 		_monitor = new ConnectionMonitor(_client);
 		_ = WatchAsync();
 	}
@@ -224,8 +230,10 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 		// Each part closes even when one before it fails: the connection, the jump hosts and the login must not outlive the session.
 		Guid id = Context.SessionId;
 		await SessionTeardown.ReleaseAsync(_monitor.DisposeAsync, _logger, id, "the connection monitor");
-		await SessionTeardown.ReleaseAsync(_fileSystem.DisposeAsync, _logger, id, "its file systems");
+		await SessionTeardown.ReleaseAsync(_docker.DisposeAsync, _logger, id, "the Docker manager");
 		await SessionTeardown.ReleaseAsync(_admin.DisposeAsync, _logger, id, "the system view");
+		await SessionTeardown.ReleaseAsync(_rootFiles.DisposeAsync, _logger, id, "the tools' root file system");
+		await SessionTeardown.ReleaseAsync(_fileSystem.DisposeAsync, _logger, id, "its file systems");
 		await SessionTeardown.ReleaseAsync(_terminal.DisposeAsync, _logger, id, "the shell");
 		await SessionTeardown.ReleaseAsync(_tunnels.DisposeAsync, _logger, id, "the tunnels");
 		if (_forwarding is { } forwarding)
@@ -235,7 +243,6 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 
 		await SessionTeardown.ReleaseAsync(_sftp.DisposeAsync, _logger, id, "the SFTP connection");
 		await SessionTeardown.ReleaseAsync(() => new ValueTask(CompanionConnection<SshClient>.DisposeClientAsync(_client)), _logger, id, "the SSH connection");
-		_docker.Dispose();
 		SudoPasswords.Dispose();
 		AccountNames.Dispose();
 		await SessionTeardown.ReleaseAsync(Context.DisposeAsync, _logger, id, "the login and jump hosts");

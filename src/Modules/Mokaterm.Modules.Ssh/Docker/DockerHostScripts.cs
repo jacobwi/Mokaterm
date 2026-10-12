@@ -1,4 +1,5 @@
 using System.Globalization;
+using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -23,6 +24,9 @@ internal static class DockerHostScripts
 	/// <summary>The most files a search reports.</summary>
 	public const int MaxFound = 500;
 
+	/// <summary><c>$1</c> a file on the docker host, then a command and its words: runs the command reading the file on stdin.</summary>
+	public const string WithInputScript = "f=$1\nshift\nexec \"$@\" < \"$f\"";
+
 	/// <summary>One character per path: <c>1</c> for a regular file that exists, <c>0</c> for anything else.</summary>
 	private const string FileStatesScript = "for f do if [ -f \"$f\" ]; then printf 1; else printf 0; fi; done";
 
@@ -31,16 +35,15 @@ internal static class DockerHostScripts
 	/// projects and are often huge. <c>timeout</c> stops a slow root where the host has it; the call's own time limit
 	/// stops the rest. Line endings are made LF here, since this file is CRLF and sh reads a CR as part of a word.
 	/// </summary>
-	private static readonly string FindScript = FindScriptText.ReplaceLineEndings("\n");
+	private static readonly string FindScript = (ShellTimeout.Function + "\n" + FindScriptText).ReplaceLineEndings("\n");
 
 	private const string FindScriptText = """
 		depth=$1
 		limit=$2
 		shift 2
-		if command -v timeout >/dev/null 2>&1; then t="timeout $limit"; else t=""; fi
 		for root in "$HOME" "$@"; do
 			[ -d "$root" ] || continue
-			$t find "$root" -maxdepth "$depth" '(' -name node_modules -o -name .git -o -name proc -o -name sys -o -name overlay2 ')' -prune -o -type f '(' -name compose.yaml -o -name compose.yml -o -name docker-compose.yaml -o -name docker-compose.yml ')' -print 2>/dev/null
+			mokaterm_limit "$limit" find "$root" -maxdepth "$depth" '(' -name node_modules -o -name .git -o -name proc -o -name sys -o -name overlay2 ')' -prune -o -type f '(' -name compose.yaml -o -name compose.yml -o -name docker-compose.yaml -o -name docker-compose.yml ')' -print 2>/dev/null
 		done
 		exit 0
 		""";

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Mokaterm.Abstractions.Containers;
 
@@ -33,6 +34,20 @@ internal sealed record DockerContainerStats
 
 	public double? MemoryPercentValue => DockerSizes.ParsePercent(MemoryPercent);
 
+	/// <summary>The memory in use, the first half of <see cref="Memory"/>.</summary>
+	public long? MemoryBytes => DockerSizes.ParsePair(Memory).First;
+
+	/// <summary>Received and sent together, for sorting.</summary>
+	public long? NetworkBytes => Sum(NetworkIo);
+
+	/// <summary>Read and written together, for sorting.</summary>
+	public long? BlockBytes => Sum(BlockIo);
+
+	public int? PidCount => int.TryParse(Pids, NumberStyles.Integer, CultureInfo.InvariantCulture, out int count) ? count : null;
+
+	/// <summary>The CPU figure as a share of every core, 0 to 100, which is what a bar shows.</summary>
+	public double? CpuShare(int cores) => CpuValue is { } cpu ? cpu / Math.Max(1, cores) : null;
+
 	public static IReadOnlyList<DockerContainerStats> Parse(string? output)
 	{
 		List<DockerContainerStats> rows = [];
@@ -65,4 +80,11 @@ internal sealed record DockerContainerStats
 
 		return rows;
 	}
+
+	private static long? Sum(string pair) => DockerSizes.ParsePair(pair) switch
+	{
+		({ } first, { } second) => first + second,
+		({ } first, null) => first,
+		_ => null,
+	};
 }

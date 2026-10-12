@@ -610,27 +610,6 @@
 	white-space: nowrap;
 }
 
-.mt-admin ::deep .mta-bar {
-	height: 3px;
-	overflow: hidden;
-	border-radius: 2px;
-	background: var(--moka-color-surface-3);
-}
-
-.mt-admin ::deep .mta-bar > span {
-	display: block;
-	height: 100%;
-	background: var(--moka-color-success);
-}
-
-.mt-admin ::deep .mta-bar--warn > span {
-	background: var(--moka-color-warning);
-}
-
-.mt-admin ::deep .mta-bar--full > span {
-	background: var(--moka-color-error);
-}
-
 .mt-admin ::deep .mta-pre {
 	max-height: 260px;
 	margin: 0;
@@ -661,6 +640,19 @@
 	flex: 1;
 	max-height: none;
 	min-height: 120px;
+}
+
+/* The log page hands its whole height to the shared log view, which scrolls its own lines. */
+.mt-admin ::deep .mta-logs {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.mt-admin ::deep .mta-logs-field {
+	flex: 1 1 180px;
+	min-width: 0;
 }
 
 .mt-admin ::deep .mta-section {

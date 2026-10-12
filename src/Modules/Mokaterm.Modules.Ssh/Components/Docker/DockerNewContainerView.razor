@@ -1,0 +1,195 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Forms.PasswordField
+@inherits DockerPageBase
+
+<div class="mt-dk-panel-head">
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowLeft"
+				Disabled="IsBusy" OnClick="OnCancel" aria-label="Back to the containers" />
+	<span class="mt-dk-cell-name">New container</span>
+	<span class="mt-dk-label">docker run</span>
+</div>
+
+@ChangePanel
+
+<form class="mt-dk-scroll" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+	<div class="mt-dk-form">
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Image"
+						   Value="@_image"
+						   ValueChanged="@(value => Set(ref _image, value, DockerRunSpec.ImageField))"
+						   ErrorText="@Problem(DockerRunSpec.ImageField)"
+						   Placeholder="nginx:1.27-alpine"
+						   Disabled="IsBusy"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   data-autofocus />
+		</div>
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Name"
+						   Value="@_name"
+						   ValueChanged="@(value => Set(ref _name, value, DockerRunSpec.NameField))"
+						   ErrorText="@Problem(DockerRunSpec.NameField)"
+						   Placeholder="docker picks one"
+						   Disabled="IsBusy"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		</div>
+	</div>
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Ports</span>
+			<span class="mt-dk-note">[ip:]host:container[/tcp|udp]</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy" OnClick="@(() => _ports.Add(""))">Add port</MokaButton>
+		</div>
+		@for (int index = 0; index < _ports.Count; index++)
+		{
+			int row = index;
+			<div class="mt-dk-form" @key="row">
+				<div class="mt-dk-form-field">
+					<MokaTextField Value="@_ports[row]"
+								   ValueChanged="@(value => SetRow(_ports, row, value, DockerRunSpec.PortField(row)))"
+								   ErrorText="@Problem(DockerRunSpec.PortField(row))"
+								   Placeholder="8080:80 or 127.0.0.1:8443:443/tcp"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="@($"Port {row + 1}")" />
+				</div>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveRow(_ports, row))" aria-label="@($"Remove port {row + 1}")" />
+			</div>
+		}
+	</div>
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Volumes and folders</span>
+			<span class="mt-dk-note">volume:/path or /host/folder:/path, :ro to keep it read-only</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy" OnClick="@(() => _mounts.Add(""))">Add mount</MokaButton>
+		</div>
+		@for (int index = 0; index < _mounts.Count; index++)
+		{
+			int row = index;
+			<div class="mt-dk-form" @key="row">
+				<div class="mt-dk-form-field">
+					<MokaTextField Value="@_mounts[row]"
+								   ValueChanged="@(value => SetRow(_mounts, row, value, DockerRunSpec.MountField(row)))"
+								   ErrorText="@Problem(DockerRunSpec.MountField(row))"
+								   Placeholder="data:/var/lib/data or /srv/site:/usr/share/nginx/html:ro"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="@($"Mount {row + 1}")" />
+				</div>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveRow(_mounts, row))" aria-label="@($"Remove mount {row + 1}")" />
+			</div>
+		}
+	</div>
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Environment</span>
+			<span class="mt-dk-note">Values stay hidden until shown, here and in the command the confirmation shows.</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy" OnClick="AddVariable">Add variable</MokaButton>
+		</div>
+		@for (int index = 0; index < _environment.Count; index++)
+		{
+			int row = index;
+			<div class="mt-dk-form" @key="_environment[row]">
+				<div class="mt-dkn-variable-name">
+					<MokaTextField Value="@_environment[row].Name"
+								   ValueChanged="@(value => SetVariable(row, name: value))"
+								   ErrorText="@Problem(DockerRunSpec.VariableField(row))"
+								   Placeholder="NAME"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="@($"Name of variable {row + 1}")" />
+				</div>
+				<div class="mt-dk-form-field">
+					<MokaPasswordField Value="@_environment[row].Value"
+									   ValueChanged="@(value => SetVariable(row, value: value))"
+									   Placeholder="value"
+									   Disabled="IsBusy"
+									   Size="MokaSize.Sm"
+									   autocomplete="off"
+									   aria-label="@($"Value of variable {row + 1}")" />
+				</div>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveVariable(row))" aria-label="@($"Remove variable {row + 1}")" />
+			</div>
+		}
+	</div>
+
+	<div class="mt-dk-section">
+		<span class="mt-dk-label">Restart</span>
+		<div class="mt-dk-toolbar">
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_restart.ToString()" ValueChanged="OnRestartChanged" AriaLabel="Restart policy">
+				<MokaSegment Value="@nameof(DockerRestartPolicy.No)" Text="no" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.OnFailure)" Text="on-failure" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.Always)" Text="always" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.UnlessStopped)" Text="unless-stopped" />
+			</MokaSegmentedControl>
+			@if (_restart == DockerRestartPolicy.OnFailure)
+			{
+				<div class="mt-dkn-retries">
+					<MokaTextField Value="@_retries"
+								   ValueChanged="@(value => Set(ref _retries, value, DockerRunSpec.RestartField))"
+								   ErrorText="@Problem(DockerRunSpec.RestartField)"
+								   Placeholder="retries, 0 for no limit"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   inputmode="numeric"
+								   autocomplete="off"
+								   aria-label="Retries" />
+				</div>
+			}
+		</div>
+		<span class="mt-dk-note">@RestartNote</span>
+	</div>
+
+	<div class="mt-dk-form">
+		<div class="mt-dk-form-field">
+			<MokaSelect TValue="string"
+						Label="Network"
+						Items="_networkChoices"
+						Value="@_network"
+						ValueChanged="@(value => Set(ref _network, value, DockerRunSpec.NetworkField))"
+						ValueSelector="NetworkLabel"
+						ErrorText="@Problem(DockerRunSpec.NetworkField)"
+						Loading="_networksLoading"
+						Disabled="IsBusy"
+						Size="MokaSize.Sm" />
+		</div>
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Command"
+						   Value="@_command"
+						   ValueChanged="@(value => Set(ref _command, value, DockerRunSpec.CommandField))"
+						   ErrorText="@Problem(DockerRunSpec.CommandField)"
+						   Placeholder="the image's own"
+						   Disabled="IsBusy"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		</div>
+	</div>
+
+	<div class="mt-dk-toolbar">
+		<span class="mt-dk-note">The exact docker run is shown before anything runs.</span>
+		<span class="mt-dk-spacer"></span>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="IsBusy" OnClick="OnCancel">Cancel</MokaButton>
+		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play" Loading="IsBusy" Disabled="IsBusy">
+			Create
+		</MokaButton>
+	</div>
+</form>

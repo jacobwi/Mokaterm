@@ -11,14 +11,14 @@
 				OnClick="TogglePull" aria-expanded="@(_pulling ? "true" : "false")">
 		Pull
 	</MokaButton>
-	<MokaButton Variant="MokaVariant.Text"
-				Color="MokaColor.Error"
-				Size="MokaSize.Xs"
-				StartIcon="DockerIcons.Prune"
-				Disabled="@(IsBusy || DanglingCount == 0)"
-				OnClick="PruneAsync">
-		@($"Prune dangling ({DanglingCount.ToString(CultureInfo.CurrentCulture)})")
-	</MokaButton>
+	<DockerUpdateCheck Session="Session" References="TaggedReferences" OnChecked="StateHasChanged" />
+	@if (Navigation is { } navigation)
+	{
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+					OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))" title="Dangling and unused images, with what each frees">
+			@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
+		</MokaButton>
+	}
 	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
 				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
 </div>
@@ -58,15 +58,35 @@
 	<div class="mt-dk-list" role="list" aria-label="Images">
 		@foreach (DockerImage image in Shown)
 		{
+			ImageUpdateResult? update = image.IsTagged ? Feature?.ImageUpdates.Find(image.Reference) : null;
 			<div class="mt-dk-row" role="listitem" @key="image.Reference + image.Id">
 				<div class="mt-dk-row-main mt-dk-row-static">
 					<span class="mt-dk-cell-name mt-dk-cell--w45" title="@image.Reference">@image.Reference</span>
-					<span class="mt-dk-label mt-dk-cell--w12">@(image.IsDangling ? "dangling" : "")</span>
+					<span class="mt-dk-cell--w12">
+						@if (image.IsDangling)
+						{
+							<span class="mt-dk-label">dangling</span>
+						}
+						else if (update is { HasUpdate: true })
+						{
+							@UpdateChip(image.Reference)
+						}
+						else if (update is { Label.Length: > 0 })
+						{
+							<span class="mt-dk-label" title="@update.Detail">@update.Label</span>
+						}
+					</span>
 					<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>
 					<span class="mt-dk-cell mt-dk-cell--size">@image.Size</span>
 				</div>
 				<span class="mt-dk-hover">
 					<CopyButton Text="@image.Reference" Label="Copy the reference" />
+					@if (Navigation is { } rowNavigation)
+					{
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play"
+									Disabled="IsBusy" OnClick="@(() => rowNavigation.NewContainer(image.Reference))"
+									title="New container from this image" aria-label="@($"New container from {image.Reference}")" />
+					}
 					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
 								Disabled="IsBusy" OnClick="@(() => RemoveAsync(image, force: false))" title="Remove" aria-label="@($"Remove {image.Reference}")" />
 					<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
@@ -75,6 +95,19 @@
 										Disabled="IsBusy" aria-label="@($"Actions for {image.Reference}")" />
 						</ChildContent>
 						<Items>
+							@if (update is { HasUpdate: true })
+							{
+								<MokaDropdownItem Text="Pull the newer image" Icon="DockerIcons.Update" OnClick="@(() => PullUpdateAsync(image))" />
+							}
+							@if (image.IsTagged)
+							{
+								<MokaDropdownItem Text="Check for an update" Icon="DockerIcons.Update" OnClick="@(() => CheckOneAsync(image))" />
+							}
+							@if (Navigation is { } menuNavigation)
+							{
+								<MokaDropdownItem Text="New container from this image" Icon="MokatermIcons.Play" OnClick="@(() => menuNavigation.NewContainer(image.Reference))" />
+							}
+							<MokaDropdownItem Divider />
 							<MokaDropdownItem Text="Remove" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: false))" />
 							<MokaDropdownItem Text="Remove even if used (--force)" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: true))" />
 							<MokaDropdownItem Divider />

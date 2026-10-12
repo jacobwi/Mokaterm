@@ -46,6 +46,7 @@
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete" Disabled="IsBusy" OnClick="@(() => RunAsync("down"))">Down</MokaButton>
 				</span>
 				<span class="mt-dk-spacer"></span>
+				<DockerUpdateCheck Session="Session" References="ServiceImages" OnChecked="StateHasChanged" />
 				<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 					<ChildContent>
 						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.MoreHorizontal" Disabled="IsBusy" aria-label="More project actions" />
@@ -57,6 +58,7 @@
 						<MokaDropdownItem Text="Up" Icon="MokaIcons.Navigation.ArrowUp" Class="mt-dk-narrow-only" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("up"))" />
 						<MokaDropdownItem Text="Down" Icon="MokaIcons.Action.Delete" Class="mt-dk-narrow-only" OnClick="@(() => RunAsync("down"))" />
 						<MokaDropdownItem Text="Pull" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull"))" />
+						<MokaDropdownItem Text="Update (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update"))" />
 						<MokaDropdownItem Text="Recreate (--force-recreate)" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate"))" />
 						<MokaDropdownItem Divider />
 						<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => Show("logs"))" />
@@ -128,6 +130,7 @@
 							<span class="mt-dk-label mt-dk-cell--w12">@(service.Health == DockerHealth.None ? "" : DockerStateDisplay.HealthLabel(service.Health))</span>
 						}
 						<span class="mt-dk-cell mt-dk-cell--grow" title="@service.Image">@service.Image</span>
+						@UpdateChip(service.Image)
 						<span class="mt-dk-cell mt-dk-cell--optional">@string.Join(", ", service.Ports)</span>
 						<span class="mt-dk-cell mt-dk-cell--count" title="Containers running, of all of them">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</span>
 						<span class="mt-dk-cell mt-dk-cell--time mt-dk-cell--optional">@service.Uptime</span>
@@ -137,11 +140,12 @@
 						<span class="mt-dk-hover">
 							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.File.FileText"
 										OnClick="@(() => ShowLogs(service.Name))" title="Logs" aria-label="@($"Logs of {service.Name}")" />
-							@if (service.Containers.FirstOrDefault(container => container.IsRunning) is { } running)
+							@if (RunningContainer(service) is { } running)
 							{
+								<DockerPortLinks Session="Session" Ports="RunningPorts(service)" Name="@($"{ProjectName} {service.Name}")" />
 								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
-											Disabled="@(IsBusy || Session.Terminal is null)" OnClick="@(() => ShellAsync(running.Name))"
-											title="Open a shell in the session's terminal" aria-label="@($"Open a shell in {service.Name}")" />
+											Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="@(() => ShellAsync(running.Name))"
+											title="Open a shell in a new tab" aria-label="@($"Open a shell in {service.Name}")" />
 							}
 							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect"
 										Disabled="IsBusy" OnClick="@(() => RunAsync("restart", service.Name))" title="Restart" aria-label="@($"Restart {service.Name}")" />
@@ -156,8 +160,13 @@
 									<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => RunAsync("start", service.Name))" />
 									<MokaDropdownItem Text="Recreate this service" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate", service.Name))" />
 									<MokaDropdownItem Text="Pull its image" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull", service.Name))" />
+									<MokaDropdownItem Text="Update this service (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update", service.Name))" />
 									<MokaDropdownItem Divider />
 									<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => ShowLogs(service.Name))" />
+									<MokaDropdownItem Text="Browse files"
+													  Icon="MokatermIcons.FolderOpen"
+													  Disabled="@(RunningContainer(service) is null)"
+													  OnClick="@(() => RunningContainer(service) is { } browsed ? BrowseFilesAsync(browsed.Name) : Task.CompletedTask)" />
 								</Items>
 							</MokaDropdown>
 						</span>

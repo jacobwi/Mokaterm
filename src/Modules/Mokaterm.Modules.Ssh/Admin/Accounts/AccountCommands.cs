@@ -1,6 +1,6 @@
 using System.Globalization;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Modules.Ssh.Admin.Detection;
-using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Admin.Accounts;
 
@@ -10,6 +10,9 @@ namespace Mokaterm.Modules.Ssh.Admin.Accounts;
 /// </summary>
 internal sealed class AccountCommands
 {
+	// Groups that hand out sudo on the common distributions.
+	private static readonly HashSet<string> AdminGroups = new(StringComparer.Ordinal) { "sudo", "wheel", "admin" };
+
 	public AccountCommands(AccountToolKind tools, bool hasChpasswd)
 	{
 		Tools = tools;
@@ -252,6 +255,69 @@ internal sealed class AccountCommands
 			Destructive = true,
 			ConfirmText = "Delete user",
 		};
+	}
+
+	/// <summary>A new group with no members: groupadd, or addgroup on BusyBox.</summary>
+	public AdminAction AddGroup(string name)
+	{
+		RequireChange();
+		Require(AdminNames.CheckAccount(name), nameof(name));
+		string quoted = PosixShell.Quote(name);
+		return new AdminAction
+		{
+			Title = $"Add group {name}",
+			Script = Root("accounts.addgroup", Tools == AccountToolKind.Shadow ? $"groupadd -- {quoted}" : $"addgroup {quoted}"),
+			Description = "Creates the group with the next free group id and no members.",
+			ConfirmText = "Add group",
+		};
+	}
+
+	/// <summary>
+	/// Deletes a group: groupdel, or delgroup on BusyBox. A group that is still someone's primary group, and the root
+	/// group, are refused before any script is built.
+	/// </summary>
+	public AdminAction DeleteGroup(GroupAccount group, AccountsSnapshot snapshot, string loginName)
+	{
+		RequireChange();
+		ArgumentNullException.ThrowIfNull(group);
+		ArgumentNullException.ThrowIfNull(snapshot);
+		Require(AdminNames.CheckAccount(group.Name), nameof(group));
+		if (WhyNotDeleteGroup(group, snapshot) is { } refusal)
+		{
+			throw new InvalidOperationException(refusal);
+		}
+
+		bool sessionLosesRoot = AdminGroups.Contains(group.Name) && group.Members.Contains(loginName);
+		string quoted = PosixShell.Quote(group.Name);
+		return new AdminAction
+		{
+			Title = $"Delete group {group.Name}",
+			Script = Root("accounts.delgroup", Tools == AccountToolKind.Shadow ? $"groupdel -- {quoted}" : $"delgroup {quoted}"),
+			Description = group.Members.Count == 0
+				? "Deletes the group. Files it owns stay, owned by a number that a new group may get later."
+				: $"Deletes the group, and with it the membership of {string.Join(", ", group.Members)}. Files it owns stay, owned by a number.",
+			Warning = sessionLosesRoot
+				? $"{loginName}, the account this session logged in as, is in {group.Name}, which is what usually lets it use sudo. Without it this session's root mode, and the next sudo, are refused."
+				: group.Gid < snapshot.FirstPersonUid ? "This looks like a system group. Services that rely on it may stop working." : null,
+			CutsConnection = sessionLosesRoot,
+			Destructive = true,
+			ConfirmText = "Delete group",
+		};
+	}
+
+	/// <summary>Why a group cannot be deleted here, or null: the root group, and a group that is a user's primary group.</summary>
+	public static string? WhyNotDeleteGroup(GroupAccount group, AccountsSnapshot snapshot)
+	{
+		ArgumentNullException.ThrowIfNull(group);
+		ArgumentNullException.ThrowIfNull(snapshot);
+		if (group.Gid == 0)
+		{
+			return "The root group cannot be deleted here.";
+		}
+
+		return snapshot.Users.FirstOrDefault(user => user.Gid == group.Gid) is { } owner
+			? $"It is the primary group of {owner.Name}, so groupdel refuses it while that account exists."
+			: null;
 	}
 
 	/// <summary>Why an account cannot be deleted here, or null.</summary>

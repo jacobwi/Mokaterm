@@ -1,21 +1,21 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Modules.Ssh.Docker;
-using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's images, one line each: pull one by reference, remove a tag or an untagged image (forcing it from the
-/// row's menu only), and prune the dangling ones with a confirmation that says how much they hold.
+/// The host's images, one line each: pull one by reference, ask the registries whether a tag moved on (and pull the
+/// newer image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu
+/// only). Pruning lives on the cleanup page, which lists what would go first.
 /// </summary>
 public sealed partial class DockerImagesPage : DockerPageBase
 {
 	private IReadOnlyList<DockerImage> _images = [];
 	private IReadOnlyList<DockerImage> _shown = [];
-	private IReadOnlyList<DockerDiskUsage> _usage = [];
+	private IReadOnlyList<string> _tagged = [];
 	private string _query = "";
 	private string _pull = "";
 	private string? _pullError;
@@ -26,17 +26,17 @@ public sealed partial class DockerImagesPage : DockerPageBase
 
 	private IReadOnlyList<DockerImage> Shown => _shown;
 
+	/// <summary>Every tag on the host: what "Check for updates" asks about.</summary>
+	private IReadOnlyList<string> TaggedReferences => _tagged;
+
 	private int DanglingCount => _images.Count(image => image.IsDangling);
 
 	protected override Task OnInitializedAsync() => RefreshAsync();
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{
-		Task<IReadOnlyList<DockerImage>> images = client.ListImagesAsync(token);
-		Task<IReadOnlyList<DockerDiskUsage>> usage = client.DiskUsageAsync(token);
-		await Task.WhenAll(images, usage);
-		_images = await images;
-		_usage = await usage;
+		_images = await client.ListImagesAsync(token);
+		_tagged = [.. _images.Where(image => image.IsTagged).Select(image => image.Reference).Distinct(StringComparer.Ordinal)];
 		ApplyFilter();
 	});
 
@@ -72,8 +72,53 @@ public sealed partial class DockerImagesPage : DockerPageBase
 		DockerOutput? output = await RunChangeAsync(DockerCommands.Pull(reference), $"Pull {reference}", afterwards: RefreshAsync);
 		if (output is { Succeeded: true })
 		{
+			Feature?.ImageUpdates.Forget([reference]);
 			_pull = "";
 			_pulling = false;
+		}
+	}
+
+	/// <summary>
+	/// Pulls the newer image for a tag. Containers keep the image they were made from, so the question says how each
+	/// kind gets the new one rather than recreating anything itself.
+	/// </summary>
+	private async Task PullUpdateAsync(DockerImage image)
+	{
+		DockerOutput? output = await RunChangeAsync(
+			DockerCommands.Pull(image.Reference),
+			$"Pull the newer {image.Reference}",
+			$"The newer {image.Reference} is pulled and the tag moves to it. Containers made from the old one keep running it until they are made again: a compose service through Update in its project, any other container with the docker run it was first started with.",
+			"Pull",
+			RefreshAsync,
+			destructive: false);
+		if (output is { Succeeded: true })
+		{
+			Feature?.ImageUpdates.Forget([image.Reference]);
+		}
+	}
+
+	private async Task CheckOneAsync(DockerImage image)
+	{
+		if (Feature is not { } feature || Client is not { } client)
+		{
+			return;
+		}
+
+		try
+		{
+			IReadOnlyList<ImageUpdateResult> results = await feature.ImageUpdates.CheckAsync(client, [image.Reference], force: true, progress: null, Lifetime);
+			if (results is [{ } result])
+			{
+				Interaction.Notify(result.HasUpdate ? NoticeSeverity.Info : NoticeSeverity.Success, $"{image.Reference}: {result.Detail}");
+			}
+		}
+		catch (Exception ex) when (Describe(ex) is { } problem)
+		{
+			Interaction.Notify(NoticeSeverity.Error, $"Could not check {image.Reference}: {problem}");
+		}
+		catch (OperationCanceledException)
+		{
+			// The page went away.
 		}
 	}
 
@@ -88,18 +133,5 @@ public sealed partial class DockerImagesPage : DockerPageBase
 		}
 
 		return ChangeAsync(DockerCommands.RemoveImage(image.RemoveTarget, force), $"Remove {image.Reference}", message, "Remove", RefreshAsync);
-	}
-
-	private Task PruneAsync()
-	{
-		List<DockerImage> dangling = [.. _images.Where(image => image.IsDangling)];
-		long listed = dangling.Sum(image => image.SizeBytes ?? 0);
-		string reclaimable = _usage.FirstOrDefault(row => row.Type == "Images")?.Reclaimable ?? "";
-		string message = string.Create(
-			CultureInfo.CurrentCulture,
-			$"Removes the {dangling.Count} dangling {(dangling.Count == 1 ? "image" : "images")}: no tag points at them and no container uses them. Their listed sizes add up to {DisplayFormat.Bytes(listed)}, layers they share with other images included, so less may come back.")
-			+ (reclaimable.Length > 0 ? $" docker system df counts {reclaimable} reclaimable across every unused image, tagged ones included, which this keeps." : "");
-
-		return ChangeAsync(DockerCommands.PruneDanglingImages(), "Prune dangling images", message, "Prune", RefreshAsync);
 	}
 }

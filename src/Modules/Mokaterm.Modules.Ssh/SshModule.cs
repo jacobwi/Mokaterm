@@ -1,9 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Abstractions.Sessions;
+using Mokaterm.Modules.Ssh.Admin.Reboot;
 using Mokaterm.Modules.Ssh.Components;
 using Mokaterm.Modules.Ssh.Components.Admin;
 using Mokaterm.Modules.Ssh.Components.Docker;
@@ -31,6 +35,13 @@ public sealed class SshModule : IMokatermModule
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtocolProvider, SshProtocolProvider>());
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtocolProvider, SftpProtocolProvider>());
 		services.TryAddSingleton<IPrivateKeyInspector, SshPrivateKeyInspector>();
+
+		// Built on first use, from the session manager and prompts the host supplies; the module itself offers neither.
+		services.TryAddScoped(provider => new RebootReconnects(
+			provider.GetRequiredService<ISessionManager>(),
+			provider.GetRequiredService<IUserInteraction>(),
+			provider.GetService<TimeProvider>() ?? TimeProvider.System,
+			provider.GetRequiredService<ILogger<RebootReconnects>>()));
 
 		services.AddProtocolUi(new ProtocolUiDescriptor
 		{

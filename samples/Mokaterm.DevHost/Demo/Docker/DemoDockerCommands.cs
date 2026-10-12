@@ -41,8 +41,8 @@ internal sealed class DemoDockerCommands : IRemoteCommandFeature
 		return new RemoteCommandOutcome
 		{
 			ExitCode = result.ExitCode,
-			Output = Captured(result.Output, request.OutputLimitBytes),
-			Error = Captured(result.Error, request.OutputLimitBytes),
+			Output = Captured(result.Bytes ?? Encoding.UTF8.GetBytes(result.Output), request.OutputLimitBytes),
+			Error = Captured(Encoding.UTF8.GetBytes(result.Error), request.OutputLimitBytes),
 			Duration = _time.GetElapsedTime(started),
 		};
 	}
@@ -102,9 +102,8 @@ internal sealed class DemoDockerCommands : IRemoteCommandFeature
 		return words;
 	}
 
-	private static CapturedOutput Captured(string text, int keep)
+	private static CapturedOutput Captured(byte[] bytes, int keep)
 	{
-		byte[] bytes = Encoding.UTF8.GetBytes(text);
 		return new CapturedOutput(bytes.AsMemory(0, Math.Min(bytes.Length, Math.Max(keep, RemoteCommandRequest.MinOutputLimitBytes))), bytes.Length);
 	}
 }

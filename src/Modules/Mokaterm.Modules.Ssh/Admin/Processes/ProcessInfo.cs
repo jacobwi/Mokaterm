@@ -1,14 +1,26 @@
 namespace Mokaterm.Modules.Ssh.Admin.Processes;
 
-/// <summary>One process as ps lists it.</summary>
+/// <summary>One process as ps lists it, with its CPU share sampled over a second.</summary>
 internal sealed record ProcessInfo
 {
 	public required int Pid { get; init; }
 
+	/// <summary>The parent's PID from <c>/proc/[pid]/stat</c>, or null when the sample missed the process.</summary>
+	public int? ParentPid { get; init; }
+
 	public string User { get; init; } = "";
 
-	/// <summary>ps's CPU figure: the share of one CPU averaged over the process's life, not the last second.</summary>
+	/// <summary>
+	/// Share of one CPU in percent: measured over the second the list was read when <see cref="CpuSampled"/>, else ps's
+	/// average over the process's whole life (a process that started after the sample).
+	/// </summary>
 	public double? Cpu { get; init; }
+
+	/// <summary><see cref="Cpu"/> was measured over the sampling second rather than averaged over the process's life.</summary>
+	public bool CpuSampled { get; init; }
+
+	/// <summary>The nice value, -20 (first in line) to 19 (last), or null when the sample missed the process.</summary>
+	public int? Nice { get; init; }
 
 	/// <summary>Resident memory as a share of all memory.</summary>
 	public double? Memory { get; init; }

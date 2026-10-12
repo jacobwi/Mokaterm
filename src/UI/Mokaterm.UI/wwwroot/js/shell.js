@@ -166,6 +166,36 @@ export function attachListKeys(element) {
 	});
 }
 
+// A list whose rows are each a tab stop (data-mt-row): Space is the row's own key, so it must not scroll the dialog,
+// and the arrows, Home and End move the focus between rows, since a keydown reaches .NET only after the browser acted.
+export function attachRowKeys(element) {
+	attachOnce(element, 'rowKeys', (target) => {
+		target.addEventListener('keydown', (event) => {
+			const row = event.target;
+			if (!(row instanceof HTMLElement) || !row.hasAttribute('data-mt-row') || event.ctrlKey || event.altKey || event.metaKey) {
+				return;
+			}
+
+			if (event.key === ' ') {
+				event.preventDefault();
+				return;
+			}
+
+			const rows = [...target.querySelectorAll('[data-mt-row]')];
+			const index = rows.indexOf(row);
+			const next = event.key === 'ArrowDown' ? rows[index + 1]
+				: event.key === 'ArrowUp' ? rows[index - 1]
+				: event.key === 'Home' ? rows[0]
+				: event.key === 'End' ? rows[rows.length - 1]
+				: undefined;
+			if (next) {
+				event.preventDefault();
+				next.focus();
+			}
+		});
+	});
+}
+
 // A combobox field (quick connect) drives its list from the keyboard while keeping the focus, so the keys that would
 // move the caret or the focus are kept from the browser while the field uses them. Which ones that is right now is
 // written on the field by .NET in data-mt-keys, because a keydown is handled on the server after the browser acted.

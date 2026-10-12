@@ -1,4 +1,4 @@
-using Mokaterm.Modules.Ssh.Shell;
+using Mokaterm.Abstractions.Commands;
 
 namespace Mokaterm.Modules.Ssh.Admin.Network;
 
@@ -28,15 +28,22 @@ internal static class NetworkCommands
 			"fi",
 			AdminSections.Start("resolv"),
 			"cat /etc/resolv.conf 2>/dev/null",
-			"if command -v ss >/dev/null 2>&1; then",
-			$"\t{AdminSections.Start("ss")}",
-			"\tss -tulpn 2>/dev/null",
-			"elif command -v netstat >/dev/null 2>&1; then",
-			$"\t{AdminSections.Start("netstat")}",
-			"\tnetstat -tulpn 2>/dev/null",
-			"fi",
+			ListeningPorts,
 			"exit 0"),
 	};
+
+	/// <summary>
+	/// The part of a script that lists listening ports, with <c>netstat</c> where there is no <c>ss</c>; the processes
+	/// behind other users' ports only show as root. <see cref="NetworkParser.ParseListening"/> reads it back.
+	/// </summary>
+	public static string ListeningPorts { get; } = string.Join('\n',
+		"if command -v ss >/dev/null 2>&1; then",
+		$"\t{AdminSections.Start("ss")}",
+		"\tss -tulpn 2>/dev/null",
+		"elif command -v netstat >/dev/null 2>&1; then",
+		$"\t{AdminSections.Start("netstat")}",
+		"\tnetstat -tulpn 2>/dev/null",
+		"fi");
 
 	/// <summary>
 	/// Brings a link up or down. Taking down the interface this session arrives on, or the one the default route

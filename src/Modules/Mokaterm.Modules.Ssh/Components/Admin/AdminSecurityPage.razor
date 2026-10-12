@@ -1,0 +1,542 @@
+@using Moka.Red.ContextMenu
+@using Mokaterm.Modules.Ssh.Admin.Network
+@using Mokaterm.Modules.Ssh.Admin.Security
+@using Mokaterm.UI.Common.Editing
+@inherits AdminPageBase
+
+<AdminPageFrame Title="Security"
+				Summary="@Summary"
+				Search="@_filter"
+				SearchChanged="FilterChanged"
+				SearchPlaceholder="@(_view == "logins" ? "Filter by address or user" : "Filter by port or process")"
+				Loading="Loading"
+				Loaded="Loaded"
+				Error="@LoadError"
+				OnRefresh="ReloadAsync"
+				LoadingText="Reading the SSH server, logins, fail2ban and ports"
+				ListPage
+				Detail="@DetailFragment">
+	<Chips>
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChanged" AriaLabel="Security part to show" />
+	</Chips>
+	<ChipsEnd>
+		@if (_snapshot is { AsRoot: false } && Context.RootChangeBlocked is null)
+		{
+			<button type="button" class="mta-link" disabled="@Busy" @onclick="Context.EnableRoot" title="sshd -T, the login log, fail2ban and other users' ports need root">read more as root</button>
+		}
+	</ChipsEnd>
+	<ChildContent>
+		@if (_snapshot is { } snapshot)
+		{
+			@switch (_view)
+			{
+				case "logins":
+					@LoginsView(snapshot)
+					break;
+				case "ports":
+					@PortsView(snapshot)
+					break;
+				case "fail2ban":
+					@Fail2BanView(snapshot)
+					break;
+				default:
+					@ChecksView
+					break;
+			}
+		}
+	</ChildContent>
+</AdminPageFrame>
+
+@code {
+	private SecuritySnapshot? _snapshot;
+	private IReadOnlyList<SecurityCheck> _checks = [];
+	private SessionLogin? _login;
+	private int? _securityUpdates;
+	private string? _securityUpdatesNote;
+	private string _view = "checks";
+	private string _filter = "";
+	private string? _selected;
+	private string? _editProblem;
+	private bool _editing;
+
+	[Inject]
+	private IRemoteTextEditor Editor { get; set; } = default!;
+
+	protected override bool ReadsMoreAsRoot => true;
+
+	private string Summary => _snapshot is null
+		? ""
+		: $"{_checks.Count(check => check.Level == SecurityLevel.Warning)} warnings, {_checks.Count(check => check.Level == SecurityLevel.Notice)} notes · {(_snapshot.AsRoot ? "read as root" : $"read as {Context.LoginName}")}";
+
+	private IReadOnlyList<AdminChip> Chips
+	{
+		get
+		{
+			List<AdminChip> chips =
+			[
+				new("checks", "Checks", _checks.Count(check => check.Level == SecurityLevel.Warning), Alert: true),
+				new("logins", "Failed logins", _snapshot?.FailedLogins.Count),
+				new("ports", "Listening", _snapshot?.Listening.Count),
+			];
+
+			if (_snapshot?.Fail2Ban is { } fail2ban)
+			{
+				chips.Add(new("fail2ban", "fail2ban", fail2ban.Jails.Count));
+			}
+
+			return chips;
+		}
+	}
+
+	private SecurityCheck? Selected => _view == "checks" && _selected is { } id ? _checks.FirstOrDefault(check => check.Id == id) : null;
+
+	private Fail2BanJail? SelectedJail => _view == "fail2ban" && _selected is { } name ? _snapshot?.Fail2Ban?.Jails.FirstOrDefault(jail => jail.Name == name) : null;
+
+	private RenderFragment? DetailFragment => Selected is not null ? CheckPanel : SelectedJail is not null ? JailPanel : null;
+
+	protected override async Task LoadAsync(CancellationToken cancellationToken)
+	{
+		_ = LoadSecurityUpdatesAsync(cancellationToken);
+		AdminOutcome outcome = await ReadAsync(SecurityCommands.Read(ReadAsRoot), cancellationToken);
+		_snapshot = SecurityCommands.Parse(outcome.Output);
+		_login = await Context.Login();
+		Rebuild();
+	}
+
+	private void Rebuild()
+	{
+		if (_snapshot is { } snapshot && _login is { } login)
+		{
+			_checks = SecurityChecks.Build(snapshot, login, _securityUpdates, _securityUpdatesNote);
+		}
+	}
+
+	private async Task LoadSecurityUpdatesAsync(CancellationToken cancellationToken)
+	{
+		_securityUpdates = null;
+		_securityUpdatesNote = Capabilities.Packages is { } packages ? $"Asking {packages.DisplayName}." : null;
+		try
+		{
+			(IReadOnlyList<Mokaterm.Modules.Ssh.Admin.Packages.PackageUpdate>? updates, string? note) =
+				await AdminUpdateReads.SecurityUpdatesAsync(Feature, Capabilities.Packages, Capabilities.PackagesMissing, cancellationToken);
+			_securityUpdates = updates?.Count;
+			_securityUpdatesNote = note;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		Rebuild();
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private RenderFragment ChecksView => __builder =>
+	{
+		<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) minmax(0, 0.8fr) 28px; --mta-cols-narrow: 14px minmax(0, 1fr) minmax(0, 0.6fr) 28px">
+			<div class="mta-row mta-row--head">
+				<span></span>
+				<span>Check</span>
+				<span>Value</span>
+				<span></span>
+			</div>
+			@foreach (SecurityCheck check in _checks)
+			{
+				<div class="@(check.Id == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+					 @key="check.Id"
+					 role="button"
+					 tabindex="0"
+					 aria-pressed="@(check.Id == _selected ? "true" : "false")"
+					 @onclick="@(() => Select(check.Id))"
+					 @onkeydown="@(args => OnRowKey(args, check.Id))"
+					 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(check)))"
+					 @oncontextmenu:preventDefault="true">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@LevelColor(check.Level)" Glow="@(check.Level is SecurityLevel.Warning)" />
+					<span class="mta-cell" title="@check.Summary">
+						<span>@check.Title</span>
+						<span class="mta-dim mta-after mta-wide">@check.Summary</span>
+					</span>
+					<span class="mta-cell mta-mono" title="@check.Value">@check.Value</span>
+					<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+						<MokaButton Variant="MokaVariant.Text"
+									Color="MokaColor.Surface"
+									Size="MokaSize.Xs"
+									StartIcon="MokaIcons.Navigation.MoreHorizontal"
+									OnClick="@(args => ShowRowMenu(args, MenuFor(check)))"
+									aria-label="@($"Actions for {check.Title}")" />
+					</span>
+				</div>
+			}
+		</div>
+	};
+
+	private RenderFragment LoginsView(SecuritySnapshot snapshot) => __builder =>
+	{
+		if (snapshot.FailedLoginSource.Length == 0)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Shield"
+							Title="No login log was read"
+							Description="@(snapshot.AsRoot ? "There is no journal, auth.log, secure or btmp to read SSH logins from." : "The login log is root's. Turn on root mode to read it.")" />
+			return;
+		}
+
+		List<FailedLogin> shown = [.. snapshot.FailedLogins.Reverse().Where(Matches)];
+		if (shown.Count == 0)
+		{
+			<MokaEmptyState Icon="MokatermIcons.ShieldCheck"
+							Title="@(snapshot.FailedLogins.Count == 0 ? "No failed logins" : "Nothing matches")"
+							Description="@(snapshot.FailedLogins.Count == 0 ? $"None in the recent lines of {snapshot.FailedLoginSource}." : "No failed login matches the filter.")" />
+			return;
+		}
+
+		<MokaText Element="p" Size="MokaSize.Xs" Class="mta-dim">
+			@($"Most tries: {string.Join(", ", FailedLoginParser.ByAddress(snapshot.FailedLogins).Take(5).Select(entry => $"{entry.Address} ({entry.Count})"))} · from {snapshot.FailedLoginSource}, newest first")
+		</MokaText>
+		<div class="mta-table" style="--mta-cols: 170px minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 0.8fr) minmax(0, 1fr)">
+			<div class="mta-row mta-row--head">
+				<span class="mta-wide">When</span>
+				<span>User</span>
+				<span>From</span>
+				<span class="mta-wide">Method</span>
+			</div>
+			@foreach ((FailedLogin login, int index) in shown.Take(MaxRows).Select((login, index) => (login, index)))
+			{
+				<div class="mta-row" @key="index">
+					<span class="mta-cell mta-mono mta-dim mta-wide" title="@login.Time">@login.Time</span>
+					<span class="mta-cell mta-mono" title="@login.User">
+						@login.User
+						@if (login.InvalidUser)
+						{
+							<span class="mta-dim mta-after">no such user</span>
+						}
+					</span>
+					<span class="mta-cell mta-mono" title="@login.Address">@login.Address</span>
+					<span class="mta-cell mta-mono mta-dim mta-wide">@login.Method</span>
+				</div>
+			}
+		</div>
+	};
+
+	private RenderFragment PortsView(SecuritySnapshot snapshot) => __builder =>
+	{
+		if (snapshot.ListeningSource.Length == 0)
+		{
+			<MokaEmptyState Icon="SshIcons.Network" Title="No port list" Description="Neither ss nor netstat is installed, so listening ports cannot be read." />
+			return;
+		}
+
+		HashSet<ListeningSocket> open = [.. SecurityChecks.OpenToAll(snapshot.Listening)];
+		List<ListeningSocket> shown = [.. snapshot.Listening.Where(Matches).OrderByDescending(open.Contains).ThenBy(socket => socket.Port)];
+		<div class="mta-table" style="--mta-cols: 56px minmax(0, 1fr) 64px minmax(0, 1fr) 130px; --mta-cols-narrow: 56px minmax(0, 1fr) 64px">
+			<div class="mta-row mta-row--head">
+				<span>Proto</span>
+				<span>Address</span>
+				<span>Port</span>
+				<span class="mta-wide">Process</span>
+				<span class="mta-wide">Reachable</span>
+			</div>
+			@foreach ((ListeningSocket socket, int index) in shown.Take(MaxRows).Select((socket, index) => (socket, index)))
+			{
+				bool everyone = open.Contains(socket);
+				<div class="mta-row" @key="index">
+					<span class="mta-cell mta-mono mta-dim">@socket.Protocol</span>
+					<span class="mta-cell mta-mono" title="@socket.Address">@socket.Address</span>
+					<span class="mta-cell mta-mono">@socket.Port</span>
+					<span class="mta-cell mta-mono mta-dim mta-wide" title="@socket.Process">@(socket.Process.Length > 0 ? socket.Process : snapshot.AsRoot ? "" : "(root only)")</span>
+					<span class="mta-cell mta-wide">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@(everyone ? MokaColor.Warning : MokaColor.Surface)" Label="@(everyone ? "EVERY ADDRESS" : IsLoopback(socket) ? "THIS MACHINE" : "ONE ADDRESS")" />
+					</span>
+				</div>
+			}
+		</div>
+		@if (!snapshot.AsRoot)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The processes behind other users' ports show as root.</MokaText>
+		}
+	};
+
+	private RenderFragment Fail2BanView(SecuritySnapshot snapshot) => __builder =>
+	{
+		if (snapshot.Fail2Ban is not { } fail2ban)
+		{
+			return;
+		}
+
+		if (fail2ban.Problem is { } problem)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Shield" Title="fail2ban did not say" Description="@problem" />
+			return;
+		}
+
+		<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 90px 90px 90px; --mta-cols-narrow: minmax(0, 1fr) 90px">
+			<div class="mta-row mta-row--head">
+				<span>Jail</span>
+				<span class="mta-wide">Failing now</span>
+				<span>Banned now</span>
+				<span class="mta-wide">Banned in all</span>
+			</div>
+			@foreach (Fail2BanJail jail in fail2ban.Jails)
+			{
+				<div class="@(jail.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+					 @key="jail.Name"
+					 role="button"
+					 tabindex="0"
+					 @onclick="@(() => Select(jail.Name))"
+					 @onkeydown="@(args => OnRowKey(args, jail.Name))">
+					<span class="mta-cell mta-mono">@jail.Name</span>
+					<span class="mta-cell mta-mono mta-dim mta-wide">@jail.CurrentlyFailed</span>
+					<span class="mta-cell mta-mono">@jail.CurrentlyBanned</span>
+					<span class="mta-cell mta-mono mta-dim mta-wide">@jail.TotalBanned</span>
+				</div>
+			}
+		</div>
+	};
+
+	private RenderFragment CheckPanel => __builder =>
+	{
+		if (Selected is not { } check || _snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		SshdConfig sshd = snapshot.Sshd;
+		<AdminDetailPanel Title="@check.Title"
+						  Subtitle="@check.Keyword"
+						  Mono="false"
+						  DotColor="@LevelColor(check.Level)"
+						  DotGlow="@(check.Level == SecurityLevel.Warning)"
+						  OnClose="@(() => _selected = null)">
+			<Actions>
+				@if (check.Fix is { } fix && check.Keyword is { } keyword)
+				{
+					@if (sshd.RouteFor(keyword) is { } route)
+					{
+						<MokaButton Variant="MokaVariant.Outlined"
+									Color="@(fix.CutsConnection ? MokaColor.Error : MokaColor.Primary)"
+									Size="MokaSize.Xs"
+									Disabled="@(Busy || _editing || Context.RootChangeBlocked is not null)"
+									title="@(Context.RootChangeBlocked ?? (route.UsesDropIn ? $"Writes {fix.Keyword} {fix.Value} into {route.File}" : $"Opens {route.File} to change {fix.Keyword}"))"
+									OnClick="@(() => FixAsync(fix, route))">
+							@(route.UsesDropIn ? fix.Label : $"Edit {route.File}")
+						</MokaButton>
+					}
+				}
+				@if (check.Shows is { } shows)
+				{
+					<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" OnClick="@(() => Show(shows))">@ShowsText(shows)</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<MokaText Element="p" Size="MokaSize.Sm">@check.Summary</MokaText>
+				<dl class="mta-kv">
+					<dt>Value</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@check.Value</MokaText></dd>
+					<dt>Status</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@LevelText(check.Level)</MokaText></dd>
+					@if (check.Keyword is { } keyword)
+					{
+						<dt>From</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@SourceText(sshd, keyword)</MokaText></dd>
+					}
+				</dl>
+				@if (check.Keyword is not null && check.Fix is null && check.Level != SecurityLevel.Good && !sshd.Effective)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Changing it needs sshd's own reading of its settings (sshd -T), which only root gets. Turn on root mode.</MokaText>
+				}
+				@if (check.Fix is { } offered && check.Keyword is { } fixKeyword)
+				{
+					@if (sshd.RouteFor(fixKeyword) is { UsesDropIn: false } byHand)
+					{
+						<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+							@($"A drop-in would not win here, so {byHand.File} opens in the editor: set {offered.Keyword} {offered.Value} there. sshd -t checks it before sshd reloads.")
+						</MokaText>
+					}
+					@if (offered.Warning is { } warning)
+					{
+						<MokaAlert Severity="@(offered.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
+					}
+				}
+				@if (_editProblem is { } problem)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _editProblem = null)">@problem</MokaAlert>
+				}
+				@if (check.Keyword is not null && sshd.TestProblem is { } broken)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@($"sshd -T refused its settings: {broken}")</MokaAlert>
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment JailPanel => __builder =>
+	{
+		if (SelectedJail is not { } jail)
+		{
+			return;
+		}
+
+		<AdminDetailPanel Title="@jail.Name" Subtitle="@jail.Watches" OnClose="@(() => _selected = null)">
+			<dl class="mta-kv">
+				<dt>Failing now</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.CurrentlyFailed</MokaText></dd>
+				<dt>Failed in all</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.TotalFailed</MokaText></dd>
+				<dt>Banned in all</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.TotalBanned</MokaText></dd>
+			</dl>
+			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Banned now</MokaText>
+			@if (jail.Banned.Count == 0)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Nobody.</MokaText>
+			}
+			else
+			{
+				<pre class="mta-pre">@string.Join("\n", jail.Banned)</pre>
+			}
+		</AdminDetailPanel>
+	};
+
+	private const int MaxRows = 400;
+
+	private static MokaColor LevelColor(SecurityLevel level) => level switch
+	{
+		SecurityLevel.Good => MokaColor.Success,
+		SecurityLevel.Notice => MokaColor.Info,
+		SecurityLevel.Warning => MokaColor.Warning,
+		_ => MokaColor.Surface,
+	};
+
+	private static string LevelText(SecurityLevel level) => level switch
+	{
+		SecurityLevel.Good => "fine",
+		SecurityLevel.Notice => "worth a look",
+		SecurityLevel.Warning => "weakens the machine",
+		_ => "not read",
+	};
+
+	private static string ShowsText(string shows) => shows switch
+	{
+		"logins" => "Show the logins",
+		"ports" => "Show the ports",
+		"fail2ban" => "Show the jails",
+		"security-updates" => "Show the updates",
+		_ => "Open Packages",
+	};
+
+	private static string SourceText(SshdConfig sshd, string keyword) =>
+		sshd.Sources.TryGetValue(keyword.ToLowerInvariant(), out string? file)
+			? file
+			: sshd.KnowsFiles ? "sshd's default" : "not read";
+
+	private static bool IsLoopback(ListeningSocket socket) =>
+		socket.Address.StartsWith("127.", StringComparison.Ordinal) || socket.Address is "::1" || socket.Address.Contains("%lo", StringComparison.Ordinal);
+
+	private bool Matches(FailedLogin login) => _filter.Trim().Length == 0
+		|| login.Address.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| login.User.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private bool Matches(ListeningSocket socket) => _filter.Trim().Length == 0
+		|| socket.Port.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(_filter.Trim(), StringComparison.Ordinal)
+		|| socket.Process.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
+		|| socket.Address.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(SecurityCheck check)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(check.Id, keepOpen: true) }];
+		if (check.Shows is { } shows)
+		{
+			items.Add(new MokaContextMenuItem { Text = ShowsText(shows), OnClickSync = () => Show(shows) });
+		}
+
+		if (check.Fix is { } fix && check.Keyword is { } keyword && _snapshot?.Sshd.RouteFor(keyword) is { } route)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = route.UsesDropIn ? fix.Label : $"Edit {route.File}",
+				DividerBefore = true,
+				Disabled = Busy || _editing || Context.RootChangeBlocked is not null,
+				OnClick = () => FixAsync(fix, route),
+			});
+		}
+
+		return items;
+	}
+
+	// Only the lists that grow long take a filter; the checks fit on a page.
+	private EventCallback<string> FilterChanged => _view is "logins" or "ports"
+		? EventCallback.Factory.Create<string>(this, value => _filter = value)
+		: default;
+
+	private void OnViewChanged(string value)
+	{
+		_view = value;
+		_selected = null;
+		_filter = "";
+	}
+
+	private void Show(string shows)
+	{
+		if (shows == "security-updates")
+		{
+			Context.NavigateWith(AdminPage.Packages, Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
+			return;
+		}
+
+		if (shows == "packages")
+		{
+			Context.Navigate(AdminPage.Packages);
+			return;
+		}
+
+		OnViewChanged(shows);
+	}
+
+	private void Select(string id) => Select(id, keepOpen: false);
+
+	private void Select(string id, bool keepOpen)
+	{
+		_selected = _selected == id && !keepOpen ? null : id;
+		_editProblem = null;
+	}
+
+	private void OnRowKey(KeyboardEventArgs args, string id)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(id);
+		}
+	}
+
+	/// <summary>
+	/// Puts a fix in place: through the drop-in when it wins, else by opening the file that does in the editor, then
+	/// checking the files with sshd -t and reloading.
+	/// </summary>
+	private async Task FixAsync(SshdFix fix, SshdChangeRoute route)
+	{
+		_editProblem = null;
+		if (route.UsesDropIn)
+		{
+			await RunAsync(SshdCommands.SetInDropIn(fix, Profile.Init));
+			return;
+		}
+
+		_editing = true;
+		try
+		{
+			RemoteTextEditResult result = await AdminFileEditing.EditAsRootAsync(Editor, Feature, route.File, route.File, createNew: false, CancellationToken.None);
+			switch (result.Outcome)
+			{
+				case RemoteTextEditOutcome.Saved:
+					await RunAsync(SshdCommands.CheckAndReload(Profile.Init, route.File, fix));
+					break;
+				case RemoteTextEditOutcome.Failed:
+					_editProblem = result.Message;
+					break;
+			}
+		}
+		finally
+		{
+			_editing = false;
+		}
+	}
+}

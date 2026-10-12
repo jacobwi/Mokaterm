@@ -42,13 +42,24 @@ internal sealed class DemoTerminalChannel : ITerminalChannel
 	private int _disposed;
 
 	/// <param name="ended">Called once the login shell exits and its last output is queued.</param>
-	public DemoTerminalChannel(DemoShell shell, Action ended, ILogger logger)
+	/// <param name="startupLine">Typed in once the banner is out, the way an SSH login's startup command is.</param>
+	public DemoTerminalChannel(DemoShell shell, Action ended, ILogger logger, string? startupLine = null)
 	{
 		_shell = shell;
 		_editor = new LineEditor(shell.History);
 		_echo = new ShellOutput(_output.Writer);
 		_ended = ended;
 		_logger = logger;
+
+		// Queued before the banner's job starts, since that job drains the queue when it ends.
+		if (startupLine is not null)
+		{
+			foreach (TerminalKey key in _keys.Read(startupLine + "\r"))
+			{
+				QueueWhileBusy(key);
+			}
+		}
+
 		StartJob(shell.GreetAsync);
 	}
 

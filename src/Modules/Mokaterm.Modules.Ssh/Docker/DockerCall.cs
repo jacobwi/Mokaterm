@@ -24,6 +24,8 @@ internal sealed record DockerCall
 	/// <summary>How much of each stream a change keeps for the output box.</summary>
 	public const int ChangeOutputBytes = 512 * 1024;
 
+	private static readonly IReadOnlySet<int> NoMasks = new HashSet<int>();
+
 	public required DockerProgram Program { get; init; }
 
 	public required IReadOnlyList<string> Arguments { get; init; }
@@ -34,6 +36,18 @@ internal sealed record DockerCall
 	public TimeSpan Timeout { get; init; } = DefaultTimeout;
 
 	public int OutputLimitBytes { get; init; } = ListingOutputBytes;
+
+	/// <summary>
+	/// stdout is bytes rather than text, such as a file read out of a container: it is kept as it came in
+	/// <see cref="DockerOutput.RawOutput"/> and never decoded into <see cref="DockerOutput.Output"/>.
+	/// </summary>
+	public bool BinaryOutput { get; init; }
+
+	/// <summary>
+	/// The arguments that are <c>NAME=value</c> with a secret value, such as <c>--env</c> for a new container: what is
+	/// shown masks the value after the first <c>=</c>, and the command runs with it as typed.
+	/// </summary>
+	public IReadOnlySet<int> MaskedArguments { get; init; } = NoMasks;
 
 	/// <summary>The words that start the command: <c>docker</c>, <c>docker compose</c>, <c>docker-compose</c> or <c>sh -c</c>.</summary>
 	public IReadOnlyList<string> ProgramWords => Program switch
@@ -54,8 +68,11 @@ internal sealed record DockerCall
 		return new DockerCall { Program = DockerProgram.Shell, Arguments = [script, "sh", .. arguments] };
 	}
 
-	/// <summary>The command as a person would type it, which is also exactly what runs.</summary>
-	public string Display => DockerCommandLine.Build(this);
+	/// <summary>
+	/// The command as a person would type it, which is also exactly what runs, apart from the values of
+	/// <see cref="MaskedArguments"/>.
+	/// </summary>
+	public string Display => DockerCommandLine.Build(this, masked: true);
 
 	/// <summary>The same words for a change: a longer wait and a smaller output cap.</summary>
 	public DockerCall AsChange(TimeSpan? timeout = null) => this with

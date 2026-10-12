@@ -1,6 +1,7 @@
 // Page-side plumbing shared by every view that owns one instance per element (the terminal, the VNC and RDP screens)
 // and by the shell and the file browser: the instance map, calls back to .NET, listeners that come back as disposables,
-// the bounded queues that carry input to .NET, and the attach-once marker.
+// the bounded queues that carry input to .NET, the attach-once marker, and opening web links (from the terminal's links
+// and from .NET through IUrlOpener).
 //
 // Served as _content/Mokaterm.UI.Common/js/interop.js. Views import it with a relative path
 // (../../Mokaterm.UI.Common/js/interop.js) so a host under a path base resolves it too, and every importer shares the
@@ -60,6 +61,28 @@ export function invoke(state, method, ...args) {
 export function listen(target, type, handler, options = false) {
 	target.addEventListener(type, handler, options);
 	return { dispose: () => target.removeEventListener(type, handler, options) };
+}
+
+/**
+ * Opens an http or https address in a new tab, which the desktop app's WebView hands to the system browser. Anything
+ * else is refused here as well as in .NET: a new window skips the desktop host's own check of where a link may go, and
+ * any other scheme would reach whatever program registered it. Returns whether it opened.
+ */
+export function openWebLink(address) {
+	let url;
+	try {
+		url = new URL(address);
+	}
+	catch {
+		return false;
+	}
+
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+		return false;
+	}
+
+	window.open(url.href, '_blank', 'noopener');
+	return true;
 }
 
 /** Disposes what a view collected without letting one broken subscription stop the rest of its teardown. */

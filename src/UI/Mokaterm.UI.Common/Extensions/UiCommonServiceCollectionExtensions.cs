@@ -14,6 +14,7 @@ public static class UiCommonServiceCollectionExtensions
 		services.TryAddSingleton(TimeProvider.System);
 		services.TryAddSingleton<IUiContributions, UiContributions>();
 		services.TryAddScoped<IClipboardService, JsClipboardService>();
+		services.TryAddScoped<IUrlOpener, JsUrlOpener>();
 		services.TryAddScoped<FormInterop>();
 		return services;
 	}

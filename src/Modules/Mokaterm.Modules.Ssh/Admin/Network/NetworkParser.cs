@@ -27,22 +27,26 @@ internal static class NetworkParser
 		}
 
 		(List<(string Scope, IReadOnlyList<string> Servers)> dns, List<string> search) = ParseDns(sections);
-		string source = sections.Has("ss") ? "ss" : sections.Has("netstat") ? "netstat" : "";
+		(IReadOnlyList<ListeningSocket> listening, string source) = ParseListening(sections);
 		return new NetworkSnapshot
 		{
 			Interfaces = interfaces,
 			Routes = routes,
 			Dns = dns,
 			SearchDomains = search,
-			Listening = source switch
-			{
-				"ss" => ParseSs(sections.Get("ss")),
-				"netstat" => ParseNetstat(sections.Get("netstat")),
-				_ => [],
-			},
+			Listening = listening,
 			ListeningSource = source,
 			FromText = fromText,
 		};
+	}
+
+	/// <summary>What <see cref="NetworkCommands.ListeningPorts"/> printed, and which tool printed it (empty for neither).</summary>
+	public static (IReadOnlyList<ListeningSocket> Sockets, string Source) ParseListening(AdminSections sections)
+	{
+		ArgumentNullException.ThrowIfNull(sections);
+		return sections.Has("ss") ? (ParseSs(sections.Get("ss")), "ss")
+			: sections.Has("netstat") ? (ParseNetstat(sections.Get("netstat")), "netstat")
+			: ([], "");
 	}
 
 	/// <summary><c>ip -j addr show</c>, or null when there is no JSON to read.</summary>

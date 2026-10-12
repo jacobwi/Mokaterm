@@ -10,6 +10,10 @@
 		<MokaSegment Value="running" Text="@($"Up {RunningCount.ToString(CultureInfo.CurrentCulture)}")" />
 		<MokaSegment Value="stopped" Text="@($"Down {(_containers.Count - RunningCount).ToString(CultureInfo.CurrentCulture)}")" />
 	</MokaSegmentedControl>
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add"
+				Disabled="@(IsBusy || _newImage is not null)" OnClick="@(() => NewContainer(""))">
+		New container
+	</MokaButton>
 	<MokaButton Variant="MokaVariant.Text"
 				Color="MokaColor.Surface"
 				Size="MokaSize.Xs"
@@ -27,6 +31,17 @@
 	<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@shellProblem</MokaAlert>
 }
 
+@if (_newImage is { } newImage)
+{
+	<DockerNewContainerView Session="Session"
+							Visible="Visible"
+							Image="@newImage"
+							TakenNames="TakenNames"
+							OnCreated="OnCreatedAsync"
+							OnCancel="CloseNewContainer" />
+}
+else
+{
 <div class="@(_selected is null ? "mt-dk-split" : "mt-dk-split mt-dk-split--open")">
 	<div class="mt-dk-split-list" role="list" aria-label="Containers">
 		@if (IsFirstLoad)
@@ -59,7 +74,9 @@
 											   Color="@DockerStateDisplay.Color(container.State, container.Health)"
 											   Pulse="@DockerStateDisplay.IsMoving(container.State, container.Health)" />
 								<span class="mt-dk-cell-name mt-dk-cell--w30">@ShortName(container)</span>
+								<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-label mt-dk-cell--w12 mt-dk-cell--error" : "mt-dk-label mt-dk-cell--w12")">@DockerStateDisplay.HealthLabel(container.Health)</span>
 								<span class="mt-dk-cell mt-dk-cell--grow" title="@container.Image">@container.Image</span>
+								@UpdateChip(container.Image)
 								<span class="mt-dk-cell mt-dk-cell--optional" title="@Ports(container)">@Ports(container)</span>
 							</button>
 							<span class="mt-dk-hover">
@@ -67,9 +84,10 @@
 											OnClick="@(() => Select(container, "logs"))" title="Logs" aria-label="@($"Logs of {container.Name}")" />
 								@if (container.IsRunning)
 								{
+									<DockerPortLinks Session="Session" Ports="container.Ports" Name="@container.Name" />
 									<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
-												Disabled="@(IsBusy || Session.Terminal is null)"
-												OnClick="@(() => ShellAsync(container))" title="Open a shell in the session's terminal" aria-label="@($"Open a shell in {container.Name}")" />
+												Disabled="@(IsBusy || !CanOpenShellTab)"
+												OnClick="@(() => ShellAsync(container))" title="Open a shell in a new tab" aria-label="@($"Open a shell in {container.Name}")" />
 								}
 								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(container.IsAlive ? MokatermIcons.Reconnect : MokatermIcons.Play)"
 											Disabled="IsBusy"
@@ -79,7 +97,8 @@
 													 Id="@container.Id"
 													 State="@container.State"
 													 Disabled="IsBusy"
-													 HasTerminal="@(Session.Terminal is not null)"
+													 HasTerminal="CanOpenShellTab"
+													 HasUpdate="@(Feature?.ImageUpdates.Find(container.Image) is { HasUpdate: true })"
 													 OnAction="@(action => OnMenuAsync(container, action))" />
 							</span>
 						</div>
@@ -103,3 +122,4 @@
 		</div>
 	}
 </div>
+}

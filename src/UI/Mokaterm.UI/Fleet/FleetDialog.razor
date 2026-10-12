@@ -1,0 +1,148 @@
+@namespace Mokaterm.UI.Fleet
+@inherits ShellEditorBase<FleetEditorRequest>
+
+<ShellEditorDialog Open="@(Request is not null)"
+				   Title="Fleet overview"
+				   Icon="MokatermIcons.Fleet"
+				   DialogSize="MokaDialogSize.ExtraLarge"
+				   Busy="IsBusy"
+				   OnClose="Close">
+	<ChildContent>
+		@if (Request is not null)
+		{
+			<PromptBody @ref="Body">
+				<div class="mt-fleet">
+					@if (_error is not null)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+					}
+
+					<div class="mt-fleet-bar">
+						<span class="mt-fleet-count">@Summary</span>
+						<div class="mt-fleet-bar__tools">
+							<EnumSegmentedControl TEnum="FleetView"
+												  Value="_view"
+												  ValueChanged="SetView"
+												  Options="Views"
+												  AriaLabel="Which logins to show" />
+							<MokaSearchInput Value="@_filter"
+											 ValueChanged="OnFilterChanged"
+											 Placeholder="Filter by name, address, user or system"
+											 Size="MokaSize.Sm"
+											 Debounce="0"
+											 Class="mt-fleet-filter"
+											 aria-label="Filter logins"
+											 data-autofocus="true" />
+						</div>
+					</div>
+
+					<div class="mt-fleet-picked">
+						<span class="mt-fleet-count">@PickedSummary</span>
+						<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="@(Visible.Count == 0)" OnClick="PickShown">Pick shown</MokaButton>
+						<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="@(_picked.Count == 0)" OnClick="ClearPicked">Clear</MokaButton>
+						<span class="mt-fleet-picked__actions">
+							<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect" Disabled="@(PickedRows.Count == 0)" OnClick="RefreshPickedAsync">Read again</MokaButton>
+							<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Command" Disabled="@(PickedRows.Count == 0)" OnClick="RunCommandOnPicked">Run command</MokaButton>
+							<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Connect" Disabled="@(PickedRows.Count == 0)" OnClick="OpenPickedAsync">Open</MokaButton>
+						</span>
+					</div>
+
+					@if (!Catalog.IsLoaded)
+					{
+						<div class="mt-fleet-empty">
+							<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+						</div>
+					}
+					else if (_rows.Count == 0)
+					{
+						<MokaEmptyState Icon="MokatermIcons.Fleet"
+										Title="No login here can report on its machine"
+										Description="SSH logins can. Save one, and it is listed here."
+										Size="MokaSize.Sm" />
+					}
+					else
+					{
+						@if (!Fleet.HasSurvey)
+						{
+							<MokaCallout Type="MokaCalloutType.Note">
+								@NotReadText
+							</MokaCallout>
+						}
+
+						<div class="mt-fleet-table" role="grid" aria-label="Saved logins and their machines" aria-rowcount="@(Visible.Count + 1)" @ref="_table">
+							<div class="mt-fleet-row mt-fleet-row--head" role="row">
+								<span class="mt-fleet-cell mt-fleet-cell--pick" role="columnheader"><span class="mt-fleet-sr">Picked</span></span>
+								<span class="mt-fleet-cell mt-fleet-cell--state" role="columnheader">State</span>
+								<span class="mt-fleet-cell mt-fleet-cell--login" role="columnheader">Login</span>
+								<span class="mt-fleet-cell mt-fleet-cell--os" role="columnheader">System</span>
+								<span class="mt-fleet-cell mt-fleet-cell--uptime" role="columnheader">Up</span>
+								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--load" role="columnheader" title="Load average over one minute">Load</span>
+								<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory" role="columnheader">Memory</span>
+								<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk" role="columnheader" title="The fullest real file system">Disk</span>
+								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates" role="columnheader" title="Pending updates the package manager already knows about">Updates</span>
+								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--reboot" role="columnheader">Reboot</span>
+								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed" role="columnheader" title="Failed services">Failed</span>
+								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker" role="columnheader" title="Running containers of all, when Docker answers this login">Docker</span>
+								<span class="mt-fleet-cell mt-fleet-cell--actions" role="columnheader"><span class="mt-fleet-sr">Actions</span></span>
+							</div>
+
+							@if (Visible.Count == 0)
+							{
+								<div class="mt-fleet-empty">
+									<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
+										@(_view == FleetView.Attention ? "Nothing needs a look right now." : "Nothing matches the filter.")
+									</MokaText>
+								</div>
+							}
+							else
+							{
+								DateTimeOffset now = Time.GetUtcNow();
+								@foreach (FleetRow row in Visible)
+								{
+									Guid id = row.Login.Id;
+									<FleetHostRow @key="id"
+												  Row="row"
+												  Picked="@_picked.Contains(id)"
+												  Expanded="@_expanded.Contains(id)"
+												  Now="now"
+												  OnTogglePick="() => TogglePick(id)"
+												  OnToggleExpand="() => ToggleExpand(id)"
+												  OnRefresh="() => RefreshAsync([id])"
+												  OnOpen="() => OpenAsync([id])"
+												  OnRunCommand="() => RunCommand([id])" />
+								}
+							}
+						</div>
+					}
+				</div>
+			</PromptBody>
+		}
+	</ChildContent>
+	<Actions>
+		@if (Fleet.IsRunning)
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" OnClick="Stop">Stop</MokaButton>
+		}
+		@if (SkippedCount > 0)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Loading="_retrying"
+						title="Reads the skipped logins again and asks what each one needs, one prompt at a time."
+						OnClick="RunSkippedAskingAsync">
+				@($"Run skipped, asking ({SkippedCount})")
+			</MokaButton>
+		}
+		@if (RetryableCount > 0 && !Fleet.IsRunning)
+		{
+			<MokaButton Variant="MokaVariant.Text" Loading="_retrying" OnClick="RetryFailedAsync">@($"Retry failed ({RetryableCount})")</MokaButton>
+		}
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="Close">Close</MokaButton>
+		<MokaButton data-primary="true"
+					StartIcon="MokatermIcons.Reconnect"
+					Loading="_refreshing"
+					Disabled="@(_rows.Count == 0)"
+					OnClick="RefreshAllAsync">
+			Refresh all
+		</MokaButton>
+	</Actions>
+</ShellEditorDialog>

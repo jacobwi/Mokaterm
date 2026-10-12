@@ -1,5 +1,5 @@
 using System.Globalization;
-using Mokaterm.Modules.Ssh.Shell;
+using Mokaterm.Abstractions.Commands;
 
 namespace Mokaterm.Modules.Ssh.Admin.Clock;
 

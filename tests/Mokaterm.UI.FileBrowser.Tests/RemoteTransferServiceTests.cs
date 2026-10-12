@@ -1,11 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Platform;
-using Mokaterm.Abstractions.Protocols;
-using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
-using Mokaterm.Abstractions.Terminal;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.UI.FileBrowser.Tests.Fakes;
 using Mokaterm.UI.FileBrowser.Transfers;
@@ -84,8 +80,8 @@ public sealed partial class RemoteTransferServiceTests
 	[Fact]
 	public async Task Retry_AfterTheSessionReopenedItsFileSystem_UploadsThroughTheNewOne()
 	{
-		FileFeature feature = new(_fileSystem);
-		Tab session = new(feature);
+		FakeFileFeature feature = new(_fileSystem);
+		FakeTab session = new(feature);
 		_fileSystem.UploadFailures.Enqueue(new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The SFTP connection is closed.", "/srv/upload/report.pdf"));
 		await _service.UploadAsync(new TransferFileSystem(_fileSystem, session, session.Session), Origin, Target, [LocalFile("report.pdf", "report.pdf")], TestContext.Current.CancellationToken);
 
@@ -102,8 +98,8 @@ public sealed partial class RemoteTransferServiceTests
 	public async Task Retry_AfterTheSessionReconnected_OpensRootOnceOnTheNewConnection()
 	{
 		FakeFileSystem root = new() { Elevated = true };
-		FileFeature feature = new(_fileSystem);
-		Tab session = new(feature);
+		FakeFileFeature feature = new(_fileSystem);
+		FakeTab session = new(feature);
 		TransferFileSystem target = new(root, session, session.Session);
 		root.UploadFailures.Enqueue(new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The session is closed.", "/srv/upload/a"));
 		root.UploadFailures.Enqueue(new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The session is closed.", "/srv/upload/b"));
@@ -125,7 +121,7 @@ public sealed partial class RemoteTransferServiceTests
 	[Fact]
 	public async Task Run_WhileTheSessionIsDisconnected_FailsAsALostConnection()
 	{
-		Tab session = new(new FileFeature(_fileSystem));
+		FakeTab session = new(new FakeFileFeature(_fileSystem));
 		await _service.UploadAsync(new TransferFileSystem(_fileSystem, session, session.Session), Origin, Target, [LocalFile("report.pdf", "report.pdf")], TestContext.Current.CancellationToken);
 		session.Disconnect();
 
@@ -140,7 +136,7 @@ public sealed partial class RemoteTransferServiceTests
 	[Fact]
 	public async Task WaitForCompletion_FollowsTheBatchWithoutReadingTheQueue()
 	{
-		Item[] batch = [new("a"), new("b"), new("c")];
+		FakeTransferItem[] batch = [new("a"), new("b"), new("c")];
 		Task wait = _service.WaitForCompletionAsync(batch, TestContext.Current.CancellationToken);
 
 		batch[0].State = TransferState.Completed;
@@ -160,7 +156,7 @@ public sealed partial class RemoteTransferServiceTests
 	[Fact]
 	public async Task WaitForCompletion_ATransferRetriedWhileOthersRun_IsWaitedForAgain()
 	{
-		Item[] batch = [new("a"), new("b")];
+		FakeTransferItem[] batch = [new("a"), new("b")];
 		Task wait = _service.WaitForCompletionAsync(batch, TestContext.Current.CancellationToken);
 		batch[0].State = TransferState.Failed;
 		batch[1].State = TransferState.Running;
@@ -186,88 +182,6 @@ public sealed partial class RemoteTransferServiceTests
 		OpenReadAsync = _ => ValueTask.FromResult<Stream>(new MemoryStream([1, 2, 3])),
 	};
 
-	/// <summary>Keeps what was enqueued and runs it on request, as the queue would when a transfer starts or is retried.</summary>
-	private sealed class FakeQueue : ITransferQueue
-	{
-		private Action? _changed;
-
-		public List<TransferRequest> Requests { get; } = [];
-
-		public int ItemsReads { get; private set; }
-
-		public int Subscribers => _changed?.GetInvocationList().Length ?? 0;
-
-		public IReadOnlyList<ITransferItem> Items
-		{
-			get
-			{
-				ItemsReads++;
-				return [];
-			}
-		}
-
-		public int ActiveCount => 0;
-
-		public event Action? Changed
-		{
-			add => _changed += value;
-			remove => _changed -= value;
-		}
-
-		public ITransferItem Enqueue(TransferRequest request)
-		{
-			Requests.Add(request);
-			return new Item(request.Name);
-		}
-
-		public Task RunAsync(int index) =>
-			Requests[index].ExecuteAsync(new TransferContext(new Progress<long>(), _ => { }, CancellationToken.None));
-
-		public void RaiseChanged() => _changed?.Invoke();
-
-		public void Cancel(Guid id) => throw new NotSupportedException();
-
-		public void Retry(Guid id) => throw new NotSupportedException();
-
-		public void Remove(Guid id) => throw new NotSupportedException();
-
-		public void ClearFinished() => throw new NotSupportedException();
-	}
-
-	/// <summary>A live item, the way the queue hands them out: its state changes in place.</summary>
-	private sealed class Item(string name) : ITransferItem
-	{
-		public Guid Id { get; } = Guid.NewGuid();
-
-		public string Name => name;
-
-		public TransferDirection Direction => TransferDirection.Upload;
-
-		public string Source => "";
-
-		public string Destination => "";
-
-		public string? Group => null;
-
-		public bool Elevated => false;
-
-		public TransferState State { get; set; } = TransferState.Queued;
-
-		public long? TotalBytes => null;
-
-		public long TransferredBytes => 0;
-
-		public double BytesPerSecond => 0;
-
-		public string? Error => null;
-
-		public DateTimeOffset QueuedAt => DateTimeOffset.UnixEpoch;
-
-		public DateTimeOffset? StartedAt => null;
-
-		public DateTimeOffset? FinishedAt => null;
-	}
-
 	/// <summary>Every section at its defaults: overwrites are asked about.</summary>
 	private sealed class DefaultSettings : ISettingsService
 	{
@@ -289,89 +203,5 @@ public sealed partial class RemoteTransferServiceTests
 			where T : class, ISettingsSection, new() => throw new NotSupportedException();
 
 		public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-	}
-
-	private sealed class NoLocalFiles : ILocalFileAccess
-	{
-		public bool CanPickFolders => false;
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<bool> SaveFileAsync(string suggestedName, long? length, Func<Stream, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-	}
-
-	/// <summary>A session tab whose connection can drop and come back, each connection a new object.</summary>
-	private sealed class Tab(FileFeature feature) : ISessionHandle
-	{
-		public event Action? Changed
-		{
-			add { }
-			remove { }
-		}
-
-		public Guid Id { get; } = Guid.NewGuid();
-
-		public string Title => "abc@build-01";
-
-		public HostProfile Host { get; } = new() { Id = Guid.NewGuid(), Address = "build-01" };
-
-		public ConnectionProfile Connection { get; } = new() { Id = Guid.NewGuid(), HostId = Guid.NewGuid(), ProtocolId = "ssh" };
-
-		public ProtocolDescriptor Protocol { get; } = new() { Id = "ssh", DisplayName = "SSH", DefaultPort = 22, Capabilities = ProtocolCapabilities.FileSystem };
-
-		public bool IsTransient => false;
-
-		public SessionState State => Session is null ? SessionState.Disconnected : SessionState.Connected;
-
-		public string? StatusMessage => null;
-
-		public ConnectFailure? Failure => null;
-
-		public DateTimeOffset OpenedAt => DateTimeOffset.UnixEpoch;
-
-		public DateTimeOffset? ConnectedAt => DateTimeOffset.UnixEpoch;
-
-		public ITerminalStream? Terminal => null;
-
-		public IProtocolSession? Session { get; private set; } = new LiveConnection(feature);
-
-		public void Reconnect() => Session = new LiveConnection(feature);
-
-		public void Disconnect() => Session = null;
-	}
-
-	private sealed class LiveConnection(FileFeature feature) : IProtocolSession
-	{
-		public Task Completion => Task.CompletedTask;
-
-		public TFeature? GetFeature<TFeature>()
-			where TFeature : class => feature as TFeature;
-
-		public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-	}
-
-	/// <summary>Hands out whichever file systems the test put in place, and counts the root views it opened.</summary>
-	private sealed class FileFeature(IRemoteFileSystem user) : IFileSystemFeature
-	{
-		public IRemoteFileSystem User { get; set; } = user;
-
-		public IRemoteFileSystem? Root { get; set; }
-
-		public int ElevatedOpens { get; private set; }
-
-		public bool SupportsElevation => true;
-
-		public ValueTask<IRemoteFileSystem> OpenAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(User);
-
-		public ValueTask<IRemoteFileSystem> OpenElevatedAsync(CancellationToken cancellationToken = default)
-		{
-			ElevatedOpens++;
-			return ValueTask.FromResult(Root ?? throw new RemoteFileSystemException(RemoteFileErrorKind.ElevationFailed, "No root view."));
-		}
 	}
 }

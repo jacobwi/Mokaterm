@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits ComposePanelBase
 
 @if (Context is { } context)
 {
@@ -10,10 +10,11 @@
 			<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Read through sudo" />
 		}
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-					Disabled="@(IsLoading || _editing is not null)" OnClick="LoadAllAsync" title="Read the files again" aria-label="Read the files again" />
+					Disabled="@(IsLoading || IsEditing)" OnClick="LoadAllAsync" title="Read the files again" aria-label="Read the files again" />
 	</div>
 
 	@LoadErrorPanel(LoadAllAsync)
+	@EditOutcome
 
 	@if (_unset.Count > 0)
 	{
@@ -39,35 +40,11 @@
 					<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="@(file.Required ? MokaColor.Error : MokaColor.Surface)" />
 				}
 				<span class="mt-dk-spacer"></span>
-				@if (file.Exists && file.Text is { Truncated: false } && _editing is null)
-				{
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" OnClick="@(() => Edit(file))">
-						Edit
-					</MokaButton>
-				}
+				@EditButtons(file.Path, _asRoot, createNew: !file.Exists)
 			</div>
 			@PathLine(file.Path, "Copy the path")
 
-			@if (_editing == file && file.Text is { } original)
-			{
-				<MokaTextArea Class="mt-dk-code" Value="@_draft"
-							  ValueChanged="OnDraftChanged"
-							  Rows="12"
-							  Disabled="_saving"
-							  Size="MokaSize.Sm"
-							  spellcheck="false"
-							  aria-label="@($"Contents of {file.Path}")" />
-				<div class="mt-dk-toolbar">
-					<span class="mt-dk-note mt-dk-cell--grow">@SaveNote(original)</span>
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="_saving" OnClick="CancelEdit">Cancel</MokaButton>
-					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_saving" OnClick="SaveAsync">Save</MokaButton>
-				</div>
-				@if (_saveProblem is { } saveProblem)
-				{
-					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@saveProblem</MokaAlert>
-				}
-			}
-			else if (file.Problem is { } problem)
+			@if (file.Problem is { } problem)
 			{
 				<div class="mt-dk-alert-line">
 					<span class="mt-dk-note">@problem</span>
@@ -87,9 +64,9 @@
 				{
 					<DockerVariableRow @key="variable.Line" Name="@variable.Name" Value="@variable.Value" />
 				}
-				@if (file.Text is { Truncated: true })
+				@if (file.IsCut)
 				{
-					<span class="mt-dk-note">Only the start of this file was read, so it is not offered for editing.</span>
+					<span class="mt-dk-note">@CutText</span>
 				}
 			}
 		</div>

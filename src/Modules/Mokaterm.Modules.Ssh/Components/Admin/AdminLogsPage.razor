@@ -9,69 +9,82 @@
 		}
 	</Chips>
 	<ChildContent>
-		<div class="mta-section" style="height:100%">
-			<div class="mta-inline">
-				@if (_source == "journal")
-				{
-					<div class="mta-grow">
-						<TextSetting Value="@_unit"
-									 ValueChanged="@(value => _unit = value)"
-									 Validate="AdminNames.CheckService"
-									 AllowEmpty
-									 Placeholder="Every unit, or one such as nginx"
-									 AriaLabel="Unit" />
-					</div>
-					<MokaSelect TValue="string"
-								Items="PriorityChoices"
-								Value="@_priority"
-								ValueChanged="@(value => _priority = value ?? "")"
-								ValueSelector="PriorityLabel"
-								Size="MokaSize.Sm"
-								aria-label="Priority" />
-				}
-				else
-				{
-					<div class="mta-grow">
-						<MokaSelect TValue="string"
-									Items="_files"
-									Value="@_file"
-									ValueChanged="@(value => _file = value)"
-									Searchable
-									Loading="_filesLoading"
-									Placeholder="@(_files.Count == 0 ? "No log files listed" : "Pick a log file")"
-									Size="MokaSize.Sm"
-									aria-label="Log file" />
-					</div>
-				}
-				<MokaSelect TValue="int"
-							Items="LogCommands.LineCounts"
-							Value="_lines"
-							ValueChanged="@(value => _lines = value)"
-							ValueSelector="@(count => $"last {count} lines")"
-							Size="MokaSize.Sm"
-							aria-label="Lines" />
-				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Loading || !CanRead)" OnClick="ReloadAsync">Read</MokaButton>
+		@if (_source == "files" && _files.Count == 0 && !_filesLoading && Loaded)
+		{
+			<MokaEmptyState Icon="SshIcons.Log" Title="No log files" Description="Nothing readable was found under /var/log. Root mode can read files this login cannot." />
+		}
+		else
+		{
+			<div class="mta-logs">
+				<LogView Tail="_tail"
+						 Label="@(_source == "journal" ? "Journal" : "Log file")"
+						 EmptyText="@EmptyText"
+						 LineChoices="LogCommands.LineCounts"
+						 LineCount="_lines"
+						 LineCountChanged="OnLinesChangedAsync"
+						 Following="_following"
+						 FollowingChanged="OnFollowingChanged"
+						 CanFollow="@(_follower is not null || _following)"
+						 FollowTitle="@FollowTitle">
+					<Controls>
+						@if (_source == "journal")
+						{
+							<div class="mta-logs-field">
+								<TextSetting Value="@_unit"
+											 ValueChanged="@(value => _unit = value)"
+											 Validate="AdminNames.CheckService"
+											 AllowEmpty
+											 Placeholder="Every unit, or one such as nginx"
+											 AriaLabel="Unit" />
+							</div>
+							<MokaSelect TValue="string"
+										Items="PriorityChoices"
+										Value="@_priority"
+										ValueChanged="OnPriorityChangedAsync"
+										ValueSelector="PriorityLabel"
+										Size="MokaSize.Sm"
+										aria-label="Priority" />
+						}
+						else
+						{
+							<div class="mta-logs-field">
+								<MokaSelect TValue="string"
+											Items="_files"
+											Value="@_file"
+											ValueChanged="OnFileChangedAsync"
+											Searchable
+											Loading="_filesLoading"
+											Placeholder="@(_files.Count == 0 ? "No log files listed" : "Pick a log file")"
+											Size="MokaSize.Sm"
+											aria-label="Log file" />
+							</div>
+						}
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="@(Loading || !CanRead)" OnClick="ReloadAsync">Read</MokaButton>
+					</Controls>
+					<Status>
+						@if (_truncated)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The output passed the size this view keeps; only its start is shown.</MokaText>
+						}
+						@if (_followError is { } followError)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim" title="@followError">@($"Following paused: {followError}")</MokaText>
+						}
+						else if (_followNotice is { } notice)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@notice</MokaText>
+						}
+					</Status>
+				</LogView>
 			</div>
-
-			@if (_text is { } text)
-			{
-				<pre class="mta-pre mta-pre--fill">@(text.Length == 0 ? "(no lines)" : text)</pre>
-				@if (_truncated)
-				{
-					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The output passed the size this view keeps; only its start is shown.</MokaText>
-				}
-			}
-			else if (_source == "files" && _files.Count == 0 && !_filesLoading)
-			{
-				<MokaEmptyState Icon="SshIcons.Log" Title="No log files" Description="Nothing readable was found under /var/log. Root mode can read files this login cannot." />
-			}
-		</div>
+		}
 	</ChildContent>
 </AdminPageFrame>
 
 @code {
 	private static readonly IReadOnlyList<string> PriorityChoices = ["", .. LogCommands.Priorities];
 
+	private readonly LogTail _tail = new();
 	private string _source = "journal";
 	private string _unit = "";
 	private string _priority = "";
@@ -79,14 +92,23 @@
 	private IReadOnlyList<string> _files = [];
 	private bool _filesLoading;
 	private string? _file;
-	private string? _text;
 	private bool _truncated;
+	private bool _following;
+	private LogFollower? _follower;
+	private string? _followError;
+	private string? _followNotice;
 
 	protected override bool ReadsMoreAsRoot => true;
 
 	private bool CanRead => _source == "journal" || _file is not null;
 
 	private IReadOnlyList<AdminChip> Sources => [new("journal", "Journal"), new("files", "Files in /var/log", _files.Count > 0 ? _files.Count : null)];
+
+	private string EmptyText => !Loaded ? "Reading the log..." : _source == "files" && _file is null ? "Pick a log file." : "No lines.";
+
+	private string FollowTitle => _source == "journal"
+		? "Fetch new entries every two seconds, from the last one shown"
+		: "Fetch what is added to the file every two seconds, and notice when it is rotated";
 
 	private string Summary => _source == "journal"
 		? $"journalctl{(_unit.Length > 0 ? $" -u {_unit}" : "")}{(_priority.Length > 0 ? $" -p {_priority}" : "")} -n {_lines}{(ReadAsRoot ? "" : " · without root mode the journal may show only this login's messages")}"
@@ -102,6 +124,10 @@
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
+		// A fresh read is a new starting point; whatever follows has to continue from it.
+		_follower = null;
+		_followError = null;
+		_followNotice = null;
 		if (_source == "files")
 		{
 			if (_files.Count == 0)
@@ -111,26 +137,44 @@
 
 			if (_file is null)
 			{
-				_text = null;
+				_tail.Reset([]);
+				_truncated = false;
 				return;
 			}
 		}
 
-		AdminScript script = _source == "journal"
-			? LogCommands.Journal(_unit.Length == 0 ? null : _unit, _priority.Length == 0 ? null : _priority, _lines, ReadAsRoot)
-			: LogCommands.ReadFile(_file!, _lines, ReadAsRoot);
-		AdminOutcome outcome = await ReadAsync(script, cancellationToken);
-		string text = AdminText.Clean(outcome.Output).TrimEnd();
-		if (!outcome.Succeeded && text.Length == 0)
+		bool asRoot = ReadAsRoot;
+		if (_source == "journal")
+		{
+			string? unit = _unit.Length == 0 ? null : _unit;
+			string? priority = _priority.Length == 0 ? null : _priority;
+			AdminOutcome outcome = await ReadAsync(LogCommands.Journal(unit, priority, _lines, asRoot), cancellationToken);
+			JournalRead read = LogCommands.ParseJournal(outcome.Output);
+			Show(outcome, read.Lines);
+			_follower = LogFollower.ForJournal(read, unit, priority, asRoot);
+		}
+		else
+		{
+			string path = _file!;
+			AdminOutcome outcome = await ReadAsync(LogCommands.ReadFile(path, _lines, asRoot), cancellationToken);
+			(IReadOnlyList<LogLine> lines, LogFollower? follower) = LogFollower.ForFile(path, LogCommands.ParseFile(outcome.Output), asRoot);
+			Show(outcome, lines);
+			_follower = follower;
+		}
+	}
+
+	private static string PriorityLabel(string priority) => priority.Length == 0 ? "any priority" : $"{priority} and worse";
+
+	private void Show(AdminOutcome outcome, IReadOnlyList<LogLine> lines)
+	{
+		if (!outcome.Succeeded && lines.All(line => line.Text.Trim().Length == 0))
 		{
 			throw new AdminException(outcome.Problem());
 		}
 
-		_text = text;
+		_tail.Reset(lines);
 		_truncated = outcome.IsTruncated;
 	}
-
-	private static string PriorityLabel(string priority) => priority.Length == 0 ? "any priority" : $"{priority} and worse";
 
 	private async Task LoadFilesAsync(CancellationToken cancellationToken)
 	{
@@ -147,10 +191,78 @@
 		}
 	}
 
+	private void OnFollowingChanged(bool following)
+	{
+		_following = following;
+		_followError = null;
+		if (following)
+		{
+			StartPolling(LogCommands.FollowInterval, FollowAsync);
+		}
+		else
+		{
+			StopPolling();
+		}
+	}
+
+	/// <summary>
+	/// One follow poll. A failure is shown and the next poll tries again from the same place; a read that started
+	/// meanwhile replaced the follower, and what this poll brought belongs to the old one.
+	/// </summary>
+	private async Task FollowAsync()
+	{
+		if (_follower is not { } follower)
+		{
+			return;
+		}
+
+		try
+		{
+			LogFollowStep step = follower.Take(await ReadAsync(follower.Next(), Lifetime));
+			if (!ReferenceEquals(follower, _follower))
+			{
+				return;
+			}
+
+			_tail.AppendAll(step.Lines);
+			_followError = null;
+			_followNotice = step.Notice ?? _followNotice;
+		}
+		catch (AdminException ex)
+		{
+			_followError = ex.Message;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		StateHasChanged();
+	}
+
 	private async Task OnSourceChangedAsync(string value)
 	{
 		_source = value;
-		_text = null;
+		_tail.Reset([]);
+		_truncated = false;
 		await ReloadAsync();
+	}
+
+	private Task OnLinesChangedAsync(int lines)
+	{
+		_lines = lines;
+		return ReloadAsync();
+	}
+
+	private Task OnPriorityChangedAsync(string? priority)
+	{
+		_priority = priority ?? "";
+		return ReloadAsync();
+	}
+
+	private Task OnFileChangedAsync(string? file)
+	{
+		_file = file;
+		return ReloadAsync();
 	}
 }

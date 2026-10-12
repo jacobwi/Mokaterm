@@ -10,8 +10,9 @@ using Mokaterm.UI.FileBrowser.Properties;
 namespace Mokaterm.UI.FileBrowser.Dialogs;
 
 /// <summary>
-/// Opens the file browser's dialogs and returns their results typed. Call only from the browser itself: awaiting a
-/// service dialog from inside another service dialog waits forever.
+/// Opens the file browser's dialogs and returns their results typed, from the browser itself or from the editor behind
+/// <see cref="Common.Editing.IRemoteTextEditor"/>. Service dialogs stack, so these open on top of a browser that is in a
+/// dialog of its own.
 /// </summary>
 internal sealed class FileBrowserDialogs
 {

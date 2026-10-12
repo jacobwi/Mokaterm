@@ -68,6 +68,14 @@
 		}
 	</text>;
 
+	/// <summary>A chip for an image this session's update check found behind its tag; nothing otherwise.</summary>
+	private protected RenderFragment UpdateChip(string? image) => @<text>
+		@if (Feature?.ImageUpdates.Find(image) is { HasUpdate: true } update)
+		{
+			<MokaTag Text="UPDATE" Size="MokaSize.Xs" Color="MokaColor.Info" title="@update.Detail" />
+		}
+	</text>;
+
 	/// <summary>A path in mono with a copy button, cut at its end when the line is short.</summary>
 	private protected static RenderFragment PathLine(string path, string label) => @<div class="mt-dk-path">
 		<span class="mt-dk-path-text" title="@path">@path</span>

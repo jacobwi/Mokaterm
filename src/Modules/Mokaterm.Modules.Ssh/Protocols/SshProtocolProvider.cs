@@ -10,7 +10,7 @@ using LoginMethod = Mokaterm.Abstractions.Connections.AuthenticationMethod;
 
 namespace Mokaterm.Modules.Ssh.Protocols;
 
-/// <summary>SSH terminal sessions with an SFTP file browser beside them, and command-only connections for command runs.</summary>
+/// <summary>SSH terminal sessions with an SFTP file browser beside them, and command-only connections for command runs and the fleet overview.</summary>
 internal sealed class SshProtocolProvider : IProtocolProvider
 {
 	private readonly SshConnector _connector;
@@ -35,7 +35,7 @@ internal sealed class SshProtocolProvider : IProtocolProvider
 		Description = "Secure shell with a file browser over SFTP.",
 		QuickConnectExample = "user@host:port",
 		DefaultPort = 22,
-		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands,
+		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands | ProtocolCapabilities.HostSummary,
 		AuthenticationMethods = [LoginMethod.Password, LoginMethod.PublicKey, LoginMethod.KeyboardInteractive, LoginMethod.Agent],
 		Order = 0,
 	};

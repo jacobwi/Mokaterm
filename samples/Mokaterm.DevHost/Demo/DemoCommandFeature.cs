@@ -31,14 +31,14 @@ internal sealed class DemoCommandFeature : IRemoteCommandFeature
 	{
 		ArgumentNullException.ThrowIfNull(request);
 		long started = _time.GetTimestamp();
-		await Task.Delay(TimeSpan.FromMilliseconds(150 + StableNumber(_hostName) % 900), _time, cancellationToken);
+		await Task.Delay(TimeSpan.FromMilliseconds(150 + DemoRandom.Next(DemoRandom.Seed(_hostName), 900)), _time, cancellationToken);
 
 		Capture output = new(request.OutputLimitBytes);
 		Capture error = new(request.OutputLimitBytes);
 		if (DemoSystemOutput.ScriptName(request.Command) is { } script)
 		{
 			// The SSH module's system view reading this machine: its scripts print an output marker first.
-			if (DemoSystemOutput.For(script, _account, _hostName, _time.GetUtcNow()) is { } text)
+			if ((DemoMonitorOutput.For(script, request.Command, _account, _time.GetUtcNow()) ?? DemoSystemOutput.For(script, _account, _hostName, _time.GetUtcNow())) is { } text)
 			{
 				output.Text("MOKATERM-OUT\0" + text);
 				return Outcome(0, output, error, started);
@@ -68,7 +68,7 @@ internal sealed class DemoCommandFeature : IRemoteCommandFeature
 					exit = 0;
 					break;
 				case "uptime":
-					output.Line(string.Create(CultureInfo.InvariantCulture, $" {_time.GetUtcNow():HH:mm:ss} up {3 + StableNumber(_hostName) % 40} days,  2:17,  1 user,  load average: 0.08, 0.12, 0.10"));
+					output.Line(string.Create(CultureInfo.InvariantCulture, $" {_time.GetUtcNow():HH:mm:ss} up {3 + DemoRandom.Next(DemoRandom.Seed(_hostName), 40)} days,  2:17,  1 user,  load average: 0.08, 0.12, 0.10"));
 					exit = 0;
 					break;
 				case "date":
@@ -108,18 +108,6 @@ internal sealed class DemoCommandFeature : IRemoteCommandFeature
 		}
 
 		return Outcome(exit, output, error, started);
-	}
-
-	/// <summary>The same number for the same host on every run, unlike <see cref="string.GetHashCode()"/>.</summary>
-	private static int StableNumber(string text)
-	{
-		int value = 17;
-		foreach (char character in text)
-		{
-			value = unchecked((value * 31) + character);
-		}
-
-		return value & 0x7fffffff;
 	}
 
 	private RemoteCommandOutcome Outcome(int exit, Capture output, Capture error, long started) => new()

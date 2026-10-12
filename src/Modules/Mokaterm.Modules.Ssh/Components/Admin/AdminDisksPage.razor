@@ -6,17 +6,23 @@
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
-				SearchPlaceholder="Filter by device or mount point"
+				SearchPlaceholder="@(_view == "space" ? "Filter by name" : "Filter by device or mount point")"
+				PrimaryText="@(_view == "space" ? "Find large files" : null)"
+				PrimaryIcon="MokaIcons.Action.Search"
+				PrimaryDisabled="_searching"
+				PrimaryTitle="List the largest files under this folder, on its own file system"
+				OnPrimary="FindLargeFilesAsync"
 				Loading="Loading"
 				Loaded="Loaded"
 				Error="@LoadError"
 				OnRefresh="ReloadAsync"
-				ListPage>
+				ListPage
+				Detail="@(_view == "devices" && SelectedDevice is not null ? DevicePanel : null)">
 	<Chips>
-		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => _view = value)" AriaLabel="Disk details to show" />
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Disk details to show" />
 	</Chips>
 	<ChipsEnd>
-		@if (_view != "devices")
+		@if (_view is "usage" or "mounts")
 		{
 			<MokaCheckbox Value="_everything" ValueChanged="@(value => _everything = value)" Label="Kernel and memory file systems too" />
 		}
@@ -26,6 +32,10 @@
 		{
 			@switch (_view)
 			{
+				case "space":
+					@SpaceView(snapshot)
+					break;
+
 				case "devices":
 					@if (snapshot.Devices.Count == 0)
 					{
@@ -43,12 +53,22 @@
 							</div>
 							@foreach ((BlockDevice device, int depth) in Flatten(snapshot.Devices, 0).Where(pair => Matches(pair.Device.Name) || Matches(pair.Device.MountPoint)))
 							{
-								<div class="mta-row" @key="@($"{device.Name}|{depth}|{device.MountPoint}")">
-									<span class="mta-cell" style="@($"padding-left:{depth * 14}px")" title="@DeviceTitle(device)">
+								<div class="@(device.Name == _device ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+									 @key="@($"{device.Name}|{depth}|{device.MountPoint}")"
+									 role="button"
+									 tabindex="0"
+									 title="@DeviceTitle(device)"
+									 @onclick="@(() => SelectDevice(device))"
+									 @onkeydown="@(args => OnDeviceKey(args, device))">
+									<span class="mta-cell" style="@($"padding-left:{depth * 14}px")">
 										<span class="mta-mono">@device.Name</span>
 										@if (device.Model.Length > 0 || device.Label.Length > 0)
 										{
 											<span class="mta-dim mta-after">@(device.Model.Length > 0 ? device.Model : device.Label)</span>
+										}
+										@if (_smart.TryGetValue(device.Name, out SmartReport? health) && health.Passed is { } passed)
+										{
+											<span class="mta-after"><MokaTag Text="@(passed && !health.NeedsAttention ? "OK" : "CHECK")" Size="MokaSize.Xs" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : MokaColor.Error)" /></span>
 										}
 									</span>
 									<span class="mta-cell mta-mono mta-dim mta-wide">@device.Type</span>
@@ -76,14 +96,20 @@
 						</div>
 						@foreach (FileSystemUsage item in SortedUsage(snapshot.Usage.Where(item => (_everything || DiskCommands.IsStorage(item)) && (Matches(item.MountPoint) || Matches(item.Source)))))
 						{
-							<div class="mta-row" @key="@($"{item.MountPoint}|{item.Source}")">
+							<div class="mta-row mta-row--clickable"
+								 @key="@($"{item.MountPoint}|{item.Source}")"
+								 role="button"
+								 tabindex="0"
+								 title="@($"See what is using space on {item.MountPoint}")"
+								 @onclick="@(() => OpenSpaceAsync(item.MountPoint))"
+								 @onkeydown="@(args => OnUsageKeyAsync(args, item.MountPoint))">
 								<span class="mta-cell mta-mono" title="@item.MountPoint">@item.MountPoint</span>
 								<span class="mta-cell mta-mono mta-dim mta-wide" title="@item.Source">@item.Source</span>
 								<span class="mta-cell mta-mono mta-dim mta-wide">@item.Type</span>
 								<span class="mta-cell" title="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")">
 									<span class="mta-mono">@AdminFormat.Percent(item.UsedPercent)</span>
 									<span class="mta-mono mta-dim mta-after">@AdminFormat.Kb(item.AvailableKb) free</span>
-									<div class="@AdminFormat.BarClass(item.UsedPercent)"><span style="@AdminFormat.BarWidth(item.UsedPercent)"></span></div>
+									<UsageBar Percent="item.UsedPercent" />
 								</span>
 								<span class="mta-cell mta-mono">@AdminFormat.Kb(item.TotalKb)</span>
 							</div>
@@ -122,11 +148,34 @@
 </AdminPageFrame>
 
 @code {
+	private const string SpaceTab = "space";
+
 	private DiskSnapshot? _snapshot;
 	private readonly AdminSort _sort = new("mount");
 	private string _view = "usage";
 	private string _filter = "";
 	private bool _everything;
+
+	private readonly Dictionary<string, SpaceReport> _spaceCache = new(StringComparer.Ordinal);
+	private string _spacePath = "/";
+	private SpaceReport? _space;
+	private string? _spaceError;
+	private bool _measuring;
+	private CancellationTokenSource? _measure;
+
+	private long _largeKb = SpaceCommands.LargeFileSizesKb[1];
+	private SpaceReport? _large;
+	private string? _largeError;
+	private bool _searching;
+	private CancellationTokenSource? _search;
+
+	private readonly Dictionary<string, SmartReport> _smart = new(StringComparer.Ordinal);
+	private string? _device;
+	private string? _smartReading;
+	private string? _smartError;
+	private CancellationTokenSource? _smartRead;
+
+	protected override bool ReadsMoreAsRoot => true;
 
 	private string Summary
 	{
@@ -135,6 +184,11 @@
 			if (_snapshot is not { } snapshot)
 			{
 				return "";
+			}
+
+			if (_view == SpaceTab)
+			{
+				return $"du -x -k -d 1 {_spacePath} · stays on this file system{(ReadAsRoot ? "" : " · root mode reads folders this login cannot")}";
 			}
 
 			List<FileSystemUsage> storage = [.. snapshot.Usage.Where(DiskCommands.IsStorage)];
@@ -146,15 +200,359 @@
 	private IReadOnlyList<AdminChip> Chips =>
 	[
 		new("usage", "Usage", _snapshot?.Usage.Count(DiskCommands.IsStorage)),
+		new(SpaceTab, "What's using space"),
 		new("devices", "Devices", _snapshot?.Devices.Count),
 		new("mounts", "Mounts", _snapshot?.Mounts.Count),
 	];
+
+	private BlockDevice? SelectedDevice => _device is { } name && _snapshot is { } snapshot
+		? Flatten(snapshot.Devices, 0).Select(pair => pair.Device).FirstOrDefault(device => device.Name == name)
+		: null;
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
 		AdminOutcome outcome = await ReadAsync(DiskCommands.Read(), cancellationToken);
 		_snapshot = DiskCommands.Parse(outcome.Output);
+
+		// A refresh or a change of root mode reads everything again: what root can see is not what the login can.
+		_spaceCache.Clear();
+		_smart.Clear();
+		_large = null;
+		_largeError = null;
+		if (_view == SpaceTab)
+		{
+			_ = MeasureAsync(_spacePath);
+		}
+
+		if (SelectedDevice is { } device)
+		{
+			StartSmartRead(device);
+		}
 	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			foreach (CancellationTokenSource? source in (CancellationTokenSource?[])[_measure, _search, _smartRead])
+			{
+				source?.Cancel();
+				source?.Dispose();
+			}
+
+			_measure = _search = _smartRead = null;
+		}
+
+		base.Dispose(disposing);
+	}
+
+	private RenderFragment SpaceView(DiskSnapshot snapshot) => __builder =>
+	{
+		IReadOnlyList<(string Name, string Path)> trail = SpaceCommands.Trail(_spacePath);
+		<div class="mta-space">
+			<nav class="mta-crumbs" aria-label="Folder">
+				@for (int index = 0; index < trail.Count; index++)
+				{
+					(string name, string path) = trail[index];
+					bool last = index == trail.Count - 1;
+					@if (index > 1)
+					{
+						<span class="mta-dim" aria-hidden="true">/</span>
+					}
+					<button type="button" class="@(last ? "mta-crumb mta-crumb--here" : "mta-crumb")" aria-current="@(last ? "location" : null)" disabled="@last" @onclick="@(() => MeasureAsync(path))">@name</button>
+				}
+				<span class="mta-spacer"></span>
+				@if (SpaceCommands.Parent(_spacePath) is { } up)
+				{
+					<button type="button" class="mta-link" @onclick="@(() => MeasureAsync(up))">Up</button>
+				}
+				<button type="button" class="mta-link" disabled="@_measuring" @onclick="@(() => MeasureAsync(_spacePath, reuse: false))">Measure again</button>
+			</nav>
+
+			@if (_measuring)
+			{
+				<div class="mta-loading">
+					<MokaSpinner Label="@($"Measuring {_spacePath}; du takes a while on a big folder")" />
+				</div>
+			}
+			else if (_spaceError is { } error)
+			{
+				<MokaAlert Severity="MokaToastSeverity.Error" Dense>@error</MokaAlert>
+			}
+			else if (_space is { } report)
+			{
+				List<FileSystemUsage> mounts = [.. MountsInside(snapshot, _spacePath)];
+				long top = Math.Max(1, report.TotalKb ?? report.Entries.Select(entry => entry.Kb).DefaultIfEmpty(0).Sum());
+				<div class="mta-space-head">
+					<span class="mta-stat mta-stat--small">@(report.TotalKb is { } total ? AdminFormat.Kb(total) : "?")</span>
+					<span class="mta-dim">@SpaceNote(report)</span>
+					@if (report.Unreadable > 0 && !ReadAsRoot && Context.RootChangeBlocked is null)
+					{
+						<button type="button" class="mta-link" @onclick="Context.EnableRoot">Turn on root mode to read them</button>
+					}
+				</div>
+				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 90px minmax(80px, 1fr); --mta-cols-narrow: minmax(0, 1fr) 80px">
+					<div class="mta-row mta-row--head">
+						<span>Folder</span>
+						<span>Size</span>
+						<span class="mta-wide">Share</span>
+					</div>
+					@foreach (SpaceEntry entry in report.Entries.Where(entry => Matches(entry.Name) && !mounts.Any(mount => mount.MountPoint == entry.Path)))
+					{
+						<div class="mta-row mta-row--clickable" @key="entry.Path" role="button" tabindex="0" title="@($"Open {entry.Path}")"
+							 @onclick="@(() => MeasureAsync(entry.Path))"
+							 @onkeydown="@(args => OnFolderKeyAsync(args, entry.Path))">
+							<span class="mta-cell mta-mono">@entry.Name/</span>
+							<span class="mta-cell mta-mono">@AdminFormat.Kb(entry.Kb)</span>
+							<span class="mta-cell mta-wide"><UsageBar Percent="@(entry.Kb * 100.0 / top)" /></span>
+						</div>
+					}
+					@if (report.FilesHereKb is { } files && files > 0)
+					{
+						<div class="mta-row">
+							<span class="mta-cell mta-dim">Files directly in this folder</span>
+							<span class="mta-cell mta-mono">@AdminFormat.Kb(files)</span>
+							<span class="mta-cell mta-wide"><UsageBar Percent="@(files * 100.0 / top)" /></span>
+						</div>
+					}
+					@foreach (FileSystemUsage mount in mounts.Where(mount => Matches(SpaceCommands.NameOf(mount.MountPoint))))
+					{
+						<div class="mta-row mta-row--clickable" @key="@($"mount|{mount.MountPoint}")" role="button" tabindex="0" title="@($"{mount.Source}, a file system of its own, so du left it out here. Open it to measure it.")"
+							 @onclick="@(() => MeasureAsync(mount.MountPoint))"
+							 @onkeydown="@(args => OnFolderKeyAsync(args, mount.MountPoint))">
+							<span class="mta-cell mta-mono">
+								@SpaceCommands.NameOf(mount.MountPoint)/
+								<span class="mta-dim mta-after">@($"{mount.Type} file system of its own")</span>
+							</span>
+							<span class="mta-cell mta-mono mta-dim">@AdminFormat.Kb(mount.UsedKb)</span>
+							<span class="mta-cell mta-wide"></span>
+						</div>
+					}
+					@if (report.Entries.Count == 0 && mounts.Count == 0 && report.FilesHereKb is null or 0)
+					{
+						<div class="mta-more">Nothing under this folder takes any space.</div>
+					}
+				</div>
+			}
+
+			@if (_searching || _large is not null || _largeError is not null)
+			{
+				<section class="mta-section mta-large" aria-label="Large files">
+					<div class="mta-inline">
+						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Large files</MokaText>
+						<AdminChips Items="LargeChoices" Value="@_largeKb.ToString(CultureInfo.InvariantCulture)" ValueChanged="OnLargeSizeChangedAsync" AriaLabel="Files over" />
+						<span class="mta-spacer"></span>
+						@if (_large is not null || _largeError is not null)
+						{
+							<button type="button" class="mta-link" @onclick="CloseLargeFiles">Hide</button>
+						}
+					</div>
+					@if (_searching)
+					{
+						<MokaSpinner Label="@($"Looking for files over {AdminFormat.Kb(_largeKb)} under {_spacePath}")" />
+					}
+					else if (_largeError is { } largeError)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Error" Dense>@largeError</MokaAlert>
+					}
+					else if (_large is { } large)
+					{
+						@if (large.Entries.Count == 0)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"No file over {AdminFormat.Kb(_largeKb)} under {large.Path}{(large.StoppedEarly ? " in the time the search had" : "")}.")</MokaText>
+						}
+						else
+						{
+							long largest = Math.Max(1, large.Entries[0].Kb);
+							<div class="mta-table" style="--mta-cols: minmax(0, 1.6fr) 90px minmax(80px, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) 80px">
+								<div class="mta-row mta-row--head">
+									<span>File</span>
+									<span>Size</span>
+									<span class="mta-wide"></span>
+								</div>
+								@foreach (SpaceEntry file in large.Entries.Where(file => Matches(file.Path)))
+								{
+									<div class="mta-row" @key="file.Path">
+										<span class="mta-cell mta-mono" title="@file.Path">@Relative(file.Path, large.Path)</span>
+										<span class="mta-cell mta-mono">@AdminFormat.Kb(file.Kb)</span>
+										<span class="mta-cell mta-wide"><UsageBar Percent="@(file.Kb * 100.0 / largest)" /></span>
+									</div>
+								}
+							</div>
+						}
+						@if (LargeNote(large) is { Length: > 0 } note)
+						{
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@note</MokaText>
+						}
+					}
+				</section>
+			}
+		</div>
+	};
+
+	private RenderFragment DevicePanel => __builder =>
+	{
+		if (SelectedDevice is not { } device)
+		{
+			return;
+		}
+
+		<AdminDetailPanel Title="@device.Name" Subtitle="@(device.Model.Length > 0 ? device.Model : device.Type)" OnClose="@(() => _device = null)">
+			<Actions>
+				@if (CanReadSmart(device) && ReadAsRoot)
+				{
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh" Disabled="@(_smartReading == device.Name)" OnClick="@(() => ReadSmartAsync(device))">Read SMART again</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					<dt>Type</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(device.Type.Length > 0 ? device.Type : "unknown")</MokaText></dd>
+					@if (device.SizeBytes is { } size)
+					{
+						<dt>Size</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@DisplayFormat.Bytes(size)</MokaText></dd>
+					}
+					@if (device.FileSystem.Length > 0)
+					{
+						<dt>File system</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{device.FileSystem}{(device.Label.Length > 0 ? $" · {device.Label}" : "")}")</MokaText></dd>
+					}
+					@if (device.MountPoint.Length > 0)
+					{
+						<dt>Mounted on</dt>
+						<dd><button type="button" class="mta-link" @onclick="@(() => OpenSpaceAsync(device.MountPoint))">@device.MountPoint</button></dd>
+					}
+					@if (device.ReadOnly || device.Removable)
+					{
+						<dt>Flags</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm">@string.Join(", ", new[] { device.ReadOnly ? "read only" : "", device.Removable ? "removable" : "" }.Where(part => part.Length > 0))</MokaText></dd>
+					}
+				</dl>
+
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Health (SMART)</MokaText>
+				@if (SmartUnavailable(device) is { } unavailable)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@unavailable</MokaText>
+				}
+				else if (!ReadAsRoot)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@(Context.RootChangeBlocked ?? "smartctl opens the raw disk, which only root may do.")</MokaText>
+					@if (Context.RootChangeBlocked is null)
+					{
+						<div><MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Lock" OnClick="Context.EnableRoot">Turn on root mode</MokaButton></div>
+					}
+				}
+				else if (_smartReading == device.Name)
+				{
+					<MokaSpinner Label="Asking smartctl" />
+				}
+				else if (_smartError is { } smartError)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@smartError</MokaAlert>
+				}
+				else if (_smart.TryGetValue(device.Name, out SmartReport? report))
+				{
+					@SmartView(report)
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private static RenderFragment SmartView(SmartReport report) => __builder =>
+	{
+		@if (report.Passed is { } passed)
+		{
+			<div class="mta-inline">
+				<MokaTag Text="@(passed ? report.HealthText : "FAILED")" Size="MokaSize.Xs" Color="@(passed ? MokaColor.Success : MokaColor.Error)" />
+				<span class="mta-dim">@(passed
+					? report.NeedsAttention ? "The disk passes its own test, but some of its counters below are worth a look." : "The disk's own overall assessment."
+					: "The disk expects to fail soon. Back it up and replace it.")</span>
+			</div>
+		}
+		else if (report.Problem is { } problem)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@problem</MokaText>
+		}
+
+		<dl class="mta-kv">
+			@if (report.Model.Length > 0)
+			{
+				<dt>Model</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Model</MokaText></dd>
+			}
+			@if (report.Serial.Length > 0)
+			{
+				<dt>Serial</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Serial</MokaText></dd>
+			}
+			@if (report.Firmware.Length > 0)
+			{
+				<dt>Firmware</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Firmware</MokaText></dd>
+			}
+			@if (KindOf(report) is { Length: > 0 } kind)
+			{
+				<dt>Kind</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@kind</MokaText></dd>
+			}
+			@if (report.TemperatureCelsius is { } temperature)
+			{
+				<dt>Temperature</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{temperature} °C")</MokaText></dd>
+			}
+			@if (report.PowerOnHours is { } hours)
+			{
+				<dt>Powered on</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@PowerOn(hours)</MokaText></dd>
+			}
+			@if (report.PowerCycles is { } cycles)
+			{
+				<dt>Power cycles</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@cycles.ToString("N0", CultureInfo.CurrentCulture)</MokaText></dd>
+			}
+			@foreach ((string label, string value) in report.NvmeHealth)
+			{
+				<dt>@label</dt>
+				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
+			}
+		</dl>
+
+		@if (report.Attributes.Count > 0)
+		{
+			<div class="mta-table" style="--mta-cols: 34px minmax(0, 1fr) 44px 44px 50px minmax(56px, 0.6fr); --mta-cols-narrow: 34px minmax(0, 1fr) 44px minmax(56px, 0.6fr)" role="table" aria-label="SMART attributes">
+				<div class="mta-row mta-row--head" role="row">
+					<span role="columnheader">ID</span>
+					<span role="columnheader">Attribute</span>
+					<span role="columnheader">Value</span>
+					<span role="columnheader" class="mta-wide">Worst</span>
+					<span role="columnheader" class="mta-wide">Thresh</span>
+					<span role="columnheader">Raw</span>
+				</div>
+				@foreach (SmartAttribute row in report.Attributes)
+				{
+					<div class="@(row.Failed ? "mta-row mta-smart--failed" : row.Worrying ? "mta-row mta-smart--worrying" : "mta-row")" role="row" @key="row.Id"
+						 title="@(row.Failed ? $"The disk calls this attribute failed{(row.WhenFailed.Length > 0 ? $" ({row.WhenFailed})" : "")}." : row.Worrying ? "Damaged or unreadable sectors: a disk usually gets worse from here." : null)">
+						<span class="mta-cell mta-mono" role="cell">@row.Id</span>
+						<span class="mta-cell mta-mono" role="cell" title="@row.Name">@row.Name</span>
+						<span class="mta-cell mta-mono" role="cell">@row.Value</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Worst</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Threshold</span>
+						<span class="mta-cell mta-mono" role="cell" title="@row.Raw">@row.Raw</span>
+					</div>
+				}
+			</div>
+		}
+
+		@if (report.Passed is not null && report.Messages.Count > 0)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@string.Join(" ", report.Messages)</MokaText>
+		}
+		<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"smartctl {report.Version}{(report.ExitStatus is { } exit && exit != 0 ? $" · exit status {exit}" : "")}")</MokaText>
+	};
+
+	private IReadOnlyList<AdminChip> LargeChoices =>
+		[.. SpaceCommands.LargeFileSizesKb.Select(kb => new AdminChip(kb.ToString(CultureInfo.InvariantCulture), $"over {AdminFormat.Kb(kb)}"))];
 
 	private static IEnumerable<(BlockDevice Device, int Depth)> Flatten(IEnumerable<BlockDevice> devices, int depth)
 	{
@@ -180,6 +578,64 @@
 	private static bool IsStorageMount(MountEntry mount, DiskSnapshot snapshot) =>
 		snapshot.Usage.Any(item => item.MountPoint == mount.MountPoint && DiskCommands.IsStorage(item));
 
+	/// <summary>File systems mounted directly in <paramref name="folder"/>, which du's <c>-x</c> leaves out of its sizes.</summary>
+	private static IEnumerable<FileSystemUsage> MountsInside(DiskSnapshot snapshot, string folder) =>
+		snapshot.Usage.Where(item => DiskCommands.IsStorage(item) && item.MountPoint != folder && SpaceCommands.Parent(item.MountPoint) == folder);
+
+	private static string SpaceNote(SpaceReport report)
+	{
+		List<string> parts = [report.Entries.Count == 1 ? "1 folder" : $"{AdminFormat.Count(report.Entries.Count)} folders"];
+		if (report.StoppedEarly)
+		{
+			parts.Add($"du was stopped after {SpaceCommands.ServerSeconds} s, so only the folders it finished are listed");
+		}
+
+		if (report.Unreadable > 0)
+		{
+			parts.Add($"{AdminFormat.Count(report.Unreadable)} could not be read and count as empty ({report.FirstProblem})");
+		}
+
+		if (report.Truncated)
+		{
+			parts.Add("du printed more than this view keeps");
+		}
+
+		return string.Join(" · ", parts);
+	}
+
+	private static string LargeNote(SpaceReport report)
+	{
+		List<string> parts = [];
+		if (report.Capped)
+		{
+			parts.Add($"Only the first {SpaceCommands.MaxLargeFiles} files found are listed; a larger size finds fewer.");
+		}
+
+		if (report.StoppedEarly)
+		{
+			parts.Add($"The search was stopped after {SpaceCommands.ServerSeconds} s, so files in folders it had not reached are missing.");
+		}
+
+		return string.Join(" ", parts);
+	}
+
+	private static string Relative(string file, string folder) =>
+		folder == "/" ? file[1..] : file.StartsWith(folder + "/", StringComparison.Ordinal) ? file[(folder.Length + 1)..] : file;
+
+	private static string KindOf(SmartReport report) => (report.Protocol, report.RotationRpm) switch
+	{
+		("NVMe", _) => "NVMe solid state",
+		(_, 0) => $"{report.Protocol} solid state".Trim(),
+		(_, { } rpm) => $"{report.Protocol} disk, {rpm.ToString(CultureInfo.InvariantCulture)} rpm".Trim(),
+		_ => report.Protocol,
+	};
+
+	private static string PowerOn(long hours) => hours >= 24 * 365
+		? string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h, about {hours / (24.0 * 365):0.#} years")
+		: hours >= 48
+			? string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h, about {hours / 24} days")
+			: string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h");
+
 	private IEnumerable<FileSystemUsage> SortedUsage(IEnumerable<FileSystemUsage> usage) => _sort.Key switch
 	{
 		"used" => _sort.Apply(usage, item => (double)item.UsedPercent),
@@ -188,4 +644,200 @@
 	};
 
 	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	/// <summary>Why the device's health cannot be asked for, or null when smartctl can be run on it.</summary>
+	private string? SmartUnavailable(BlockDevice device) =>
+		SmartCommands.Unavailable(device)
+		?? (Capabilities.HasSmartctl ? null : "smartctl is not installed. It comes with the smartmontools package.")
+		?? (_snapshot?.DevicesFromPartitions == true ? "Without lsblk this view cannot tell whole disks from partitions." : null);
+
+	private bool CanReadSmart(BlockDevice device) => SmartUnavailable(device) is null;
+
+	private async Task OnViewChangedAsync(string view)
+	{
+		_view = view;
+		if (view == SpaceTab && _space is null && !_measuring)
+		{
+			await MeasureAsync(_spacePath);
+		}
+	}
+
+	private Task OpenSpaceAsync(string mountPoint)
+	{
+		_view = SpaceTab;
+		_filter = "";
+		return MeasureAsync(mountPoint);
+	}
+
+	private Task OnUsageKeyAsync(KeyboardEventArgs args, string mountPoint) =>
+		args.Key is "Enter" or " " ? OpenSpaceAsync(mountPoint) : Task.CompletedTask;
+
+	private Task OnFolderKeyAsync(KeyboardEventArgs args, string path) =>
+		args.Key is "Enter" or " " ? MeasureAsync(path) : Task.CompletedTask;
+
+	/// <summary>
+	/// Opens <paramref name="path"/> in the space view, from what was measured already when it can. A newer call
+	/// cancels the one before, so clicking through folders never shows an older folder's sizes.
+	/// </summary>
+	private async Task MeasureAsync(string path, bool reuse = true)
+	{
+		string folder = SpaceCommands.Tidy(path);
+		if (folder != _spacePath)
+		{
+			CloseLargeFiles();
+		}
+
+		_spacePath = folder;
+		_filter = "";
+		_measure?.Cancel();
+		_measure?.Dispose();
+		_measure = null;
+		if (reuse && _spaceCache.TryGetValue(folder, out SpaceReport? cached))
+		{
+			(_space, _spaceError, _measuring) = (cached, null, false);
+			return;
+		}
+
+		CancellationTokenSource measure = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+		_measure = measure;
+		(_space, _spaceError, _measuring) = (null, null, true);
+		StateHasChanged();
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(SpaceCommands.Measure(folder, ReadAsRoot), measure.Token);
+			SpaceReport report = SpaceCommands.ParseMeasure(outcome.Output, folder, outcome.IsTruncated);
+			if (report.TotalKb is null && report.Entries.Count == 0 && !report.StoppedEarly)
+			{
+				_spaceError = report.FirstProblem.Length > 0 ? report.FirstProblem : outcome.Problem();
+			}
+			else
+			{
+				_space = report;
+				_spaceCache[folder] = report;
+			}
+		}
+		catch (AdminException ex) when (!measure.IsCancellationRequested)
+		{
+			_spaceError = ex.Message;
+		}
+		catch (OperationCanceledException) when (measure.IsCancellationRequested)
+		{
+			return;
+		}
+		finally
+		{
+			if (ReferenceEquals(_measure, measure))
+			{
+				_measuring = false;
+			}
+		}
+
+		StateHasChanged();
+	}
+
+	private async Task FindLargeFilesAsync()
+	{
+		_search?.Cancel();
+		_search?.Dispose();
+		CancellationTokenSource search = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+		_search = search;
+		string folder = _spacePath;
+		(_large, _largeError, _searching) = (null, null, true);
+		StateHasChanged();
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(SpaceCommands.LargeFiles(folder, _largeKb, ReadAsRoot), search.Token);
+			_large = SpaceCommands.ParseLargeFiles(outcome.Output, folder, outcome.IsTruncated);
+		}
+		catch (AdminException ex) when (!search.IsCancellationRequested)
+		{
+			_largeError = ex.Message;
+		}
+		catch (OperationCanceledException) when (search.IsCancellationRequested)
+		{
+			return;
+		}
+		finally
+		{
+			if (ReferenceEquals(_search, search))
+			{
+				_searching = false;
+			}
+		}
+
+		StateHasChanged();
+	}
+
+	private Task OnLargeSizeChangedAsync(string value)
+	{
+		_largeKb = long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long kb) ? kb : _largeKb;
+		return FindLargeFilesAsync();
+	}
+
+	private void CloseLargeFiles()
+	{
+		_search?.Cancel();
+		_search?.Dispose();
+		_search = null;
+		(_large, _largeError, _searching) = (null, null, false);
+	}
+
+	private void SelectDevice(BlockDevice device)
+	{
+		_device = _device == device.Name ? null : device.Name;
+		if (_device is not null)
+		{
+			StartSmartRead(device);
+		}
+	}
+
+	private void OnDeviceKey(KeyboardEventArgs args, BlockDevice device)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			SelectDevice(device);
+		}
+	}
+
+	/// <summary>Reads the device's health on its own when root mode allows it and nothing was read for it yet.</summary>
+	private void StartSmartRead(BlockDevice device)
+	{
+		_smartError = null;
+		if (CanReadSmart(device) && ReadAsRoot && !_smart.ContainsKey(device.Name) && _smartReading != device.Name)
+		{
+			_ = ReadSmartAsync(device);
+		}
+	}
+
+	private async Task ReadSmartAsync(BlockDevice device)
+	{
+		_smartRead?.Cancel();
+		_smartRead?.Dispose();
+		CancellationTokenSource read = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+		_smartRead = read;
+		(_smartReading, _smartError) = (device.Name, null);
+		StateHasChanged();
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(SmartCommands.Read(device.Name), read.Token);
+			_smart[device.Name] = SmartCommands.Parse(outcome.Output);
+		}
+		catch (AdminException ex) when (!read.IsCancellationRequested)
+		{
+			_smartError = ex.Message;
+		}
+		catch (OperationCanceledException) when (read.IsCancellationRequested)
+		{
+			return;
+		}
+		finally
+		{
+			if (ReferenceEquals(_smartRead, read))
+			{
+				_smartReading = null;
+			}
+		}
+
+		StateHasChanged();
+	}
 }

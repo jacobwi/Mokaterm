@@ -4,10 +4,17 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Moka.Red.Core.Enums;
 using Mokaterm.Abstractions.Commands;
+using Mokaterm.Abstractions.Connections;
+using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.Abstractions.Terminal;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Admin.Reboot;
+using Mokaterm.Modules.Ssh.FileSystem;
 using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
@@ -30,6 +37,8 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	private IProtocolSession? _attached;
 	private SystemAdminFeature? _feature;
 	private SystemAdminFeature? _ownedFeature;
+	private SessionRootFiles? _ownedRootFiles;
+	private Task<SessionLogin>? _login;
 	private SystemProfile? _profile;
 	private AdminPageContext? _context;
 	private AdminPage _page = AdminPage.Overview;
@@ -53,6 +62,12 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	[Inject]
 	private ILogger<SystemAdminView> Logger { get; set; } = default!;
 
+	[Inject]
+	private RebootReconnects Reboots { get; set; } = default!;
+
+	[Inject]
+	private ICredentialStore Credentials { get; set; } = default!;
+
 	private bool IsBusy => _review is not null || _feature?.Running is not null;
 
 	private AdminActionResult? Result => _feature?.Running ?? _feature?.Last;
@@ -65,11 +80,15 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			_handle = null;
 		}
 
+		Reboots.Changed -= OnRebootChanged;
+
 		_reviewAnswer?.TrySetResult(false);
 		await DetachAsync();
 		await _closed.CancelAsync();
 		_closed.Dispose();
 	}
+
+	protected override void OnInitialized() => Reboots.Changed += OnRebootChanged;
 
 	protected override async Task OnParametersSetAsync()
 	{
@@ -151,6 +170,7 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			new(AdminPage.Firewall, "Firewall", MokatermIcons.Shield, capabilities.Firewall is null
 				? capabilities.FirewallMissing
 				: _feature?.RootBlockedReason is { } blocked ? $"The firewall only answers root. {blocked}" : null),
+			new(AdminPage.Security, "Security", MokatermIcons.ShieldCheck, null),
 		];
 	}
 
@@ -199,8 +219,8 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			return "";
 		}
 
-		string output = AdminText.Clean(outcome.Output).TrimEnd();
-		string error = AdminText.Clean(outcome.Error).TrimEnd();
+		string output = TerminalTextFilter.Plain(outcome.Output).TrimEnd();
+		string error = TerminalTextFilter.Plain(outcome.Error).TrimEnd();
 		string text = (output, error) switch
 		{
 			({ Length: > 0 }, { Length: > 0 }) => output + "\n\n" + error,
@@ -257,11 +277,14 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 		_feature = session.GetFeature<SystemAdminFeature>();
 		if (_feature is null && session.GetFeature<IRemoteCommandFeature>() is { } commands)
 		{
-			// A session that can run commands but is not SSH (the DevHost's demo): reads only, owned by this view.
+			// A session that can run commands but is not SSH (the DevHost's demo): reads only, owned by this view, with
+			// the session's files as root where it has them.
+			_ownedRootFiles = session.GetFeature<IFileSystemFeature>() is { } files ? new SessionRootFiles(files) : null;
 			_ownedFeature = new SystemAdminFeature(
-				new CommandFeatureAdminShell(commands, Session.Connection.GetTitle(Session.Host)),
+				new CommandFeatureAdminShell(commands, Session.Connection.GetTitle(Session.Host), Session.Connection.AuthenticationMethod),
 				Time,
-				Logger);
+				Logger,
+				_ownedRootFiles);
 			_feature = _ownedFeature;
 		}
 
@@ -293,6 +316,13 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			await owned.DisposeAsync();
 		}
 
+		if (_ownedRootFiles is { } rootFiles)
+		{
+			_ownedRootFiles = null;
+			await rootFiles.DisposeAsync();
+		}
+
+		_login = null;
 		_feature = null;
 		_attached = null;
 		_profile = null;
@@ -350,8 +380,90 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			Navigate = Show,
 			SessionAddress = Session.Host.Address,
 			IsBusy = () => IsBusy,
+			IsVisible = () => IsActive,
+			Reboot = RebootAsync,
+			Login = () => _login ??= ResolveLoginAsync(feature, profile),
 		};
 	}
+
+	/// <summary>
+	/// How this session logged in: the method from the session itself, and for a key login its fingerprint from the
+	/// keychain or the agent identity the connection names. A locked vault leaves the fingerprint unknown.
+	/// </summary>
+	private async Task<SessionLogin> ResolveLoginAsync(SystemAdminFeature feature, SystemProfile profile)
+	{
+		AuthenticationMethod? method = feature.LoginMethod;
+		string? fingerprint = null;
+		if (method == AuthenticationMethod.PublicKey && Session.Connection.CredentialId is { } credentialId)
+		{
+			try
+			{
+				fingerprint = (await Credentials.FindAsync(credentialId, _closed.Token))?.KeyFingerprint;
+			}
+			catch (Exception ex) when (ex is VaultLockedException or OperationCanceledException or ObjectDisposedException)
+			{
+				// Unknown, which every warning that depends on it allows for.
+			}
+		}
+		else if (method == AuthenticationMethod.Agent)
+		{
+			fingerprint = SshConnectionOptions.FromOptions(Session.Connection.Options).AgentIdentity;
+		}
+
+		return new SessionLogin(profile.Facts.UserName, method, fingerprint);
+	}
+
+	/// <summary>
+	/// Reviews and runs the reboot. Once it was sent (or the connection went while it ran), the window waits for the
+	/// session to drop and reconnects it when the server answers again, whether or not this view is still open.
+	/// </summary>
+	private async Task RebootAsync()
+	{
+		if (_profile is not { } profile || !RebootCommands.CanReboot(profile))
+		{
+			return;
+		}
+
+		ISessionHandle session = Session;
+		AdminActionResult? result = await ReviewAndRunAsync(RebootCommands.Reboot(profile), null);
+
+		// A reboot that did not finish either took the connection with it, or never ran (sudo refused): only the
+		// first has anything to reconnect.
+		if (result is { Succeeded: true } || (result is { Failure: not null } && await DropsAsync(session)))
+		{
+			Reboots.Start(session);
+		}
+	}
+
+	/// <summary>Whether <paramref name="session"/> leaves Connected within a few seconds.</summary>
+	private async Task<bool> DropsAsync(ISessionHandle session)
+	{
+		for (int look = 0; look < 20 && session.State == SessionState.Connected; look++)
+		{
+			await Task.Delay(TimeSpan.FromMilliseconds(250), Time);
+		}
+
+		return session.State != SessionState.Connected;
+	}
+
+	private void StopRebootWatch() => Reboots.Stop(Session.Id);
+
+	private string RebootTitle(RebootWatch watch) => watch.State switch
+	{
+		RebootWatchState.WaitingForDown => $"Rebooting {Session.Host.DisplayName}",
+		RebootWatchState.Reconnecting => $"Reconnecting to {Session.Host.DisplayName}",
+		_ => $"Waiting for {Session.Host.DisplayName} to come back",
+	};
+
+	private static string RebootText(RebootWatch watch) => watch.State switch
+	{
+		RebootWatchState.WaitingForDown => "The reboot was sent. Waiting for the connection to go.",
+		RebootWatchState.Reconnecting => "The server answers again. Logging in.",
+		_ when watch.Attempts > 0 => string.Create(CultureInfo.CurrentCulture, $"The server did not let the session in yet ({watch.Attempts} tries). Trying again shortly, until {watch.StartedAt.ToLocalTime() + watch.Times.Down + watch.Times.Back:HH:mm}."),
+		_ => "The session reconnects as soon as the server answers SSH again.",
+	};
+
+	private void OnRebootChanged() => _ = InvokeAsync(StateHasChanged);
 
 	private void Show(AdminPage page)
 	{

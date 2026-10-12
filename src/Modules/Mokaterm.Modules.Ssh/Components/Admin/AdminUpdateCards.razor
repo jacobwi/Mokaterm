@@ -1,0 +1,61 @@
+@using Mokaterm.Modules.Ssh.Admin.Packages
+@using Mokaterm.Modules.Ssh.Admin.Reboot
+@implements IDisposable
+
+@* Two overview cards, security updates and whether a reboot is due, which read on their own so the overview only
+   places them. Both open the packages page, where the reboot is offered. *@
+<button type="button" class="mta-card" @onclick="OpenSecurity" disabled="@(Context.Profile.Capabilities.Packages is null)">
+	<span class="mta-card-label">Security updates</span>
+	<span class="@(_security is { Count: > 0 } ? "mta-stat mta-stat--alert" : "mta-stat")">@(_security is { } security ? AdminFormat.Count(security.Count) : _securityNote is null ? "..." : "?")</span>
+	<span class="mta-card-sub" title="@_securityNote">@(_security is not null ? Context.Profile.Capabilities.Packages?.DisplayName : _securityNote ?? "asking")</span>
+</button>
+
+@if (RebootCommands.CanReboot(Context.Profile))
+{
+	<button type="button" class="mta-card" @onclick="OpenPackages">
+		<span class="mta-card-label">Reboot</span>
+		<span class="@(_reboot?.Required == true ? "mta-stat mta-stat--alert mta-stat--small" : "mta-stat mta-stat--small")">
+			@(_reboot?.Required switch { true => "REQUIRED", false => "not needed", _ => _reboot is null ? "..." : "unknown" })
+		</span>
+		<span class="mta-card-sub" title="@(_reboot is { } status ? AdminUpdateReads.RebootText(status) : null)">@(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "reading")</span>
+	</button>
+}
+
+@code {
+	private readonly CancellationTokenSource _lifetime = new();
+	private IReadOnlyList<PackageUpdate>? _security;
+	private string? _securityNote;
+	private RebootStatus? _reboot;
+
+	[CascadingParameter]
+	private AdminPageContext Context { get; set; } = default!;
+
+	public void Dispose()
+	{
+		_lifetime.Cancel();
+		_lifetime.Dispose();
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			Task<RebootStatus> reboot = AdminUpdateReads.RebootAsync(Context.Feature, _lifetime.Token);
+			(_security, _securityNote) = await AdminUpdateReads.SecurityUpdatesAsync(
+				Context.Feature,
+				Context.Profile.Capabilities.Packages,
+				Context.Profile.Capabilities.PackagesMissing,
+				_lifetime.Token);
+			StateHasChanged();
+			_reboot = await reboot;
+		}
+		catch (OperationCanceledException)
+		{
+		}
+	}
+
+	private void OpenSecurity() =>
+		Context.NavigateWith(AdminPage.Packages, Context.Profile.Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
+
+	private void OpenPackages() => Context.NavigateWith(AdminPage.Packages, "updates");
+}

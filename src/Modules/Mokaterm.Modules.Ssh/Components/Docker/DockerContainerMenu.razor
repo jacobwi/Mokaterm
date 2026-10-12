@@ -32,9 +32,14 @@
 		{
 			<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => OnAction.InvokeAsync("start"))" />
 		}
+		@if (HasUpdate)
+		{
+			<MokaDropdownItem Text="Update the image" Icon="DockerIcons.Update" OnClick="@(() => OnAction.InvokeAsync("update"))" />
+		}
 		<MokaDropdownItem Divider />
-		<MokaDropdownItem Text="Open shell in the terminal" Icon="MokatermIcons.Terminal" Disabled="@(State != "running" || !HasTerminal)" OnClick="@(() => OnAction.InvokeAsync("shell"))" />
+		<MokaDropdownItem Text="Open a shell in a new tab" Icon="MokatermIcons.Terminal" Disabled="@(State != "running" || !HasTerminal)" OnClick="@(() => OnAction.InvokeAsync("shell"))" />
 		<MokaDropdownItem Text="Run a command" Icon="MokatermIcons.Command" Disabled="@(State != "running")" OnClick="@(() => OnAction.InvokeAsync("run"))" />
+		<MokaDropdownItem Text="Browse files" Icon="MokatermIcons.FolderOpen" Disabled="@(State != "running")" OnClick="@(() => OnAction.InvokeAsync("files"))" />
 		<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => OnAction.InvokeAsync("logs"))" />
 		<MokaDropdownItem Text="Inspect" Icon="MokaIcons.File.Code" OnClick="@(() => OnAction.InvokeAsync("inspect"))" />
 		<MokaDropdownItem Text="Stats" Icon="DockerIcons.Stats" OnClick="@(() => OnAction.InvokeAsync("stats"))" />
@@ -62,9 +67,13 @@
 	[Parameter]
 	public bool Disabled { get; set; }
 
-	/// <summary>False for a session with no terminal to type a shell into.</summary>
+	/// <summary>False for a login whose protocol has no terminal for a shell tab.</summary>
 	[Parameter]
 	public bool HasTerminal { get; set; }
+
+	/// <summary>True when the session's update check found a newer image for its tag, which offers <c>update</c>.</summary>
+	[Parameter]
+	public bool HasUpdate { get; set; }
 
 	/// <summary>The action picked: <c>start</c>, <c>stop</c>, <c>remove-volumes</c> and so on.</summary>
 	[Parameter]

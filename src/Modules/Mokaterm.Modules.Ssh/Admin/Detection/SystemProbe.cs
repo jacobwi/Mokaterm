@@ -19,6 +19,7 @@ internal static class SystemProbe
 		"crontab", "sudo", "getent",
 		"useradd", "usermod", "userdel", "adduser", "addgroup", "deluser", "chpasswd", "passwd",
 		"chronyc", "busybox", "sw_vers",
+		"smartctl",
 	];
 
 	/// <summary>Every path whose existence some page or command set asks about.</summary>
@@ -107,7 +108,8 @@ internal static class SystemProbe
 		return (parts[2], port);
 	}
 
-	private static Dictionary<string, string> KeyValues(string? text)
+	/// <summary><c>key=value</c> lines, the last value of a key winning; the survey reads its own parts this way too.</summary>
+	internal static Dictionary<string, string> KeyValues(string? text)
 	{
 		Dictionary<string, string> values = new(StringComparer.Ordinal);
 		foreach (string line in AdminSections.Lines(text))

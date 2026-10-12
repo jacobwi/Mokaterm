@@ -16,7 +16,8 @@ public sealed partial class DockerFileViewer : DockerPageBase
 {
 	private string _path = "";
 	private IReadOnlyList<RemoteFileEntry>? _entries;
-	private HostTextFile? _file;
+	private RemoteTextFile? _file;
+	private long _fileSize;
 	private string? _problem;
 	private bool _needsRoot;
 	private bool _asRoot;
@@ -25,8 +26,6 @@ public sealed partial class DockerFileViewer : DockerPageBase
 	/// <summary>The absolute path the viewer starts at and never goes above.</summary>
 	[Parameter, EditorRequired]
 	public string Root { get; set; } = "/";
-
-	private bool CanUseRoot => HostFiles?.CanUseRoot ?? false;
 
 	private string RootNote => CanUseRoot
 		? "Reading as root goes through sudo with the session's sudo password, which is sent on stdin and never shown."
@@ -38,12 +37,12 @@ public sealed partial class DockerFileViewer : DockerPageBase
 		return ReloadAsync();
 	}
 
-	private static string FileLine(HostTextFile file)
+	private static string FileLine(RemoteTextFile file, long size)
 	{
-		string size = DisplayFormat.Bytes(file.Size);
-		return file.Truncated
-			? string.Create(CultureInfo.CurrentCulture, $"{size}, only the first {DockerHostFiles.MaxTextBytes / 1024} KB shown")
-			: size;
+		string bytes = DisplayFormat.Bytes(size);
+		return file.IsCut
+			? string.Create(CultureInfo.CurrentCulture, $"{bytes}, only the first {DockerHostFiles.MaxViewBytes / 1024} KB shown")
+			: bytes;
 	}
 
 	private Task ReloadAsync() => ShowAsync(_path);
@@ -88,6 +87,7 @@ public sealed partial class DockerFileViewer : DockerPageBase
 			else
 			{
 				_file = await files.ReadTextAsync(path, _asRoot, Lifetime);
+				_fileSize = entry.Size;
 			}
 
 			_path = path;

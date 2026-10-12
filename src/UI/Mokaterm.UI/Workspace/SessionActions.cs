@@ -416,7 +416,8 @@ internal sealed class SessionActions
 		OnClickSync = () => _workspace.MoveToNewPane(session.Id, direction),
 	};
 
-	private void Show(Guid sessionId)
+	/// <summary>Makes a session the active tab, closing the settings that would cover it.</summary>
+	public void Show(Guid sessionId)
 	{
 		_shell.CloseSettings();
 		_workspace.Activate(sessionId);

@@ -64,12 +64,8 @@ internal sealed class SudoRunner : IDisposable
 {
 	private const int MaxPasswordPrompts = 3;
 
-	// OpenSSH allows ten channels per connection by default, and the session's shell already holds one.
-	private const int MaxConcurrentCommands = 4;
-
 	private readonly SshClient _client;
 	private readonly string _sudoCommand;
-	private readonly SemaphoreSlim _slots = new(MaxConcurrentCommands, MaxConcurrentCommands);
 	private SecretBuffer? _password;
 
 	private SudoRunner(SshClient client, string sudoCommand, string account, SecretBuffer? password)
@@ -163,13 +159,7 @@ internal sealed class SudoRunner : IDisposable
 	internal static ReadOnlyMemory<byte> EnsureSucceeded(RemoteCommandResult result, string account, string path, string? destination = null, bool allowPartialListing = false)
 	{
 		EnsureElevated(result.ExitStatus, result.Error, account, path, out string scriptError);
-		bool hasPayload = RemoteOutput.TryGetPayload(result.Output, out ReadOnlyMemory<byte> payload);
-		if (result.ExitStatus == 0 || (allowPartialListing && result.ExitStatus == 1 && hasPayload && !payload.IsEmpty))
-		{
-			return payload;
-		}
-
-		throw RemoteCommandErrors.ToException(result.ExitStatus, scriptError, path, destination);
+		return RemoteOutput.Require(result.ExitStatus, result.Output, scriptError, path, destination, allowPartialListing);
 	}
 
 	/// <summary>Throws <see cref="RemoteFileErrorKind.ElevationFailed"/> unless stderr shows sudo ran the script.</summary>
@@ -186,33 +176,18 @@ internal sealed class SudoRunner : IDisposable
 	}
 
 	/// <summary>Runs a script as root to completion.</summary>
-	public async Task<RemoteCommandResult> RunAsync(string script, IEnumerable<string> arguments, CancellationToken cancellationToken)
-	{
-		await _slots.WaitAsync(cancellationToken);
-		try
-		{
-			return await RemoteCommand.RunAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, cancellationToken);
-		}
-		finally
-		{
-			_slots.Release();
-		}
-	}
+	/// <param name="runsLong">The script may take minutes, as a copy or an archive can (<see cref="ExecChannelBudget"/>).</param>
+	public Task<RemoteCommandResult> RunAsync(string script, IEnumerable<string> arguments, bool runsLong, CancellationToken cancellationToken) =>
+		RemoteCommand.RunAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, runsLong, cancellationToken);
 
-	/// <summary>Starts a script as root whose output is streamed. Disposing the stream frees its command slot.</summary>
+	/// <summary>
+	/// Starts a script as root whose output is streamed. A download reads at the pace of whoever saves it, so the
+	/// channel counts as long; disposing the stream closes it.
+	/// </summary>
 	public async Task<ElevatedReadStream> StartReadAsync(string script, IEnumerable<string> arguments, string path, CancellationToken cancellationToken)
 	{
-		await _slots.WaitAsync(cancellationToken);
-		try
-		{
-			RemoteCommand command = await RemoteCommand.StartAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, cancellationToken);
-			return new ElevatedReadStream(command, () => _slots.Release(), Account, path);
-		}
-		catch
-		{
-			_slots.Release();
-			throw;
-		}
+		RemoteCommand command = await RemoteCommand.StartAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, runsLong: true, cancellationToken);
+		return new ElevatedReadStream(command, Account, path);
 	}
 
 	/// <summary>
@@ -232,23 +207,15 @@ internal sealed class SudoRunner : IDisposable
 	{
 		ArgumentNullException.ThrowIfNull(request);
 		string command = BuildCommand(_sudoCommand, _password is not null, script, arguments);
-		await _slots.WaitAsync(cancellationToken);
-		try
-		{
-			return await CommandExecution.RunAsync(token => StartExecutionAsync(command, input, token), request, time, cancellationToken);
-		}
-		finally
-		{
-			_slots.Release();
-		}
+		return await CommandExecution.RunAsync(token => StartExecutionAsync(command, input, request.RunsLong, token), request, time, cancellationToken);
 	}
 
 	public void Dispose() => Interlocked.Exchange(ref _password, null)?.Dispose();
 
-	private async Task<IExecChannel> StartExecutionAsync(string command, SecretBuffer? input, CancellationToken cancellationToken)
+	private async Task<IExecChannel> StartExecutionAsync(string command, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
 	{
 		using SecretBuffer? stdin = JoinInput(input);
-		RemoteCommand started = await RemoteCommand.StartAsync(_client, command, stdin, cancellationToken);
+		RemoteCommand started = await RemoteCommand.StartAsync(_client, command, stdin, runsLong, cancellationToken);
 		if (stdin is null)
 		{
 			// Nothing was written, and SSH.NET sends EOF only after data, so stdin has to be closed by hand.
@@ -313,7 +280,7 @@ internal sealed class SudoRunner : IDisposable
 		RemoteCommandResult result;
 		try
 		{
-			result = await RemoteCommand.RunAsync(login.Client, BuildCommand(login.SudoCommand, password is not null, "", []), password, cancellationToken);
+			result = await RemoteCommand.RunAsync(login.Client, BuildCommand(login.SudoCommand, password is not null, "", []), password, runsLong: false, cancellationToken);
 		}
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, null, out RemoteFileSystemException? mapped))
 		{

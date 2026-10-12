@@ -4,14 +4,6 @@
 <div class="mt-dk-toolbar">
 	<span class="mt-dk-label">Engine</span>
 	<span class="mt-dk-spacer"></span>
-	<MokaButton Variant="MokaVariant.Outlined"
-				Color="MokaColor.Error"
-				Size="MokaSize.Xs"
-				StartIcon="DockerIcons.Prune"
-				Disabled="@(IsBusy || IsFirstLoad)"
-				OnClick="PruneAsync">
-		Prune
-	</MokaButton>
 	<MokaButton Variant="MokaVariant.Text"
 				Color="MokaColor.Surface"
 				Size="MokaSize.Xs"
@@ -23,7 +15,6 @@
 </div>
 
 @LoadErrorPanel(RefreshAsync)
-@ChangePanel
 
 <div class="mt-dk-scroll">
 	@if (Feature?.Status is { } status)
@@ -81,6 +72,14 @@
 		<div class="mt-dk-section-head">
 			<span class="mt-dk-label">Disk usage</span>
 			<span class="mt-dk-cell">docker system df</span>
+			<span class="mt-dk-spacer"></span>
+			@if (Navigation is { } navigation)
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+							OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))">
+					Clean up
+				</MokaButton>
+			}
 		</div>
 		@if (IsFirstLoad)
 		{
@@ -88,21 +87,13 @@
 		}
 		else if (_usage.Count > 0)
 		{
-			<table class="mt-dk-table">
-				<thead><tr><th>Type</th><th>Total</th><th>Active</th><th>Size</th><th>Reclaimable</th></tr></thead>
-				<tbody>
-					@foreach (DockerDiskUsage row in _usage)
-					{
-						<tr @key="row.Type">
-							<td>@row.Type</td>
-							<td>@row.TotalCount</td>
-							<td>@row.Active</td>
-							<td>@row.Size</td>
-							<td>@row.Reclaimable</td>
-						</tr>
-					}
-				</tbody>
-			</table>
+			<dl class="mt-dk-facts">
+				@foreach (DockerDiskUsage row in _usage)
+				{
+					<dt @key="row.Type">@row.Type</dt>
+					<dd>@UsageLine(row)</dd>
+				}
+			</dl>
 		}
 	</div>
 </div>

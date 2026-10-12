@@ -9,14 +9,17 @@
 				OnClick="ToggleCreate" aria-expanded="@(_creating ? "true" : "false")">
 		New
 	</MokaButton>
-	<MokaButton Variant="MokaVariant.Text"
-				Color="MokaColor.Error"
-				Size="MokaSize.Xs"
-				StartIcon="DockerIcons.Prune"
-				Disabled="@(IsBusy || UnusedCount == 0)"
-				OnClick="RemoveUnusedAsync">
-		@($"Remove unused ({UnusedCount.ToString(CultureInfo.CurrentCulture)})")
-	</MokaButton>
+	@if (Navigation is { } navigation)
+	{
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="DockerIcons.Prune"
+					OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))"
+					title="Unused volumes with their sizes, removed together">
+			@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
+		</MokaButton>
+	}
 	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
 				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
 </div>

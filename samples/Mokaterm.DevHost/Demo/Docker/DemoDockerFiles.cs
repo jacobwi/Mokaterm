@@ -1,4 +1,5 @@
 using System.Text;
+using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.DevHost.Demo.FileSystem;
 
 namespace Mokaterm.DevHost.Demo.Docker;
@@ -7,19 +8,11 @@ namespace Mokaterm.DevHost.Demo.Docker;
 /// The files the demo engine's projects and volumes point at, put into the demo session's file tree so the Docker
 /// manager's files, env and volume views have something real to read: the shop project's compose file and env files
 /// (one of them missing on purpose), a monitoring project whose override file is gone, and volume folders under
-/// <c>/var/lib/docker</c> that only root may read.
+/// <c>/var/lib/docker</c> that only root may read. The engine reads them back from the same tree, so a file saved from
+/// the manager is what its <c>test -f</c> and <c>compose config</c> see.
 /// </summary>
 internal static class DemoDockerFiles
 {
-	/// <summary>Paths the demo engine's <c>test -f</c> answers yes for, beside what the tree holds.</summary>
-	public static readonly IReadOnlyList<string> Present =
-	[
-		"/srv/shop/compose.yaml",
-		"/srv/shop/.env",
-		"/srv/shop/web.env",
-		"/opt/monitoring/docker-compose.yml",
-	];
-
 	/// <summary>Files a search for compose files finds, beside the projects that run.</summary>
 	public static readonly IReadOnlyList<string> Found =
 	[
@@ -66,6 +59,33 @@ internal static class DemoDockerFiles
 		NGINX_PORT=80
 		NGINX_ENTRYPOINT_QUIET_LOGS=1
 		""";
+
+	/// <summary>
+	/// The engine's view of <paramref name="tree"/>: a file's text as root reads it, or null when there is no such file.
+	/// The daemon and compose run as root here, so permissions never hide a file from them.
+	/// </summary>
+	public static Func<string, string?> Reader(DemoFileTree tree)
+	{
+		Func<string, byte[]?> bytes = ByteReader(tree);
+		return path => bytes(path) is { } content ? Encoding.UTF8.GetString(content) : null;
+	}
+
+	/// <summary><see cref="Reader"/> as bytes, for a file the host pipes into a container as it is.</summary>
+	public static Func<string, byte[]?> ByteReader(DemoFileTree tree)
+	{
+		ArgumentNullException.ThrowIfNull(tree);
+		return path =>
+		{
+			try
+			{
+				return tree.Read(path, DemoAccount.Root).Content;
+			}
+			catch (RemoteFileSystemException)
+			{
+				return null;
+			}
+		};
+	}
 
 	public static void Add(DemoNode tree, DateTimeOffset now)
 	{

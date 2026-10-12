@@ -40,6 +40,12 @@
 							Size="MokaSize.Xs"
 							TooltipPosition="MokaTooltipPosition.Left"
 							OnClick="() => Actions.ImportConnections()" />
+				<IconAction Icon="MokatermIcons.Fleet"
+							Title="Fleet overview"
+							Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.FleetOverview)"
+							Size="MokaSize.Xs"
+							TooltipPosition="MokaTooltipPosition.Left"
+							OnClick="() => Actions.OpenFleet()" />
 			</Actions>
 			<ChildContent>
 				<ConnectionExplorer />
@@ -76,5 +82,6 @@
 	<ExportDialog />
 	<CommandSnippetEditor />
 	<CommandRunDialog />
+	<FleetDialog />
 	<MokaCheatsheet Open="@Shell.ShortcutsOpen" OpenChanged="Shell.SetShortcutsOpen" Groups="Commands.CheatsheetGroups" />
 </div>

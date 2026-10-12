@@ -123,7 +123,7 @@ public partial class RemoteFileBrowser
 				picked,
 				FolderComparison.FolderName(picked),
 				remoteFolder,
-				TransferOrigin.Format(fileSystem.IsElevated ? "root" : fileSystem.UserName, Session.Host.Address, remoteFolder),
+				TransferOrigin.Format(fileSystem.IsElevated ? "root" : fileSystem.UserName, Source.Location, remoteFolder),
 				fileSystem.IsElevated,
 				(progress, cancellationToken) => WhileConnectedAsync(
 					token => RemoteTreeWalker.SearchAsync(fileSystem, remoteFolder, FolderComparison.RemoteQuery, progress, token),

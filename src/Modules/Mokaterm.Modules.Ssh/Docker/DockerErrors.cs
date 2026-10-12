@@ -1,3 +1,5 @@
+using Mokaterm.Modules.Ssh.Shell;
+
 namespace Mokaterm.Modules.Ssh.Docker;
 
 /// <summary>
@@ -80,12 +82,12 @@ internal static class DockerErrors
 		DockerFailure.NotInstalled => $"Docker is not installed on {host}, or it is not on the login's PATH.",
 		DockerFailure.PermissionDenied => $"This account may not use Docker on {host}: the daemon's socket only lets in root and the docker group.",
 		DockerFailure.DaemonUnreachable => $"The Docker daemon on {host} is not answering. {Quote(error)}".TrimEnd(),
-		DockerFailure.NotFound => DockerText.FirstLine(error) is { Length: > 0 } line ? line : "It is gone.",
-		_ => DockerText.FirstLine(error) is { Length: > 0 } other ? other : "docker failed without saying why.",
+		DockerFailure.NotFound => RemoteText.FirstLine(error) is { Length: > 0 } line ? line : "It is gone.",
+		_ => RemoteText.FirstLine(error) is { Length: > 0 } other ? other : "docker failed without saying why.",
 	};
 
 	private static string Quote(string? error) =>
-		DockerText.FirstLine(error) is { Length: > 0 } line ? $"It said: {line}" : "";
+		RemoteText.FirstLine(error) is { Length: > 0 } line ? $"It said: {line}" : "";
 
 	private static bool ContainsAny(string text, string[] markers) =>
 		markers.Any(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase));

@@ -5,7 +5,7 @@ namespace Mokaterm.Modules.Ssh.Docker;
 /// <param name="HostPort">The port on the docker host, or null when it is only exposed.</param>
 /// <param name="ContainerPort">The port inside, or a range such as <c>8000-8010</c>.</param>
 /// <param name="Protocol"><c>tcp</c>, <c>udp</c> or <c>sctp</c>.</param>
-internal sealed record DockerPort(string HostAddress, string? HostPort, string ContainerPort, string Protocol)
+public sealed record DockerPort(string HostAddress, string? HostPort, string ContainerPort, string Protocol)
 {
 	public bool IsPublished => HostPort is not null;
 

@@ -28,6 +28,7 @@ internal sealed class SystemCapabilities
 		HasJournal = profile.HasJournal;
 		HasNetworkTools = facts.Has("ip");
 		HasProcessTools = facts.Has("ps");
+		HasSmartctl = facts.Has("smartctl");
 
 		ServicesMissing = profile.IsContainer
 			? "No init system runs here, which is usual in a container: services are whatever the container started."
@@ -58,6 +59,9 @@ internal sealed class SystemCapabilities
 	public bool HasNetworkTools { get; }
 
 	public bool HasProcessTools { get; }
+
+	/// <summary>smartmontools, which reads a disk's health.</summary>
+	public bool HasSmartctl { get; }
 
 	public string ServicesMissing { get; }
 

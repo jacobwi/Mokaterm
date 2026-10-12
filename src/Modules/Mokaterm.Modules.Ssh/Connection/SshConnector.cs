@@ -272,8 +272,7 @@ internal sealed class SshConnector
 	/// </summary>
 	private static bool DialsDirectly(ProtocolConnectContext context, SshEndpoint? dial)
 	{
-		SshConnectionOptions options = SshConnectionOptions.FromOptions(context.Connection.Options);
-		return dial is null && options.JumpConnectionIds.Count == 0 && !options.Proxy.IsEnabled;
+		return dial is null && SshConnectionOptions.FromOptions(context.Connection.Options).ReachesTargetDirectly;
 	}
 
 	/// <summary>

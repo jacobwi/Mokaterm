@@ -50,6 +50,9 @@ public sealed partial class DockerComposeProjectView : DockerPageBase
 
 	private ComposeProjectHealth Health => ComposeService.HealthOf(_services);
 
+	/// <summary>The images the services run, for the update check.</summary>
+	private IReadOnlyList<string> ServiceImages => [.. _services.Select(service => service.Image).Where(image => image.Length > 0).Distinct(StringComparer.Ordinal)];
+
 	private string ServiceCount => string.Create(
 		CultureInfo.InvariantCulture,
 		$"{_services.Count(service => service.State == ComposeServiceState.Running)}/{_services.Count}");
@@ -136,8 +139,12 @@ public sealed partial class DockerComposeProjectView : DockerPageBase
 		}
 
 		_services = ComposeService.Group(members, _defined);
-		_context = new ComposeProjectContext(project, _target, _services, ++_version);
+		_context = new ComposeProjectContext(project, _target, _services, ++_version, RunAsync);
 	});
+
+	/// <summary>The ports of a service's running containers: a scaled service may publish one per replica.</summary>
+	private static IReadOnlyList<DockerPort> RunningPorts(ComposeService service) =>
+		[.. service.Containers.Where(container => container.IsRunning).SelectMany(container => container.Ports)];
 
 	private void Show(string tab) => _tab = tab;
 
@@ -164,6 +171,10 @@ public sealed partial class DockerComposeProjectView : DockerPageBase
 
 	private void TogglePullFirst() => _pullFirst = !_pullFirst;
 
+	/// <summary>The service's container a shell or the file browser goes to: the first one that runs.</summary>
+	private static ComposeContainer? RunningContainer(ComposeService service) =>
+		service.Containers.FirstOrDefault(container => container.IsRunning);
+
 	private async Task ShellAsync(string container)
 	{
 		if (await OpenShellAsync(container) is { } problem)
@@ -187,6 +198,10 @@ public sealed partial class DockerComposeProjectView : DockerPageBase
 			return;
 		}
 
-		await RunChangesAsync(plan.Calls, plan.Title, plan.Confirm, plan.ConfirmText, RefreshAsync);
+		IReadOnlyList<DockerOutput>? outputs = await RunChangesAsync(plan.Calls, plan.Title, plan.Confirm, plan.ConfirmText, RefreshAsync);
+		if (action is "update" or "pull" && outputs is { Count: > 0 } && outputs.All(output => output.Succeeded))
+		{
+			Feature?.ImageUpdates.Forget([.. _services.Where(item => service is null || item.Name == service).Select(item => item.Image)]);
+		}
 	}
 }

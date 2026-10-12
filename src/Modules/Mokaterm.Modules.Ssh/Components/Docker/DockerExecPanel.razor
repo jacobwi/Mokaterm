@@ -74,12 +74,12 @@ else
 			@if (result.Output.Length > 0 || result.Error.Length == 0)
 			{
 				<span class="mt-dk-label">stdout</span>
-				<pre class="mt-dk-box">@(result.Output.Length == 0 ? "(nothing)" : DockerText.Plain(result.Output))</pre>
+				<pre class="mt-dk-box">@(result.Output.Length == 0 ? "(nothing)" : TerminalTextFilter.Plain(result.Output))</pre>
 			}
 			@if (result.Error.Length > 0)
 			{
 				<span class="mt-dk-label">stderr</span>
-				<pre class="mt-dk-box mt-dk-box--short mt-dk-box--error">@DockerText.Plain(result.Error)</pre>
+				<pre class="mt-dk-box mt-dk-box--short mt-dk-box--error">@TerminalTextFilter.Plain(result.Error)</pre>
 			}
 			@if (result.OutputTruncated || result.ErrorTruncated)
 			{

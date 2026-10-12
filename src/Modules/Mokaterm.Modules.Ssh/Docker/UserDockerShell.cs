@@ -19,12 +19,12 @@ internal sealed class UserDockerShell : IDockerShell
 	{
 		ArgumentNullException.ThrowIfNull(call);
 		string line = DockerCommandLine.Build(call);
-		RemoteCommandRequest request = new() { Command = line, OutputLimitBytes = call.OutputLimitBytes };
+		RemoteCommandRequest request = DockerShellRun.Request(call, line);
 		RemoteCommandOutcome outcome = await DockerShellRun.WithTimeoutAsync(
 			token => _commands.RunAsync(request, token),
 			call.Timeout,
 			cancellationToken);
 
-		return DockerShellRun.ToOutput(line, outcome, DockerShellRun.ErrorText(outcome), elevated: false);
+		return DockerShellRun.ToOutput(line, outcome, outcome.Error.ToText(), elevated: false, call.BinaryOutput);
 	}
 }

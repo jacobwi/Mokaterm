@@ -44,7 +44,7 @@
 
 @if (_file is { } file)
 {
-	<span class="mt-dk-cell">@FileLine(file)</span>
+	<span class="mt-dk-cell">@FileLine(file, _fileSize)</span>
 	<pre class="mt-dk-box mt-dk-box--nowrap">@file.Text</pre>
 }
 else if (_entries is { } entries)

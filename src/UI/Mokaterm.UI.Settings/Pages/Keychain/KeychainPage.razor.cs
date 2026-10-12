@@ -120,14 +120,12 @@ public sealed partial class KeychainPage : VaultListPageBase<CredentialInfo>
 		SshPublicKey? publicKey;
 		try
 		{
-			using CredentialSecret secret = await Store.RevealAsync(credential.Id);
-			if (secret.PrivateKey is not { } buffer)
+			(bool hasKey, publicKey) = await CredentialPublicKey.ReadAsync(Store, KeyGenerator, credential.Id);
+			if (!hasKey)
 			{
 				Interaction.Notify(NoticeSeverity.Warning, "This credential has no saved key.");
 				return;
 			}
-
-			publicKey = KeyGenerator.ReadPublicKey(buffer.RevealString());
 		}
 		catch (VaultLockedException)
 		{

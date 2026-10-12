@@ -27,7 +27,14 @@ public sealed class RemoteScriptsTests
 		{ nameof(RemoteScripts.Copy), RemoteScripts.Copy },
 		{ nameof(RemoteScripts.Compress), RemoteScripts.Compress },
 		{ nameof(RemoteScripts.Extract), RemoteScripts.Extract },
+		{ nameof(RemoteScripts.Identity), RemoteScripts.Identity },
+		{ nameof(RemoteScripts.ReadRange), RemoteScripts.ReadRange },
+		{ nameof(RemoteScripts.WriteInput), RemoteScripts.WriteInput },
 	};
+
+	[Fact]
+	public void ReadRange_ReadsInTheBlockItsOffsetCounts() =>
+		Assert.Contains("bs=" + RemoteScripts.ReadBlockBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), RemoteScripts.ReadRange, StringComparison.Ordinal);
 
 	[Theory]
 	[MemberData(nameof(Scripts))]

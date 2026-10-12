@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Fleet;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
@@ -47,6 +48,9 @@ public sealed class SessionsServiceCollectionExtensionsTests
 			Assert.Same(scope.ServiceProvider.GetRequiredService<ITransferQueue>(), scope.ServiceProvider.GetRequiredService<ITransferQueue>());
 			Assert.Same(scope.ServiceProvider.GetRequiredService<ISessionLogRecorder>(), scope.ServiceProvider.GetRequiredService<ISessionLogRecorder>());
 			Assert.Same(scope.ServiceProvider.GetRequiredService<ICommandRunner>(), scope.ServiceProvider.GetRequiredService<ICommandRunner>());
+
+			// One runner serves command runs and surveys, so the scope ends both through one list.
+			Assert.Same(scope.ServiceProvider.GetRequiredService<ICommandRunner>(), scope.ServiceProvider.GetRequiredService<IHostSurveyRunner>());
 		}
 
 		await using AsyncServiceScope second = provider.CreateAsyncScope();

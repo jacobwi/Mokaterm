@@ -1,5 +1,5 @@
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Modules.Ssh.Admin.Detection;
-using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Admin.Packages;
 
@@ -73,27 +73,19 @@ internal sealed class PackageCommands
 	{
 		Name = "packages.updates",
 		Timeout = UpdateCheckTimeout,
-		Body = Kind switch
-		{
-			PackageManagerKind.Apt => "apt list --upgradable 2>/dev/null",
+		Body = UpdatesBody(cachedOnly: false),
+	};
 
-			// check-update exits 100 when there are updates, which is the answer and not a failure.
-			PackageManagerKind.Dnf => "dnf -q check-update\ncode=$?\nif [ \"$code\" = 100 ]; then exit 0; fi\nexit \"$code\"",
-			PackageManagerKind.Yum => "yum -q check-update\ncode=$?\nif [ \"$code\" = 100 ]; then exit 0; fi\nexit \"$code\"",
-			PackageManagerKind.Zypper => "zypper --non-interactive --quiet list-updates",
-
-			// checkupdates syncs into a scratch database, so it sees new versions without root; it exits 2 for "none".
-			PackageManagerKind.Pacman => string.Join('\n',
-				"if command -v checkupdates >/dev/null 2>&1; then",
-				"\tcheckupdates",
-				"\tcode=$?",
-				"\tif [ \"$code\" = 2 ]; then exit 0; fi",
-				"\texit \"$code\"",
-				"fi",
-				"pacman -Qu",
-				"exit 0"),
-			_ => "apk version -l '<' 2>/dev/null",
-		},
+	/// <summary>
+	/// Pending updates from the manager's cache alone, so nothing reaches the network: what a survey of many machines
+	/// can afford. dnf and yum read the system cache, zypper skips its refresh and pacman reads its own sync database
+	/// instead of syncing a scratch one; apt and apk only ever read their local lists here. It says nothing new about a
+	/// machine whose cache is old, which is the price of reading forty of them in seconds.
+	/// </summary>
+	public AdminScript ListCachedUpdates() => new()
+	{
+		Name = "packages.updates.cached",
+		Body = UpdatesBody(cachedOnly: true),
 	};
 
 	public IReadOnlyList<PackageUpdate> ParseUpdates(string output) => Kind switch
@@ -104,6 +96,48 @@ internal sealed class PackageCommands
 		PackageManagerKind.Pacman => PackageListParser.ParsePacmanUpdates(output),
 		_ => PackageListParser.ParseApkVersion(output),
 	};
+
+	/// <summary>
+	/// Whether the manager says which pending updates fix security problems: apt by the suite an update comes from,
+	/// dnf and yum by their advisories. pacman and apk keep no such list, and zypper keeps it as patches, not packages.
+	/// </summary>
+	public bool KnowsSecurityUpdates => Kind is PackageManagerKind.Apt or PackageManagerKind.Dnf or PackageManagerKind.Yum;
+
+	/// <summary>
+	/// The pending updates that fix security problems, from the same knowledge <see cref="ListUpdates"/> reads. Apt's
+	/// is the same list, read by suite; null where <see cref="KnowsSecurityUpdates"/> is false.
+	/// </summary>
+	public AdminScript? ListSecurityUpdates() => Kind switch
+	{
+		PackageManagerKind.Apt => ListUpdates() with { Name = "packages.security" },
+		PackageManagerKind.Dnf => new AdminScript { Name = "packages.security", Timeout = UpdateCheckTimeout, Body = CheckUpdate("dnf", cachedOnly: false, securityOnly: true) },
+		PackageManagerKind.Yum => new AdminScript { Name = "packages.security", Timeout = UpdateCheckTimeout, Body = CheckUpdate("yum", cachedOnly: false, securityOnly: true) },
+		_ => null,
+	};
+
+	public IReadOnlyList<PackageUpdate> ParseSecurityUpdates(string output) => Kind switch
+	{
+		PackageManagerKind.Apt => SecurityUpdatesAmong(PackageListParser.ParseAptUpgradable(output))!,
+		PackageManagerKind.Dnf or PackageManagerKind.Yum => PackageListParser.ParseCheckUpdate(output),
+		_ => [],
+	};
+
+	/// <summary>
+	/// For apt, the security updates within a list <see cref="ListUpdates"/> already read, so a page that has that list
+	/// needs no second read. Null for the managers whose advisories need <see cref="ListSecurityUpdates"/>.
+	/// </summary>
+	public IReadOnlyList<PackageUpdate>? SecurityUpdatesAmong(IReadOnlyList<PackageUpdate> updates)
+	{
+		ArgumentNullException.ThrowIfNull(updates);
+		return Kind == PackageManagerKind.Apt ? [.. updates.Where(update => IsSecuritySource(update.Source))] : null;
+	}
+
+	/// <summary>
+	/// An apt suite that carries security fixes: <c>noble-security</c>, <c>bookworm-security</c>, or Debian's older
+	/// <c>buster/updates</c>. apt lists every suite an update comes from, comma separated.
+	/// </summary>
+	internal static bool IsSecuritySource(string source) =>
+		source.Split(',').Any(suite => suite.EndsWith("-security", StringComparison.Ordinal) || suite.EndsWith("/updates", StringComparison.Ordinal));
 
 	/// <summary>Fetches the repositories' current lists, so the next check sees what is new. Null for pacman, see <see cref="HasRefresh"/>.</summary>
 	public AdminAction? RefreshIndex()
@@ -193,6 +227,18 @@ internal sealed class PackageCommands
 		};
 	}
 
+	/// <summary>The commands a manager needs on the machine before it counts as there, which detection and the survey both test.</summary>
+	internal static IReadOnlyList<string> RequiredCommands(PackageManagerKind kind) => kind switch
+	{
+		PackageManagerKind.Apt => ["apt-get", "dpkg-query"],
+		PackageManagerKind.Dnf => ["dnf", "rpm"],
+		PackageManagerKind.Yum => ["yum", "rpm"],
+		PackageManagerKind.Zypper => ["zypper", "rpm"],
+		PackageManagerKind.Pacman => ["pacman"],
+		PackageManagerKind.Apk => ["apk"],
+		_ => [],
+	};
+
 	internal static bool IsCritical(string name)
 	{
 		string lower = name.ToLowerInvariant();
@@ -200,6 +246,35 @@ internal sealed class PackageCommands
 			|| lower.StartsWith("linux-image", StringComparison.Ordinal)
 			|| lower.StartsWith("kernel", StringComparison.Ordinal);
 	}
+
+	// check-update exits 100 when there are updates, which is the answer and not a failure. -C reads the system cache,
+	// which an ordinary login may read but never refresh.
+	private static string CheckUpdate(string program, bool cachedOnly, bool securityOnly = false) =>
+		$"{program} -q{(cachedOnly ? " -C" : "")}{(securityOnly ? " --security" : "")} check-update\ncode=$?\nif [ \"$code\" = 100 ]; then exit 0; fi\nexit \"$code\"";
+
+	private string UpdatesBody(bool cachedOnly) => Kind switch
+	{
+		PackageManagerKind.Apt => "apt list --upgradable 2>/dev/null",
+		PackageManagerKind.Dnf => CheckUpdate("dnf", cachedOnly),
+		PackageManagerKind.Yum => CheckUpdate("yum", cachedOnly),
+		PackageManagerKind.Zypper => cachedOnly
+			? "zypper --non-interactive --no-refresh --quiet list-updates"
+			: "zypper --non-interactive --quiet list-updates",
+
+		// checkupdates syncs into a scratch database, so it sees new versions without root; it exits 2 for "none".
+		// pacman -Qu reads the sync database as it stands and exits 1 for "none".
+		PackageManagerKind.Pacman when cachedOnly => "pacman -Qu\nexit 0",
+		PackageManagerKind.Pacman => string.Join('\n',
+			"if command -v checkupdates >/dev/null 2>&1; then",
+			"\tcheckupdates",
+			"\tcode=$?",
+			"\tif [ \"$code\" = 2 ]; then exit 0; fi",
+			"\texit \"$code\"",
+			"fi",
+			"pacman -Qu",
+			"exit 0"),
+		_ => "apk version -l '<' 2>/dev/null",
+	};
 
 	private static AdminScript Root(string name, string body, TimeSpan timeout) => new()
 	{

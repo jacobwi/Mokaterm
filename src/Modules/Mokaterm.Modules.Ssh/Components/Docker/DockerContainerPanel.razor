@@ -17,13 +17,16 @@
 	{
 		@if (actions.Status == "running")
 		{
+			<DockerPortLinks Session="Session" Ports="actions.Ports" Name="@Name" />
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
-						Disabled="@(IsBusy || Session.Terminal is null)" OnClick="ShellAsync" title="Open a shell in the session's terminal" aria-label="Open a shell" />
+						Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="ShellAsync" title="Open a shell in a new tab" aria-label="Open a shell" />
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen"
+						OnClick="BrowseAsync" title="Browse its files" aria-label="Browse files" />
 		}
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(IsAlive(actions) ? MokatermIcons.Reconnect : MokatermIcons.Play)"
 					Disabled="IsBusy" OnClick="@(() => OnMenuAsync(IsAlive(actions) ? "restart" : "start"))"
 					title="@(IsAlive(actions) ? "Restart" : "Start")" aria-label="@(IsAlive(actions) ? "Restart" : "Start")" />
-		<DockerContainerMenu Name="@Name" Id="@actions.Id" State="@actions.Status" Disabled="IsBusy" HasTerminal="@(Session.Terminal is not null)" OnAction="OnMenuAsync" />
+		<DockerContainerMenu Name="@Name" Id="@actions.Id" State="@actions.Status" Disabled="IsBusy" HasTerminal="CanOpenShellTab" OnAction="OnMenuAsync" />
 	}
 	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="OnClose" aria-label="Close the panel" />
 </div>
@@ -161,11 +164,18 @@ else if (IsFirstLoad)
 							{
 								<tr>
 									<td>@port.ContainerPort/@port.Protocol</td>
-									<td>@(port.HostPort is { } hostPort ? $"{Or(port.HostAddress, "0.0.0.0")}:{hostPort}" : "exposed only")</td>
+									<td>@(port.HostPort is { } hostPort ? $"{Or(port.HostAddress, "0.0.0.0")}:{hostPort}" : "not published")</td>
 								</tr>
 							}
 						</tbody>
 					</table>
+					@if (details.Ports.Any(port => !port.IsPublished))
+					{
+						<span class="mt-dk-note">
+							A port that is not published answers only on the container's docker networks. Publish it (ports: in
+							compose, -p for docker run) to open it in the browser from here.
+						</span>
+					}
 				}
 			</div>
 

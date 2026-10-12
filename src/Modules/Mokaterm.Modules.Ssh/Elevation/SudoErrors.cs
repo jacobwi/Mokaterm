@@ -1,3 +1,5 @@
+using Mokaterm.Modules.Ssh.Shell;
+
 namespace Mokaterm.Modules.Ssh.Elevation;
 
 /// <summary>Why sudo refused to run a command.</summary>
@@ -87,7 +89,7 @@ internal static class SudoErrors
 		SudoFailure.NotAllowed => $"{account} is not allowed to run commands as root with sudo.",
 		SudoFailure.TerminalRequired => $"sudo on {HostOf(account)} only runs from a terminal (requiretty), so file operations cannot run as root.",
 		SudoFailure.NotInstalled => $"sudo is not installed on {HostOf(account)}.",
-		_ => FirstLine(error) is { Length: > 0 } line ? $"sudo failed: {line}" : "sudo failed.",
+		_ => RemoteText.FirstLine(error) is { Length: > 0 } line ? $"sudo failed: {line}" : "sudo failed.",
 	};
 
 	/// <summary>
@@ -102,20 +104,6 @@ internal static class SudoErrors
 		return index < 0
 			? (false, error, "")
 			: (true, error[..index], error[(index + marker.Length)..]);
-	}
-
-	internal static string FirstLine(string text)
-	{
-		foreach (string line in text.Split('\n'))
-		{
-			string trimmed = line.Trim();
-			if (trimmed.Length > 0)
-			{
-				return trimmed;
-			}
-		}
-
-		return "";
 	}
 
 	private static bool ContainsAny(string text, string[] markers) =>

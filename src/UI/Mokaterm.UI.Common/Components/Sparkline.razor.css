@@ -1,0 +1,13 @@
+.mt-sparkline {
+	display: block;
+	width: 100%;
+	overflow: visible;
+}
+
+.mt-sparkline polyline {
+	fill: none;
+	stroke: var(--mt-sparkline-color, var(--moka-color-primary));
+	stroke-width: 1.5;
+	stroke-linejoin: round;
+	vector-effect: non-scaling-stroke;
+}

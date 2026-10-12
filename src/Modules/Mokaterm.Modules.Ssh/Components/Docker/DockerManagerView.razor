@@ -50,6 +50,7 @@
 			case DockerAvailability.Ready:
 				<ToolNavigation TPage="DockerManagerPage" Entries="NavEntries" Current="_page" CurrentChanged="Show" Label="Docker pages">
 					<div class="mt-dk-page" @key="(_feature.Client, _feature.ComposePreference)">
+						<CascadingValue Value="_navigation" IsFixed="true">
 						@switch (_page)
 						{
 							case DockerManagerPage.Overview:
@@ -57,6 +58,9 @@
 								break;
 							case DockerManagerPage.Containers:
 								<DockerContainersPage Session="Session" Visible="IsActive" />
+								break;
+							case DockerManagerPage.Stats:
+								<DockerStatsPage Session="Session" Visible="IsActive" />
 								break;
 							case DockerManagerPage.Compose:
 								<DockerComposePage Session="Session" Visible="IsActive" />
@@ -70,7 +74,11 @@
 							case DockerManagerPage.Networks:
 								<DockerNetworksPage Session="Session" Visible="IsActive" />
 								break;
+							case DockerManagerPage.Cleanup:
+								<DockerCleanupPage Session="Session" Visible="IsActive" />
+								break;
 						}
+						</CascadingValue>
 					</div>
 				</ToolNavigation>
 				break;

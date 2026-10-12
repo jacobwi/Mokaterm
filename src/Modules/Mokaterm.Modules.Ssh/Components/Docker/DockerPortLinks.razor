@@ -1,0 +1,60 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Feedback.Dropdown
+@using Moka.Red.Feedback.Popover
+@inherits DockerPageBase
+
+@* One button for a single port that opens one way; a menu for several ports, for a port that leaves http or https to
+   the user, and for one that cannot be opened from here, which the menu says why. *@
+@if (_routes is [{ CanOpen: true, Schemes: [var scheme] } only])
+{
+	<MokaButton Variant="MokaVariant.Text"
+				Color="MokaColor.Surface"
+				Size="MokaSize.Xs"
+				StartIcon="MokatermIcons.Globe"
+				Disabled="_opening"
+				OnClick="@(() => OpenAsync(only, scheme))"
+				title="@Hint(only, scheme)"
+				aria-label="@($"Open {only.Port.Display} of {Name} in the browser")" />
+}
+else if (_routes.Count > 0)
+{
+	<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
+		<ChildContent>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokatermIcons.Globe"
+						Disabled="_opening"
+						title="Open in the browser"
+						aria-label="@($"Open a port of {Name} in the browser")" />
+		</ChildContent>
+		<Items>
+			@foreach (DockerPortRoute route in _routes)
+			{
+				@if (route.CanOpen)
+				{
+					@foreach (string choice in route.Schemes)
+					{
+						<MokaDropdownItem OnClick="@(() => OpenAsync(route, choice))">
+							<span class="mt-port-item" title="@Hint(route, choice)">
+								<span class="mt-port-line">
+									<span class="mt-port-name">@route.Port.Display</span>
+									<span class="mt-port-scheme">@choice</span>
+								</span>
+							</span>
+						</MokaDropdownItem>
+					}
+				}
+				else
+				{
+					<MokaDropdownItem Disabled>
+						<span class="mt-port-item">
+							<span class="mt-port-name">@route.Port.Display</span>
+							<span class="mt-port-reason">@route.Reason</span>
+						</span>
+					</MokaDropdownItem>
+				}
+			}
+		</Items>
+	</MokaDropdown>
+}

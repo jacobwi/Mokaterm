@@ -1,4 +1,3 @@
-using System.Globalization;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 
@@ -7,7 +6,8 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <summary>
 /// The host's volumes, marked in use unless no container at all (running or stopped) refers to them. A volume opens
 /// its panel: the full path on the docker host, the containers that mount it and where, and a read-only look at its
-/// files, which usually takes root. Only unused volumes can be removed, and nothing is ever written into one from here.
+/// files, which usually takes root. Only unused volumes can be removed, one here or together on the cleanup page, and
+/// nothing is ever written into one from here.
 /// </summary>
 public sealed partial class DockerVolumesPage : DockerPageBase
 {
@@ -116,20 +116,4 @@ public sealed partial class DockerVolumesPage : DockerPageBase
 		$"The volume {volume.Name} and everything stored in it are deleted. No container uses it now, and this cannot be undone.",
 		"Remove",
 		RefreshAsync);
-
-	private Task RemoveUnusedAsync()
-	{
-		List<string> names = [.. _volumes.Where(CanRemove).Select(volume => volume.Name)];
-		if (names.Count == 0)
-		{
-			return Task.CompletedTask;
-		}
-
-		return ChangeAsync(
-			DockerCommands.RemoveVolumes(names),
-			"Remove unused volumes",
-			string.Create(CultureInfo.CurrentCulture, $"These {names.Count} volumes and everything stored in them are deleted: {DockerWording.NameList(names)}. No container uses them now, and this cannot be undone."),
-			"Remove",
-			RefreshAsync);
-	}
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Modules.Ssh.Tools;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -43,14 +44,35 @@ internal static class DockerCommands
 	public static DockerCall DiskUsage() => Docker(["system", "df", "--format", JsonLines]);
 
 	/// <summary>
-	/// Removes stopped containers, networks no container uses, dangling images and unused build cache; volumes stay,
-	/// because <c>--volumes</c> is not passed.
+	/// Every image, container, volume and build cache entry with its size, as one JSON object of four arrays. Sizing
+	/// every volume can take the daemon a while on a big host.
 	/// </summary>
-	public static DockerCall SystemPrune() => Docker(["system", "prune", "--force"]).AsChange(DockerCall.LongTimeout);
+	public static DockerCall SystemUsage() =>
+		Docker(["system", "df", "--verbose", "--format", JsonLines]) with { Timeout = TimeSpan.FromMinutes(2) };
+
+	/// <summary>
+	/// Every build cache entry nothing uses, not just the dangling ones (<c>--all</c>): what the cleanup lists under build
+	/// cache. Build cache cannot be removed by name, so this is the one cleanup that is a prune.
+	/// </summary>
+	public static DockerCall PruneBuildCache() => Docker(["builder", "prune", "--all", "--force"]).AsChange(DockerCall.LongTimeout);
+
+	/// <summary>
+	/// One line per container: id, restart count, state, exit code, health (<c>-</c> without a check), name and compose
+	/// project. One exec channel for the whole host, through the same shell as every docker command.
+	/// </summary>
+	public static DockerCall ContainerStates() => DockerCall.Script(ContainerStatesScript, [ContainerStatesFormat]);
 
 	public static DockerCall ListContainers() => Docker(["ps", "--all", "--no-trunc", "--format", JsonLines]);
 
 	public static DockerCall Inspect(string container) => Docker(["container", "inspect", Container(container)]);
+
+	/// <summary>Removes exactly the stopped containers named, which is what the confirmation lists. A running one is refused, not killed.</summary>
+	public static DockerCall RemoveContainers(IReadOnlyList<string> containers)
+	{
+		ArgumentNullException.ThrowIfNull(containers);
+		ArgumentOutOfRangeException.ThrowIfZero(containers.Count);
+		return Docker(["rm", .. containers.Select(Container)]).AsChange();
+	}
 
 	/// <summary>Several containers in one inspect, for the mounts of a volume's users.</summary>
 	public static DockerCall InspectAll(IReadOnlyList<string> containers)
@@ -80,7 +102,7 @@ internal static class DockerCommands
 		List<string> words = ["logs", "--timestamps", "--tail", Tail(tail)];
 		if (since is not null)
 		{
-			if (!DockerLogParser.IsTimestamp(since) || since.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+			if (!LogLines.IsTimestampWord(since))
 			{
 				throw new ArgumentException("That is not a docker timestamp.", nameof(since));
 			}
@@ -94,11 +116,37 @@ internal static class DockerCommands
 	}
 
 	/// <summary>
-	/// Prints <c>bash</c> when the container has it. Run before typing a shell into the terminal, so the typed command
+	/// Prints <c>bash</c> when the container has it. Run before a container's shell tab opens, so the command it types
 	/// is the plain one a person would use. Needs <c>sh</c>, which every image with a shell has.
 	/// </summary>
 	public static DockerCall FindShell(string container) =>
 		Docker(["exec", Container(container), "sh", "-c", "command -v bash"]) with { Timeout = TimeSpan.FromSeconds(15) };
+
+	/// <summary>
+	/// One of the module's file scripts run inside a running container: <c>docker exec NAME sh -c SCRIPT sh ARG...</c>, so
+	/// paths stay positional arguments in the container too. stdout is kept as bytes, since a listing is NUL-separated and
+	/// a read is the file itself.
+	/// </summary>
+	public static DockerCall ExecScript(string container, string script, IReadOnlyList<string> arguments)
+	{
+		ArgumentNullException.ThrowIfNull(script);
+		ArgumentNullException.ThrowIfNull(arguments);
+		return Docker(["exec", Container(container), "sh", "-c", script, "sh", .. arguments]) with { BinaryOutput = true };
+	}
+
+	/// <summary>
+	/// <see cref="ExecScript"/> reading <paramref name="input"/>, a file on the docker host, on stdin: the host runs
+	/// <c>docker exec -i NAME sh -c SCRIPT sh ARG... &lt; INPUT</c> through a fixed script of its own, so the input's path is
+	/// an argument there as well.
+	/// </summary>
+	public static DockerCall ExecScriptWithInput(string container, string input, string script, IReadOnlyList<string> arguments)
+	{
+		ArgumentNullException.ThrowIfNull(script);
+		ArgumentNullException.ThrowIfNull(arguments);
+		string file = Checked(input, DockerNames.PathProblem(input, "input file"));
+		return DockerCall.Script(DockerHostScripts.WithInputScript, [file, "docker", "exec", "-i", Container(container), "sh", "-c", script, "sh", .. arguments])
+			with { BinaryOutput = true };
+	}
 
 	public static DockerCall Start(string container) => Docker(["start", Container(container)]).AsChange();
 
@@ -132,11 +180,12 @@ internal static class DockerCommands
 	}
 
 	/// <summary>
-	/// The line typed into the session's terminal to open a shell in a container, Enter included. Typed rather than run,
-	/// so the shell belongs to the terminal; a name with a control character is refused because the terminal would read
-	/// it as keys.
+	/// What a container's shell tab types into its login shell: <c>exec docker exec -it NAME SHELL</c>, through sudo when
+	/// the manager runs as root, so sudo asks for its password in that terminal. exec puts docker in the login shell's
+	/// place, so leaving the container ends the tab's session instead of dropping back to the server's prompt. A name
+	/// with a control character is refused, because the terminal would read it as keys.
 	/// </summary>
-	public static string ShellCommandLine(string container, string shell, bool elevated)
+	public static string ShellStartupCommand(string container, string shell, bool elevated)
 	{
 		if (shell is not ("bash" or "sh"))
 		{
@@ -144,7 +193,7 @@ internal static class DockerCommands
 		}
 
 		string line = DockerCommandLine.Build(Docker(["exec", "-it", Container(container), shell]));
-		return (elevated ? "sudo " + line : line) + "\r";
+		return (elevated ? "exec sudo " : "exec ") + line;
 	}
 
 	public static DockerCall ListImages() => Docker(["image", "ls", "--no-trunc", "--format", JsonLines]);
@@ -155,8 +204,32 @@ internal static class DockerCommands
 	public static DockerCall RemoveImage(string reference, bool force) =>
 		Docker(force ? ["image", "rm", "--force", Image(reference)] : ["image", "rm", Image(reference)]).AsChange();
 
-	/// <summary>Removes images no tag points at and no container uses. Tagged images stay, because <c>--all</c> is not passed.</summary>
-	public static DockerCall PruneDanglingImages() => Docker(["image", "prune", "--force"]).AsChange(DockerCall.LongTimeout);
+	/// <summary>Removes exactly the tags and image ids named, which is what the confirmation lists.</summary>
+	public static DockerCall RemoveImages(IReadOnlyList<string> references)
+	{
+		ArgumentNullException.ThrowIfNull(references);
+		ArgumentOutOfRangeException.ThrowIfZero(references.Count);
+		return Docker(["image", "rm", .. references.Select(Image)]).AsChange(DockerCall.LongTimeout);
+	}
+
+	/// <summary>Several images in one inspect, for the digests the registries gave them and their platform.</summary>
+	public static DockerCall InspectImages(IReadOnlyList<string> references)
+	{
+		ArgumentNullException.ThrowIfNull(references);
+		ArgumentOutOfRangeException.ThrowIfZero(references.Count);
+		return Docker(["image", "inspect", .. references.Select(Image)]);
+	}
+
+	/// <summary>Answers with its version where buildx is installed, which is what says <see cref="ImagetoolsInspect"/> can run.</summary>
+	public static DockerCall BuildxVersion() => Docker(["buildx", "version"]) with { Timeout = TimeSpan.FromSeconds(15) };
+
+	/// <summary>What the registry holds for the tag now, its digest first. Nothing is pulled.</summary>
+	public static DockerCall ImagetoolsInspect(string reference) =>
+		Docker(["buildx", "imagetools", "inspect", Image(reference)]) with { OutputLimitBytes = 256 * 1024 };
+
+	/// <summary>The same through <c>docker manifest</c>, for a host without buildx. It prints every platform of an index.</summary>
+	public static DockerCall ManifestInspect(string reference) =>
+		Docker(["manifest", "inspect", "--verbose", Image(reference)]) with { OutputLimitBytes = 4 * 1024 * 1024 };
 
 	public static DockerCall ListVolumes() => Docker(["volume", "ls", "--format", JsonLines]);
 
@@ -184,6 +257,17 @@ internal static class DockerCommands
 		ArgumentOutOfRangeException.ThrowIfZero(names.Count);
 		return Docker(["network", "rm", .. names.Select(name => Existing(name, "network"))]).AsChange();
 	}
+
+	/// <summary>The template for <see cref="ContainerStates"/>, passed as an argument so its quotes never meet the script's.</summary>
+	internal const string ContainerStatesFormat =
+		"{{.Id}} {{.RestartCount}} {{.State.Status}} {{.State.ExitCode}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}} {{.Name}} {{with .Config.Labels}}{{index . \"com.docker.compose.project\"}}{{end}}";
+
+	/// <summary>
+	/// Lists every container and inspects them all with the template in <c>$1</c>. A container removed between the two
+	/// makes inspect exit 1 after printing the rest, which the reader takes as it is.
+	/// </summary>
+	private const string ContainerStatesScript =
+		"ids=$(docker ps --all --quiet --no-trunc) || exit $?; [ -n \"$ids\" ] || exit 0; exec docker container inspect --format \"$1\" $ids";
 
 	internal static string Tail(int lines)
 	{

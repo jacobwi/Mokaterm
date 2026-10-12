@@ -1,3 +1,5 @@
+using Mokaterm.Abstractions.Connections;
+
 namespace Mokaterm.Modules.Ssh.Admin;
 
 /// <summary>
@@ -15,6 +17,12 @@ internal interface IAdminShell : IAsyncDisposable
 
 	/// <summary>The login as <c>user@host</c>, for messages.</summary>
 	string Account { get; }
+
+	/// <summary>
+	/// How the session logged in, which decides whether turning a login method off on the server locks this login out.
+	/// Null when the session does not say.
+	/// </summary>
+	AuthenticationMethod? LoginMethod => null;
 
 	/// <summary>Whether a script can be handed input on stdin, which a crontab and a new password need.</summary>
 	bool SupportsInput { get; }

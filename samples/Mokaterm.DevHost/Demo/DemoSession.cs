@@ -29,15 +29,21 @@ internal sealed class DemoSession : IProtocolSession
 	private readonly DemoIndicators _indicators = new();
 	private int _disposed;
 
-	public DemoSession(DemoAccount account, string hostName, string address, TerminalSize size, TimeProvider timeProvider, ILogger logger)
+	/// <param name="startupCommand">Typed into the shell once it is up, as the SSH module does with its startup command.</param>
+	public DemoSession(DemoAccount account, string hostName, string address, TerminalSize size, TimeProvider timeProvider, ILogger logger, string? startupCommand = null)
 	{
 		DemoFileTree tree = DemoTreeSeed.Create(account, hostName, timeProvider);
 		_files = new DemoFileSystemFeature(tree, account, _closed.Token);
 		DemoShell shell = new(tree, account, hostName, address, size, timeProvider);
-		_terminal = new DemoTerminalChannel(shell, () => _completion.TrySetResult(), logger);
+		_terminal = new DemoTerminalChannel(shell, () => _completion.TrySetResult(), logger, startupCommand);
 		_tunnels = new DemoTunnels(timeProvider);
 		_commands = new DemoCommandFeature(account, hostName, timeProvider);
-		_docker = DockerSessionFeature.ForCommands(new DemoDockerCommands(new DemoDockerEngine(timeProvider), timeProvider), timeProvider, hostName, account.Name);
+		_docker = DockerSessionFeature.ForCommands(
+			new DemoDockerCommands(new DemoDockerEngine(timeProvider, DemoDockerFiles.Reader(tree), DemoDockerFiles.ByteReader(tree)), timeProvider),
+			timeProvider,
+			hostName,
+			account.Name,
+			_files);
 	}
 
 	public Task Completion => _completion.Task;
@@ -82,8 +88,8 @@ internal sealed class DemoSession : IProtocolSession
 		// File system views keep the token and fail with "connection lost" from here on.
 		_closed.Cancel();
 		await _terminal.DisposeAsync();
+		await _docker.DisposeAsync();
 		await _files.DisposeAsync();
-		_docker.Dispose();
 		_completion.TrySetResult();
 	}
 }

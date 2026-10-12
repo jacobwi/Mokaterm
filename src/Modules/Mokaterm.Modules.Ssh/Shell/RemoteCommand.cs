@@ -24,11 +24,13 @@ internal sealed class RemoteCommand : IExecChannel
 	internal const int CopyBufferBytes = 80 * 1024;
 
 	private readonly SshCommand _command;
+	private readonly ExecSlot _slot;
 
-	private RemoteCommand(SshCommand command, Task execution)
+	private RemoteCommand(SshCommand command, Task execution, ExecSlot slot)
 	{
 		_command = command;
 		Execution = execution;
+		_slot = slot;
 	}
 
 	/// <summary>Stdout. Reads return 0 once the command finished and its output was drained.</summary>
@@ -72,11 +74,24 @@ internal sealed class RemoteCommand : IExecChannel
 	/// closes stdin, so sudo asking twice fails instead of waiting. SSH.NET only sends EOF after data was written, so a
 	/// command started without input must never read stdin.
 	/// </summary>
-	public static async Task<RemoteCommand> StartAsync(SshClient client, string commandText, SecretBuffer? input, CancellationToken cancellationToken)
+	/// <param name="runsLong">
+	/// The channel may stay open for minutes (<see cref="ExecChannelBudget.RunsLong"/>), which keeps it out of the slots
+	/// the connection's budget holds back for short calls.
+	/// </param>
+	/// <remarks>
+	/// The channel waits for a slot in its connection's <see cref="ExecChannelBudget"/> first and holds it until it is
+	/// disposed. Every exec channel of this module opens here, which is what makes the budget the connection's.
+	/// </remarks>
+	public static async Task<RemoteCommand> StartAsync(SshClient client, string commandText, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
 	{
-		SshCommand command = client.CreateCommand(commandText);
+		ArgumentNullException.ThrowIfNull(client);
+		ExecSlot slot = await ExecChannelBudget.For(client).AcquireAsync(runsLong, cancellationToken);
+		SshCommand? created = null;
 		try
 		{
+			SshCommand command = client.CreateCommand(commandText);
+			created = command;
+
 			// ExecuteAsync opens the channel and sends the exec request synchronously before it returns its task.
 			Task execution = await Task.Factory.StartNew(
 				() => command.ExecuteAsync(cancellationToken),
@@ -89,20 +104,21 @@ internal sealed class RemoteCommand : IExecChannel
 				await SendLineAsync(command, input, cancellationToken);
 			}
 
-			return new RemoteCommand(command, execution);
+			return new RemoteCommand(command, execution, slot);
 		}
 		catch
 		{
-			command.Dispose();
+			created?.Dispose();
+			slot.Dispose();
 			throw;
 		}
 	}
 
 	/// <summary>Runs a command to completion and collects its output.</summary>
 	/// <exception cref="RemoteFileSystemException">The command wrote more than <see cref="MaxOutputBytes"/>; it is stopped.</exception>
-	public static async Task<RemoteCommandResult> RunAsync(SshClient client, string commandText, SecretBuffer? input, CancellationToken cancellationToken)
+	public static async Task<RemoteCommandResult> RunAsync(SshClient client, string commandText, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
 	{
-		using RemoteCommand command = await StartAsync(client, commandText, input, cancellationToken);
+		using RemoteCommand command = await StartAsync(client, commandText, input, runsLong, cancellationToken);
 		byte[] output = await ReadAllAsync(command.Output, MaxOutputBytes, cancellationToken);
 		await command.Execution;
 		return new RemoteCommandResult(command.ExitStatus, output, command.ReadError());
@@ -139,7 +155,14 @@ internal sealed class RemoteCommand : IExecChannel
 
 	public void Dispose()
 	{
-		_command.Dispose();
+		try
+		{
+			_command.Dispose();
+		}
+		finally
+		{
+			_slot.Dispose();
+		}
 
 		// Disposing a running command faults its task; nobody awaits it any more.
 		if (Execution.IsFaulted)

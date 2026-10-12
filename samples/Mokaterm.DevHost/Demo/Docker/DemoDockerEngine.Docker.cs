@@ -36,10 +36,15 @@ internal sealed partial class DemoDockerEngine
 		["kill", var name] => Change(name, container => Stop(container, 137)),
 		["pause", var name] => Change(name, container => container.State = "paused"),
 		["rm", .. var rest] => Remove(rest),
+		["run", .. var run] => RunContainer(run),
 		["image", "ls", ..] => DemoDockerResult.Ok(string.Concat(_images.Select(image => Line(ImageRow(image)) + "\n"))),
+		["image", "inspect", .. var references] => InspectImages(references),
 		["pull", var reference] => Pull(reference),
 		["image", "rm", .. var rest] => RemoveImage(rest),
-		["image", "prune", ..] => PruneImages(),
+		["buildx", "version"] => DemoDockerResult.Ok(BuildxVersion + "\n"),
+		["buildx", "imagetools", "inspect", var reference] => Imagetools(reference),
+		["manifest", "inspect", "--verbose", var reference] => ManifestInspect(reference),
+		["builder", "prune", ..] => PruneBuildCache(),
 		["volume", "ls", "--quiet", ..] => DemoDockerResult.Ok(string.Concat(_volumes.Where(volume => !VolumeInUse(volume)).Select(volume => volume + "\n"))),
 		["volume", "ls", ..] => DemoDockerResult.Ok(string.Concat(_volumes.Select(volume => Line(VolumeRow(volume)) + "\n"))),
 		["volume", "create", var name] => CreateVolume(name),
@@ -47,8 +52,8 @@ internal sealed partial class DemoDockerEngine
 		["network", "ls", ..] => DemoDockerResult.Ok(string.Concat(_networks.Select(network => Line(NetworkRow(network)) + "\n"))),
 		["network", "create", var name] => CreateNetwork(name),
 		["network", "rm", .. var names] => RemoveNetworks(names),
+		["system", "df", "--verbose", ..] => SystemUsage(),
 		["system", "df", ..] => DiskUsage(),
-		["system", "prune", ..] => SystemPrune(),
 		_ => DemoDockerResult.Fail(1, $"docker: '{string.Join(' ', words)}' is not a docker command the demo knows.\nSee 'docker --help'"),
 	};
 
@@ -130,7 +135,7 @@ internal sealed partial class DemoDockerEngine
 				Path = container.Command.Split(' ')[0],
 				Name = "/" + container.Name,
 				Image = "sha256:" + HexId(container.Image),
-				RestartCount = container.RestartPolicy == "no" ? 0 : 2,
+				RestartCount = container.RestartCount,
 				State = new
 				{
 					Status = container.State,
@@ -203,10 +208,17 @@ internal sealed partial class DemoDockerEngine
 		return DemoDockerResult.Ok(JsonSerializer.Serialize(inspected, Indented) + "\n");
 	}
 
-	private DemoDockerResult Stats(IEnumerable<string> names)
+	/// <summary>The containers named, or every running one when none are, as <c>docker stats</c> lists them.</summary>
+	private DemoDockerResult Stats(IEnumerable<string> named)
 	{
 		StringBuilder output = new();
 		double phase = _time.GetUtcNow().ToUnixTimeMilliseconds() / 4000d;
+		List<string> names = [.. named];
+		if (names.Count == 0)
+		{
+			names = [.. _containers.Where(container => container.State == "running").Select(container => container.Name)];
+		}
+
 		foreach (string name in names)
 		{
 			if (Find(name) is not { } container)
@@ -328,22 +340,30 @@ internal sealed partial class DemoDockerEngine
 		}
 	}
 
+	/// <summary>Each container named, the way docker goes on past one it cannot remove and exits 1 at the end.</summary>
 	private DemoDockerResult Remove(string[] words)
 	{
 		bool force = words.Contains("--force");
-		string name = words[^1];
-		if (Find(name) is not { } container)
+		StringBuilder output = new();
+		StringBuilder error = new();
+		foreach (string name in words.Where(word => !word.StartsWith('-')))
 		{
-			return DemoDockerResult.Fail(1, $"Error response from daemon: No such container: {name}");
+			if (Find(name) is not { } container)
+			{
+				error.Append(CultureInfo.InvariantCulture, $"Error response from daemon: No such container: {name}\n");
+			}
+			else if (container.IsAlive && !force)
+			{
+				error.Append(CultureInfo.InvariantCulture, $"Error response from daemon: cannot remove container \"/{name}\": container is running: stop the container before removing or force remove\n");
+			}
+			else
+			{
+				_containers.Remove(container);
+				output.Append(name).Append('\n');
+			}
 		}
 
-		if (container.IsAlive && !force)
-		{
-			return DemoDockerResult.Fail(1, $"Error response from daemon: cannot remove container \"/{name}\": container is running: stop the container before removing or force remove");
-		}
-
-		_containers.Remove(container);
-		return DemoDockerResult.Ok(name + "\n");
+		return new DemoDockerResult(error.Length == 0 ? 0 : 1, output.ToString(), error.ToString());
 	}
 
 	private Dictionary<string, string> ImageRow((string Repository, string Tag, string Id, long Size, DateTimeOffset Created) image) => new()
@@ -364,47 +384,54 @@ internal sealed partial class DemoDockerEngine
 	private DemoDockerResult Pull(string reference)
 	{
 		int colon = reference.LastIndexOf(':');
-		bool tagged = colon > reference.LastIndexOf('/');
-		string repository = tagged ? reference[..colon] : reference;
-		string tag = tagged ? reference[(colon + 1)..] : "latest";
-		if (!_images.Any(image => image.Repository == repository && image.Tag == tag))
+		bool hasTag = colon > reference.LastIndexOf('/');
+		string repository = hasTag ? reference[..colon] : reference;
+		string tag = hasTag ? reference[(colon + 1)..] : "latest";
+		string tagged = $"{repository}:{tag}";
+		bool newer = !_images.Any(image => image.Repository == repository && image.Tag == tag);
+		if (newer)
 		{
 			_images.Add((repository, tag, "sha256:" + HexId(reference), 31_400_000, _time.GetUtcNow().AddDays(-4)));
+			_registry.TryAdd(tagged, Digest("pulled " + tagged));
+			_pulled[tagged] = _registry[tagged];
 		}
 
-		string digest = "sha256:" + HexId("digest" + reference);
-		return DemoDockerResult.Ok(
-			$"{tag}: Pulling from {repository}\n6e771e15690e: Pull complete\n0b2a6a6e5c1f: Pull complete\nDigest: {digest}\nStatus: Downloaded newer image for {repository}:{tag}\ndocker.io/{repository}:{tag}\n");
+		newer |= PullLatest(tagged);
+		string digest = _pulled.TryGetValue(tagged, out string? pulled) ? pulled : Digest("pulled " + tagged);
+		return DemoDockerResult.Ok(newer
+			? $"{tag}: Pulling from {repository}\n6e771e15690e: Pull complete\n0b2a6a6e5c1f: Pull complete\nDigest: {digest}\nStatus: Downloaded newer image for {tagged}\ndocker.io/{tagged}\n"
+			: $"{tag}: Pulling from {repository}\nDigest: {digest}\nStatus: Image is up to date for {tagged}\ndocker.io/{tagged}\n");
 	}
 
+	/// <summary>Each tag or id named, going on past one it cannot remove, as docker does.</summary>
 	private DemoDockerResult RemoveImage(string[] words)
 	{
 		bool force = words.Contains("--force");
-		string reference = words[^1];
-		int index = _images.FindIndex(image => image.Id == reference || $"{image.Repository}:{image.Tag}" == reference);
-		if (index < 0)
+		StringBuilder output = new();
+		StringBuilder error = new();
+		foreach (string reference in words.Where(word => !word.StartsWith('-')))
 		{
-			return DemoDockerResult.Fail(1, $"Error response from daemon: No such image: {reference}");
+			int index = _images.FindIndex(image => image.Id == reference || $"{image.Repository}:{image.Tag}" == Tagged(reference));
+			if (index < 0)
+			{
+				error.Append(CultureInfo.InvariantCulture, $"Error response from daemon: No such image: {reference}\n");
+				continue;
+			}
+
+			(string repository, string tag, string id, _, _) = _images[index];
+			string name = $"{repository}:{tag}";
+			if (!force && _containers.FirstOrDefault(container => container.Image == name) is { } user)
+			{
+				error.Append(CultureInfo.InvariantCulture, $"Error response from daemon: conflict: unable to remove repository reference \"{name}\" (must force) - container {user.Id[..12]} is using its referenced image {id[7..19]}\n");
+				continue;
+			}
+
+			_images.RemoveAt(index);
+			_pulled.Remove(name);
+			output.Append(repository == "<none>" ? $"Deleted: {id}\n" : $"Untagged: {name}\nDeleted: {id}\n");
 		}
 
-		(string repository, string tag, string id, _, _) = _images[index];
-		string name = $"{repository}:{tag}";
-		if (!force && _containers.FirstOrDefault(container => container.Image == name) is { } user)
-		{
-			return DemoDockerResult.Fail(1, $"Error response from daemon: conflict: unable to remove repository reference \"{name}\" (must force) - container {user.Id[..12]} is using its referenced image {id[7..19]}");
-		}
-
-		_images.RemoveAt(index);
-		return DemoDockerResult.Ok(repository == "<none>" ? $"Deleted: {id}\n" : $"Untagged: {name}\nDeleted: {id}\n");
-	}
-
-	private DemoDockerResult PruneImages()
-	{
-		List<string> removed = [.. _images.Where(image => image.Repository == "<none>").Select(image => image.Id)];
-		_images.RemoveAll(image => image.Repository == "<none>");
-		return DemoDockerResult.Ok(removed.Count == 0
-			? "Total reclaimed space: 0B\n"
-			: "Deleted Images:\n" + string.Concat(removed.Select(id => $"deleted: {id}\n")) + "\nTotal reclaimed space: 198MB\n");
+		return new DemoDockerResult(error.Length == 0 ? 0 : 1, output.ToString(), error.ToString());
 	}
 
 	private bool VolumeInUse(string volume) => _containers.Any(container => container.Volumes.Contains(volume));
@@ -493,10 +520,18 @@ internal sealed partial class DemoDockerEngine
 		return DemoDockerResult.Ok(output.ToString());
 	}
 
+	/// <summary>The summary, worked out from the same state the verbose listing shows, so a cleanup shows up in both.</summary>
 	private DemoDockerResult DiskUsage()
 	{
+		bool Used((string Repository, string Tag, string Id, long Size, DateTimeOffset Created) image) =>
+			_containers.Any(container => container.Image == $"{image.Repository}:{image.Tag}");
 		long images = _images.Sum(image => image.Size);
-		long dangling = _images.Where(image => image.Repository == "<none>").Sum(image => image.Size);
+		long unusedImages = _images.Where(image => !Used(image)).Sum(image => image.Size);
+		long volumes = _volumes.Sum(VolumeBytes);
+		long unusedVolumes = _volumes.Where(volume => !VolumeInUse(volume)).Sum(VolumeBytes);
+		long cache = _buildCache.Sum(entry => entry.Size);
+		long unusedCache = _buildCache.Where(entry => !entry.InUse).Sum(entry => entry.Size);
+		string Share(long part, long whole) => string.Create(CultureInfo.InvariantCulture, $"{Megabytes(part)} ({(whole == 0 ? 0 : part * 100 / whole)}%)");
 		string Rows(params (string Type, int Total, int Active, string Size, string Reclaimable)[] rows) =>
 			string.Concat(rows.Select(row => Line(new Dictionary<string, string>
 			{
@@ -507,20 +542,11 @@ internal sealed partial class DemoDockerEngine
 				["Type"] = row.Type,
 			}) + "\n"));
 
+		int stopped = _containers.Count(container => !container.IsAlive);
 		return DemoDockerResult.Ok(Rows(
-			("Images", _images.Count, _containers.Select(container => container.Image).Distinct().Count(), string.Create(CultureInfo.InvariantCulture, $"{images / 1e9:0.##}GB"), string.Create(CultureInfo.InvariantCulture, $"{(dangling + 4_260_000) / 1e6:0.#}MB ({(dangling + 4_260_000) * 100 / Math.Max(images, 1)}%)")),
-			("Containers", _containers.Count, _containers.Count(container => container.IsAlive), "1.2MB", "18kB (1%)"),
-			("Local Volumes", _volumes.Count, _volumes.Count(VolumeInUse), "1.43GB", "212MB (14%)"),
-			("Build Cache", 31, 0, "642MB", "642MB")));
-	}
-
-	private DemoDockerResult SystemPrune()
-	{
-		int containers = _containers.RemoveAll(container => !container.IsAlive);
-		int networks = _networks.RemoveAll(network => network.Name is not ("bridge" or "host" or "none") && !_containers.Any(container => container.Networks.Contains(network.Name)));
-		int images = _images.RemoveAll(image => image.Repository == "<none>");
-		return DemoDockerResult.Ok(string.Create(
-			CultureInfo.InvariantCulture,
-			$"Deleted Containers: {containers}\nDeleted Networks: {networks}\nDeleted Images: {images}\nDeleted build cache objects: 31\n\nTotal reclaimed space: 840.2MB\n"));
+			("Images", _images.Count, _images.Count(Used), Megabytes(images), Share(unusedImages, images)),
+			("Containers", _containers.Count, _containers.Count(container => container.IsAlive), "1.2MB", Share(stopped * 18_400L, 1_200_000)),
+			("Local Volumes", _volumes.Count, _volumes.Count(VolumeInUse), Megabytes(volumes), Share(unusedVolumes, volumes)),
+			("Build Cache", _buildCache.Count, _buildCache.Count(entry => entry.InUse), Megabytes(cache), Megabytes(unusedCache))));
 	}
 }

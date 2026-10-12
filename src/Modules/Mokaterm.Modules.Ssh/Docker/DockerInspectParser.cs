@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Abstractions.Terminal;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -161,7 +162,7 @@ internal static class DockerInspectParser
 				probes.Add(new DockerHealthProbe(
 					DockerJson.Time(probe, "Start"),
 					DockerJson.Int(probe, "ExitCode") ?? 0,
-					DockerText.Plain(DockerJson.Text(probe, "Output")).Trim()));
+					TerminalTextFilter.Plain(DockerJson.Text(probe, "Output")).Trim()));
 			}
 		}
 

@@ -7,19 +7,29 @@ namespace Mokaterm.DevHost.Demo.Docker;
 internal sealed partial class DemoDockerEngine
 {
 	/// <summary>
-	/// The two scripts the manager sends, told apart by how they start: the batched <c>test -f</c>, answered from the
-	/// files the demo tree holds, and the search for compose files.
+	/// The scripts the manager sends, told apart by how they start: the batched <c>test -f</c>, answered from the files
+	/// the demo tree holds, the search for compose files, and the health watch's read of every container.
 	/// </summary>
-	private static DemoDockerResult Script(string script, string[] arguments)
+	private DemoDockerResult Script(string script, string[] arguments)
 	{
 		if (script.StartsWith("for f do", StringComparison.Ordinal))
 		{
-			return DemoDockerResult.Ok(string.Concat(arguments.Select(path => DemoDockerFiles.Present.Contains(path) ? "1" : "0")));
+			return DemoDockerResult.Ok(string.Concat(arguments.Select(path => _readFile(path) is null ? "0" : "1")));
+		}
+
+		if (IsInputScript(script))
+		{
+			return WithInput(arguments);
 		}
 
 		if (script.StartsWith("depth=", StringComparison.Ordinal))
 		{
 			return DemoDockerResult.Ok(string.Concat(DemoDockerFiles.Found.Select(path => path + "\n")));
+		}
+
+		if (script.StartsWith("ids=$(docker ps", StringComparison.Ordinal))
+		{
+			return ContainerStates();
 		}
 
 		return DemoDockerResult.Fail(2, "sh: 1: the demo runs only the manager's own scripts");
@@ -29,7 +39,8 @@ internal sealed partial class DemoDockerEngine
 	/// <c>docker exec [-u U] [-w DIR] [-e K=V]... NAME CMD...</c>: a few commands answer the way a small Linux container
 	/// would, the rest are not found. The finder for bash is handled before this.
 	/// </summary>
-	private DemoDockerResult Exec(string[] words)
+	/// <param name="input">What <c>-i</c> feeds the command on stdin, from a file the host piped in.</param>
+	private DemoDockerResult Exec(string[] words, byte[]? input = null)
 	{
 		string user = "root";
 		string directory = "/";
@@ -39,6 +50,9 @@ internal sealed partial class DemoDockerEngine
 		{
 			switch (words[index])
 			{
+				case "-i" or "-t" or "-it":
+					index++;
+					continue;
 				case "-u":
 					user = words[index + 1];
 					break;
@@ -64,6 +78,11 @@ internal sealed partial class DemoDockerEngine
 		}
 
 		string[] command = words[(index + 1)..];
+		if (command is ["sh", "-c", var fileScript, "sh", .. var scriptArguments] && IsFileScript(fileScript))
+		{
+			return ContainerScript(container, fileScript, scriptArguments, input);
+		}
+
 		string line = command is [("sh" or "bash"), "-c", var script] ? script : string.Join(' ', command);
 		string program = line.Split(' ', 2)[0];
 		return program switch

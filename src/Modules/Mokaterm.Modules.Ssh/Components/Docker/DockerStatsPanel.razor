@@ -10,19 +10,15 @@
 			<div class="mt-dk-stat">
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">CPU</MokaText>
 				<span class="mt-dk-stat-value">@stats.Cpu</span>
-				<div class="mt-dk-bar" aria-hidden="true"><span style="@BarWidth(CpuShare(stats))"></span></div>
-				<svg class="mt-dk-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points="@Spark(_cpuHistory, CpuScale)" />
-				</svg>
+				<UsageBar Percent="stats.CpuShare(CoreCount)" />
+				<Sparkline Values="_history.Cpu(stats.Id)" Max="CpuScale" Slots="DockerStatsHistory.Length" Label="Recent CPU samples" />
 			</div>
 			<div class="mt-dk-stat">
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Memory</MokaText>
 				<span class="mt-dk-stat-value">@stats.MemoryPercent</span>
-				<div class="mt-dk-bar" aria-hidden="true"><span style="@BarWidth(stats.MemoryPercentValue)"></span></div>
+				<UsageBar Percent="stats.MemoryPercentValue" />
 				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-meta">@stats.Memory</MokaText>
-				<svg class="mt-dk-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points="@Spark(_memoryHistory, 100)" />
-				</svg>
+				<Sparkline Values="_history.Memory(stats.Id)" Max="100" Slots="DockerStatsHistory.Length" Label="Recent memory samples" />
 			</div>
 			<div class="mt-dk-stat">
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Network in / out</MokaText>

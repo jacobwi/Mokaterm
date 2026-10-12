@@ -701,8 +701,4 @@ public sealed class ParserTests
 		Assert.Equal(new[] { ("/etc/x y", "z\n"), ("/etc/q", "q\n") }, sections.All("file"));
 		Assert.Equal("echo '@@mt:one'", AdminSections.Start("one"));
 	}
-
-	[Fact]
-	public void Clean_DropsEscapesAndControlCharacters() =>
-		Assert.Equal("red plain\ttab\nnext title gone", AdminText.Clean("\u001b[31mred\u001b[0m plain\ttab\r\nnext\u0007 title\u001b]0;window\u0007 gone"));
 }

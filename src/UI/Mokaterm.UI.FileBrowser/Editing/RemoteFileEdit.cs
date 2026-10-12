@@ -56,8 +56,18 @@ internal sealed class RemoteFileEdit
 				}
 			}
 
-			using MemoryStream body = new(_file.ToBytes(text));
-			await _fileSystem.UploadAsync(_path, body, new UploadOptions { Overwrite = true }, progress: null, cancellationToken);
+			byte[] bytes = _file.ToBytes(text);
+			try
+			{
+				using MemoryStream body = new(bytes, writable: false);
+				await _fileSystem.UploadAsync(_path, body, new UploadOptions { Overwrite = true }, progress: null, cancellationToken);
+			}
+			finally
+			{
+				// An env file is where passwords live; the text itself cannot be wiped, but this copy of it can.
+				Array.Clear(bytes);
+			}
+
 			Release();
 			return FileSaveResult.Saved;
 		}

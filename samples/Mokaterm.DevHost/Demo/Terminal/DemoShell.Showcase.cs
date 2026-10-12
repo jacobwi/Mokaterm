@@ -35,6 +35,7 @@ internal sealed partial class DemoShell
 		("lorem [N]", "N paragraphs of wrapped text"),
 		("stty size", "rows and columns the terminal reported"),
 		("sudo -s, sudo CMD", "a root shell, or one command as root"),
+		("docker exec -it NAME", "a container's shell, as the Docker tool's tab opens it"),
 		("exit, Ctrl+D", "leave the root shell, or end the session"),
 	];
 

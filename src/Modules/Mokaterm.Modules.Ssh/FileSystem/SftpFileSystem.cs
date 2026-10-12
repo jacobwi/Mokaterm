@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Modules.Ssh.Connection;
@@ -493,7 +494,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		RemoteCommandResult result;
 		try
 		{
-			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(RemoteScripts.Checksum, [target]), null, cancellationToken);
+			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(RemoteScripts.Checksum, [target]), null, runsLong: true, cancellationToken);
 		}
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, target, out RemoteFileSystemException? mapped))
 		{
@@ -716,7 +717,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 			foreach (int[] batch in links.Chunk(LinkBatchSize))
 			{
 				string command = PosixShell.ScriptCommand(RemoteScripts.LinkTargets, [directory, .. batch.Select(i => entries[i].Name)]);
-				RemoteCommandResult result = await RemoteCommand.RunAsync(shell, command, null, cancellationToken);
+				RemoteCommandResult result = await RemoteCommand.RunAsync(shell, command, null, runsLong: false, cancellationToken);
 				if (!RemoteOutput.TryGetPayload(result.Output, out ReadOnlyMemory<byte> payload))
 				{
 					throw new InvalidOperationException("The link target script did not run.");
@@ -954,7 +955,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		RemoteCommandResult result;
 		try
 		{
-			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(script, arguments), null, cancellationToken);
+			result = await RemoteCommand.RunAsync(shell, PosixShell.ScriptCommand(script, arguments), null, RemoteScripts.RunsLong(script), cancellationToken);
 		}
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, path, out RemoteFileSystemException? mapped))
 		{

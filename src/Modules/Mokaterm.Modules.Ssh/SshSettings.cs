@@ -33,7 +33,7 @@ public sealed record SshSettings : ISettingsSection
 	/// <summary>The command that runs file operations as root.</summary>
 	public string SudoCommand { get; init; } = "sudo";
 
-	/// <summary>Absolute directory where root uploads are staged before they move into place.</summary>
+	/// <summary>Absolute directory where root uploads, and uploads into containers, are staged before they move on.</summary>
 	public string StagingDirectory { get; init; } = "/tmp";
 
 	/// <summary>How long a server prompt, such as a one-time code, may stay open.</summary>

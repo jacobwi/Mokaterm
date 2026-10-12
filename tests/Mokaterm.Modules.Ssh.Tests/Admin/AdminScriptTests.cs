@@ -7,6 +7,7 @@ using Mokaterm.Modules.Ssh.Admin.Accounts;
 using Mokaterm.Modules.Ssh.Admin.Clock;
 using Mokaterm.Modules.Ssh.Admin.Cron;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
 using Mokaterm.Modules.Ssh.Admin.Firewall;
 using Mokaterm.Modules.Ssh.Admin.SystemLogs;
 using Mokaterm.Modules.Ssh.Admin.Naming;
@@ -294,6 +295,13 @@ public sealed class AdminScriptTests
 		NetworkSnapshot snapshot = NetworkParser.Parse(NetworkFixtures.IpJson);
 		yield return NetworkCommands.SetLink(snapshot.Interfaces[1], up: false, snapshot, null).Script;
 		yield return ProcessCommands.Signal(new ProcessInfo { Pid = 4242, Command = "x" }, force: true, asRoot: true).Script;
+		yield return ProcessCommands.Renice(new ProcessInfo { Pid = 4242, Command = "x" }, -5, asRoot: true).Script;
+		yield return MonitorCommands.Sample();
+		yield return SpaceCommands.Measure("/var/it's here", asRoot: false);
+		yield return SpaceCommands.LargeFiles("/srv/data", 102400, asRoot: true);
+		yield return SmartCommands.Read("nvme0n1");
+		yield return LogCommands.FollowJournal("s=aa;i=1", "nginx.service", "err", asRoot: false);
+		yield return LogCommands.FollowFile("/var/log/syslog", "131077", 4096, asRoot: false);
 	}
 
 	private static async Task<(int ExitCode, byte[] Output, string Error)> RunWithStdinAsync(string shell, string script, string stdin)

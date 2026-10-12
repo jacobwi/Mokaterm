@@ -1,3 +1,5 @@
+using Mokaterm.Modules.Ssh.Admin.Packages;
+
 namespace Mokaterm.Modules.Ssh.Admin.Detection;
 
 /// <summary>
@@ -8,6 +10,15 @@ namespace Mokaterm.Modules.Ssh.Admin.Detection;
 internal sealed record SystemProfile
 {
 	private SystemCapabilities? _capabilities;
+
+	/// <summary>
+	/// The order package managers are looked for when the distribution does not name one. The survey's script picks a
+	/// manager in the same order, since it has to choose before anything is detected.
+	/// </summary>
+	public static IReadOnlyList<PackageManagerKind> PackageManagerSearchOrder { get; } =
+	[
+		PackageManagerKind.Apt, PackageManagerKind.Dnf, PackageManagerKind.Yum, PackageManagerKind.Zypper, PackageManagerKind.Pacman, PackageManagerKind.Apk,
+	];
 
 	public required SystemFacts Facts { get; init; }
 
@@ -166,7 +177,7 @@ internal sealed record SystemProfile
 		}
 
 		// An unknown or trimmed distribution: whichever manager is actually there.
-		foreach (PackageManagerKind candidate in (PackageManagerKind[])[PackageManagerKind.Apt, PackageManagerKind.Dnf, PackageManagerKind.Yum, PackageManagerKind.Zypper, PackageManagerKind.Pacman, PackageManagerKind.Apk])
+		foreach (PackageManagerKind candidate in PackageManagerSearchOrder)
 		{
 			if (IsUsable(candidate, facts))
 			{
@@ -211,14 +222,6 @@ internal sealed record SystemProfile
 		return facts.Has("iptables") ? FirewallKind.Iptables : FirewallKind.None;
 	}
 
-	private static bool IsUsable(PackageManagerKind kind, SystemFacts facts) => kind switch
-	{
-		PackageManagerKind.Apt => facts.Has("apt-get") && facts.Has("dpkg-query"),
-		PackageManagerKind.Dnf => facts.Has("dnf") && facts.Has("rpm"),
-		PackageManagerKind.Yum => facts.Has("yum") && facts.Has("rpm"),
-		PackageManagerKind.Zypper => facts.Has("zypper") && facts.Has("rpm"),
-		PackageManagerKind.Pacman => facts.Has("pacman"),
-		PackageManagerKind.Apk => facts.Has("apk"),
-		_ => false,
-	};
+	private static bool IsUsable(PackageManagerKind kind, SystemFacts facts) =>
+		kind != PackageManagerKind.None && PackageCommands.RequiredCommands(kind).All(facts.Has);
 }

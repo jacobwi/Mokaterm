@@ -13,8 +13,6 @@ namespace Mokaterm.Modules.Local.Sessions;
 /// </summary>
 internal sealed class LocalTerminalChannel : ITerminalChannel, IPseudoTerminalOutput
 {
-	private const char Escape = (char)0x1B;
-
 	private readonly TerminalOutputQueue _output = new();
 	private readonly TaskCompletionSource _ended = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private readonly string _programName;
@@ -141,6 +139,6 @@ internal sealed class LocalTerminalChannel : ITerminalChannel, IPseudoTerminalOu
 		string written = code is < 0 or > 0xFFFF
 			? string.Create(CultureInfo.InvariantCulture, $"{code} (0x{unchecked((uint)code):X8})")
 			: code.ToString(CultureInfo.InvariantCulture);
-		return Encoding.UTF8.GetBytes($"\r\n{Escape}[2m[mokaterm] {_programName} exited with code {written}{Escape}[0m\r\n");
+		return Encoding.UTF8.GetBytes(TerminalNotice.Format($"{_programName} exited with code {written}"));
 	}
 }

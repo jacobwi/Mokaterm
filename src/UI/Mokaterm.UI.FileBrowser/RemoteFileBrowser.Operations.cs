@@ -1,4 +1,5 @@
 using Moka.Red.Icons;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.UI.Common.Icons;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
@@ -188,7 +189,7 @@ public partial class RemoteFileBrowser
 		ReferenceEquals(fileSystem, _userFileSystem) || ReferenceEquals(fileSystem, _rootFileSystem);
 
 	/// <summary>The account of <paramref name="fileSystem"/>, for transfers that ask the session for its file system when they run.</summary>
-	private TransferFileSystem ForTransfers(IRemoteFileSystem fileSystem) => new(fileSystem, Session, _protocolSession);
+	private TransferFileSystem ForTransfers(IRemoteFileSystem fileSystem) => Source.ForTransfers(fileSystem, _live);
 
 	/// <summary>
 	/// Applies a change with <paramref name="fileSystem"/>, or the browser's current one, and lists the folder again, also
@@ -604,7 +605,7 @@ public partial class RemoteFileBrowser
 	/// <summary>Types <c>cd -- 'folder'</c> and Enter into the session's terminal.</summary>
 	private async Task OpenTerminalHereAsync(string directory)
 	{
-		if (Session.Terminal is not { } terminal)
+		if (Source.Terminal is not { } terminal)
 		{
 			return;
 		}
@@ -753,7 +754,7 @@ public partial class RemoteFileBrowser
 				drop.Items.Count(item => item.IsDirectory),
 				totalBytes,
 				directory,
-				Session.Host.Address,
+				Source.Location,
 				_userFileSystem?.UserName ?? current.UserName,
 				CanElevate,
 				asRoot,

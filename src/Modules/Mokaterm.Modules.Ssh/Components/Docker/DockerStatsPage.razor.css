@@ -1,0 +1,60 @@
+/* The shared table look comes from the manager; this adds sortable headers and the CPU line beside its figure. */
+.mt-dks-table td {
+	vertical-align: middle;
+}
+
+.mt-dks-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 0;
+	border: none;
+	border-radius: var(--moka-radius-sm);
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	cursor: pointer;
+	transition: color var(--moka-transition-fast);
+}
+
+.mt-dks-sort:hover,
+.mt-dks-sort--active {
+	color: var(--moka-color-on-surface);
+}
+
+.mt-dks-sort:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mt-dks-name {
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+}
+
+.mt-dks-figure {
+	display: inline-block;
+	min-width: 52px;
+}
+
+.mt-dks-cpu {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}
+
+.mt-dks-cpu ::deep .mt-dks-spark {
+	flex: 0 0 72px;
+	width: 72px;
+}
+
+@container mt-dk-page (max-width: 560px) {
+	.mt-dks-optional {
+		display: none;
+	}
+}

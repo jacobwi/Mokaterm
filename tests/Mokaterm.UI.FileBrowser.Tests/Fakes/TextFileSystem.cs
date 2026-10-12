@@ -72,6 +72,11 @@ internal sealed class TextFileSystem : IRemoteFileSystem
 			throw failure;
 		}
 
+		if (!options.Overwrite && _files.ContainsKey(path))
+		{
+			throw new RemoteFileSystemException(RemoteFileErrorKind.AlreadyExists, "File exists", path);
+		}
+
 		using MemoryStream copy = new();
 		await source.CopyToAsync(copy, cancellationToken);
 		byte[] bytes = copy.ToArray();

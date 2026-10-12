@@ -5,8 +5,10 @@ internal enum DockerManagerPage
 {
 	Overview,
 	Containers,
+	Stats,
 	Compose,
 	Images,
 	Volumes,
 	Networks,
+	Cleanup,
 }

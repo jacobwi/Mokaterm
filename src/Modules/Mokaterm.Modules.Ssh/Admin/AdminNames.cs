@@ -88,6 +88,28 @@ internal static partial class AdminNames
 		return path!.Split('/').Any(part => part is "." or "..") ? "Only files under /var/log can be read here." : null;
 	}
 
+	/// <summary>
+	/// A folder to measure: an absolute path without <c>.</c> or <c>..</c> parts, control characters or a line break,
+	/// which would split du's output. Anything else is allowed, since a folder may be named anything.
+	/// </summary>
+	public static string? CheckFolderPath(string? path)
+	{
+		if (string.IsNullOrEmpty(path) || !path.StartsWith('/'))
+		{
+			return "Type an absolute path, such as /var/log.";
+		}
+
+		if (path.Length > 4096 || path.Any(char.IsControl))
+		{
+			return "A folder path cannot hold control characters or line breaks, or be longer than 4096 characters.";
+		}
+
+		return path.Split('/').Any(part => part is "." or "..") ? "Type the folder's own path, without . or .. in it." : null;
+	}
+
+	/// <summary>A block device as lsblk names it under <c>/dev</c>: sda, nvme0n1, mmcblk0, cciss!c0d0.</summary>
+	public static string? CheckBlockDevice(string? name) => Check(name, BlockDevicePattern(), "Device names hold only letters, digits and the characters . _ - : ! +.");
+
 	/// <summary>A new password for chpasswd: one line, no NUL.</summary>
 	public static string? CheckPassword(string? password)
 	{
@@ -132,4 +154,7 @@ internal static partial class AdminNames
 
 	[GeneratedRegex(@"^/var/log/[A-Za-z0-9_.@+-][A-Za-z0-9_.@+/-]{0,255}$", RegexOptions.CultureInvariant)]
 	private static partial Regex LogPathPattern();
+
+	[GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9_.:!+-]{0,63}$", RegexOptions.CultureInvariant)]
+	private static partial Regex BlockDevicePattern();
 }

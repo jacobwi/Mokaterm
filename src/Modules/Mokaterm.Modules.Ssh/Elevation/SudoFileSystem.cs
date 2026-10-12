@@ -1,8 +1,6 @@
 using System.Buffers;
 using System.Globalization;
-using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
-using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Modules.Ssh.FileSystem;
 using Mokaterm.Modules.Ssh.Shell;
@@ -13,7 +11,7 @@ namespace Mokaterm.Modules.Ssh.Elevation;
 /// The same files as root: every operation is a small POSIX script run through sudo on an exec channel. Uploads first go
 /// to a private staging file as the logged-in user over SFTP, then move into place as root.
 /// </summary>
-internal sealed class SudoFileSystem : IRemoteFileSystem
+internal sealed class SudoFileSystem : ScriptFileSystem
 {
 	private const int TransferBufferSize = 128 * 1024;
 
@@ -45,142 +43,39 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		_onDisposed = onDisposed;
 	}
 
-	public RemoteFileSystemFeatures Features =>
+	public override RemoteFileSystemFeatures Features =>
 		RemoteFileSystemFeatures.Permissions | RemoteFileSystemFeatures.Ownership | RemoteFileSystemFeatures.SymbolicLinks
 		| RemoteFileSystemFeatures.Elevation | RemoteFileSystemFeatures.Accounts
 		| RemoteFileSystemFeatures.Copy | RemoteFileSystemFeatures.Archives;
 
-	public string UserName => "root";
+	public override string UserName => "root";
 
-	public bool IsElevated => true;
+	public override bool IsElevated => true;
 
-	public async ValueTask<string> GetHomeDirectoryAsync(CancellationToken cancellationToken = default)
+	public override async ValueTask<string> GetHomeDirectoryAsync(CancellationToken cancellationToken = default)
 	{
 		ThrowIfDisposed();
 		SftpFileSystem user = await _userFileSystem(cancellationToken);
 		return await user.GetHomeDirectoryAsync(cancellationToken);
 	}
 
-	public async ValueTask<string> ResolvePathAsync(string path, CancellationToken cancellationToken = default)
+	public override async ValueTask<string> ResolvePathAsync(string path, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(path);
 		ThrowIfDisposed();
 
 		// "~" keeps meaning the logged-in user's home, so a path typed in the browser leads to the same place as root.
 		SftpFileSystem user = await _userFileSystem(cancellationToken);
-		string absolute = RemotePath.Normalize(SftpFileSystem.ExpandHome(path, user.HomeDirectory));
-		ReadOnlyMemory<byte> payload = await RunAsync(RemoteScripts.Resolve, [absolute], absolute, cancellationToken);
-		string resolved = RemoteOutput.ReadLine(payload.Span);
-		return resolved.StartsWith('/') ? resolved : absolute;
+		return await ResolveAbsoluteAsync(Absolute(SftpFileSystem.ExpandHome(path, user.HomeDirectory)), cancellationToken);
 	}
 
-	public async ValueTask<IReadOnlyList<RemoteFileEntry>> ListAsync(string path, CancellationToken cancellationToken = default)
-	{
-		string directory = Absolute(path);
-		ReadOnlyMemory<byte> payload = await RunAsync(RemoteScripts.List, [directory, "list"], directory, cancellationToken, allowPartialListing: true);
-		return RemoteListingParser.Parse(payload.Span, directory, isStat: false);
-	}
-
-	public async ValueTask<RemoteFileEntry?> StatAsync(string path, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		try
-		{
-			ReadOnlyMemory<byte> payload = await RunAsync(RemoteScripts.List, [target, "stat"], target, cancellationToken);
-			List<RemoteFileEntry> entries = RemoteListingParser.Parse(payload.Span, target, isStat: true);
-			return entries.Count > 0 ? entries[0] : null;
-		}
-		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotFound)
-		{
-			return null;
-		}
-	}
-
-	public async ValueTask CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		await RunAsync(RemoteScripts.CreateDirectory, [target], target, cancellationToken);
-	}
-
-	public async ValueTask DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		if (RemotePath.IsRoot(target))
-		{
-			throw new RemoteFileSystemException(RemoteFileErrorKind.PermissionDenied, "The root directory cannot be deleted.", target);
-		}
-
-		await RunAsync(RemoteScripts.Delete, [target, Flag(recursive)], target, cancellationToken);
-	}
-
-	public async ValueTask RenameAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
-	{
-		string source = Absolute(sourcePath);
-		string destination = Absolute(destinationPath);
-		if (string.Equals(source, destination, StringComparison.Ordinal))
-		{
-			return;
-		}
-
-		await RunAsync(RemoteScripts.Rename, [source, destination, Flag(overwrite)], source, cancellationToken, destination);
-	}
-
-	public async ValueTask CopyAsync(string sourcePath, string destinationPath, bool overwrite, CancellationToken cancellationToken = default)
-	{
-		string source = Absolute(sourcePath);
-		string destination = Absolute(destinationPath);
-		await RunAsync(RemoteScripts.Copy, RemoteScriptArguments.Copy(source, destination, overwrite), source, cancellationToken, destination);
-	}
-
-	public async ValueTask CompressAsync(string directory, IReadOnlyList<string> names, string archivePath, CancellationToken cancellationToken = default)
-	{
-		string folder = Absolute(directory);
-		string archive = Absolute(archivePath);
-		await RunAsync(RemoteScripts.Compress, RemoteScriptArguments.Compress(folder, names, archive), folder, cancellationToken, archive);
-	}
-
-	public async ValueTask ExtractAsync(string archivePath, string destinationDirectory, CancellationToken cancellationToken = default)
-	{
-		string archive = Absolute(archivePath);
-		string destination = Absolute(destinationDirectory);
-		await RunAsync(RemoteScripts.Extract, RemoteScriptArguments.Extract(archive, destination), archive, cancellationToken, destination);
-	}
-
-	public ValueTask SetPermissionsAsync(string path, UnixFileMode permissions, bool recursive, CancellationToken cancellationToken = default) =>
-		ChangePermissionsAsync(path, new PermissionChange { Mode = permissions, Recursive = recursive }, cancellationToken);
-
-	public async ValueTask ChangePermissionsAsync(string path, PermissionChange change, CancellationToken cancellationToken = default)
-	{
-		ArgumentNullException.ThrowIfNull(change);
-		string target = Absolute(path);
-		if (ChmodArguments.Mode(change) is not { } mode)
-		{
-			return;
-		}
-
-		await RunAsync(RemoteScripts.ChangeMode, [target, mode, Flag(change.Recursive), ChmodArguments.Targets(change.Targets)], target, cancellationToken);
-	}
-
-	public async ValueTask SetOwnerAsync(string path, string owner, string? group, bool recursive, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		string owners = group is null ? AccountName(owner, target) : $"{AccountName(owner, target)}:{AccountName(group, target)}";
-		await RunAsync(RemoteScripts.ChangeOwner, [target, owners, Flag(recursive)], target, cancellationToken);
-	}
-
-	public async ValueTask SetGroupAsync(string path, string group, bool recursive, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		await RunAsync(RemoteScripts.ChangeGroup, [target, AccountName(group, target), Flag(recursive)], target, cancellationToken);
-	}
-
-	public async ValueTask<RemoteAccounts> ListAccountsAsync(CancellationToken cancellationToken = default)
+	public override async ValueTask<RemoteAccounts> ListAccountsAsync(CancellationToken cancellationToken = default)
 	{
 		ThrowIfDisposed();
 		return (await _accountNames.GetAsync(cancellationToken)).Accounts;
 	}
 
-	public async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+	public override async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
 	{
 		string target = Absolute(path);
 		RemoteFileEntry entry = await StatAsync(target, cancellationToken)
@@ -195,42 +90,27 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		return await StartReadAsync(target, RemoteScripts.Read, [target], CancellationToken.None);
 	}
 
-	public async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public override async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(source);
 		ArgumentNullException.ThrowIfNull(options);
 		string target = Absolute(path);
 		SftpFileSystem user = await _userFileSystem(cancellationToken);
-		string staging = RemotePath.Combine(_stagingDirectory, ".mokaterm-upload-" + RandomNumberGenerator.GetHexString(32, lowercase: true));
-		try
-		{
-			try
-			{
-				UploadOptions stagingOptions = new() { Permissions = UnixFileMode.UserRead | UnixFileMode.UserWrite };
-				await user.UploadAsync(staging, source, stagingOptions, progress, cancellationToken);
-			}
-			catch (RemoteFileSystemException ex) when (ex.Kind is not RemoteFileErrorKind.ConnectionLost)
-			{
-				throw new RemoteFileSystemException(ex.Kind, $"The upload could not be staged in {_stagingDirectory}: {ex.Message}", target, ex);
-			}
+		await using StagedUpload staged = StagedUpload.In(user, _stagingDirectory, _logger);
+		await staged.WriteAsync(source, progress, target, cancellationToken);
 
-			string mode = options.Permissions is { } permissions ? UnixFileModeFormat.ToOctal(permissions) : "";
-			string stamp = options.LastModified is { } lastModified
-				? lastModified.UtcDateTime.ToString("yyyyMMddHHmm.ss", CultureInfo.InvariantCulture)
-				: "";
+		string mode = options.Permissions is { } permissions ? UnixFileModeFormat.ToOctal(permissions) : "";
+		string stamp = options.LastModified is { } lastModified
+			? lastModified.UtcDateTime.ToString("yyyyMMddHHmm.ss", CultureInfo.InvariantCulture)
+			: "";
 
-			await RunAsync(RemoteScripts.PlaceUpload, [staging, target, Flag(options.Overwrite), mode, stamp], target, cancellationToken);
-		}
-		finally
-		{
-			await RemoveStagingFileAsync(user, staging);
-		}
+		await RunScriptAsync(RemoteScripts.PlaceUpload, [staged.Path, target, Flag(options.Overwrite), mode, stamp], target, cancellationToken);
 	}
 
-	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+	public override ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
 		DownloadAsync(path, destination, 0, progress, cancellationToken);
 
-	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	public override async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(destination);
 		ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -265,9 +145,9 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		}
 	}
 
-	public ChecksumAlgorithm? ServerChecksum => Volatile.Read(ref _checksumUnavailable) == 0 ? ChecksumAlgorithm.Sha256 : null;
+	public override ChecksumAlgorithm? ServerChecksum => Volatile.Read(ref _checksumUnavailable) == 0 ? ChecksumAlgorithm.Sha256 : null;
 
-	public async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
+	public override async ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default)
 	{
 		string target = Absolute(path);
 		if (Volatile.Read(ref _checksumUnavailable) != 0)
@@ -278,7 +158,7 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		ReadOnlyMemory<byte> payload;
 		try
 		{
-			payload = await RunAsync(RemoteScripts.Checksum, [target], target, cancellationToken);
+			payload = await RunScriptAsync(RemoteScripts.Checksum, [target], target, cancellationToken);
 		}
 		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotSupported)
 		{
@@ -297,7 +177,7 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		return null;
 	}
 
-	public ValueTask DisposeAsync()
+	public override ValueTask DisposeAsync()
 	{
 		if (Interlocked.Exchange(ref _disposed, 1) == 0)
 		{
@@ -308,29 +188,19 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		return ValueTask.CompletedTask;
 	}
 
-	private static string Flag(bool value) => value ? "1" : "";
-
-	private static string AccountName(string name, string path) => RemoteAccount.IsValidName(name)
-		? name
-		: throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"'{name}' is not a valid user or group name.", path);
-
-	private string Absolute(string path)
-	{
-		ArgumentNullException.ThrowIfNull(path);
-		ThrowIfDisposed();
-		string normalized = RemotePath.Normalize(path);
-		return normalized.Contains('\0', StringComparison.Ordinal)
-			? throw new RemoteFileSystemException(RemoteFileErrorKind.NotFound, "Paths cannot contain NUL characters.", path)
-			: normalized;
-	}
-
-	private async Task<ReadOnlyMemory<byte>> RunAsync(string script, string[] arguments, string path, CancellationToken cancellationToken, string? destination = null, bool allowPartialListing = false)
+	protected override async Task<ReadOnlyMemory<byte>> RunScriptAsync(
+		string script,
+		IReadOnlyList<string> arguments,
+		string path,
+		CancellationToken cancellationToken,
+		string? destination = null,
+		bool allowPartialListing = false)
 	{
 		ThrowIfDisposed();
 		RemoteCommandResult result;
 		try
 		{
-			result = await _runner.RunAsync(script, arguments, cancellationToken);
+			result = await _runner.RunAsync(script, arguments, RemoteScripts.RunsLong(script), cancellationToken);
 		}
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, path, out RemoteFileSystemException? mapped))
 		{
@@ -338,6 +208,14 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		}
 
 		return SudoRunner.EnsureSucceeded(result, _runner.Account, path, destination, allowPartialListing);
+	}
+
+	protected override void ThrowIfDisposed()
+	{
+		if (Volatile.Read(ref _disposed) != 0)
+		{
+			throw new RemoteFileSystemException(RemoteFileErrorKind.ElevationFailed, "The root view was closed.");
+		}
 	}
 
 	private async Task<ElevatedReadStream> StartReadAsync(string target, string script, string[] arguments, CancellationToken cancellationToken)
@@ -350,30 +228,6 @@ internal sealed class SudoFileSystem : IRemoteFileSystem
 		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, target, out RemoteFileSystemException? mapped))
 		{
 			throw mapped;
-		}
-	}
-
-	private async Task RemoveStagingFileAsync(SftpFileSystem user, string staging)
-	{
-		try
-		{
-			await user.DeleteAsync(staging, recursive: false, CancellationToken.None);
-		}
-		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotFound)
-		{
-			// Moved into place, or already removed by the script.
-		}
-		catch (RemoteFileSystemException ex)
-		{
-			_logger.LogWarning("A staging file for a root upload could not be removed: {Error}", LogSafe.Describe(ex));
-		}
-	}
-
-	private void ThrowIfDisposed()
-	{
-		if (Volatile.Read(ref _disposed) != 0)
-		{
-			throw new RemoteFileSystemException(RemoteFileErrorKind.ElevationFailed, "The root view was closed.");
 		}
 	}
 }

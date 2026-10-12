@@ -1,0 +1,21 @@
+.mt-usage {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: var(--moka-color-surface-3);
+}
+
+.mt-usage-fill {
+	display: block;
+	height: 100%;
+	background: var(--moka-color-success);
+	transition: width var(--moka-transition-slow);
+}
+
+.mt-usage--warn .mt-usage-fill {
+	background: var(--moka-color-warning);
+}
+
+.mt-usage--full .mt-usage-fill {
+	background: var(--moka-color-error);
+}

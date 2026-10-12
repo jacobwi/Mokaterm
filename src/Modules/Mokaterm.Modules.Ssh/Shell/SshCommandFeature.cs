@@ -29,10 +29,10 @@ internal sealed class SshCommandFeature : IRemoteCommandFeature
 		}
 
 		string command = RemoteCommandRequest.Normalize(request.Command);
-		return CommandExecution.RunAsync(token => StartAsync(command, token), request, _time, cancellationToken);
+		return CommandExecution.RunAsync(token => StartAsync(command, request.RunsLong, token), request, _time, cancellationToken);
 	}
 
-	private async Task<IExecChannel> StartAsync(string command, CancellationToken cancellationToken)
+	private async Task<IExecChannel> StartAsync(string command, bool runsLong, CancellationToken cancellationToken)
 	{
 		SshClient client;
 		try
@@ -45,7 +45,7 @@ internal sealed class SshCommandFeature : IRemoteCommandFeature
 			throw new RemoteCommandException(ex.Message, ex);
 		}
 
-		RemoteCommand started = await RemoteCommand.StartAsync(client, command, input: null, cancellationToken);
+		RemoteCommand started = await RemoteCommand.StartAsync(client, command, input: null, runsLong, cancellationToken);
 		started.CloseInput();
 		return started;
 	}

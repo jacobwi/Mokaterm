@@ -9,7 +9,7 @@ namespace Mokaterm.DevHost.Demo;
 /// tags each script on its first line; reads get canned output in the shape the real tools print, and anything else
 /// (every change, since the demo never runs as root) gets nothing and exit 127.
 /// </summary>
-internal static class DemoSystemOutput
+internal static partial class DemoSystemOutput
 {
 	/// <summary>The tag the system view puts on the first line of every script it sends.</summary>
 	private const string Tag = "# mokaterm system view: ";
@@ -42,27 +42,23 @@ internal static class DemoSystemOutput
 	/// <summary>The stdout a read prints after its marker, or null for a script the demo does not answer.</summary>
 	public static string? For(string script, DemoAccount account, string hostName, DateTimeOffset now)
 	{
+		if (ForAdmin(script, account, hostName, now) is { } admin)
+		{
+			return admin;
+		}
+
 		long epoch = now.ToUnixTimeSeconds();
 		return script switch
 		{
 			"detect" => Detect(account, hostName),
-			"overview.read" => string.Create(CultureInfo.InvariantCulture, $"""
-				@@mt:uptime
-				1036810.27 4031722.10
-				@@mt:loadavg
-				0.42 0.31 0.27 2/318 48211
+			"survey" => DemoSurveyOutput.For(account, hostName, now),
+			"overview.read" => DemoMonitorOutput.Sample(now) + string.Create(CultureInfo.InvariantCulture, $"""
 				@@mt:now
 				{epoch}
 				@@mt:cpu
 				model name	: AMD EPYC 7763 64-Core Processor
 				@@mt:cores
 				4
-				@@mt:meminfo
-				MemTotal:        8037888 kB
-				MemFree:          912000 kB
-				MemAvailable:    5122000 kB
-				SwapTotal:       2097148 kB
-				SwapFree:        1897148 kB
 				{Df}
 				"""),
 			"disks.read" => $$"""
@@ -74,7 +70,12 @@ internal static class DemoSystemOutput
 				         {"name":"vda15", "type":"part", "size":1073741824, "fstype":"vfat", "mountpoint":"/boot/efi", "label":"UEFI", "model":null, "ro":false, "rm":false}
 				      ]
 				   },
-				   {"name":"vdb", "type":"disk", "size":214748364800, "fstype":"xfs", "mountpoint":"/srv/data", "label":"data", "model":null, "ro":false, "rm":false}
+				   {"name":"vdb", "type":"disk", "size":214748364800, "fstype":"xfs", "mountpoint":"/srv/data", "label":"data", "model":null, "ro":false, "rm":false},
+				   {"name":"sda", "type":"disk", "size":4000787030016, "fstype":null, "mountpoint":null, "label":null, "model":"WDC WD40EFRX-68N32N0", "ro":false, "rm":false,
+				      "children": [
+				         {"name":"sda1", "type":"part", "size":4000785104896, "fstype":"ext4", "mountpoint":null, "label":"archive", "model":null, "ro":false, "rm":false}
+				      ]
+				   }
 				]}
 				@@mt:partitions
 				{{Df}}
@@ -230,30 +231,7 @@ internal static class DemoSystemOutput
 				@@mt:logindefs
 				UID_MIN			 1000
 				""",
-			"processes.list" => $"""
-				@@mt:memtotal
-				MemTotal:        8037888 kB
-				@@mt:procps
-				      1 root                              0.0  0.1 13212 Ss   /sbin/init
-				    612 systemd-resolve                   0.0  0.1 12900 Ss   /usr/lib/systemd/systemd-resolved
-				    801 root                              0.0  0.0  9012 Ss   sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
-				   1123 root                              0.0  0.0  5512 Ss   nginx: master process /usr/sbin/nginx -g daemon on; master_process on;
-				   1124 www-data                          2.4  0.3 26112 S    nginx: worker process
-				   1310 postgres                          1.1  3.9 318004 Ss   /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main
-				   4410 deploy                           38.2  6.1 498112 Rl   node /srv/app/server.js
-				   5120 {account.Name}                              0.5  0.4 30210 S    python3 -m http.server 8000
-				   9921 root                              0.0  0.0     0 I    [kworker/1:2-events]
-				""",
-			"logs.journal" => """
-				2026-10-11T07:58:01+0000 web1 CRON[48102]: (root) CMD (command -v debian-sa1 > /dev/null && debian-sa1 1 1)
-				2026-10-11T08:00:01+0000 web1 systemd[1]: Starting backup-agent.service - Nightly backup agent...
-				2026-10-11T08:00:03+0000 web1 backup-agent[48130]: error: destination s3://backups not reachable
-				2026-10-11T08:00:03+0000 web1 systemd[1]: backup-agent.service: Main process exited, code=exited, status=1/FAILURE
-				2026-10-11T08:00:03+0000 web1 systemd[1]: backup-agent.service: Failed with result 'exit-code'.
-				2026-10-11T08:04:12+0000 web1 sshd[48190]: Accepted publickey for deploy from 203.0.113.9 port 51234 ssh2
-				""",
 			"logs.files" => "/var/log/alternatives.log\n/var/log/apt/history.log\n/var/log/auth.log\n/var/log/nginx/access.log\n/var/log/nginx/error.log\n/var/log/syslog\n",
-			"logs.file" => "2026/10/11 07:41:02 [error] 1124#1124: *8812 open() \"/srv/www/favicon.ico\" failed (2: No such file or directory)\n",
 			_ => null,
 		};
 	}
@@ -282,7 +260,7 @@ internal static class DemoSystemOutput
 			.Append("user=").Append(account.Name).Append('\n')
 			.Append("pid1=systemd\ninit_link=/lib/systemd/systemd\nssh=203.0.113.9 51234 10.0.0.5 22\nufw=yes\n")
 			.Append("@@mt:commands\n");
-		foreach (string command in (string[])["systemctl", "journalctl", "timedatectl", "hostnamectl", "resolvectl", "service", "apt-get", "dpkg-query", "ufw", "nft", "iptables", "ip", "ss", "lsblk", "df", "ps", "kill", "crontab", "sudo", "getent", "useradd", "usermod", "userdel", "chpasswd", "passwd"])
+		foreach (string command in (string[])["systemctl", "journalctl", "timedatectl", "hostnamectl", "resolvectl", "service", "apt-get", "dpkg-query", "ufw", "nft", "iptables", "ip", "ss", "lsblk", "df", "ps", "kill", "crontab", "sudo", "getent", "useradd", "usermod", "userdel", "chpasswd", "passwd", "smartctl"])
 		{
 			text.Append(command).Append('\n');
 		}

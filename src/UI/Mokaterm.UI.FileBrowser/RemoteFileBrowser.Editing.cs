@@ -1,10 +1,8 @@
+using Microsoft.AspNetCore.Components;
 using Mokaterm.Abstractions.FileSystem;
-using Mokaterm.Abstractions.Interaction;
-using Mokaterm.Abstractions.Settings;
-using Mokaterm.UI.Common.Formatting;
+using Mokaterm.UI.Common.Editing;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.FileBrowser.Browsing;
-using Mokaterm.UI.FileBrowser.Editing;
 
 namespace Mokaterm.UI.FileBrowser;
 
@@ -14,11 +12,10 @@ public sealed partial class RemoteFileBrowser
 	// What a new file is called until the user types something else; the base name is selected, so typing replaces it.
 	private const string NewFileName = "untitled.txt";
 
-	/// <summary>
-	/// Reads the file, shows the editor, and saves through the file system's own replace, which keeps the owner and
-	/// mode the file already had. Anything the editor could not hand back unchanged is refused up front rather than
-	/// opened and quietly rewritten on save.
-	/// </summary>
+	[Inject]
+	private IRemoteTextEditor Editor { get; set; } = default!;
+
+	/// <summary>Edits the file with the shared editor, which modules use too; only the failure alert is the browser's.</summary>
 	private async Task EditAsync(RemoteFileEntry entry)
 	{
 		if (_fileSystem is not { } fileSystem || entry.IsDirectoryLike)
@@ -26,56 +23,13 @@ public sealed partial class RemoteFileBrowser
 			return;
 		}
 
-		CancellationToken token = ConnectionToken;
-		int maxBytes = Settings.Get<FileTransferSettings>().Clamped().MaxEditKilobytes * 1024;
-
-		RemoteTextFile? file;
-		TextFileRefusal refusal;
-		RemoteFileEntry? opened;
-		try
-		{
-			await using Stream source = await fileSystem.OpenReadAsync(entry.Path, token);
-			(file, refusal) = await RemoteTextFile.ReadAsync(source, maxBytes, token);
-
-			// What the file looked like when it was read, so a save can notice someone else changing it meanwhile.
-			opened = file is null ? null : await fileSystem.StatAsync(entry.Path, token);
-		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			ShowAlert("Could not open " + entry.Name, ex, retryAsRoot: _ => EditAsync(entry));
-			return;
-		}
-		catch (OperationCanceledException)
-		{
-			return;
-		}
-
-		if (file is null)
-		{
-			Interaction.Notify(NoticeSeverity.Warning, RefusalText(refusal, maxBytes), "Cannot edit " + entry.Name);
-			return;
-		}
-
-		RemoteFileEdit edit = new(fileSystem, entry.Path, file, opened, maxBytes);
-		bool saved = await Dialogs.EditFileAsync(
-			entry.Name,
-			entry.Path,
-			file.Text,
-			RemoteFileEdit.Facts(file, opened?.Size ?? entry.Size),
-			(text, overwrite) => edit.SaveAsync(text, overwrite, ConnectionToken),
-			edit.AcceptServerCopy,
-			ConfirmDiscardEditAsync);
-
-		if (saved)
-		{
-			await RefreshAsync(entry.Path);
-		}
+		await EditFileAsync(fileSystem, entry.Path, entry.Name, createNew: false, "Could not open " + entry.Name);
 	}
 
 	/// <summary>
-	/// Asks for a name, creates an empty file of that name in the current folder and opens it in the editor. A taken name
-	/// is refused in the dialog, and the server refuses it again when the listing on screen was out of date. It runs as
-	/// the browser's account, with the usual offer to retry as root, after which the editor opens as root.
+	/// Asks for a name and has the editor create an empty file of that name in the current folder and open it. A taken
+	/// name is refused in the dialog, and the server refuses it again when the listing on screen was out of date. It runs
+	/// as the browser's account, with the usual offer to retry as root, after which the editor opens as root.
 	/// </summary>
 	private async Task CreateFileAsync()
 	{
@@ -89,17 +43,12 @@ public sealed partial class RemoteFileBrowser
 			string directory = _path;
 			HashSet<string> taken = TakenNames(except: null);
 			string? name = await Dialogs.AskNameAsync("New file", MokatermIcons.FilePlus, "File name", EntryNames.Unique(NewFileName, taken, isFolder: false), "Create", taken, selectBaseName: true);
-			if (name is null)
+			if (name is null || _fileSystem is not { } fileSystem)
 			{
 				return;
 			}
 
-			string path = RemotePath.Combine(directory, name);
-			await RunChangeAsync(
-				"Could not create " + name,
-				(fileSystem, token) => fileSystem.UploadAsync(path, Stream.Null, UploadOptions.Default, progress: null, token).AsTask(),
-				select: path,
-				then: () => EditCreatedAsync(path));
+			await EditFileAsync(fileSystem, RemotePath.Combine(directory, name), name, createNew: true, "Could not create " + name);
 		}
 		finally
 		{
@@ -107,31 +56,30 @@ public sealed partial class RemoteFileBrowser
 		}
 	}
 
-	// The listing, not the view: a new ".env" is in the folder even while hidden files are not shown.
-	private Task EditCreatedAsync(string path) =>
-		_path == RemotePath.GetParent(path) && _entries.FirstOrDefault(entry => entry.Path == path) is { } created
-			? EditAsync(created)
-			: Task.CompletedTask;
-
-	private async Task<bool> ConfirmDiscardEditAsync()
+	/// <summary>
+	/// The browser's side of an edit: the folder is listed again once the file may have changed (after a save, and after
+	/// any attempt to create one), and a file that could not be opened shows an alert that offers root after a permission
+	/// error, which runs the same edit again with the root file system.
+	/// </summary>
+	private async Task EditFileAsync(IRemoteFileSystem fileSystem, string path, string name, bool createNew, string failureTitle)
 	{
-		ConfirmPrompt prompt = new()
+		CancellationToken token = ConnectionToken;
+		RemoteTextEditResult result = await Editor.EditAsync(
+			new RemoteTextEditRequest { FileSystem = fileSystem, Path = path, DisplayName = name, CreateNew = createNew },
+			token);
+		if (token.IsCancellationRequested || !BelongsToConnection(fileSystem))
 		{
-			Title = "Discard changes",
-			Message = "The edits have not been saved. Closing the editor throws them away.",
-			ConfirmText = "Discard",
-			Destructive = true,
-		};
-		return (await Interaction.ConfirmAsync(prompt, ConnectionToken)).Confirmed;
-	}
+			return;
+		}
 
-	private static string RefusalText(TextFileRefusal refusal, int maxBytes) => refusal switch
-	{
-		TextFileRefusal.TooLarge =>
-			$"It is bigger than {DisplayFormat.Bytes(maxBytes)}, the largest the editor opens. Download it, or raise the limit in Settings, Files and transfers.",
-		TextFileRefusal.Binary =>
-			"It holds bytes that are not text, so an editor would corrupt it. Download it instead.",
-		_ =>
-			"It is not UTF-8 text. Editing it here would write the editor's own characters back over the server's bytes, so download it instead.",
-	};
+		if (result is { Outcome: RemoteTextEditOutcome.Failed, Error: { } error })
+		{
+			ShowAlert(failureTitle, error, fileSystem.IsElevated ? null : root => EditFileAsync(root, path, name, createNew, failureTitle));
+		}
+
+		if (result.Outcome == RemoteTextEditOutcome.Saved || createNew)
+		{
+			await RefreshAsync(path);
+		}
+	}
 }

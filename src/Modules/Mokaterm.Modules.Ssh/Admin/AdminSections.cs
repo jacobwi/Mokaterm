@@ -18,9 +18,16 @@ internal sealed class AdminSections
 	/// <summary>The line a script prints to start a part.</summary>
 	public static string Start(string name) => $"echo '{Prefix}{name}'";
 
-	public static AdminSections Parse(string output)
+	public static AdminSections Parse(string output) => Parse(output, Prefix);
+
+	/// <summary>
+	/// Output split on lines that start with <paramref name="prefix"/> instead of <see cref="Prefix"/>, for a script that
+	/// runs other scripts whole as its parts: each part keeps its own <c>@@mt:</c> sections for its own parser.
+	/// </summary>
+	public static AdminSections Parse(string output, string prefix)
 	{
 		ArgumentNullException.ThrowIfNull(output);
+		ArgumentException.ThrowIfNullOrEmpty(prefix);
 		List<(string Name, string Text)> parts = [];
 		string? name = null;
 		int start = 0;
@@ -29,14 +36,14 @@ internal sealed class AdminSections
 		{
 			int end = output.IndexOf('\n', position);
 			int lineEnd = end < 0 ? output.Length : end;
-			if (string.CompareOrdinal(output, position, Prefix, 0, Prefix.Length) == 0 && lineEnd - position >= Prefix.Length)
+			if (string.CompareOrdinal(output, position, prefix, 0, prefix.Length) == 0 && lineEnd - position >= prefix.Length)
 			{
 				if (name is not null)
 				{
 					parts.Add((name, output[start..position]));
 				}
 
-				name = output[(position + Prefix.Length)..lineEnd].TrimEnd();
+				name = output[(position + prefix.Length)..lineEnd].TrimEnd();
 				start = end < 0 ? output.Length : end + 1;
 			}
 
@@ -83,6 +90,28 @@ internal sealed class AdminSections
 				yield return (partName[prefix.Length..], text);
 			}
 		}
+	}
+
+	/// <summary>
+	/// Everything after the first line that starts part <paramref name="name"/>, as it came: for a script that ends by
+	/// printing a log or a file, whose own lines could look like the start of a part. Null when the part never started.
+	/// </summary>
+	public static string? Rest(string output, string name)
+	{
+		ArgumentNullException.ThrowIfNull(output);
+		string line = Prefix + name;
+		int at = output.StartsWith(line + "\n", StringComparison.Ordinal) || output == line
+			? 0
+			: output.IndexOf("\n" + line + "\n", StringComparison.Ordinal) is >= 0 and var found
+				? found + 1
+				: output.EndsWith("\n" + line, StringComparison.Ordinal) ? output.Length - line.Length : -1;
+		if (at < 0)
+		{
+			return null;
+		}
+
+		int start = at + line.Length + 1;
+		return start >= output.Length ? "" : output[start..];
 	}
 
 	/// <summary>The non-blank lines of a part, trimmed at the end.</summary>

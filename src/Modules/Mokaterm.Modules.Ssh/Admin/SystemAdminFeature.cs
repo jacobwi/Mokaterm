@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.FileSystem;
 
 namespace Mokaterm.Modules.Ssh.Admin;
 
@@ -21,11 +23,13 @@ internal sealed class SystemAdminFeature : IAsyncDisposable
 	private AdminActionResult? _last;
 	private int _disposed;
 
-	public SystemAdminFeature(IAdminShell shell, TimeProvider time, ILogger logger)
+	/// <param name="rootFiles">The session's one root file system, for the files a page edits as root; null when the session has no files. The session owns it.</param>
+	public SystemAdminFeature(IAdminShell shell, TimeProvider time, ILogger logger, SessionRootFiles? rootFiles = null)
 	{
 		_shell = shell;
 		_time = time;
 		_logger = logger;
+		RootFiles = rootFiles;
 	}
 
 	/// <summary>Raised after detection, root mode or an action changed. Handlers may run on any thread.</summary>
@@ -36,6 +40,12 @@ internal sealed class SystemAdminFeature : IAsyncDisposable
 
 	/// <summary><c>user@host</c>.</summary>
 	public string Account => _shell.Account;
+
+	/// <summary>How this session logged in, or null when the session does not say.</summary>
+	public AuthenticationMethod? LoginMethod => _shell.LoginMethod;
+
+	/// <summary>The session's root file system, shared with the Docker manager, or null for a session without files.</summary>
+	public SessionRootFiles? RootFiles { get; }
 
 	/// <summary>The session logged in as root, so nothing goes through sudo.</summary>
 	public bool LoginIsRoot => Profile?.Facts.IsRoot == true;

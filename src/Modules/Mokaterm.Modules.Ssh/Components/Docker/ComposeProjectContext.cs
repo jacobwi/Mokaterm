@@ -9,16 +9,25 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <param name="Target">How compose commands find the project, or null when there is no compose to run them with.</param>
 /// <param name="Services">The services, in the order the files define them.</param>
 /// <param name="Version">Bumped by every refresh, so a tab can tell new state from a repeat.</param>
-internal sealed record ComposeProjectContext(ComposeProject Project, ComposeTarget? Target, IReadOnlyList<ComposeService> Services, int Version)
+/// <param name="RunAction">
+/// Runs one of the project's own actions (<see cref="ComposeActions"/>, such as <c>up</c>) the way the header's buttons
+/// do, with their options, so a tab that offers one shows its progress in the same place.
+/// </param>
+internal sealed record ComposeProjectContext(
+	ComposeProject Project,
+	ComposeTarget? Target,
+	IReadOnlyList<ComposeService> Services,
+	int Version,
+	Func<string, Task> RunAction)
 {
-	/// <summary>The colour class for a container's lines in the merged log: one per service, in the services' order.</summary>
-	public string? SourceClass(string container)
+	/// <summary>The hue for a container's lines in the merged log: its service's place in the services' order.</summary>
+	public int? SourceHue(string container)
 	{
 		for (int index = 0; index < Services.Count; index++)
 		{
 			if (Services[index].Containers.Any(item => item.Name == container))
 			{
-				return $"mt-dk-src-{index % 8}";
+				return index;
 			}
 		}
 

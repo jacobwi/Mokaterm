@@ -1,5 +1,5 @@
 using System.Text;
-using Mokaterm.Modules.Ssh.Shell;
+using Mokaterm.Abstractions.Commands;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -19,7 +19,8 @@ internal static class DockerCommandLine
 	/// <summary>The same script for a call with a working directory. Exit 1 is what <c>cd</c> itself returns.</summary>
 	public const string ElevatedScriptInDirectory = "cd -- \"$1\" || exit 1\nshift\nexec \"$@\"";
 
-	public static string Build(DockerCall call)
+	/// <param name="masked">Shows the secret values of <see cref="DockerCall.MaskedArguments"/> as a mask, for a line that is only read.</param>
+	public static string Build(DockerCall call, bool masked = false)
 	{
 		ArgumentNullException.ThrowIfNull(call);
 		StringBuilder line = new();
@@ -29,12 +30,20 @@ internal static class DockerCommandLine
 		}
 
 		line.AppendJoin(' ', call.ProgramWords);
-		foreach (string argument in call.Arguments)
+		for (int index = 0; index < call.Arguments.Count; index++)
 		{
-			line.Append(' ').Append(Word(argument));
+			string argument = call.Arguments[index];
+			line.Append(' ').Append(Word(masked && call.MaskedArguments.Contains(index) ? Mask(argument) : argument));
 		}
 
 		return line.ToString();
+	}
+
+	/// <summary><c>NAME=value</c> as <c>NAME=</c> and the mask the Env tab shows; an empty value has nothing to hide.</summary>
+	private static string Mask(string argument)
+	{
+		int equals = argument.IndexOf('=', StringComparison.Ordinal);
+		return equals < 0 || equals == argument.Length - 1 ? argument : argument[..(equals + 1)] + DockerInspectParser.Mask;
 	}
 
 	/// <summary>The script and its positional arguments for running <paramref name="call"/> through sudo.</summary>

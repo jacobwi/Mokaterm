@@ -6,6 +6,7 @@ using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.DevHost.Demo.FileSystem;
 using Mokaterm.DevHost.Demo.Terminal;
+using Mokaterm.Modules.Ssh;
 
 namespace Mokaterm.DevHost.Demo;
 
@@ -43,7 +44,7 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 		Description = "In-memory shell and file system for UI work",
 		QuickConnectExample = "user@host:port",
 		DefaultPort = 22,
-		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands,
+		Capabilities = ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands | ProtocolCapabilities.HostSummary,
 		AuthenticationMethods = [AuthenticationMethod.Anonymous, AuthenticationMethod.Password],
 		RequiresUsername = true,
 		Order = 100,
@@ -90,10 +91,12 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 				$"The demo server has no user named '{userName}'. Use letters, digits, '.', '_' or '-'.");
 		}
 
+		// The SSH startup command is honoured too, so the Docker manager's shell tab opens here the way it does over SSH.
 		DemoAccount account = DemoAccount.ForUser(userName);
+		string? startupCommand = SshConnectionOptions.FromOptions(context.Connection.Options).StartupCommand;
 		return context.Purpose == ConnectPurpose.Commands
 			? new DemoCommandSession(account, HostNameOf(context.Host), _timeProvider)
-			: new DemoSession(account, HostNameOf(context.Host), context.Host.Address, context.TerminalSize, _timeProvider, _logger);
+			: new DemoSession(account, HostNameOf(context.Host), context.Host.Address, context.TerminalSize, _timeProvider, _logger, startupCommand);
 	}
 
 	private static bool IsValidUserName(string userName) =>

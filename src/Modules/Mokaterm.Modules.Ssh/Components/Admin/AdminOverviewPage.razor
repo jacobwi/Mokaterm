@@ -1,4 +1,5 @@
 @using Mokaterm.Modules.Ssh.Admin.Clock
+@using Mokaterm.Modules.Ssh.Admin.Monitoring
 @using Mokaterm.Modules.Ssh.Admin.Overview
 @using Mokaterm.Modules.Ssh.Admin.Services
 @using Mokaterm.Modules.Ssh.Admin.Storage
@@ -6,8 +7,25 @@
 @inherits AdminPageBase
 
 <AdminPageFrame Title="Overview" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" LoadingText="Reading the machine">
+	<ChipsEnd>
+		@if (_snapshot is not null)
+		{
+			<span class="mta-live" title="@(SampleError ?? "CPU, memory, load, network and disk figures are read again every two seconds while this page is shown.")">
+				<MokaStatusDot Size="MokaSize.Xs" Color="@(SampleError is null ? MokaColor.Success : MokaColor.Warning)" Glow="@(SampleError is null)" />
+				<span class="mta-label">@(SampleError is null ? "Live" : "Live figures paused")</span>
+				@if (SampleError is { } error)
+				{
+					<span class="mta-dim mta-live-error">@error</span>
+				}
+			</span>
+		}
+	</ChipsEnd>
+	<ChildContent>
 	@if (_snapshot is { } snapshot)
 	{
+		SystemSample? sample = History.Latest;
+		SystemRates? rates = History.Rates;
+		MemoryInfo memory = sample?.Memory ?? MemoryInfo.Unknown;
 		<div class="mta-cards">
 			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.HostName))">
 				<span class="mta-card-label">System</span>
@@ -17,41 +35,80 @@
 
 			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Logs))">
 				<span class="mta-card-label">Uptime</span>
-				<span class="mta-stat">@(AdminFormat.Span(snapshot.Uptime) is { Length: > 0 } up ? up : "?")</span>
+				<span class="mta-stat">@(AdminFormat.Span(Uptime(sample) ?? snapshot.Uptime) is { Length: > 0 } up ? up : "?")</span>
 				<span class="mta-card-sub">@(snapshot.BootedAt is { } booted ? $"booted {DisplayFormat.Timestamp(booted)}" : "boot time unknown")</span>
 			</button>
 
 			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
-				<span class="mta-card-label">CPU load</span>
-				<span class="mta-stat">@(snapshot.Load1 is null ? "?" : AdminFormat.Number(snapshot.Load1))</span>
-				@if (LoadPercent(snapshot) is { } loadPercent)
-				{
-					<div class="@AdminFormat.BarClass(loadPercent)"><span style="@AdminFormat.BarWidth(loadPercent)"></span></div>
-				}
-				<span class="mta-card-sub">@LoadText(snapshot)</span>
+				<span class="mta-card-label">CPU</span>
+				<span class="mta-stat">@(rates?.CpuPercent is { } cpu ? AdminFormat.Percent(cpu) : "...")</span>
+				<UsageBar Percent="rates?.CpuPercent" />
+				<Sparkline Values="History.Cpu" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="CPU busy over the last two minutes" />
+				<span class="mta-card-sub">@CpuText(rates, snapshot)</span>
 			</button>
 
-			@if (snapshot.MemoryTotalKb is { } total && total > 0)
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+				<span class="mta-card-label">CPU load</span>
+				<span class="mta-stat">@(sample?.Load is { } load ? AdminFormat.Number(load.One) : "?")</span>
+				@if (LoadPercent(sample, snapshot) is { } loadPercent)
+				{
+					<UsageBar Percent="loadPercent" />
+				}
+				<Sparkline Values="History.Load" Max="@(snapshot.Cores is { } cores ? cores : null)" Slots="MonitorHistory.Capacity" Height="28" Label="Load over the last two minutes" />
+				<span class="mta-card-sub">@LoadText(sample, snapshot)</span>
+			</button>
+
+			@if (memory.TotalKb is { } total && total > 0)
 			{
-				long used = total - (snapshot.MemoryAvailableKb ?? 0);
-				double percent = used * 100.0 / total;
 				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
 					<span class="mta-card-label">Memory</span>
-					<span class="mta-stat">@AdminFormat.Percent(percent)</span>
-					<div class="@AdminFormat.BarClass(percent)"><span style="@AdminFormat.BarWidth(percent)"></span></div>
-					<span class="mta-card-sub">@AdminFormat.Kb(used) of @AdminFormat.Kb(total)</span>
+					<span class="mta-stat">@AdminFormat.Percent(memory.UsedPercent ?? 0)</span>
+					<UsageBar Percent="memory.UsedPercent" />
+					<Sparkline Values="History.Memory" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="Memory used over the last two minutes" />
+					<span class="mta-card-sub">@AdminFormat.Kb(memory.UsedKb) of @AdminFormat.Kb(total)</span>
 				</button>
 			}
 
-			@if (snapshot.SwapTotalKb is { } swap && swap > 0)
+			@if (memory.SwapTotalKb is { } swap && swap > 0)
 			{
-				long swapUsed = swap - (snapshot.SwapFreeKb ?? swap);
-				double swapPercent = swapUsed * 100.0 / swap;
 				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
 					<span class="mta-card-label">Swap</span>
-					<span class="mta-stat">@AdminFormat.Percent(swapPercent)</span>
-					<div class="@AdminFormat.BarClass(swapPercent)"><span style="@AdminFormat.BarWidth(swapPercent)"></span></div>
-					<span class="mta-card-sub">@AdminFormat.Kb(swapUsed) of @AdminFormat.Kb(swap)</span>
+					<span class="mta-stat">@AdminFormat.Percent(memory.SwapUsedPercent ?? 0)</span>
+					<UsageBar Percent="memory.SwapUsedPercent" />
+					<Sparkline Values="History.Swap" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="Swap used over the last two minutes" />
+					<span class="mta-card-sub">@AdminFormat.Kb(memory.SwapUsedKb) of @AdminFormat.Kb(swap)</span>
+				</button>
+			}
+
+			@if (sample?.Interfaces.Count > 0)
+			{
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Network))" title="@NetworkTitle(rates)">
+					<span class="mta-card-label">Network</span>
+					<span class="mta-stat">@(rates?.ReceivedPerSecond is { } received ? AdminFormat.Rate(received) : "...")</span>
+					<span class="mta-spark-pair">
+						<Sparkline Values="History.Received" Max="@Top(History.Received, History.Sent)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-in" Label="Received over the last two minutes" />
+						<Sparkline Values="History.Sent" Max="@Top(History.Received, History.Sent)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-out" Label="Sent over the last two minutes" />
+					</span>
+					<span class="mta-card-sub">
+						<span class="mta-key mta-key--in">in</span>
+						<span class="mta-key mta-key--out">out @AdminFormat.Rate(rates?.SentPerSecond)</span>
+					</span>
+				</button>
+			}
+
+			@if (sample?.Disks.Count > 0)
+			{
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Disks))" title="@DiskTitle(rates)">
+					<span class="mta-card-label">Disk I/O</span>
+					<span class="mta-stat">@(rates?.ReadPerSecond is { } read ? AdminFormat.Rate(read) : "...")</span>
+					<span class="mta-spark-pair">
+						<Sparkline Values="History.Read" Max="@Top(History.Read, History.Written)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-in" Label="Read from disk over the last two minutes" />
+						<Sparkline Values="History.Written" Max="@Top(History.Read, History.Written)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-out" Label="Written to disk over the last two minutes" />
+					</span>
+					<span class="mta-card-sub">
+						<span class="mta-key mta-key--in">read</span>
+						<span class="mta-key mta-key--out">write @AdminFormat.Rate(rates?.WrittenPerSecond)</span>
+					</span>
 				</button>
 			}
 
@@ -67,6 +124,8 @@
 				<span class="mta-card-sub" title="@_updatesError">@UpdatesText</span>
 			</button>
 
+			<AdminUpdateCards />
+
 			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Time))">
 				<span class="mta-card-label">Time zone</span>
 				<span class="mta-stat mta-stat--small" title="@_clock?.LocalTime">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</span>
@@ -81,15 +140,67 @@
 				<button type="button" class="mta-card" @key="disk.MountPoint" @onclick="@(() => Context.Navigate(AdminPage.Disks))" title="@($"{disk.Source} on {disk.MountPoint}")">
 					<span class="mta-card-label">@($"Disk {disk.MountPoint}")</span>
 					<span class="mta-stat">@AdminFormat.Percent(disk.UsedPercent)</span>
-					<div class="@AdminFormat.BarClass(disk.UsedPercent)"><span style="@AdminFormat.BarWidth(disk.UsedPercent)"></span></div>
+					<UsageBar Percent="disk.UsedPercent" />
 					<span class="mta-card-sub">@AdminFormat.Kb(disk.AvailableKb) free of @AdminFormat.Kb(disk.TotalKb)</span>
 				</button>
 			}
 		</div>
+
+		@if (rates is not null && (rates.Interfaces.Count > 1 || rates.Disks.Count > 1))
+		{
+			<div class="mta-live-lists">
+				@if (rates.Interfaces.Count > 1)
+				{
+					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 96px 96px" role="table" aria-label="Network interfaces">
+						<div class="mta-row mta-row--head" role="row">
+							<span role="columnheader">Interface</span>
+							<span role="columnheader">In</span>
+							<span role="columnheader">Out</span>
+						</div>
+						@foreach (InterfaceRate item in rates.Interfaces.Take(MaxDevices))
+						{
+							<div class="mta-row" role="row" @key="item.Name">
+								<span class="mta-cell mta-mono" role="cell" title="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")">
+									@item.Name
+									@if (!item.IsDevice && rates.Interfaces.Any(other => other.IsDevice))
+									{
+										<span class="mta-dim mta-after">virtual</span>
+									}
+								</span>
+								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.ReceivedPerSecond)</span>
+								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.SentPerSecond)</span>
+							</div>
+						}
+					</div>
+				}
+				@if (rates.Disks.Count > 1)
+				{
+					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 96px 96px" role="table" aria-label="Disks">
+						<div class="mta-row mta-row--head" role="row">
+							<span role="columnheader">Disk</span>
+							<span role="columnheader">Read</span>
+							<span role="columnheader">Write</span>
+						</div>
+						@foreach (DiskRate item in rates.Disks.Take(MaxDevices))
+						{
+							<div class="mta-row" role="row" @key="item.Name">
+								<span class="mta-cell mta-mono" role="cell">@item.Name</span>
+								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.ReadPerSecond)</span>
+								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.WrittenPerSecond)</span>
+							</div>
+						}
+					</div>
+				}
+			</div>
+		}
 	}
+	</ChildContent>
 </AdminPageFrame>
 
 @code {
+	/// <summary>The busiest interfaces and disks listed under the cards; the totals count them all.</summary>
+	private const int MaxDevices = 8;
+
 	private OverviewSnapshot? _snapshot;
 	private IReadOnlyList<ServiceUnit>? _services;
 	private int _failed;
@@ -111,6 +222,14 @@
 		? "no package manager"
 		: _updatesError is not null ? "could not check" : _updates is null ? $"asking {packages.DisplayName}" : packages.DisplayName;
 
+	private MonitorHistory History => Sampler.History;
+
+	private string? SampleError => Sampler.Error;
+
+	private MonitorSampler Sampler => Context.LiveSampler;
+
+	protected override void OnInitialized() => StartPolling(MonitorCommands.Interval, SampleAsync);
+
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
 		// The slow ones (a dnf metadata check can take a minute) fill their cards in as they arrive.
@@ -119,17 +238,56 @@
 		_ = LoadClockAsync(cancellationToken);
 		AdminOutcome outcome = await ReadAsync(OverviewCommands.Read(), cancellationToken);
 		_snapshot = OverviewCommands.Parse(outcome.Output);
+		History.Add(_snapshot.Sample);
 	}
 
-	private static double? LoadPercent(OverviewSnapshot snapshot) =>
-		snapshot.Load1 is { } load && snapshot.Cores is { } cores && cores > 0 ? load * 100 / cores : null;
+	private static TimeSpan? Uptime(SystemSample? sample) =>
+		sample?.UptimeSeconds is { } seconds ? TimeSpan.FromSeconds(Math.Floor(seconds)) : null;
 
-	private static string LoadText(OverviewSnapshot snapshot) =>
-		$"5m {AdminFormat.Number(snapshot.Load5)} · 15m {AdminFormat.Number(snapshot.Load15)}{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+	private static double? LoadPercent(SystemSample? sample, OverviewSnapshot snapshot) =>
+		sample?.Load is { } load && snapshot.Cores is { } cores && cores > 0 ? load.One * 100 / cores : null;
+
+	private static string LoadText(SystemSample? sample, OverviewSnapshot snapshot) =>
+		$"5m {AdminFormat.Number(sample?.Load?.Five)} · 15m {AdminFormat.Number(sample?.Load?.Fifteen)}{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+
+	private static string CpuText(SystemRates? rates, OverviewSnapshot snapshot) => rates?.CpuPercent is null
+		? "measuring"
+		: $"iowait {AdminFormat.Number(rates.IoWaitPercent, "0.0")}%{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+
+	/// <summary>One scale for both lines of a pair, so in and out can be compared by height.</summary>
+	private static double? Top(SampleHistory first, SampleHistory second)
+	{
+		double top = Math.Max(first.Count > 0 ? first.Max() : 0, second.Count > 0 ? second.Max() : 0);
+		return top > 0 ? top : null;
+	}
+
+	private static string NetworkTitle(SystemRates? rates) => rates is null
+		? "Measuring"
+		: rates.Interfaces.Any(item => item.IsDevice) && rates.Interfaces.Any(item => !item.IsDevice)
+			? "Summed over network devices; bridges, veth pairs and tunnels carry the same traffic again and are left out."
+			: "Summed over every interface but loopback.";
+
+	private static string DiskTitle(SystemRates? rates) => rates is null
+		? "Measuring"
+		: $"Summed over {rates.Disks.Count} whole {(rates.Disks.Count == 1 ? "disk" : "disks")}; partitions and volumes on them are not counted twice.";
 
 	private void OpenFailedServices() => Context.NavigateWith(AdminPage.Services, "failed");
 
 	private void OpenUpdates() => Context.NavigateWith(AdminPage.Packages, "updates");
+
+	private async Task SampleAsync()
+	{
+		try
+		{
+			await Sampler.SampleAsync(Lifetime);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		StateHasChanged();
+	}
 
 	private async Task LoadServicesAsync(CancellationToken cancellationToken)
 	{

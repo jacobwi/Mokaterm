@@ -161,6 +161,9 @@ internal sealed class ConnectionActions
 		];
 	}
 
+	/// <summary>Opens the fleet overview, with whatever this window read last.</summary>
+	public void OpenFleet() => _shell.OpenEditor(new FleetEditorRequest());
+
 	/// <summary>Opens the command run with <paramref name="connectionIds"/> picked; an empty list opens it with nothing picked.</summary>
 	public void RunCommand(IReadOnlyList<Guid> connectionIds) =>
 		_shell.OpenEditor(new CommandRunEditorRequest { ConnectionIds = connectionIds });
@@ -171,6 +174,7 @@ internal sealed class ConnectionActions
 		new() { Text = "New folder", Icon = MokatermIcons.FolderPlus, OnClickSync = () => NewFolder() },
 		new() { Text = "Import saved hosts", Icon = MokatermIcons.FileUpload, OnClickSync = () => ImportConnections() },
 		new() { Text = "Export saved hosts", Icon = MokatermIcons.FileDownload, OnClickSync = ExportConnections },
+		new() { Text = "Fleet overview", Icon = MokatermIcons.Fleet, Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.FleetOverview), DividerBefore = true, OnClickSync = OpenFleet },
 		new() { Text = "Quick connect", Icon = MokatermIcons.QuickConnect, Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.QuickConnect), OnClickSync = _shell.FocusQuickConnect },
 	];
 

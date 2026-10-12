@@ -1,0 +1,16 @@
+@namespace Mokaterm.UI.Common.Components
+
+@* A thin bar for how much of something is used: a disk, memory, a container's CPU share. With a label it is a meter a
+   screen reader can read; without one it only repeats a number shown beside it, and hides. *@
+@if (Label is { Length: > 0 } label)
+{
+	<div class="@CssClass" role="meter" aria-label="@label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@ValueText" aria-valuetext="@($"{ValueText}%")">
+		<span class="mt-usage-fill" style="@WidthStyle"></span>
+	</div>
+}
+else
+{
+	<div class="@CssClass" aria-hidden="true">
+		<span class="mt-usage-fill" style="@WidthStyle"></span>
+	</div>
+}

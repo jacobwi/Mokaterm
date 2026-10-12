@@ -107,6 +107,11 @@ internal sealed partial class DemoDockerEngine
 		}
 
 		bool hasFiles = project == "shop" ? directory == ShopFolder : directory == MonitoringFolder;
+		if (project == "shop" && hasFiles && command is ["config", ..] && ShopProblem() is { } problem)
+		{
+			return DemoDockerResult.Fail(15, problem);
+		}
+
 		List<DemoDockerContainer> members = [.. _containers.Where(container => container.Project == project)];
 		string? service = command.Length > 1 && !command[^1].StartsWith('-') ? command[^1] : null;
 		List<DemoDockerContainer> chosen = [.. members.Where(container => service is null || container.Service == service)];
@@ -131,10 +136,25 @@ internal sealed partial class DemoDockerEngine
 			["stop", ..] => Each(chosen, "Stopping", "Stopped", container => Stop(container, 0)),
 			["start", ..] => Each(chosen, "Starting", "Started", container => Start(container)),
 			["restart", ..] => Each(chosen, "Restarting", "Started", container => Start(container)),
-			["pull", ..] => new DemoDockerResult(0, "", string.Concat(chosen.Select(container => $" {container.Service} Pulled \n"))),
+			["pull", ..] => ComposePull(chosen),
 			["logs", .. var rest] => ComposeLogs(members, rest),
 			_ => DemoDockerResult.Fail(1, $"unknown docker command: \"compose {string.Join(' ', command)}\""),
 		};
+	}
+
+	/// <summary>
+	/// What compose would say about the shop's files as the tree holds them now, or null when they read: a file saved
+	/// from the manager that breaks them fails <c>config</c> the way a real one would.
+	/// </summary>
+	private string? ShopProblem()
+	{
+		if (_readFile(ShopFile) is not { } compose)
+		{
+			return $"open {ShopFile}: no such file or directory";
+		}
+
+		return DemoComposeCheck.Yaml(compose)
+			?? (_readFile($"{ShopFolder}/.env") is { } env ? DemoComposeCheck.Env($"{ShopFolder}/.env", env) : null);
 	}
 
 	private Dictionary<string, List<DemoDockerContainer>> Projects()

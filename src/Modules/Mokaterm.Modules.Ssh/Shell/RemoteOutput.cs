@@ -23,6 +23,29 @@ internal static class RemoteOutput
 		return true;
 	}
 
+	/// <summary>
+	/// What a script printed after the marker when it went through, or the <see cref="RemoteFileSystemException"/> its exit
+	/// status and stderr describe. With <paramref name="allowPartialListing"/> a listing that exits 1 with entries still
+	/// counts, because find and the shell fallback both exit 1 after an entry they could not read.
+	/// </summary>
+	/// <param name="error">stderr of the script itself, without anything a wrapper such as sudo printed first.</param>
+	public static ReadOnlyMemory<byte> Require(
+		int? exitStatus,
+		ReadOnlyMemory<byte> output,
+		string error,
+		string path,
+		string? destination = null,
+		bool allowPartialListing = false)
+	{
+		bool hasPayload = TryGetPayload(output, out ReadOnlyMemory<byte> payload);
+		if (exitStatus == 0 || (allowPartialListing && exitStatus == 1 && hasPayload && !payload.IsEmpty))
+		{
+			return payload;
+		}
+
+		throw RemoteCommandErrors.ToException(exitStatus, error, path, destination);
+	}
+
 	/// <summary>Splits NUL-terminated UTF-8 fields. A trailing field without its terminator is incomplete and dropped.</summary>
 	public static List<string> SplitFields(ReadOnlySpan<byte> payload)
 	{

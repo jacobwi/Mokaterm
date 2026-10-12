@@ -35,6 +35,11 @@ internal static class ComposeActions
 				$"Every container of {service ?? project} gets SIGTERM and, ten seconds later, SIGKILL. They stay, and Start brings them back.",
 				"Stop"),
 			"pull" => new([ComposeCommands.Pull(target, service)], $"Pull images for {touched}"),
+			"update" => new(
+				[ComposeCommands.Pull(target, service), ComposeCommands.Up(target, service: service)],
+				$"Update {touched}",
+				$"Compose pulls the newest images for {service ?? project}, then makes again every container whose image changed. What was written inside those containers, outside volumes, is lost.",
+				"Update"),
 			"up" => new(
 				pullFirst ? [ComposeCommands.Pull(target), ComposeCommands.Up(target, build)] : [ComposeCommands.Up(target, build)],
 				(build ? "Build and start " : "Start ") + touched),

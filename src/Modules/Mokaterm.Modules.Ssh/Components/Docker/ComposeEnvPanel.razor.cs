@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+using System.Globalization;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Modules.Ssh.Docker;
 
@@ -6,34 +6,26 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
 /// A project's env files: the <c>.env</c> in its folder (or the files it was started with through <c>--env-file</c>),
-/// every <c>env_file:</c> its services name, which variables the compose files use that nothing sets, and an editor
-/// for each file. The file browser's own editor cannot be reached from a module, so the editor is here and saves the
-/// way that editor does: the session file system's replace, which keeps the file's owner and mode, refusing a file
-/// that changed since it was opened. Values stay masked until shown one at a time, and none is ever logged.
+/// every <c>env_file:</c> its services name, and which variables the compose files use that nothing sets. Each file's
+/// variables are listed with their values masked until shown one at a time, and none is ever logged. Editing, and
+/// creating a file that is missing, goes through the editor the file browser uses (<see cref="ComposePanelBase"/>).
 /// </summary>
-public sealed partial class ComposeEnvPanel : DockerPageBase
+public sealed partial class ComposeEnvPanel : ComposePanelBase
 {
 	private IReadOnlyList<EnvFileView> _files = [];
 	private IReadOnlyList<string> _unset = [];
 	private string? _loadedFor;
 	private bool _asRoot;
-	private EnvFileView? _editing;
-	private string _draft = "";
-	private bool _saving;
-	private string? _saveProblem;
 
-	[CascadingParameter]
-	private ComposeProjectContext? Context { get; set; }
-
-	private bool CanUseRoot => HostFiles?.CanUseRoot ?? false;
+	private static string CutText => string.Create(
+		CultureInfo.CurrentCulture,
+		$"Only the first {DockerHostFiles.MaxViewBytes / 1024} KB were read, so variables after that are not listed. Edit opens the whole file.");
 
 	protected override Task OnParametersSetAsync() =>
 		Context is { } context && context.Project.Name != _loadedFor ? LoadAllAsync() : Task.CompletedTask;
 
-	private static string SaveNote(HostTextFile file) =>
-		file.ReadAsRoot
-			? "Saves as root through sudo, keeping the file's owner and mode. Containers see the change on their next up."
-			: "Saves over the file, keeping its owner and mode. Containers see the change on their next up.";
+	/// <summary>A saved file changes its variables and maybe what is unset, so everything is read again.</summary>
+	private protected override Task OnProjectFileSavedAsync() => LoadAllAsync();
 
 	private Task UseRootAsync()
 	{
@@ -101,7 +93,7 @@ public sealed partial class ComposeEnvPanel : DockerPageBase
 		{
 			try
 			{
-				HostTextFile yaml = await files.ReadTextAsync(composeFile, _asRoot, token);
+				RemoteTextFile yaml = await files.ReadTextAsync(composeFile, _asRoot, token);
 				found.AddRange(ComposeEnvironment.EnvFilesFromYaml(yaml.Text, composeFile).Where(path => !found.Contains(path, StringComparer.Ordinal)));
 			}
 			catch (RemoteFileSystemException)
@@ -117,8 +109,9 @@ public sealed partial class ComposeEnvPanel : DockerPageBase
 	{
 		try
 		{
-			view.Text = await files.ReadTextAsync(view.Path, _asRoot, token);
-			view.Variables = DotEnvParser.Parse(view.Text.Text);
+			RemoteTextFile text = await files.ReadTextAsync(view.Path, _asRoot, token);
+			view.Variables = DotEnvParser.Parse(text.Text);
+			view.IsCut = text.IsCut;
 			view.Problem = null;
 			view.NeedsRoot = false;
 		}
@@ -133,60 +126,7 @@ public sealed partial class ComposeEnvPanel : DockerPageBase
 		}
 	}
 
-	private void Edit(EnvFileView file)
-	{
-		if (file.Text is not { Truncated: false } text)
-		{
-			return;
-		}
-
-		_editing = file;
-		_draft = text.Text;
-		_saveProblem = null;
-	}
-
-	private void OnDraftChanged(string? value) => _draft = value ?? "";
-
-	private void CancelEdit()
-	{
-		_editing = null;
-		_draft = "";
-		_saveProblem = null;
-	}
-
-	private async Task SaveAsync()
-	{
-		if (_editing is not { Text: { } original } file || HostFiles is not { } files || _saving)
-		{
-			return;
-		}
-
-		_saving = true;
-		_saveProblem = null;
-		try
-		{
-			await files.WriteTextAsync(original, _draft, Lifetime);
-			await ReadAsync(files, file, Lifetime);
-			_editing = null;
-			_draft = "";
-		}
-		catch (Exception ex) when (Describe(ex) is { } problem)
-		{
-			_saveProblem = problem;
-		}
-		catch (OperationCanceledException)
-		{
-			return;
-		}
-		finally
-		{
-			_saving = false;
-		}
-
-		StateHasChanged();
-	}
-
-	/// <summary>One env file as the tab shows it; mutable, since reading and saving fill it in place.</summary>
+	/// <summary>One env file as the tab shows it; mutable, since reading fills it in place.</summary>
 	private sealed class EnvFileView(string path, string role, bool required, bool exists)
 	{
 		public string Path { get; } = path;
@@ -199,9 +139,10 @@ public sealed partial class ComposeEnvPanel : DockerPageBase
 
 		public bool Exists { get; } = exists;
 
-		public HostTextFile? Text { get; set; }
-
 		public IReadOnlyList<DotEnvVariable> Variables { get; set; } = [];
+
+		/// <summary>True when only the start of the file was read, so the list may stop short.</summary>
+		public bool IsCut { get; set; }
 
 		public string? Problem { get; set; }
 

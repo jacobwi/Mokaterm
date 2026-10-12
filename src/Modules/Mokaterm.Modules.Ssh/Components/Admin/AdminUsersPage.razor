@@ -7,11 +7,11 @@
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
 				SearchPlaceholder="Filter by name"
-				PrimaryText="@(Capabilities.Accounts.CanChange ? "Add user" : null)"
+				PrimaryText="@(Capabilities.Accounts.CanChange ? _view == "groups" ? "Add group" : "Add user" : null)"
 				PrimaryIcon="MokaIcons.Action.Add"
 				PrimaryDisabled="@(Busy || Context.RootChangeBlocked is not null)"
 				PrimaryTitle="@Context.RootChangeBlocked"
-				OnPrimary="StartAdd"
+				OnPrimary="@(_view == "groups" ? StartAddGroup : StartAdd)"
 				Loading="Loading"
 				Loaded="Loaded"
 				Error="@LoadError"
@@ -19,7 +19,7 @@
 				ListPage
 				Detail="@DetailFragment">
 	<Chips>
-		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; })" AriaLabel="Accounts to show" />
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; _selectedGroup = null; _addingGroup = false; })" AriaLabel="Accounts to show" />
 	</Chips>
 	<ChipsEnd>
 		@if (_snapshot is { KnowsPasswords: false })
@@ -32,18 +32,34 @@
 		{
 			@if (_view == "groups")
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr)">
+				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr) 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr) 28px">
 					<div class="mta-row mta-row--head">
 						<AdminSortHeader Text="Group" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
 						<AdminSortHeader Text="GID" Key="id" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
 						<span>Members</span>
+						<span></span>
 					</div>
 					@foreach (GroupAccount group in SortedGroups(snapshot.Groups.Where(Matches)))
 					{
-						<div class="mta-row" @key="group.Name">
+						<div class="@(group.Name == _selectedGroup && !_addingGroup ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+							 @key="group.Name"
+							 role="button"
+							 tabindex="0"
+							 @onclick="@(() => SelectGroup(group.Name))"
+							 @onkeydown="@(args => OnGroupKey(args, group.Name))"
+							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
+							 @oncontextmenu:preventDefault="true">
 							<span class="mta-cell mta-mono">@group.Name</span>
 							<span class="mta-cell mta-mono mta-dim mta-wide">@group.Gid</span>
 							<span class="mta-cell mta-mono mta-dim" title="@string.Join(", ", group.Members)">@string.Join(", ", group.Members)</span>
+							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+								<MokaButton Variant="MokaVariant.Text"
+											Color="MokaColor.Surface"
+											Size="MokaSize.Xs"
+											StartIcon="MokaIcons.Navigation.MoreHorizontal"
+											OnClick="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
+											aria-label="@($"Actions for {group.Name}")" />
+							</span>
 						</div>
 					}
 				</div>
@@ -129,6 +145,9 @@
 
 	private bool _adding;
 	private int _formVersion;
+	private string? _selectedGroup;
+	private bool _addingGroup;
+	private string _newGroup = "";
 	private string _newName = "";
 	private string _newComment = "";
 	private string _newShell = "";
@@ -158,7 +177,11 @@
 
 	private UserAccount? Selected => _selected is { } name ? _snapshot?.Users.FirstOrDefault(user => user.Name == name) : null;
 
-	private RenderFragment? DetailFragment => _view == "groups" ? null : _adding ? AddPanel : Selected is null ? null : UserPanel;
+	private RenderFragment? DetailFragment => _view == "groups"
+		? _addingGroup ? AddGroupPanel : SelectedGroup is null ? null : GroupPanel
+		: _adding ? AddPanel : Selected is null ? null : UserPanel;
+
+	private GroupAccount? SelectedGroup => _selectedGroup is { } name ? _snapshot?.Groups.FirstOrDefault(group => group.Name == name) : null;
 
 	private string? NewNameProblem => _snapshot?.Users.Any(user => user.Name == _newName) == true ? "That user already exists." : null;
 
@@ -269,7 +292,65 @@
 				{
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">This machine has neither useradd nor BusyBox's adduser, so accounts are shown and not changed.</MokaText>
 				}
+
+				<AdminAuthorizedKeys UserName="@user.Name" @key="user.Name" />
 			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment GroupPanel => __builder =>
+	{
+		if (SelectedGroup is not { } group || _snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		string? refusal = AccountCommands.WhyNotDeleteGroup(group, snapshot);
+		List<string> primaryOf = [.. snapshot.Users.Where(user => user.Gid == group.Gid).Select(user => user.Name)];
+		<AdminDetailPanel Title="@group.Name" Subtitle="@($"gid {group.Gid}")" OnClose="@(() => _selectedGroup = null)">
+			<Actions>
+				@if (Capabilities.Accounts.CanChange)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(Busy || refusal is not null || Context.RootChangeBlocked is not null)"
+								title="@(refusal ?? Context.RootChangeBlocked)"
+								OnClick="@(() => DeleteGroupAsync(group, snapshot))">
+						Delete
+					</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					<dt>Members</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(group.Members.Count > 0 ? string.Join(", ", group.Members) : "none listed")</MokaText></dd>
+					<dt>Primary of</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(primaryOf.Count > 0 ? string.Join(", ", primaryOf) : "nobody")</MokaText></dd>
+				</dl>
+				@if (refusal is not null)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@refusal</MokaText>
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private RenderFragment AddGroupPanel => __builder =>
+	{
+		<AdminDetailPanel Title="Add group" Mono="false" OnClose="@(() => _addingGroup = false)">
+			<TextSetting Label="Name" Value="@_newGroup" ValueChanged="@(value => _newGroup = value)" Validate="ValidateNewGroup" Placeholder="deploy" @key="_formVersion" />
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The group gets the next free group id and no members; add users to it from their own panel.</MokaText>
+			<div class="mta-form-actions">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="@(() => _addingGroup = false)">Cancel</MokaButton>
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							Disabled="@(Busy || ValidateNewGroup(_newGroup) is not null || Context.RootChangeBlocked is not null)"
+							OnClick="AddGroupAsync">
+					Add group
+				</MokaButton>
+			</div>
 		</AdminDetailPanel>
 	};
 
@@ -372,6 +453,73 @@
 			OnClick = () => DeleteAsync(user, snapshot),
 		});
 		return items;
+	}
+
+	private string? ValidateNewGroup(string name) => AdminNames.CheckAccount(name) ?? (_snapshot?.Groups.Any(group => group.Name == name) == true ? "That group already exists." : null);
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(GroupAccount group, AccountsSnapshot snapshot)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => SelectGroup(group.Name, keepOpen: true) }];
+		if (Capabilities.Accounts.CanChange)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Delete",
+				Icon = MokaIcons.Action.Delete,
+				DividerBefore = true,
+				Disabled = Busy || Context.RootChangeBlocked is not null || AccountCommands.WhyNotDeleteGroup(group, snapshot) is not null,
+				OnClick = () => DeleteGroupAsync(group, snapshot),
+			});
+		}
+
+		return items;
+	}
+
+	private void SelectGroup(string name) => SelectGroup(name, keepOpen: false);
+
+	private void SelectGroup(string name, bool keepOpen)
+	{
+		_addingGroup = false;
+		_selectedGroup = _selectedGroup == name && !keepOpen ? null : name;
+	}
+
+	private void OnGroupKey(KeyboardEventArgs args, string name)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			SelectGroup(name);
+		}
+	}
+
+	private void StartAddGroup()
+	{
+		_addingGroup = true;
+		_selectedGroup = null;
+		_newGroup = "";
+		_formVersion++;
+	}
+
+	private async Task AddGroupAsync()
+	{
+		string name = _newGroup;
+		if (ValidateNewGroup(name) is not null)
+		{
+			return;
+		}
+
+		if (await RunAsync(Capabilities.Accounts.AddGroup(name)) is { Succeeded: true })
+		{
+			_addingGroup = false;
+			_selectedGroup = name;
+		}
+	}
+
+	private async Task DeleteGroupAsync(GroupAccount group, AccountsSnapshot snapshot)
+	{
+		if (await RunAsync(Capabilities.Accounts.DeleteGroup(group, snapshot, Context.LoginName)) is { Succeeded: true })
+		{
+			_selectedGroup = null;
+		}
 	}
 
 	private void Select(string name) => Select(name, keepOpen: false);

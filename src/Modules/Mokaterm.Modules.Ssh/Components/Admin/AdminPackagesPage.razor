@@ -1,5 +1,6 @@
 @using Moka.Red.ContextMenu
 @using Mokaterm.Modules.Ssh.Admin.Packages
+@using Mokaterm.Modules.Ssh.Admin.Reboot
 @inherits AdminPageBase
 
 <AdminPageFrame Title="Packages"
@@ -9,7 +10,7 @@
 				SearchPlaceholder="Filter by name"
 				PrimaryText="@PrimaryText"
 				PrimaryIcon="PrimaryIcon"
-				PrimaryDisabled="@(Busy || Capabilities.Packages is null || Context.RootChangeBlocked is not null || (_view == "updates" && _updates is not { Count: > 0 }))"
+				PrimaryDisabled="@(Busy || Capabilities.Packages is null || Context.RootChangeBlocked is not null || (_view != "installed" && _updates is not { Count: > 0 }))"
 				PrimaryTitle="@Context.RootChangeBlocked"
 				OnPrimary="OnPrimaryAsync"
 				Loading="Loading"
@@ -26,7 +27,23 @@
 		}
 	</Chips>
 	<ChipsEnd>
-		@if (_view == "updates" && Capabilities.Packages?.RefreshIndex() is not null)
+		@if (_reboot is { Required: true } reboot)
+		{
+			<span title="@($"Reboot {AdminUpdateReads.RebootText(reboot)}")">
+				<MokaTag Text="REBOOT REQUIRED" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+			</span>
+		}
+		@if (RebootCommands.CanReboot(Profile))
+		{
+			<button type="button"
+					class="mta-link"
+					disabled="@(Busy || Context.RootChangeBlocked is not null)"
+					title="@(Context.RootChangeBlocked ?? $"Reboot the machine; the session reconnects once it is back. Reboot {(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "status not read yet")}.")"
+					@onclick="Context.Reboot">
+				reboot
+			</button>
+		}
+		@if (_view != "installed" && Capabilities.Packages?.RefreshIndex() is not null)
 		{
 			<button type="button"
 					class="mta-link"
@@ -42,7 +59,7 @@
 		{
 			<MokaEmptyState Icon="SshIcons.Package" Title="No package manager" Description="@Capabilities.PackagesMissing" />
 		}
-		else if (_view == "updates")
+		else if (_view != "installed")
 		{
 			@if (_updatesError is { } updatesError)
 			{
@@ -58,9 +75,26 @@
 								Title="Up to date"
 								Description="@($"{packages.DisplayName} knows of no newer versions. Its lists may be old: refresh them to ask the repositories again.")" />
 			}
+			else if (_view == "security" && _security is null)
+			{
+				@if (_securityNote is { } securityNote)
+				{
+					<MokaEmptyState Icon="MokatermIcons.Shield" Title="Security updates are not known" Description="@securityNote" />
+				}
+				else
+				{
+					<div class="mta-loading"><MokaSpinner Label="@($"Asking {packages.DisplayName} which updates fix security problems")" /></div>
+				}
+			}
+			else if (_view == "security" && _security is { Count: 0 })
+			{
+				<MokaEmptyState Icon="MokatermIcons.ShieldCheck"
+								Title="No security updates"
+								Description="@($"None of the pending updates fixes a security problem, as far as {packages.DisplayName}'s lists know.")" />
+			}
 			else
 			{
-				List<PackageUpdate> updates = [.. Sorted(_updates.Where(Matches))];
+				List<PackageUpdate> updates = [.. Sorted(_updates.Where(Matches).Where(update => _view != "security" || IsSecurity(update)))];
 				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr)">
 					<div class="mta-row mta-row--head">
 						<AdminSortHeader Text="Package" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
@@ -71,7 +105,13 @@
 					@foreach (PackageUpdate update in updates.Take(MaxRows))
 					{
 						<div class="mta-row" @key="@(update.Name + "/" + update.Architecture)">
-							<span class="mta-cell mta-mono" title="@update.Name">@update.Name</span>
+							<span class="mta-cell mta-mono" title="@update.Name">
+								@update.Name
+								@if (_view == "updates" && IsSecurity(update))
+								{
+									<span class="mta-after"><MokaTag Text="SECURITY" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+								}
+							</span>
 							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.CurrentVersion">@update.CurrentVersion</span>
 							<span class="mta-cell mta-mono" title="@update.NewVersion">@update.NewVersion</span>
 							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.Source">@update.Source</span>
@@ -144,6 +184,9 @@
 	private IReadOnlyList<InstalledPackage> _installed = [];
 	private IReadOnlyList<PackageUpdate>? _updates;
 	private string? _updatesError;
+	private HashSet<string>? _security;
+	private string? _securityNote;
+	private RebootStatus? _reboot;
 	private readonly AdminSort _sort = new("name");
 	private string _view = "installed";
 	private string _filter = "";
@@ -161,19 +204,27 @@
 			}
 
 			string updates = _updates is { } list ? $", {AdminFormat.Count(list.Count)} upgradable" : "";
+			updates += _security is { Count: > 0 } security ? $", {AdminFormat.Count(security.Count)} for security" : "";
 			return $"{AdminFormat.Count(_installed.Count)} installed{updates} · {packages.DisplayName}";
 		}
 	}
 
-	private string PrimaryText => _view == "updates" ? "Upgrade all" : "Install";
+	private string PrimaryText => _view == "installed" ? "Install" : "Upgrade all";
 
-	private MokaIconDefinition? PrimaryIcon => _view == "updates" ? (MokaIconDefinition?)null : MokaIcons.Action.Add;
+	private MokaIconDefinition? PrimaryIcon => _view == "installed" ? MokaIcons.Action.Add : (MokaIconDefinition?)null;
 
-	private IReadOnlyList<AdminChip> Chips =>
-	[
-		new("installed", "Installed", _installed.Count),
-		new("updates", "Upgradable", _updates?.Count),
-	];
+	private IReadOnlyList<AdminChip> Chips => Capabilities.Packages?.KnowsSecurityUpdates == true
+		?
+		[
+			new("installed", "Installed", _installed.Count),
+			new("updates", "Upgradable", _updates?.Count),
+			new("security", "Security", _security?.Count, Alert: true),
+		]
+		:
+		[
+			new("installed", "Installed", _installed.Count),
+			new("updates", "Upgradable", _updates?.Count),
+		];
 
 	private InstalledPackage? Selected => _selected is { } key
 		? _installed.FirstOrDefault(package => package.Name + "/" + package.Architecture == key)
@@ -183,9 +234,9 @@
 
 	protected override void OnInitialized()
 	{
-		if (Context.TakeHint() is "updates")
+		if (Context.TakeHint() is { } hint && hint is "updates" or "security")
 		{
-			_view = "updates";
+			_view = hint;
 		}
 	}
 
@@ -203,7 +254,8 @@
 		}
 
 		_installed = packages.ParseInstalled(outcome.Output);
-		if (_view == "updates" || _updates is not null)
+		_ = LoadRebootAsync(cancellationToken);
+		if (_view != "installed" || _updates is not null)
 		{
 			await LoadUpdatesAsync(cancellationToken);
 		}
@@ -322,15 +374,55 @@
 		catch (AdminException ex)
 		{
 			_updatesError = ex.Message;
+			return;
 		}
+
+		await LoadSecurityAsync(packages, _updates, cancellationToken);
 	}
+
+	/// <summary>Which pending updates fix security problems: read off apt's own list, asked of dnf and yum separately.</summary>
+	private async Task LoadSecurityAsync(PackageCommands packages, IReadOnlyList<PackageUpdate> updates, CancellationToken cancellationToken)
+	{
+		_security = null;
+		_securityNote = null;
+		if (!packages.KnowsSecurityUpdates)
+		{
+			return;
+		}
+
+		IReadOnlyList<PackageUpdate>? security = packages.SecurityUpdatesAmong(updates);
+		string? note = null;
+		if (security is null)
+		{
+			(security, note) = await AdminUpdateReads.SecurityUpdatesAsync(Feature, packages, Capabilities.PackagesMissing, cancellationToken);
+		}
+
+		_security = security is null ? null : new HashSet<string>(security.Select(update => update.Name), StringComparer.Ordinal);
+		_securityNote = note;
+	}
+
+	private async Task LoadRebootAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			_reboot = await AdminUpdateReads.RebootAsync(Feature, cancellationToken);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private bool IsSecurity(PackageUpdate update) => _security?.Contains(update.Name) == true;
 
 	private async Task OnViewChangedAsync(string value)
 	{
 		_view = value;
 		_selected = null;
 		_installing = false;
-		if (_view == "updates" && _updates is null)
+		if (_view != "installed" && _updates is null)
 		{
 			await LoadUpdatesAsync(CancellationToken.None);
 		}
@@ -362,7 +454,7 @@
 
 	private async Task OnPrimaryAsync()
 	{
-		if (_view == "updates")
+		if (_view != "installed")
 		{
 			await UpgradeAllAsync();
 		}

@@ -33,6 +33,14 @@ internal sealed class AccountDirectory
 	/// </summary>
 	public static AccountDirectory Parse(string passwd, string group) => new(ParseAccounts(passwd), ParseAccounts(group));
 
+	/// <summary>What <see cref="Shell.RemoteScripts.Accounts"/> printed after its marker: passwd, a NUL, then group.</summary>
+	public static AccountDirectory FromScript(ReadOnlySpan<byte> payload)
+	{
+		string text = System.Text.Encoding.UTF8.GetString(payload);
+		int separator = text.IndexOf('\0', StringComparison.Ordinal);
+		return separator < 0 ? Parse(text, "") : Parse(text[..separator], text[(separator + 1)..]);
+	}
+
 	/// <summary>The user name, or the id as text when the server has no name for it.</summary>
 	public string UserName(int uid) => _users.TryGetValue(uid, out string? name) ? name : uid.ToString(CultureInfo.InvariantCulture);
 

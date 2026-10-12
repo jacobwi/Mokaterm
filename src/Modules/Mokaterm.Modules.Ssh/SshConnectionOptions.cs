@@ -80,6 +80,12 @@ public sealed record SshConnectionOptions
 	/// </summary>
 	public ProxyOptions Proxy { get; init; } = ProxyOptions.None;
 
+	/// <summary>
+	/// True when a socket from this machine goes straight to the target: no jump host carries it and no proxy. Only then
+	/// does probing the target's port from here ask the machine the connection reaches.
+	/// </summary>
+	public bool ReachesTargetDirectly => JumpConnectionIds.Count == 0 && !Proxy.IsEnabled;
+
 	/// <summary>Agent and X11 forwarding, which only the ssh protocol's shell asks for.</summary>
 	public SshForwardingOptions Forwarding { get; init; } = SshForwardingOptions.None;
 

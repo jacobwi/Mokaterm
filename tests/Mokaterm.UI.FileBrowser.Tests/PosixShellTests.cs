@@ -1,4 +1,4 @@
-using Mokaterm.UI.FileBrowser.Browsing;
+using Mokaterm.Abstractions.Commands;
 
 namespace Mokaterm.UI.FileBrowser.Tests;
 

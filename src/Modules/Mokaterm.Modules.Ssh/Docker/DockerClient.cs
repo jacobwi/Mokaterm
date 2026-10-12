@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Modules.Ssh.Tools;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -8,24 +9,17 @@ namespace Mokaterm.Modules.Ssh.Docker;
 /// page shows that output either way.
 /// </summary>
 /// <remarks>
-/// At most <see cref="MaxConcurrentCommands"/> commands run at once: every one is an exec channel on the session's own
-/// connection, which also carries the shell and its tunnels, and OpenSSH allows ten channels per connection.
+/// Every command is an exec channel on the session's connection, and the connection's
+/// <see cref="Shell.ExecChannelBudget"/> is what bounds how many run at once, the system view's and sudo's included.
 /// </remarks>
 internal sealed class DockerClient
 {
-	public const int MaxConcurrentCommands = 3;
-
-	private readonly SemaphoreSlim _slots;
-
-	/// <param name="slots">Shared by every client of one session, so switching to sudo does not double the channels.</param>
-	public DockerClient(IDockerShell shell, string host, SemaphoreSlim slots)
+	public DockerClient(IDockerShell shell, string host)
 	{
 		ArgumentNullException.ThrowIfNull(shell);
 		ArgumentNullException.ThrowIfNull(host);
-		ArgumentNullException.ThrowIfNull(slots);
 		Shell = shell;
 		Host = host;
-		_slots = slots;
 	}
 
 	public IDockerShell Shell { get; }
@@ -37,18 +31,10 @@ internal sealed class DockerClient
 
 	/// <summary>Runs a call and returns how it ended, whatever its exit.</summary>
 	/// <exception cref="DockerCommandException">The command did not run to its end.</exception>
-	public async Task<DockerOutput> RunAsync(DockerCall call, CancellationToken cancellationToken)
+	public Task<DockerOutput> RunAsync(DockerCall call, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(call);
-		await _slots.WaitAsync(cancellationToken);
-		try
-		{
-			return await Shell.RunAsync(call, cancellationToken);
-		}
-		finally
-		{
-			_slots.Release();
-		}
+		return Shell.RunAsync(call, cancellationToken);
 	}
 
 	/// <summary>Runs a call that must succeed and returns its stdout.</summary>
@@ -78,7 +64,7 @@ internal sealed class DockerClient
 		DockerContainerStats.Parse(await ReadAsync(DockerCommands.Stats(containers), cancellationToken));
 
 	/// <summary>The end of a container's log, both streams in order.</summary>
-	public async Task<IReadOnlyList<DockerLogLine>> LogsAsync(string container, int tail, string? since, CancellationToken cancellationToken)
+	public async Task<IReadOnlyList<LogLine>> LogsAsync(string container, int tail, string? since, CancellationToken cancellationToken)
 	{
 		DockerOutput output = await RunAsync(DockerCommands.Logs(container, tail, since), cancellationToken);
 		return output.Succeeded ? DockerLogParser.Merge(output.Output, output.Error) : throw Failed(output);
@@ -114,6 +100,20 @@ internal sealed class DockerClient
 
 	public async Task<IReadOnlyList<DockerDiskUsage>> DiskUsageAsync(CancellationToken cancellationToken) =>
 		DockerDiskUsage.Parse(await ReadAsync(DockerCommands.DiskUsage(), cancellationToken));
+
+	/// <summary>Every image, container, volume and build cache entry with its size; null when this docker prints no such detail.</summary>
+	public async Task<DockerSystemUsage?> SystemUsageAsync(CancellationToken cancellationToken) =>
+		DockerSystemUsage.Parse(await ReadAsync(DockerCommands.SystemUsage(), cancellationToken));
+
+	/// <summary>Every container with its restart count and health, for the health watch.</summary>
+	public async Task<IReadOnlyList<DockerContainerState>> ContainerStatesAsync(CancellationToken cancellationToken)
+	{
+		DockerOutput output = await RunAsync(DockerCommands.ContainerStates(), cancellationToken);
+		IReadOnlyList<DockerContainerState> states = DockerContainerState.Parse(output.Output);
+
+		// A container removed between the listing and the inspect fails the inspect after it printed the rest.
+		return output.Succeeded || states.Count > 0 ? states : throw Failed(output);
+	}
 
 	/// <summary>
 	/// Every compose project: from <c>compose ls</c> where the compose has it, completed and extended from the labels
@@ -200,7 +200,7 @@ internal sealed class DockerClient
 		ReadAsync(ComposeCommands.Config(target), cancellationToken);
 
 	/// <summary>The project's merged log, every line with the container it came from, oldest first.</summary>
-	public async Task<IReadOnlyList<DockerLogLine>> ComposeLogsAsync(ComposeTarget target, string? service, int tail, string? since, CancellationToken cancellationToken)
+	public async Task<IReadOnlyList<LogLine>> ComposeLogsAsync(ComposeTarget target, string? service, int tail, string? since, CancellationToken cancellationToken)
 	{
 		DockerOutput output = await RunAsync(ComposeCommands.Logs(target, service, tail, since), cancellationToken);
 		return output.Succeeded ? DockerLogParser.MergeCompose(output.Output, output.Error) : throw Failed(output);

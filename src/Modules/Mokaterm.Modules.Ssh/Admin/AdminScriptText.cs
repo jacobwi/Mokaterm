@@ -81,11 +81,12 @@ internal static class AdminScriptText
 		}
 	}
 
-	/// <summary>The request a script runs under: its own output cap.</summary>
+	/// <summary>The request a script runs under: its own output cap, and long when its time limit is (a package change).</summary>
 	public static RemoteCommandRequest Request(AdminScript script, string commandText) => new()
 	{
 		Command = commandText,
 		OutputLimitBytes = Math.Max(script.OutputLimitBytes, RemoteCommandRequest.MinOutputLimitBytes),
+		RunsLong = ExecChannelBudget.RunsLong(script.Timeout),
 	};
 
 	/// <summary>
@@ -98,7 +99,7 @@ internal static class AdminScriptText
 		ArgumentNullException.ThrowIfNull(outcome);
 		if (!RemoteOutput.TryGetPayload(outcome.Output.Bytes, out ReadOnlyMemory<byte> payload))
 		{
-			string reason = SudoErrors.FirstLine(scriptError);
+			string reason = RemoteText.FirstLine(scriptError);
 			throw new AdminException(reason.Length > 0
 				? $"The server did not run the script: {reason}"
 				: "The server did not run the script. The login may be limited to a forced command or a restricted shell.");
@@ -122,12 +123,5 @@ internal static class AdminScriptText
 			IsTruncated = truncated,
 			Duration = outcome.Duration,
 		};
-	}
-
-	/// <summary>Stderr as text.</summary>
-	public static string ErrorText(RemoteCommandOutcome outcome)
-	{
-		ArgumentNullException.ThrowIfNull(outcome);
-		return Encoding.UTF8.GetString(outcome.Error.Bytes.Span);
 	}
 }

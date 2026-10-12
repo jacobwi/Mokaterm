@@ -15,6 +15,12 @@ public sealed record RemoteCommandRequest
 	/// <summary>How much of each stream, stdout and stderr, is kept. The rest is counted in <see cref="CapturedOutput.TotalBytes"/>.</summary>
 	public int OutputLimitBytes { get; init; } = 256 * 1024;
 
+	/// <summary>
+	/// The command may run for minutes (an install, an image pull). A connection that limits how many commands run at
+	/// once keeps some room for quick ones, which such a command never takes.
+	/// </summary>
+	public bool RunsLong { get; init; }
+
 	/// <summary>The command with the blank space around it removed, which is what gets sent.</summary>
 	public static string Normalize(string? command) => command?.Trim() ?? "";
 
@@ -46,7 +52,8 @@ public sealed record RemoteCommandRequest
 	{
 		builder
 			.Append("Command = ").Append(SecretText.Describe(Command))
-			.Append(", OutputLimitBytes = ").Append(OutputLimitBytes);
+			.Append(", OutputLimitBytes = ").Append(OutputLimitBytes)
+			.Append(", RunsLong = ").Append(RunsLong);
 		return true;
 	}
 }

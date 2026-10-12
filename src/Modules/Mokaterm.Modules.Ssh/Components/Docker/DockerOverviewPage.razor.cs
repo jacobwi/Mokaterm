@@ -5,8 +5,8 @@ using Mokaterm.UI.Common.Formatting;
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The engine at a glance: versions, what the daemon runs on, counts, and <c>docker system df</c>, with a prune that
-/// says exactly what it removes and what <c>df</c> counts as reclaimable before it runs.
+/// The engine at a glance: versions, what the daemon runs on, counts, and one line per kind of what <c>docker system
+/// df</c> counts, with the way to the cleanup page, which is where anything is removed.
 /// </summary>
 public sealed partial class DockerOverviewPage : DockerPageBase
 {
@@ -28,6 +28,12 @@ public sealed partial class DockerOverviewPage : DockerPageBase
 		string daemon = status.Info is { Rootless: true } ? "rootless daemon" : "daemon running as root";
 		return status.IsElevated ? $"{daemon}, commands through sudo" : $"{daemon}, commands as the login";
 	}
+
+	/// <summary><c>4.2GB in 9, 1.1GB (26%) reclaimable</c>.</summary>
+	private static string UsageLine(DockerDiskUsage row) =>
+		row.Reclaimable.Length > 0 && row.ReclaimableBytes is > 0
+			? $"{row.Size} in {row.TotalCount}, {row.Reclaimable} reclaimable"
+			: $"{row.Size} in {row.TotalCount}";
 
 	private static string InstallText(ComposeTool? tool, string command) => tool switch
 	{
@@ -52,17 +58,4 @@ public sealed partial class DockerOverviewPage : DockerPageBase
 		await Task.WhenAll(usage, detect);
 		_usage = await usage;
 	});
-
-	private Task PruneAsync()
-	{
-		string reclaimable = string.Join(", ", _usage
-			.Where(row => row.Reclaimable.Length > 0 && row.Type != "Local Volumes")
-			.Select(row => $"{row.Type.ToLowerInvariant()} {row.Reclaimable}"));
-
-		string message = "Removes every stopped container, every network no container uses, every dangling image (one no tag"
-			+ " points at) and all build cache nothing uses. Volumes and tagged images are kept."
-			+ (reclaimable.Length > 0 ? $" docker system df puts what this frees at no more than {reclaimable}." : "");
-
-		return ChangeAsync(DockerCommands.SystemPrune(), "Prune Docker", message, "Prune", RefreshAsync);
-	}
 }

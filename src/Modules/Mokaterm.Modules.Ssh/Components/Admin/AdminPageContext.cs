@@ -1,5 +1,6 @@
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
@@ -7,6 +8,7 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 internal sealed class AdminPageContext
 {
 	private string? _hint;
+	private MonitorSampler? _liveSampler;
 
 	public required SystemAdminFeature Feature { get; init; }
 
@@ -26,6 +28,21 @@ internal sealed class AdminPageContext
 
 	/// <summary>True while a change is under review or running; pages turn their buttons off meanwhile.</summary>
 	public required Func<bool> IsBusy { get; init; }
+
+	/// <summary>False while the session's tab is hidden: a polling page waits instead of reading what nobody sees.</summary>
+	public required Func<bool> IsVisible { get; init; }
+
+	/// <summary>Reviews and runs a reboot, then reconnects the session once the server answers again.</summary>
+	public required Func<Task> Reboot { get; init; }
+
+	/// <summary>How this session logged in, for the changes that could refuse its next login. Read once and kept.</summary>
+	public required Func<Task<SessionLogin>> Login { get; init; }
+
+	/// <summary>
+	/// The overview's live figures, kept for as long as the view is open: leaving the page and coming back keeps the
+	/// lines drawn so far, and the next sample's rates cover the time away.
+	/// </summary>
+	public MonitorSampler LiveSampler => _liveSampler ??= new MonitorSampler(Feature.ReadAsync);
 
 	/// <summary>The account this session logged in as.</summary>
 	public string LoginName => Profile.Facts.UserName;

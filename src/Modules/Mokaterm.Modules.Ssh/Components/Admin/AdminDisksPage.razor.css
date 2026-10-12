@@ -1,0 +1,67 @@
+/* What's using space: a breadcrumb of the folder, its total, then its folders with their share of it. */
+.mta-space {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mta-crumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px var(--moka-spacing-xs);
+	min-width: 0;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mta-crumb {
+	padding: 1px 4px;
+	border: 0;
+	border-radius: var(--moka-radius-sm);
+	background: none;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	cursor: pointer;
+}
+
+.mta-crumb:hover:not(:disabled) {
+	background: var(--moka-color-surface-hover);
+	color: var(--moka-color-on-surface);
+}
+
+.mta-crumb:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mta-crumb--here {
+	color: var(--moka-color-on-surface);
+	cursor: default;
+}
+
+.mta-space-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	min-width: 0;
+	font-size: var(--moka-font-size-xs);
+}
+
+.mta-large {
+	padding-top: var(--moka-spacing-sm);
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+/* SMART rows the disk itself calls failed, and sector counters that are not zero yet. */
+.mta-smart--failed {
+	color: var(--moka-color-error);
+	box-shadow: inset 2px 0 0 var(--moka-color-error);
+}
+
+.mta-smart--worrying {
+	color: var(--moka-color-warning);
+	box-shadow: inset 2px 0 0 var(--moka-color-warning);
+}

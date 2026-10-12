@@ -69,7 +69,7 @@
 						 AriaLabel="sudo command" />
 		</SettingsRow>
 		<SettingsRow Label="Upload staging directory"
-					 Description="Root uploads land here first as a private file, then move into place."
+					 Description="Root uploads and uploads into containers land here first as a private file, then move on."
 					 ControlWidth="240px">
 			<TextSetting Value="@settings.StagingDirectory"
 						 ValueChanged="value => UpdateAsync(s => s with { StagingDirectory = value })"

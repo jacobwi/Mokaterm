@@ -155,4 +155,8 @@ public static class MokatermIcons
 
 	/// <summary>Moves a tool out of its dialog into a window of its own.</summary>
 	public static readonly MokaIconDefinition PopOut = MokaIcons.Content.ExternalLink;
+
+	/// <summary>The fleet overview: every saved machine in one table.</summary>
+	public static readonly MokaIconDefinition Fleet = new("mt-fleet",
+		"M3 3h7v9H3z M14 3h7v5h-7z M14 12h7v9h-7z M3 16h7v5H3z");
 }

@@ -1,0 +1,80 @@
+@namespace Mokaterm.Modules.Ssh.Components
+@using System.Globalization
+@using Moka.Red.Forms.Checkbox
+@using Moka.Red.Forms.SearchInput
+
+@* A log in a session tool: the caller's own pickers, then how many lines, times, follow, refresh and a search, then
+   the lines. Column-reverse keeps the scroll at the newest line as lines arrive, without script; the lines inside
+   stay in order. *@
+<div class="@(Fill ? "mt-log mt-log--fill" : "mt-log")">
+	<div class="mt-log-toolbar">
+		@Controls
+		@if (LineChoices is { Count: > 0 } choices)
+		{
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@LineCount.ToString(CultureInfo.InvariantCulture)" ValueChanged="OnLineCountChangedAsync" AriaLabel="Lines from the end">
+				@foreach (int count in choices)
+				{
+					<MokaSegment @key="count" Value="@count.ToString(CultureInfo.InvariantCulture)" Text="@count.ToString("N0", CultureInfo.CurrentCulture)" />
+				}
+			</MokaSegmentedControl>
+		}
+		@if (Tail.Newest.Length > 0)
+		{
+			<MokaCheckbox Label="Times" Value="_showTimestamps" ValueChanged="OnShowTimestampsChanged" />
+		}
+		@if (FollowingChanged.HasDelegate)
+		{
+			<MokaButton Variant="@(Following ? MokaVariant.Filled : MokaVariant.Outlined)"
+						Color="@(Following ? MokaColor.Primary : MokaColor.Surface)"
+						Size="MokaSize.Xs"
+						StartIcon="@(Following ? MokatermIcons.Pause : MokatermIcons.Play)"
+						Disabled="@(!CanFollow)"
+						OnClick="ToggleFollowingAsync"
+						title="@(Following ? "Stop following" : FollowTitle)">
+				@(Following ? "Following" : "Follow")
+			</MokaButton>
+		}
+		@if (OnRefresh.HasDelegate)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Refresh"
+						Disabled="RefreshDisabled"
+						OnClick="OnRefresh"
+						title="@RefreshTitle"
+						aria-label="@RefreshTitle" />
+		}
+		<div class="mt-log-search">
+			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="@SearchPlaceholder" Debounce="150" aria-label="@SearchPlaceholder" />
+		</div>
+	</div>
+
+	@Status
+
+	<span class="mt-log-count">@CountText</span>
+	<div class="mt-log-box" role="log" aria-label="@Label">
+		<div class="mt-log-lines">
+			@if (_shown.Count == 0)
+			{
+				<span class="mt-log-line mt-log-muted">@(Tail.Lines.Count == 0 ? EmptyText : "No line matches the search.")</span>
+			}
+			@if (_hidden > 0)
+			{
+				<span class="mt-log-line mt-log-muted">@HiddenText</span>
+			}
+			@foreach (LogLine line in _shown)
+			{
+				<span class="@(line.IsError ? "mt-log-line mt-log-line--error" : "mt-log-line")">@if (line.Source.Length > 0)
+					{<span class="@SourceCss(line.Source)">@line.Source</span>}@if (_showTimestamps && line.Timestamp.Length > 0)
+					{<span class="mt-log-time">@ShortTime(line.Timestamp)</span>}@foreach ((string text, bool match) in Pieces(line.Text, _needle))
+					{
+						@if (match)
+						{<MokaMark>@text</MokaMark>}
+						else
+						{@text}
+					}</span>
+			}
+		</div>
+	</div>
+</div>

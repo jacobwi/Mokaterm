@@ -152,9 +152,9 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 		new(ResultView.Problems, string.Create(CultureInfo.CurrentCulture, $"Failed or non-zero ({_results.Count(host => host.IsProblem)})")),
 	];
 
-	private int RetryableCount => _results.Count(host => host.State is CommandHostState.Failed or CommandHostState.Cancelled);
+	private int RetryableCount => _results.Count(host => host.State is HostRunState.Failed or HostRunState.Cancelled);
 
-	private int SkippedCount => _results.Count(host => host.State == CommandHostState.Skipped);
+	private int SkippedCount => _results.Count(host => host.State == HostRunState.Skipped);
 
 	private bool AllCollapsed => _results.Count > 0 && _results.All(host => _collapsed.Contains(host.ConnectionId));
 
@@ -547,11 +547,11 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 
 	private string ResultsSummary()
 	{
-		int done = _results.Count(host => host.State == CommandHostState.Done && host.ExitCode == 0);
-		int nonZero = _results.Count(host => host.State == CommandHostState.Done && host.ExitCode != 0);
-		int failed = _results.Count(host => host.State == CommandHostState.Failed);
+		int done = _results.Count(host => host.State == HostRunState.Done && host.ExitCode == 0);
+		int nonZero = _results.Count(host => host.State == HostRunState.Done && host.ExitCode != 0);
+		int failed = _results.Count(host => host.State == HostRunState.Failed);
 		int skipped = SkippedCount;
-		int cancelled = _results.Count(host => host.State == CommandHostState.Cancelled);
+		int cancelled = _results.Count(host => host.State == HostRunState.Cancelled);
 		int pending = _results.Count(host => host.IsPending);
 		List<string> parts = [];
 		Add(done, "succeeded");

@@ -1,0 +1,14 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@* Asks the registries about the images a page shows, on demand only, and says how it went in a notice. *@
+<MokaButton Variant="MokaVariant.Text"
+			Color="MokaColor.Surface"
+			Size="MokaSize.Xs"
+			StartIcon="DockerIcons.Update"
+			Loading="_checking"
+			Disabled="@(_checking || References.Count == 0)"
+			OnClick="CheckAsync"
+			title="@Title">
+	@Text
+</MokaButton>

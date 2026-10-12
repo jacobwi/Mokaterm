@@ -1,0 +1,207 @@
+@namespace Mokaterm.UI.Fleet
+
+@* One login of the fleet overview. The row is one tab stop: Space picks it, Enter folds its details open, R reads it
+   again, O opens it in a tab and the arrows move to the next row. The buttons at its end are for the mouse; the
+   details carry the same ones for the keyboard, and keep their own keys and clicks from reaching the row. *@
+<div class="@RowClass"
+	 role="row"
+	 tabindex="0"
+	 aria-selected="@(Picked ? "true" : "false")"
+	 aria-expanded="@(Expanded ? "true" : "false")"
+	 aria-keyshortcuts="Space Enter R O"
+	 data-mt-row="true"
+	 data-no-submit="true"
+	 title="@Tooltip"
+	 @onclick="OnToggleExpand"
+	 @onkeydown="OnKeyDownAsync">
+	<span class="mt-fleet-cell mt-fleet-cell--pick" role="gridcell" @onclick="OnTogglePick" @onclick:stopPropagation>
+		<MokaCheckbox Value="@Picked" DisplayOnly />
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--state" role="gridcell">
+		<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor" Pulse="@Row.IsPending" Glow="@(Row.Result?.State == HostRunState.Done)" />
+		<span class="mt-fleet-state">@StateLabel</span>
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--login" role="gridcell">
+		<ProtocolIcon ProtocolId="@Row.Login.ProtocolId" Size="MokaSize.Xs" />
+		<SessionLabel Host="Row.Host" Connection="Row.Login" />
+	</span>
+	@* Until a machine was read, its system column says what the read is doing or why it did not get through. *@
+	<span class="mt-fleet-cell mt-fleet-cell--os" role="gridcell" title="@(Summary?.Kernel ?? Row.Result?.Message)">
+		@if (Summary?.OperatingSystem is { } system)
+		{
+			@system
+		}
+		else if (Row.Result?.Message is { Length: > 0 } message)
+		{
+			<span class="mt-fleet-dim">@message</span>
+		}
+		else
+		{
+			<span class="mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--uptime mt-fleet-mono" role="gridcell">@(DisplayFormat.Span(Summary?.Uptime) is { Length: > 0 } up ? up : Unknown)</span>
+	<span class="@LoadClass" role="gridcell" title="@LoadText">@(Summary?.Load1 is { } load ? load.ToString("0.00", CultureInfo.InvariantCulture) : Unknown)</span>
+	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory" role="gridcell" title="@MemoryText">
+		@if (Summary?.MemoryPercent is { } memory)
+		{
+			<span class="mt-fleet-mono">@Percent(memory)</span>
+			<UsageBar Percent="memory" Label="Memory used" Class="mt-fleet-bar" />
+		}
+		else
+		{
+			<span class="mt-fleet-mono mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk" role="gridcell" title="@DiskText">
+		@if (Summary?.FullestDisk is { } disk)
+		{
+			<span class="mt-fleet-mono">@Percent(disk.UsedPercent)</span>
+			<UsageBar Percent="disk.UsedPercent" Label="@($"Disk {disk.MountPoint} used")" Class="mt-fleet-bar" />
+		}
+		else
+		{
+			<span class="mt-fleet-mono mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates mt-fleet-mono" role="gridcell" title="@UpdatesText">
+		@if (Summary?.PendingUpdates is { } updates)
+		{
+			<span class="@(updates > 0 ? null : "mt-fleet-dim")">@Count(updates)</span>
+			@if (Summary.SecurityUpdates is > 0 and var security)
+			{
+				<span class="mt-fleet-alert mt-fleet-micro">@($"{Count(security)} SEC")</span>
+			}
+		}
+		else
+		{
+			<span class="mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--reboot" role="gridcell">
+		@switch (Summary?.RebootRequired)
+		{
+			case true:
+				<span class="mt-fleet-alert mt-fleet-micro">REBOOT</span>
+				break;
+			case false:
+				<span class="mt-fleet-dim">no</span>
+				break;
+			default:
+				<span class="mt-fleet-dim">@Unknown</span>
+				break;
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed mt-fleet-mono" role="gridcell" title="@FailedText">
+		@if (Summary?.FailedServices is { } failed)
+		{
+			<span class="@(failed > 0 ? "mt-fleet-alert" : "mt-fleet-dim")">@Count(failed)</span>
+		}
+		else
+		{
+			<span class="mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker mt-fleet-mono" role="gridcell" title="@ContainersText">
+		@if (Summary is { ContainersRunning: { } running, ContainersTotal: { } total })
+		{
+			<span class="@(total == 0 ? "mt-fleet-dim" : null)">@($"{Count(running)}/{Count(total)}")</span>
+		}
+		else
+		{
+			<span class="mt-fleet-dim">@Unknown</span>
+		}
+	</span>
+	<span class="mt-fleet-cell mt-fleet-cell--actions" role="gridcell" @onclick:stopPropagation>
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokatermIcons.Reconnect"
+					Disabled="@Row.IsPending"
+					tabindex="-1"
+					title="Read again (R)"
+					aria-label="Read again"
+					OnClick="OnRefresh" />
+		<MokaButton Variant="MokaVariant.Text"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="MokatermIcons.Connect"
+					tabindex="-1"
+					title="Open in a tab (O)"
+					aria-label="Open in a tab"
+					OnClick="OnOpen" />
+	</span>
+
+	@if (Expanded)
+	{
+		<div class="mt-fleet-details" role="gridcell" aria-colspan="13" @onclick:stopPropagation @onkeydown:stopPropagation>
+			@if (Row.Result?.Message is { Length: > 0 } message)
+			{
+				<span class="mt-fleet-details__message">@message</span>
+			}
+
+			@if (Summary is { } summary)
+			{
+				<dl class="mt-fleet-facts">
+					<dt>Read</dt>
+					<dd class="mt-fleet-mono">@ReadText</dd>
+					@if (summary.HostName is { } hostName)
+					{
+						<dt>Calls itself</dt>
+						<dd class="mt-fleet-mono">@hostName</dd>
+					}
+					@if (summary.Kernel is { } kernel)
+					{
+						<dt>Kernel</dt>
+						<dd class="mt-fleet-mono">@kernel</dd>
+					}
+					@if (LoadText is { } loadText)
+					{
+						<dt>Load</dt>
+						<dd class="mt-fleet-mono">@loadText</dd>
+					}
+					@if (MemoryText is { } memoryText)
+					{
+						<dt>Memory</dt>
+						<dd class="mt-fleet-mono">@memoryText</dd>
+					}
+					@if (DiskText is { } diskText)
+					{
+						<dt>Fullest disk</dt>
+						<dd class="mt-fleet-mono">@diskText</dd>
+					}
+					@if (UpdatesText is { } updatesText)
+					{
+						<dt>Updates</dt>
+						<dd>@updatesText</dd>
+					}
+					@if (summary.FailedServiceNames.Count > 0)
+					{
+						<dt>Failed</dt>
+						<dd class="mt-fleet-mono">@string.Join(", ", summary.FailedServiceNames)</dd>
+					}
+					@if (ContainersText is { } containersText)
+					{
+						<dt>Containers</dt>
+						<dd>@containersText</dd>
+					}
+				</dl>
+
+				@foreach (string note in summary.Notes)
+				{
+					<span class="mt-fleet-details__note">@note</span>
+				}
+			}
+			else if (Row.Result is null)
+			{
+				<span class="mt-fleet-details__message">Not read yet.</span>
+			}
+
+			<div class="mt-fleet-details__actions">
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect" Disabled="@Row.IsPending" OnClick="OnRefresh">Read again</MokaButton>
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Connect" OnClick="OnOpen">Open in a tab</MokaButton>
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokatermIcons.Command" OnClick="OnRunCommand">Run a command</MokaButton>
+			</div>
+		</div>
+	}
+</div>

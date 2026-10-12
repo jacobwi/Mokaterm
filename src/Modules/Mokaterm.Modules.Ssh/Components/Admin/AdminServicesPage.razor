@@ -1,5 +1,7 @@
 @using Moka.Red.ContextMenu
+@using Mokaterm.Abstractions.FileSystem
 @using Mokaterm.Modules.Ssh.Admin.Services
+@using Mokaterm.UI.Common.Editing
 @inherits AdminPageBase
 
 <AdminPageFrame Title="Services"
@@ -92,6 +94,13 @@
 	private string? _status;
 	private string? _statusError;
 	private bool _statusLoading;
+	private bool _showUnitFile;
+	private bool _editingOverride;
+	private string? _overrideSaved;
+	private string? _overrideProblem;
+
+	[Inject]
+	private IRemoteTextEditor Editor { get; set; } = default!;
 
 	protected override bool ReadsMoreAsRoot => true;
 
@@ -161,6 +170,16 @@
 						@action
 					</MokaButton>
 				}
+				@if (Capabilities.Services?.HasUnitFiles == true)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Xs"
+								Disabled="@(Busy || _editingOverride || Context.RootChangeBlocked is not null)"
+								title="@(Context.RootChangeBlocked ?? $"Edit {ServiceCommands.OverridePath(unit.Name)} as root")"
+								OnClick="@(() => EditOverrideAsync(unit))">
+						Edit override
+					</MokaButton>
+				}
 			</Actions>
 			<ChildContent>
 				<dl class="mta-kv">
@@ -169,11 +188,26 @@
 					<dt>At boot</dt>
 					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@BootText(unit)</MokaText></dd>
 				</dl>
+				@if (_overrideSaved == unit.Name)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Success" Dense Closable OnClose="@(() => _overrideSaved = null)">
+						The override is saved and systemd has read it. A restart puts it to use.
+						<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" Disabled="@(Busy || Context.RootChangeBlocked is not null)" OnClick="@(() => RestartAfterOverrideAsync(unit))">Restart now</MokaButton>
+					</MokaAlert>
+				}
+				@if (_overrideProblem is { } overrideProblem)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _overrideProblem = null)">@overrideProblem</MokaAlert>
+				}
 				<div class="mta-inline">
 					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">
-						@(Capabilities.Services?.StatusIncludesLog == true ? "Status and recent log" : "Status")
+						@(_showUnitFile ? "Unit file and overrides" : Capabilities.Services?.StatusIncludesLog == true ? "Status and recent log" : "Status")
 					</MokaText>
 					<span class="mta-spacer"></span>
+					@if (Capabilities.Services?.HasUnitFiles == true)
+					{
+						<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => ToggleUnitFileAsync(unit.Name))">@(_showUnitFile ? "status" : "unit file")</button>
+					}
 					<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => LoadStatusAsync(unit.Name))">read again</button>
 				</div>
 				@if (_statusError is { } statusError)
@@ -295,6 +329,9 @@
 		}
 
 		_selected = unit.Name;
+		_showUnitFile = false;
+		_overrideSaved = null;
+		_overrideProblem = null;
 		await LoadStatusAsync(unit.Name);
 	}
 
@@ -303,6 +340,9 @@
 		_selected = null;
 		_status = null;
 		_statusError = null;
+		_showUnitFile = false;
+		_overrideSaved = null;
+		_overrideProblem = null;
 	}
 
 	private async Task OnRowKeyAsync(KeyboardEventArgs args, ServiceUnit unit)
@@ -326,10 +366,10 @@
 		StateHasChanged();
 		try
 		{
-			AdminOutcome outcome = await ReadAsync(services.Status(name, ReadAsRoot), CancellationToken.None);
+			AdminOutcome outcome = await ReadAsync(_showUnitFile && services.HasUnitFiles ? services.Cat(name) : services.Status(name, ReadAsRoot), CancellationToken.None);
 			if (_selected == name)
 			{
-				string status = AdminText.Clean(outcome.Output).TrimEnd();
+				string status = TerminalTextFilter.Plain(outcome.Output).TrimEnd();
 				_status = status.Length > 0 ? status : outcome.Problem();
 			}
 		}
@@ -341,6 +381,116 @@
 		{
 			_statusLoading = false;
 		}
+	}
+
+	private async Task ToggleUnitFileAsync(string name)
+	{
+		_showUnitFile = !_showUnitFile;
+		await LoadStatusAsync(name);
+	}
+
+	/// <summary>
+	/// Edits the unit's override as root, the way <c>systemctl edit</c> keeps it, making its folder and the file when
+	/// they are missing. A save is followed by daemon-reload and the offer of a restart; a new file closed unsaved is
+	/// taken away again with the folder this made for it.
+	/// </summary>
+	private async Task EditOverrideAsync(ServiceUnit unit)
+	{
+		if (Capabilities.Services is not { HasUnitFiles: true } services || _editingOverride)
+		{
+			return;
+		}
+
+		_editingOverride = true;
+		_overrideProblem = null;
+		_overrideSaved = null;
+		string folder = ServiceCommands.OverrideFolder(unit.Name);
+		string path = ServiceCommands.OverridePath(unit.Name);
+		try
+		{
+			(IRemoteFileSystem? root, string? problem) = await AdminFileEditing.OpenRootAsync(Feature, CancellationToken.None);
+			if (root is null)
+			{
+				_overrideProblem = problem;
+				return;
+			}
+
+			bool madeFolder = false;
+			bool exists;
+			try
+			{
+				if (await root.StatAsync(folder) is null)
+				{
+					await root.CreateDirectoryAsync(folder);
+					madeFolder = true;
+				}
+
+				exists = await root.StatAsync(path) is not null;
+			}
+			catch (RemoteFileSystemException ex)
+			{
+				_overrideProblem = ex.Message;
+				return;
+			}
+
+			RemoteTextEditResult result = await Editor.EditAsync(new RemoteTextEditRequest
+			{
+				FileSystem = root,
+				Path = path,
+				DisplayName = $"{unit.Name} override",
+				CreateNew = !exists,
+			});
+
+			switch (result.Outcome)
+			{
+				case RemoteTextEditOutcome.Saved:
+					_selected = unit.Name;
+					if (await RunAsync(services.DaemonReload(unit.Name)) is { Succeeded: true })
+					{
+						_overrideSaved = unit.Name;
+					}
+
+					break;
+				case RemoteTextEditOutcome.Failed:
+					_overrideProblem = result.Message;
+					await TakeBackAsync(root, exists ? null : path, madeFolder ? folder : null);
+					break;
+				default:
+					await TakeBackAsync(root, exists ? null : path, madeFolder ? folder : null);
+					break;
+			}
+		}
+		finally
+		{
+			_editingOverride = false;
+		}
+	}
+
+	/// <summary>Removes the empty file and the folder an override edit made and did not save into.</summary>
+	private static async Task TakeBackAsync(IRemoteFileSystem root, string? file, string? folder)
+	{
+		try
+		{
+			if (file is not null && await root.StatAsync(file) is { Size: 0 })
+			{
+				await root.DeleteAsync(file, recursive: false);
+			}
+
+			if (folder is not null && (await root.ListAsync(folder)).Count == 0)
+			{
+				await root.DeleteAsync(folder, recursive: false);
+			}
+		}
+		catch (RemoteFileSystemException)
+		{
+			// An empty override or an empty folder changes nothing, so one left behind is no harm.
+		}
+	}
+
+	private async Task RestartAfterOverrideAsync(ServiceUnit unit)
+	{
+		_overrideSaved = null;
+		await ActAsync(ServiceAction.Restart, unit);
 	}
 
 	private async Task ActAsync(ServiceAction action, ServiceUnit unit)

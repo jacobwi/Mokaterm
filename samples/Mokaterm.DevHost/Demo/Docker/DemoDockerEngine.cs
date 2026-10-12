@@ -21,14 +21,20 @@ internal sealed partial class DemoDockerEngine
 
 	private readonly Lock _lock = new();
 	private readonly TimeProvider _time;
+	private readonly Func<string, string?> _readFile;
+	private readonly Func<string, byte[]?> _readBytes;
 	private readonly List<DemoDockerContainer> _containers = [];
 	private readonly List<(string Repository, string Tag, string Id, long Size, DateTimeOffset Created)> _images = [];
 	private readonly List<string> _volumes = [];
 	private readonly List<(string Name, string Id, string Driver)> _networks = [];
 
-	public DemoDockerEngine(TimeProvider time)
+	/// <param name="readFile">The text of a file on the demo host, or null when there is none.</param>
+	/// <param name="readBytes">The bytes of a file on the demo host, for one piped into a container; null when the demo has no host files.</param>
+	public DemoDockerEngine(TimeProvider time, Func<string, string?> readFile, Func<string, byte[]?>? readBytes = null)
 	{
 		_time = time;
+		_readFile = readFile;
+		_readBytes = readBytes ?? (_ => null);
 		DateTimeOffset now = time.GetUtcNow();
 		SeedImages(now);
 		_volumes.AddRange(["shop_pgdata", "monitoring_grafana", "old-cache", HexId("anon-1"), HexId("anon-2")]);
@@ -66,6 +72,7 @@ internal sealed partial class DemoDockerEngine
 			Networks = ["bridge"],
 			Environment = ["S3_BUCKET=acme-backups", "S3_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCY"],
 		});
+		SeedOperations(now);
 	}
 
 	/// <summary>Runs one docker command line and answers the way docker would.</summary>
@@ -74,6 +81,7 @@ internal sealed partial class DemoDockerEngine
 		ArgumentNullException.ThrowIfNull(words);
 		lock (_lock)
 		{
+			Advance();
 			return words switch
 			{
 				["sh", "-c", var script, "sh", .. var arguments] => Script(script, arguments),

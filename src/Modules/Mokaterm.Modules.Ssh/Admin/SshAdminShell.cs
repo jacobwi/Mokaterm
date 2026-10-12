@@ -16,12 +16,8 @@ namespace Mokaterm.Modules.Ssh.Admin;
 /// </summary>
 internal sealed class SshAdminShell : IAdminShell
 {
-	// The terminal holds one channel and OpenSSH allows ten; tunnels and the file browser's sudo need some of the rest.
-	private const int MaxConcurrentCommands = 3;
-
 	private readonly ISshSessionHost _host;
 	private readonly ILogger _logger;
-	private readonly SemaphoreSlim _slots = new(MaxConcurrentCommands, MaxConcurrentCommands);
 	private readonly SemaphoreSlim _rootGate = new(1, 1);
 	private readonly Lock _lock = new();
 	private RootLease? _root;
@@ -49,6 +45,8 @@ internal sealed class SshAdminShell : IAdminShell
 	}
 
 	public string Account => _host.Context.Account;
+
+	public Mokaterm.Abstractions.Connections.AuthenticationMethod? LoginMethod => _host.Context.Credentials.Method;
 
 	public bool SupportsInput => true;
 
@@ -117,7 +115,6 @@ internal sealed class SshAdminShell : IAdminShell
 
 		using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 		deadline.CancelAfter(script.Timeout);
-		await _slots.WaitAsync(deadline.Token);
 		try
 		{
 			return elevated
@@ -137,10 +134,6 @@ internal sealed class SshAdminShell : IAdminShell
 			// The session's client getter reports a dropped connection this way.
 			throw new AdminException(ex.Message, ex);
 		}
-		finally
-		{
-			_slots.Release();
-		}
 	}
 
 	public ValueTask DisposeAsync()
@@ -159,12 +152,13 @@ internal sealed class SshAdminShell : IAdminShell
 		SshClient client = await _host.GetSshClientAsync(cancellationToken);
 		string command = PosixShell.ScriptCommand(AdminScriptText.Compose(script), []);
 		using SecretBuffer? stdin = input is null ? null : AdminScriptText.FrameInput(input);
+		RemoteCommandRequest request = AdminScriptText.Request(script, command);
 		RemoteCommandOutcome outcome = await CommandExecution.RunAsync(
-			token => StartAsync(client, command, stdin, token),
-			AdminScriptText.Request(script, command),
+			token => StartAsync(client, command, stdin, request.RunsLong, token),
+			request,
 			_host.Connector.Time,
 			cancellationToken);
-		return AdminScriptText.ToOutcome(outcome, AdminScriptText.ErrorText(outcome));
+		return AdminScriptText.ToOutcome(outcome, outcome.Error.ToText());
 	}
 
 	private async Task<AdminOutcome> RunAsRootAsync(AdminScript script, AdminInput? input, CancellationToken cancellationToken)
@@ -182,7 +176,7 @@ internal sealed class SshAdminShell : IAdminShell
 				_host.Connector.Time,
 				cancellationToken);
 
-			string error = AdminScriptText.ErrorText(outcome);
+			string error = outcome.Error.ToText();
 			(bool ran, string sudoOutput, string scriptError) = SudoErrors.Split(error);
 			if (!ran)
 			{
@@ -210,9 +204,9 @@ internal sealed class SshAdminShell : IAdminShell
 		}
 	}
 
-	private static async Task<IExecChannel> StartAsync(SshClient client, string command, SecretBuffer? stdin, CancellationToken cancellationToken)
+	private static async Task<IExecChannel> StartAsync(SshClient client, string command, SecretBuffer? stdin, bool runsLong, CancellationToken cancellationToken)
 	{
-		RemoteCommand started = await RemoteCommand.StartAsync(client, command, stdin, cancellationToken);
+		RemoteCommand started = await RemoteCommand.StartAsync(client, command, stdin, runsLong, cancellationToken);
 		if (stdin is null)
 		{
 			started.CloseInput();

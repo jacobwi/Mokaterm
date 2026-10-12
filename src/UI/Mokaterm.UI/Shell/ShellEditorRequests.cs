@@ -78,3 +78,9 @@ public sealed record CommandRunEditorRequest : ShellEditorRequest
 		return true;
 	}
 }
+
+/// <summary>
+/// Opens the fleet overview: every saved login that can report on its machine, with what the window last read from
+/// each. The results live with the window, not with the dialog, so closing it keeps them for the next opening.
+/// </summary>
+public sealed record FleetEditorRequest : ShellEditorRequest;

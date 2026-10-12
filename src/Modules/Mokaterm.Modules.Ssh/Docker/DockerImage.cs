@@ -23,8 +23,17 @@ internal sealed record DockerImage
 
 	public DateTimeOffset? CreatedAt { get; init; }
 
+	/// <summary>How many containers, running or not, were made from it; only <c>system df --verbose</c> counts them.</summary>
+	public int? ContainerCount { get; init; }
+
+	/// <summary>What removing it frees: the layers no other image shares. Only <c>system df --verbose</c> prints it.</summary>
+	public string UniqueSize { get; init; } = "";
+
 	/// <summary>An image no tag points at any more: what <c>docker image prune</c> removes.</summary>
 	public bool IsDangling => Repository is "" or None && Tag is "" or None;
+
+	/// <summary>True when a tag points at it, so a registry can be asked about it.</summary>
+	public bool IsTagged => Repository is not ("" or None) && Tag is not ("" or None);
 
 	/// <summary><c>nginx:1.27</c>, <c>nginx@sha256:...</c> for an image kept by digest, or the short id for a dangling one.</summary>
 	public string Reference
@@ -56,6 +65,9 @@ internal sealed record DockerImage
 	}
 
 	public long? SizeBytes => DockerSizes.Parse(Size);
+
+	/// <summary>The unique size where docker printed one, else the whole size.</summary>
+	public long? FreedBytes => DockerSizes.Parse(UniqueSize) ?? SizeBytes;
 
 	/// <summary>
 	/// What <c>docker image rm</c> is given: the tag, so removing one tag of an image with several leaves the rest, or the
@@ -92,6 +104,8 @@ internal sealed record DockerImage
 				Size = DockerJson.Text(item, "Size"),
 				CreatedSince = DockerJson.Text(item, "CreatedSince"),
 				CreatedAt = DockerJson.ParseListingTime(DockerJson.Text(item, "CreatedAt")),
+				ContainerCount = DockerJson.Int(item, "Containers"),
+				UniqueSize = DockerJson.Text(item, "UniqueSize"),
 			});
 		}
 

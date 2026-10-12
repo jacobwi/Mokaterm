@@ -1,0 +1,313 @@
+@using Mokaterm.Abstractions.Credentials
+@using Mokaterm.Abstractions.Security
+@using Mokaterm.Modules.Ssh.Admin.Accounts
+@using Mokaterm.UI.Common.Formatting
+@implements IDisposable
+
+@* A user's ~/.ssh/authorized_keys inside the users page's detail panel: the keys with their fingerprints, a key
+   from the keychain to add (the ones the file already holds marked), and Remove on each key. *@
+<div class="mta-inline">
+	<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">SSH keys</MokaText>
+	<span class="mta-spacer"></span>
+	@if (CanRead)
+	{
+		<button type="button" class="mta-link" disabled="@_loading" @onclick="LoadAsync">read again</button>
+	}
+</div>
+
+@if (!CanRead)
+{
+	<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+		@(Context.RootChangeBlocked is { } blocked ? $"Only root may read {UserName}'s keys. {blocked}" : $"Only root may read {UserName}'s keys.")
+	</MokaText>
+	@if (Context.RootChangeBlocked is null)
+	{
+		<div>
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Lock" OnClick="Context.EnableRoot">Turn on root mode</MokaButton>
+		</div>
+	}
+}
+else if (_error is { } error)
+{
+	<MokaAlert Severity="MokaToastSeverity.Error" Dense>@error</MokaAlert>
+}
+else if (_file is null)
+{
+	<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+}
+else
+{
+	AuthorizedKeysFile file = _file;
+	@if (StateText(file) is { } state)
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@state</MokaText>
+	}
+	@if (file.IsLink)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>~/.ssh or the file in it is a symbolic link, so keys are shown and not changed here.</MokaAlert>
+	}
+	@if (file.ModeProblem is { } modes)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@modes</MokaAlert>
+	}
+	@foreach (AuthorizedKey key in file.Keys)
+	{
+		<div class="mta-inline" @key="key.LineNumber">
+			<div class="mta-grow">
+				<MokaText Element="div" Size="MokaSize.Sm" Truncate title="@AuthorizedKeyCommands.DisplayName(key)">
+					@(key.Comment.Length > 0 ? key.Comment : key.Algorithm)
+					@if (key.Fingerprint == _login?.KeyFingerprint && UserName == Context.LoginName)
+					{
+						<span class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
+					}
+				</MokaText>
+				<MokaText Element="div" Size="MokaSize.Xs" Mono Truncate Class="mta-dim" title="@key.Fingerprint">@($"{key.Algorithm} {key.Fingerprint}")</MokaText>
+				@if (key.Options.Length > 0)
+				{
+					<MokaText Element="div" Size="MokaSize.Xs" Mono Truncate Class="mta-dim" title="@key.Options">@key.Options</MokaText>
+				}
+			</div>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Error"
+						Size="MokaSize.Xs"
+						Disabled="@(!CanChange(file))"
+						title="@ChangeBlocked(file)"
+						OnClick="@(() => RemoveAsync(key))"
+						aria-label="@($"Remove {AuthorizedKeyCommands.DisplayName(key)}")">
+				Remove
+			</MokaButton>
+		</div>
+	}
+
+	@if (file.State != AuthorizedKeysState.NoHome && !file.IsLink)
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Add a key from the keychain</MokaText>
+		@if (_vaultProblem is { } vaultProblem)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@vaultProblem</MokaText>
+		}
+		else if (_keychain is { Count: 0 })
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The keychain holds no private keys. Add or generate one in Settings, Keychain.</MokaText>
+		}
+		else if (_keychain is { } keychain)
+		{
+			<div class="mta-inline">
+				<div class="mta-grow">
+					<MokaSelect TValue="CredentialInfo"
+								Items="keychain"
+								Value="_picked"
+								ValueChanged="@(value => _picked = value)"
+								ValueSelector="@(credential => KeyLabel(credential, file))"
+								IsOptionDisabled="@(credential => file.Find(credential.KeyFingerprint) is not null)"
+								Searchable
+								Placeholder="Pick a key"
+								Size="MokaSize.Sm"
+								aria-label="Key from the keychain" />
+				</div>
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Xs"
+							Disabled="@(_picked is null || !CanChange(file) || file.Find(_picked.KeyFingerprint) is not null)"
+							title="@ChangeBlocked(file)"
+							OnClick="AddAsync">
+					Add
+				</MokaButton>
+			</div>
+		}
+		@if (_addProblem is { } addProblem)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _addProblem = null)">@addProblem</MokaAlert>
+		}
+	}
+}
+
+@code {
+	private readonly CancellationTokenSource _lifetime = new();
+	private AuthorizedKeysFile? _file;
+	private IReadOnlyList<CredentialInfo>? _keychain;
+	private CredentialInfo? _picked;
+	private SessionLogin? _login;
+	private string? _error;
+	private string? _vaultProblem;
+	private string? _addProblem;
+	private bool _loading;
+	private string? _loadedFor;
+
+	[CascadingParameter]
+	private AdminPageContext Context { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string UserName { get; set; } = "";
+
+	[Inject]
+	private ICredentialStore Store { get; set; } = default!;
+
+	[Inject]
+	private ISshKeyGenerator Keys { get; set; } = default!;
+
+	/// <summary>The login's own file reads as the login; anyone else's needs root, now or after root mode is turned on.</summary>
+	private bool CanRead => IsOwn || Context.Feature.CanActAsRoot;
+
+	private bool IsOwn => UserName == Context.LoginName;
+
+	public void Dispose()
+	{
+		_lifetime.Cancel();
+		_lifetime.Dispose();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		string key = UserName + "|" + CanRead;
+		if (key == _loadedFor)
+		{
+			return;
+		}
+
+		_loadedFor = key;
+		_picked = null;
+		_addProblem = null;
+		await LoadAsync();
+	}
+
+	private async Task LoadAsync()
+	{
+		_file = null;
+		_error = null;
+		if (!CanRead)
+		{
+			return;
+		}
+
+		_loading = true;
+		string user = UserName;
+		try
+		{
+			_login ??= await Context.Login();
+			AdminOutcome outcome = await Context.Feature.ReadAsync(AuthorizedKeyCommands.Read(user, asRoot: !IsOwn), _lifetime.Token);
+			if (user == UserName)
+			{
+				_file = AuthorizedKeyCommands.Parse(outcome.Output, user);
+			}
+		}
+		catch (AdminException ex)
+		{
+			_error = ex.Message;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+		finally
+		{
+			_loading = false;
+		}
+
+		await LoadKeychainAsync();
+	}
+
+	private async Task LoadKeychainAsync()
+	{
+		_vaultProblem = null;
+		try
+		{
+			IReadOnlyList<CredentialInfo> credentials = await Store.ListAsync(_lifetime.Token);
+			_keychain = [.. credentials
+				.Where(credential => credential.Kind == CredentialKind.PrivateKey)
+				.OrderByDescending(credential => credential.IsShared)
+				.ThenBy(credential => credential.Name, StringComparer.CurrentCultureIgnoreCase)];
+		}
+		catch (VaultLockedException)
+		{
+			_keychain = null;
+			_vaultProblem = VaultFailure.Locked("list the keychain's keys");
+		}
+		catch (OperationCanceledException)
+		{
+		}
+	}
+
+	private bool CanChange(AuthorizedKeysFile file) =>
+		!file.IsLink && !Context.IsBusy() && (IsOwn || Context.RootChangeBlocked is null);
+
+	private string? ChangeBlocked(AuthorizedKeysFile file) =>
+		file.IsLink ? "The file or its folder is a symbolic link." : IsOwn ? null : Context.RootChangeBlocked;
+
+	private static string? StateText(AuthorizedKeysFile file) => file.State switch
+	{
+		AuthorizedKeysState.NoHome => "This account has no home folder, so it has nowhere to keep keys.",
+		AuthorizedKeysState.NoFolder => "There is no ~/.ssh yet. Adding a key creates it (700) and the file (600).",
+		AuthorizedKeysState.NoFile => "There is no authorized_keys file yet. Adding a key creates it (600).",
+		AuthorizedKeysState.Unreadable => "The file could not be read.",
+		_ when file.Keys.Count == 0 => "The file holds no keys.",
+		_ when file.IsCut => $"Only the first {AuthorizedKeyCommands.MaxReadBytes / 1024} KB were read; keys after that are not listed.",
+		_ => null,
+	};
+
+	private static string KeyLabel(CredentialInfo credential, AuthorizedKeysFile file)
+	{
+		string label = credential.KeyAlgorithm is { Length: > 0 } algorithm ? $"{credential.Name} · {algorithm}" : credential.Name;
+		return file.Find(credential.KeyFingerprint) is not null ? label + " · installed" : label;
+	}
+
+	private async Task AddAsync()
+	{
+		if (_picked is not { } credential || _file is not { } file || !CanChange(file))
+		{
+			return;
+		}
+
+		_addProblem = null;
+		SshPublicKey? key;
+		try
+		{
+			(bool hasKey, key) = await CredentialPublicKey.ReadAsync(Store, Keys, credential.Id, _lifetime.Token);
+			if (!hasKey)
+			{
+				_addProblem = "This keychain entry holds no saved key.";
+				return;
+			}
+		}
+		catch (VaultLockedException)
+		{
+			_addProblem = VaultFailure.Locked("add a key");
+			return;
+		}
+		catch (KeyNotFoundException)
+		{
+			_addProblem = "This key is no longer in the keychain.";
+			return;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+
+		if (key is null)
+		{
+			_addProblem = "Only keys in OpenSSH format can be added here.";
+			return;
+		}
+
+		AdminActionResult? result = await Context.Run(AuthorizedKeyCommands.Add(UserName, Context.LoginName, key, credential.Name), null);
+		if (result is not null)
+		{
+			_picked = null;
+			await LoadAsync();
+		}
+	}
+
+	private async Task RemoveAsync(AuthorizedKey key)
+	{
+		if (_file is not { } file || !CanChange(file))
+		{
+			return;
+		}
+
+		_login ??= await Context.Login();
+		if (await Context.Run(AuthorizedKeyCommands.Remove(UserName, _login, key), null) is not null)
+		{
+			await LoadAsync();
+		}
+	}
+}

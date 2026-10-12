@@ -77,4 +77,35 @@ public sealed class PortGreetingTests
 	[InlineData(ConnectFailure.Cancelled, false)]
 	public void MayBeWrongProtocol_OnlyForFailuresThatCanMeanTheWrongPort(ConnectFailure failure, bool expected) =>
 		Assert.Equal(expected, PortGreeting.MayBeWrongProtocol(failure));
+
+	[Theory]
+	[InlineData("SSH-2.0-OpenSSH_9.6\r\n", true)]
+	[InlineData("RFB 003.008\n", false)]
+	[InlineData(null, false)]
+	public async Task AnswersSsh_OnlyForAnSshGreeting(string? greeting, bool expected)
+	{
+		using GreetingServer server = new(greeting);
+
+		Assert.Equal(expected, await PortGreeting.AnswersSshAsync("127.0.0.1", server.Port, Ct));
+	}
+
+	[Fact]
+	public async Task AnswersSsh_IsFalse_WhenNothingListens()
+	{
+		int port;
+		using (GreetingServer closed = new(greeting: null))
+		{
+			port = closed.Port;
+		}
+
+		Assert.False(await PortGreeting.AnswersSshAsync("127.0.0.1", port, Ct));
+	}
+
+	[Fact]
+	public void ReachesTargetDirectly_OnlyWithoutJumpHostsAndProxy()
+	{
+		Assert.True(new SshConnectionOptions().ReachesTargetDirectly);
+		Assert.False(new SshConnectionOptions { JumpConnectionIds = [Guid.NewGuid()] }.ReachesTargetDirectly);
+		Assert.False(new SshConnectionOptions { Proxy = new ProxyOptions { Kind = ProxyKind.Socks5, Host = "proxy", Port = 1080 } }.ReachesTargetDirectly);
+	}
 }

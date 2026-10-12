@@ -3,12 +3,14 @@ using Moka.Red.Core.Theming;
 using Moka.Red.Extensions;
 using Moka.Red.Navigation.Extensions;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Sessions;
 using Mokaterm.UI.Commands;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Connections;
 using Mokaterm.UI.FileBrowser.Extensions;
+using Mokaterm.UI.Fleet;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.QuickConnect;
 using Mokaterm.UI.Settings.Extensions;
@@ -56,6 +58,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<SessionRestore>();
 		services.AddScoped<InputBroadcast>();
 		services.AddScoped<SessionActions>();
+		services.AddScoped<ISessionTabs, SessionTabs>();
 
 		services.AddScoped<SessionToolActions>();
 
@@ -64,6 +67,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<ConnectionActions>();
 		services.AddScoped<QuickConnectHistory>();
 		services.AddScoped<CommandSnippetActions>();
+		services.AddScoped<FleetOverview>();
 		services.AddScoped<VaultScreenState>();
 		services.AddScoped<DamagedDocumentNotices>();
 

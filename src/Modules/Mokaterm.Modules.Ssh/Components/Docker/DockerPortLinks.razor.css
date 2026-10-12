@@ -1,0 +1,38 @@
+/* A menu row is the port as docker writes it and how it opens; a port that cannot be opened says why underneath, in
+   prose that wraps rather than widening the menu. */
+.mt-port-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	max-width: 320px;
+}
+
+.mt-port-line {
+	display: flex;
+	align-items: baseline;
+	gap: var(--moka-spacing-sm);
+}
+
+.mt-port-name {
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
+
+.mt-port-scheme {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	color: var(--moka-color-on-surface-variant);
+}
+
+/* The item is disabled, which Moka dims to 40%; the full text colour keeps the reason readable through that. */
+.mt-port-reason {
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	color: var(--moka-color-on-surface);
+}

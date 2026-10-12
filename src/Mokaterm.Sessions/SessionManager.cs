@@ -202,15 +202,6 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 		string.IsNullOrWhiteSpace(exception.Message) ? "The connection failed." : exception.Message;
 
 	/// <summary>Keeps a notice on one dim line: remote text in an exception message must not move the cursor or restyle output.</summary>
-	private static string Printable(string text) =>
-		string.Create(text.Length, text, static (span, source) =>
-		{
-			for (int i = 0; i < source.Length; i++)
-			{
-				span[i] = char.IsControl(source[i]) ? ' ' : source[i];
-			}
-		});
-
 	private SessionHandle Open(HostProfile host, ConnectionProfile connection, SessionOpenOptions? options, bool isTransient)
 	{
 		ObjectDisposedException.ThrowIf(_disposed, this);
@@ -511,7 +502,7 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 
 		try
 		{
-			await terminal.WriteLocalAsync($"\r\n[2m[mokaterm] {Printable(notice)}[0m\r\n", handle.Lifetime);
+			await terminal.WriteLocalAsync(TerminalNotice.Format(notice), handle.Lifetime);
 		}
 		catch (OperationCanceledException)
 		{

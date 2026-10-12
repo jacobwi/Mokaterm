@@ -38,6 +38,10 @@ internal static class DockerIcons
 	/// <summary>Bars of three heights, for stats.</summary>
 	public static readonly MokaIconDefinition Stats = new("mt-docker-stats", "M4 20V12 M10 20V5 M16 20v-9 M22 20H2");
 
+	/// <summary>An arrow rising out of a circle, for image updates.</summary>
+	public static readonly MokaIconDefinition Update = new("mt-docker-update",
+		"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 16.5V8 M8.5 11.5L12 8l3.5 3.5");
+
 	/// <summary>A broom, for prune.</summary>
 	public static readonly MokaIconDefinition Prune = new("mt-docker-prune",
 		"M14 3l7 7 M17.5 6.5L11 13 M11 13l-2.5-2.5L3 16l5 5 5.5-5.5z M6 18.5l2-2");

@@ -1,12 +1,28 @@
 @namespace Mokaterm.Modules.Ssh.Components.Admin
 @inherits SessionViewBase
+@using Mokaterm.Modules.Ssh.Admin.Reboot
 
 <div class="mt-admin">
 	@if (_feature is null)
 	{
-		<MokaEmptyState Icon="MokatermIcons.Disconnect"
-						Title="The session is not connected"
-						Description="The system view reads the server over the session's SSH connection." />
+		@if (Reboots.Find(Session.Id) is { IsRunning: true } watch)
+		{
+			<div class="mta-center" role="status">
+				<MokaSpinner Label="@RebootTitle(watch)" />
+				<MokaText Element="span" Size="MokaSize.Sm" Class="mta-dim">@RebootText(watch)</MokaText>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="StopRebootWatch">Stop waiting</MokaButton>
+			</div>
+		}
+		else
+		{
+			@if (Reboots.Find(Session.Id) is { State: RebootWatchState.GaveUp, Problem: { } problem })
+			{
+				<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@problem</MokaAlert>
+			}
+			<MokaEmptyState Icon="MokatermIcons.Disconnect"
+							Title="The session is not connected"
+							Description="The system view reads the server over the session's SSH connection." />
+		}
 	}
 	else if (_profile is null)
 	{
@@ -138,6 +154,9 @@
 							break;
 						case AdminPage.Firewall:
 							<AdminFirewallPage @key="profile" />
+							break;
+						case AdminPage.Security:
+							<AdminSecurityPage @key="profile" />
 							break;
 					}
 				</CascadingValue>

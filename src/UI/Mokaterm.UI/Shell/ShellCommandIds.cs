@@ -87,6 +87,8 @@ internal static class ShellCommandIds
 
 	public const string RunCommand = "mokaterm.commands.run";
 
+	public const string FleetOverview = "mokaterm.fleet";
+
 	public const string ToggleFileBrowser = "mokaterm.session.toggle-files";
 
 	public const string FindInTerminal = "mokaterm.session.find";

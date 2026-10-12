@@ -34,6 +34,12 @@ internal sealed class ShellInterop : IAsyncDisposable
 	public ValueTask<bool> AttachListKeysAsync(ElementReference element) => _module.TryInvokeVoidAsync("attachListKeys", element);
 
 	/// <summary>
+	/// For a list whose rows are tab stops marked <c>data-mt-row</c>: Space stays the row's own and the arrows, Home and
+	/// End move the focus from row to row.
+	/// </summary>
+	public ValueTask<bool> AttachRowKeysAsync(ElementReference element) => _module.TryInvokeVoidAsync("attachRowKeys", element);
+
+	/// <summary>
 	/// Keeps the arrows, and Tab or Shift+Delete when the field's <c>data-mt-keys</c> names them, from moving the caret
 	/// or the focus out of the combobox field inside <paramref name="root"/>.
 	/// </summary>

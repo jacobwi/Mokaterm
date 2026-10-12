@@ -1,6 +1,7 @@
 using System.Globalization;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
+using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -33,19 +34,20 @@ internal static class DockerShellRun
 		}
 	}
 
-	public static string OutputText(RemoteCommandOutcome outcome)
+	/// <summary>The request a call runs under: its output cap, and long when its time limit is (a pull, a build).</summary>
+	public static RemoteCommandRequest Request(DockerCall call, string commandLine)
 	{
-		ArgumentNullException.ThrowIfNull(outcome);
-		return DockerText.Decode(outcome.Output.Bytes.Span, outcome.Output.IsTruncated);
+		ArgumentNullException.ThrowIfNull(call);
+		return new RemoteCommandRequest
+		{
+			Command = commandLine,
+			OutputLimitBytes = call.OutputLimitBytes,
+			RunsLong = ExecChannelBudget.RunsLong(call.Timeout),
+		};
 	}
 
-	public static string ErrorText(RemoteCommandOutcome outcome)
-	{
-		ArgumentNullException.ThrowIfNull(outcome);
-		return DockerText.Decode(outcome.Error.Bytes.Span, outcome.Error.IsTruncated);
-	}
-
-	public static DockerOutput ToOutput(string command, RemoteCommandOutcome outcome, string error, bool elevated)
+	/// <param name="binary">The call's <see cref="DockerCall.BinaryOutput"/>: stdout stays bytes.</param>
+	public static DockerOutput ToOutput(string command, RemoteCommandOutcome outcome, string error, bool elevated, bool binary = false)
 	{
 		ArgumentNullException.ThrowIfNull(outcome);
 		return new DockerOutput
@@ -53,7 +55,8 @@ internal static class DockerShellRun
 			Command = elevated ? "sudo " + command : command,
 			ExitCode = outcome.ExitCode,
 			ExitSignal = outcome.ExitSignal,
-			Output = OutputText(outcome),
+			Output = binary ? "" : outcome.Output.ToText(),
+			RawOutput = binary ? outcome.Output.Bytes : ReadOnlyMemory<byte>.Empty,
 			OutputTruncated = outcome.Output.IsTruncated,
 			Error = error,
 			ErrorTruncated = outcome.Error.IsTruncated,

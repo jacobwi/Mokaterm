@@ -1,0 +1,54 @@
+/* The live figures: a status in the chip row, two lines on one scale for in and out, and the busiest devices below. */
+.mta-live {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	font-size: 10px;
+}
+
+.mta-live-error {
+	overflow: hidden;
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mta-spark-pair {
+	position: relative;
+	display: block;
+	height: 28px;
+}
+
+.mta-spark-pair ::deep .mt-sparkline {
+	position: absolute;
+	inset: 0;
+}
+
+.mta-spark-pair ::deep .mta-spark-out,
+.mta-key--out {
+	--mt-sparkline-color: var(--moka-color-info);
+}
+
+.mta-key {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-right: var(--moka-spacing-sm);
+}
+
+/* A short line in the colour of its sparkline, as a legend. */
+.mta-key::before {
+	width: 10px;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--mt-sparkline-color, var(--moka-color-primary));
+	content: "";
+}
+
+.mta-live-lists {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: var(--moka-spacing-sm);
+	margin-top: var(--moka-spacing-md);
+}

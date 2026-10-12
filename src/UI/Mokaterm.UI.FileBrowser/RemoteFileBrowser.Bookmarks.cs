@@ -20,21 +20,21 @@ public partial class RemoteFileBrowser
 	[Inject]
 	private FolderBookmarkStore Bookmarks { get; set; } = default!;
 
-	/// <summary>A quick connection has no saved login to keep bookmarks under.</summary>
-	private bool CanBookmark => !Session.IsTransient;
+	/// <summary>A quick connection has no saved login to keep bookmarks under, and a module's files have no login at all.</summary>
+	private bool CanBookmark => _source?.BookmarkOwner is not null;
 
 	private bool IsBookmarked => _bookmarks.Contains(_path, StringComparer.Ordinal);
 
 	private async Task LoadBookmarksAsync()
 	{
-		if (_disposed || !CanBookmark)
+		if (_disposed || Source.BookmarkOwner is not { } owner)
 		{
 			return;
 		}
 
 		try
 		{
-			_bookmarks = await Bookmarks.ListAsync(Session.Connection.Id, _lifetime.Token);
+			_bookmarks = await Bookmarks.ListAsync(owner, _lifetime.Token);
 			_bookmarksLoaded = true;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
@@ -103,21 +103,21 @@ public partial class RemoteFileBrowser
 	}
 
 	private Task AddBookmarkAsync(string path) =>
-		ChangeBookmarksAsync(token => Bookmarks.AddAsync(Session.Connection.Id, path, token), "bookmark this folder");
+		ChangeBookmarksAsync((owner, token) => Bookmarks.AddAsync(owner, path, token), "bookmark this folder");
 
 	private Task RemoveBookmarkAsync(string path) =>
-		ChangeBookmarksAsync(token => Bookmarks.RemoveAsync(Session.Connection.Id, path, token), "remove the bookmark");
+		ChangeBookmarksAsync((owner, token) => Bookmarks.RemoveAsync(owner, path, token), "remove the bookmark");
 
-	private async Task ChangeBookmarksAsync(Func<CancellationToken, Task<IReadOnlyList<string>>> change, string action)
+	private async Task ChangeBookmarksAsync(Func<Guid, CancellationToken, Task<IReadOnlyList<string>>> change, string action)
 	{
-		if (_disposed || !CanBookmark)
+		if (_disposed || Source.BookmarkOwner is not { } owner)
 		{
 			return;
 		}
 
 		try
 		{
-			_bookmarks = await change(_lifetime.Token);
+			_bookmarks = await change(owner, _lifetime.Token);
 			_bookmarksLoaded = true;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)

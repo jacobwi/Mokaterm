@@ -111,12 +111,43 @@ public sealed class DockerCommandsTests
 		Assert.ThrowsAny<ArgumentException>(() => DockerCommands.Pull(reference));
 
 	[Fact]
-	public void Images_RemoveAndPrune()
+	public void Images_RemoveOneOrExactlyTheOnesNamed()
 	{
 		Assert.Equal("docker image rm nginx:1.27", DockerCommands.RemoveImage("nginx:1.27", force: false).Display);
 		Assert.Equal("docker image rm --force 4ca2d821beb2", DockerCommands.RemoveImage("4ca2d821beb2", force: true).Display);
-		Assert.Equal("docker image prune --force", DockerCommands.PruneDanglingImages().Display);
-		Assert.Equal("docker system prune --force", DockerCommands.SystemPrune().Display);
+		Assert.Equal("docker image rm busybox:latest 4ca2d821beb2", DockerCommands.RemoveImages(["busybox:latest", "4ca2d821beb2"]).Display);
+		Assert.Throws<ArgumentException>(() => DockerCommands.RemoveImages(["-a"]));
+	}
+
+	[Fact]
+	public void Cleanup_ReadsEverythingWithItsSize_AndRemovesByName()
+	{
+		Assert.Equal("docker system df --verbose --format '{{json .}}'", DockerCommands.SystemUsage().Display);
+		Assert.Equal("docker rm redis seed", DockerCommands.RemoveContainers(["redis", "seed"]).Display);
+		Assert.Equal("docker builder prune --all --force", DockerCommands.PruneBuildCache().Display);
+		Assert.Equal(DockerCall.LongTimeout, DockerCommands.PruneBuildCache().Timeout);
+		Assert.Throws<ArgumentException>(() => DockerCommands.RemoveContainers(["--all"]));
+	}
+
+	[Fact]
+	public void UpdateChecks_ReadLocalDigests_ThenAskTheRegistry()
+	{
+		Assert.Equal("docker image inspect nginx:1.27-alpine redis", DockerCommands.InspectImages(["nginx:1.27-alpine", "redis"]).Display);
+		Assert.Equal("docker buildx version", DockerCommands.BuildxVersion().Display);
+		Assert.Equal("docker buildx imagetools inspect ghcr.io/acme/shop-api:2.4.1", DockerCommands.ImagetoolsInspect("ghcr.io/acme/shop-api:2.4.1").Display);
+		Assert.Equal("docker manifest inspect --verbose nginx:1.27-alpine", DockerCommands.ManifestInspect("nginx:1.27-alpine").Display);
+		Assert.Throws<ArgumentException>(() => DockerCommands.ImagetoolsInspect("--insecure"));
+	}
+
+	[Fact]
+	public void ContainerStates_IsOneScript_WithTheTemplateAsAnArgument()
+	{
+		DockerCall call = DockerCommands.ContainerStates();
+
+		Assert.Equal(DockerProgram.Shell, call.Program);
+		Assert.Equal(DockerCommands.ContainerStatesFormat, call.Arguments[^1]);
+		Assert.StartsWith("sh -c 'ids=$(docker ps --all --quiet --no-trunc)", call.Display, StringComparison.Ordinal);
+		Assert.DoesNotContain("{{", call.Arguments[0], StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -148,13 +179,15 @@ public sealed class DockerCommandsTests
 		Assert.Equal("docker stats --no-stream --no-trunc --format '{{json .}}' web db", DockerCommands.Stats(["web", "db"]).Display);
 	}
 
+	// exec puts docker in the login shell's place, so leaving the container ends the tab's session.
 	[Fact]
-	public void ShellCommandLine_IsTypedWithEnter_AndSudoWhenElevated()
+	public void ShellStartupCommand_ExecsDocker_AndSudoWhenElevated()
 	{
-		Assert.Equal("docker exec -it shop-api-1 bash\r", DockerCommands.ShellCommandLine("shop-api-1", "bash", elevated: false));
-		Assert.Equal("sudo docker exec -it shop-api-1 sh\r", DockerCommands.ShellCommandLine("shop-api-1", "sh", elevated: true));
-		Assert.Throws<ArgumentException>(() => DockerCommands.ShellCommandLine("web", "zsh", elevated: false));
-		Assert.ThrowsAny<ArgumentException>(() => DockerCommands.ShellCommandLine("web\u001b[A", "sh", elevated: false));
+		Assert.Equal("exec docker exec -it shop-api-1 bash", DockerCommands.ShellStartupCommand("shop-api-1", "bash", elevated: false));
+		Assert.Equal("exec sudo docker exec -it shop-api-1 sh", DockerCommands.ShellStartupCommand("shop-api-1", "sh", elevated: true));
+		Assert.Throws<ArgumentException>(() => DockerCommands.ShellStartupCommand("web", "zsh", elevated: false));
+		Assert.ThrowsAny<ArgumentException>(() => DockerCommands.ShellStartupCommand("web\u001b[A", "sh", elevated: false));
+		Assert.ThrowsAny<ArgumentException>(() => DockerCommands.ShellStartupCommand("-rm", "sh", elevated: false));
 	}
 
 	[Fact]
@@ -173,5 +206,44 @@ public sealed class DockerCommandsTests
 
 		Assert.Equal("docker exec web sh -c 'command -v bash'", call.Display);
 		Assert.Equal(TimeSpan.FromSeconds(15), call.Timeout);
+	}
+	[Fact]
+	public void ExecScript_PassesPathsAsWordsAfterTheScript_AndKeepsTheBytes()
+	{
+		DockerCall call = DockerCommands.ExecScript("web-1", "cat -- \"$1\"", ["/srv/it's here.txt"]);
+
+		Assert.Equal(["exec", "web-1", "sh", "-c", "cat -- \"$1\"", "sh", "/srv/it's here.txt"], call.Arguments);
+		Assert.Equal("docker exec web-1 sh -c 'cat -- \"$1\"' sh '/srv/it'\\''s here.txt'", call.Display);
+		Assert.True(call.BinaryOutput);
+	}
+
+	[Fact]
+	public void ExecScript_ThroughSudo_KeepsEveryPathAnArgument()
+	{
+		DockerCall call = DockerCommands.ExecScript("web-1", "cat -- \"$1\"", ["/srv/$(reboot)"]);
+
+		(string script, IReadOnlyList<string> arguments) = DockerCommandLine.ForScript(call);
+
+		Assert.Equal(DockerCommandLine.ElevatedScript, script);
+		Assert.Equal(["docker", "exec", "web-1", "sh", "-c", "cat -- \"$1\"", "sh", "/srv/$(reboot)"], arguments);
+	}
+
+	[Fact]
+	public void ExecScriptWithInput_PipesTheHostFileIntoAnInteractiveExec()
+	{
+		DockerCall call = DockerCommands.ExecScriptWithInput("web-1", "/tmp/.mokaterm-upload-1", "cat > \"$1\"", ["/srv/a"]);
+
+		Assert.Equal(DockerProgram.Shell, call.Program);
+		Assert.Equal(
+			[DockerHostScripts.WithInputScript, "sh", "/tmp/.mokaterm-upload-1", "docker", "exec", "-i", "web-1", "sh", "-c", "cat > \"$1\"", "sh", "/srv/a"],
+			call.Arguments);
+		Assert.True(call.BinaryOutput);
+	}
+
+	[Fact]
+	public void ExecScripts_RefuseWhatIsNotAContainerOrAHostPath()
+	{
+		Assert.Throws<ArgumentException>(() => DockerCommands.ExecScript("-u", "true", []));
+		Assert.Throws<ArgumentException>(() => DockerCommands.ExecScriptWithInput("web-1", "upload.part", "true", []));
 	}
 }

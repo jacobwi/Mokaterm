@@ -28,6 +28,9 @@ internal static class RemoteScripts
 	/// </summary>
 	public const int ExitUnsupported = 105;
 
+	/// <summary>The block <see cref="ReadRange"/> counts its offset in, which is also what its <c>dd</c> reads at a time.</summary>
+	public const int ReadBlockBytes = 64 * 1024;
+
 	private const string ElevatedPreambleText = """
 		printf '%s\n' MOKATERM-ELEVATED >&2
 
@@ -264,6 +267,41 @@ internal static class RemoteScripts
 		exit "$status"
 		""";
 
+	// id -un fails for a uid the passwd file does not name, which a container run with --user often has.
+	private const string IdentityBody = """
+		u=$(id -un 2>/dev/null) || u=$(whoami 2>/dev/null) || u=$(id -u 2>/dev/null) || u=
+		printf '%s\0%s\0' "$u" "$HOME"
+		""";
+
+	// dd skips by seeking on both GNU and BusyBox, and head -c keeps reading until it has its count, which dd's count
+	// would not do on a file that answers each read short (/proc). The pipeline exits with head's status whatever dd
+	// ran into, so a file the account cannot read is refused before either starts.
+	private const string ReadRangeBody = """
+		if [ ! -e "$1" ]; then exit 101; fi
+		if [ -d "$1" ]; then exit 102; fi
+		if [ ! -r "$1" ]; then printf '%s: Permission denied\n' "$1" >&2; exit 1; fi
+		if command -v dd >/dev/null 2>&1; then
+			dd if="$1" bs=65536 skip="$2" 2>/dev/null | head -c "$3"
+		else
+			tail -c "+$(($2 * 65536 + 1))" -- "$1" | head -c "$3"
+		fi
+		""";
+
+	// Written in place, as a replace as root is: the file keeps its inode, owner and mode, which a single file mounted
+	// into a container needs, since a rename over a mount point fails. noclobber keeps a file that appeared after the check.
+	private const string WriteInputBody = """
+		if [ -d "$1" ] && [ ! -L "$1" ]; then exit 102; fi
+		if [ -e "$1" ] || [ -L "$1" ]; then
+			if [ "$2" != 1 ]; then exit 103; fi
+		else
+			set -C
+		fi
+		cat > "$1" || exit 1
+		if [ -n "$3" ]; then chmod -- "$3" "$1" || exit 1; fi
+		if [ -n "$4" ]; then TZ=UTC0 touch -t "$4" -- "$1" 2>/dev/null; fi
+		exit 0
+		""";
+
 	private const string PlaceUploadBody = """
 		staging=$1
 		target=$2
@@ -358,6 +396,39 @@ internal static class RemoteScripts
 	/// mode; a new one is moved in and handed to root. The staging file is removed on every exit.
 	/// </summary>
 	public static readonly string PlaceUpload = Normalize(Preamble + PlaceUploadBody);
+
+	/// <summary>
+	/// No arguments. Prints the account the script runs as, by name where it has one and by number otherwise, then
+	/// <c>$HOME</c>, each NUL-terminated.
+	/// </summary>
+	public static readonly string Identity = Normalize(Preamble + IdentityBody);
+
+	/// <summary>
+	/// <c>$1</c> path, <c>$2</c> where to start in blocks of <see cref="ReadBlockBytes"/>, <c>$3</c> how many bytes. Prints
+	/// that part of the file after the output marker; fewer bytes than asked for means the file ends there.
+	/// </summary>
+	public static readonly string ReadRange = Normalize(Preamble + ReadRangeBody);
+
+	/// <summary>
+	/// <c>$1</c> path, <c>$2</c> <c>1</c> to replace, <c>$3</c> octal mode or empty, <c>$4</c> <c>touch -t</c> UTC stamp or
+	/// empty. Writes stdin to the file in place, so an existing one keeps its owner and mode; the time is set where
+	/// <c>touch</c> can.
+	/// </summary>
+	public static readonly string WriteInput = Normalize(Preamble + WriteInputBody);
+
+	/// <summary>
+	/// Whether <paramref name="script"/> reads or writes file contents, which can take minutes on a big file or tree, so
+	/// its channel counts as long in <see cref="ExecChannelBudget"/>. A recursive delete or mode change walks a tree but
+	/// touches no contents, and counts as short.
+	/// </summary>
+	public static bool RunsLong(string script) =>
+		script == Copy
+		|| script == Compress
+		|| script == Extract
+		|| script == Checksum
+		|| script == PlaceUpload
+		|| script == Read
+		|| script == ReadFrom;
 
 	// Raw strings take the line endings of this source file, and a carriage return breaks sh.
 	private static string Normalize(string script) => script.ReplaceLineEndings("\n");

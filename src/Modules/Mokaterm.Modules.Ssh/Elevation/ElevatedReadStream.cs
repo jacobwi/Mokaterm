@@ -13,7 +13,6 @@ internal sealed class ElevatedReadStream : Stream
 	private const int MaxPreambleBytes = 64 * 1024;
 
 	private readonly RemoteCommand _command;
-	private readonly Action _release;
 	private readonly string _account;
 	private readonly string _path;
 	private byte[]? _scan;
@@ -24,11 +23,9 @@ internal sealed class ElevatedReadStream : Stream
 	private bool _finished;
 	private int _disposed;
 
-	/// <param name="release">Frees the command slot; called once on dispose.</param>
-	public ElevatedReadStream(RemoteCommand command, Action release, string account, string path)
+	public ElevatedReadStream(RemoteCommand command, string account, string path)
 	{
 		_command = command;
-		_release = release;
 		_account = account;
 		_path = path;
 	}
@@ -135,7 +132,6 @@ internal sealed class ElevatedReadStream : Stream
 		if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0)
 		{
 			_command.Dispose();
-			_release();
 		}
 
 		base.Dispose(disposing);

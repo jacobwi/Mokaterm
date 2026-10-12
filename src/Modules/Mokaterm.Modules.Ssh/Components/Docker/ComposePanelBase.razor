@@ -1,0 +1,86 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@code {
+	/// <summary>
+	/// What the last edit came to: a file that could not be opened (with root when the login may not), a save compose
+	/// refused (with what it printed, and the file again), or a save that went through (with Up).
+	/// </summary>
+	private protected RenderFragment EditOutcome => @<text>
+		@if (LastEdit is { Saved: false } failed)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="DismissEdit">
+				<div class="mt-dk-alert-line">
+					<span>@(failed.CreateNew ? "Could not create" : "Could not open") @failed.Name: @failed.Problem</span>
+					@if (failed.OfferRoot)
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root" Disabled="IsEditing"
+									OnClick="@(() => EditProjectFileAsync(failed.Path, asRoot: true, failed.CreateNew))">
+							@(failed.CreateNew ? "Create as root" : "Edit as root")
+						</MokaButton>
+					}
+				</div>
+			</MokaAlert>
+		}
+		else if (LastEdit is { Problem: { } problem } refused)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Title="@($"Saved {refused.Name}, and compose no longer reads the project's files")" Dense Closable OnClose="DismissEdit">
+				<div class="mt-dk-alert-line">
+					<span>@problem</span>
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" Disabled="IsEditing"
+								OnClick="@(() => EditProjectFileAsync(refused.Path, refused.AsRoot))">
+						Edit again
+					</MokaButton>
+				</div>
+				@if (refused.Output is { Length: > 0 } output && output != problem)
+				{
+					<pre class="mt-dk-box mt-dk-box--short">@output</pre>
+				}
+			</MokaAlert>
+		}
+		else if (LastEdit is { } saved)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Success" Dense Closable OnClose="DismissEdit">
+				<div class="mt-dk-alert-line">
+					<span>@SavedText(saved)</span>
+					@if (Context?.Target is { HasFiles: true })
+					{
+						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp" Disabled="@(IsEditing || IsBusy)" OnClick="UpAsync">
+							Up
+						</MokaButton>
+					}
+				</div>
+			</MokaAlert>
+		}
+	</text>;
+
+	/// <summary>The edit buttons of one file: as the login, and as root where the connection allows it.</summary>
+	private protected RenderFragment EditButtons(string path, bool asRoot, bool createNew = false) => @<span class="mt-dk-toolbar">
+		@if (asRoot || !CanUseRoot)
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
+						StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
+						OnClick="@(() => EditProjectFileAsync(path, asRoot, createNew))"
+						title="@(createNew ? $"Create {DockerHostPaths.NameOf(path)} in the editor" : $"Open {DockerHostPaths.NameOf(path)} in the editor")">
+				@(createNew ? "Create" : "Edit")
+			</MokaButton>
+		}
+		else
+		{
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
+						StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
+						OnClick="@(() => EditProjectFileAsync(path, asRoot: false, createNew))"
+						title="@(createNew ? "Create it as the login" : "Open it in the editor as the login")">
+				@(createNew ? "Create" : "Edit")
+			</MokaButton>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root" Disabled="IsEditing"
+						OnClick="@(() => EditProjectFileAsync(path, asRoot: true, createNew))"
+						title="@(createNew ? "Create it as root, through sudo" : "Open it in the editor as root, through sudo")"
+						aria-label="@($"{(createNew ? "Create" : "Edit")} {DockerHostPaths.NameOf(path)} as root")" />
+		}
+	</span>;
+
+	private static string SavedText(ProjectFileEdit edit) => edit.CheckedByCompose
+		? $"Saved {edit.Name}, and compose reads the project's files. The containers run as they were until the next Up."
+		: $"Saved {edit.Name}. The containers run as they were until the next up.";
+}

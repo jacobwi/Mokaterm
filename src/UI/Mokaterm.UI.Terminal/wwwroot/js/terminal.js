@@ -7,7 +7,7 @@ import { FitAddon } from '../lib/xterm/addon-fit.js';
 import { SearchAddon } from '../lib/xterm/addon-search.js';
 import { Unicode11Addon } from '../lib/xterm/addon-unicode11.js';
 import { WebLinksAddon } from '../lib/xterm/addon-web-links.js';
-import { createInstances, disposeQuietly, invoke, listen } from '../../Mokaterm.UI.Common/js/interop.js';
+import { createInstances, disposeQuietly, invoke, listen, openWebLink } from '../../Mokaterm.UI.Common/js/interop.js';
 import { compileTriggers, matchRanges, MaxLineLength, safeEnd, SlowMatchMs } from './triggers.js';
 
 // JS-to-.NET messages count against SignalR's receive limit on Blazor Server (32 KB by default). A chunk of input
@@ -1132,20 +1132,8 @@ function playBell() {
 // Links need Ctrl (Cmd on macOS), as the hover hint says and as in other terminals: a plain click on a URL is usually
 // meant to focus or select. On macOS Ctrl+click is a right click, which opens the menu instead.
 function openLink(event, uri) {
-	if (!(IsMac ? event.metaKey : event.ctrlKey)) {
-		return;
-	}
-
-	let url;
-	try {
-		url = new URL(uri);
-	}
-	catch {
-		return;
-	}
-
-	if (url.protocol === 'http:' || url.protocol === 'https:') {
-		window.open(url.href, '_blank', 'noopener');
+	if (IsMac ? event.metaKey : event.ctrlKey) {
+		openWebLink(uri);
 	}
 }
 

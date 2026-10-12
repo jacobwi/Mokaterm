@@ -1,0 +1,16 @@
+@namespace Mokaterm.UI.Common.Components
+
+@* A line of recent values in an SVG that stretches to its box: no axes, no script. The stroke keeps its width however
+   far the box stretches it. *@
+@if (Label is { Length: > 0 } label)
+{
+	<svg class="@CssClass" style="@HeightStyle" viewBox="0 0 @ViewWidth @ViewHeight" preserveAspectRatio="none" role="img" aria-label="@label">
+		<polyline points="@_points" />
+	</svg>
+}
+else
+{
+	<svg class="@CssClass" style="@HeightStyle" viewBox="0 0 @ViewWidth @ViewHeight" preserveAspectRatio="none" aria-hidden="true">
+		<polyline points="@_points" />
+	</svg>
+}

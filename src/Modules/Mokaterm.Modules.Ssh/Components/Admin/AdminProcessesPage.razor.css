@@ -1,0 +1,8 @@
+/* A filtered tree keeps the parents of what matched so each match shows where it sits; those parents stay quiet. */
+.mta-row--context {
+	opacity: 0.55;
+}
+
+.mta-nice {
+	width: 96px;
+}

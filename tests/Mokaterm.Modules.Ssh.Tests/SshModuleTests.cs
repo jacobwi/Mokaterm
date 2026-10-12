@@ -59,7 +59,7 @@ public sealed class SshModuleTests
 
 		Assert.Equal("SSH", ssh.DisplayName);
 		Assert.Equal(22, ssh.DefaultPort);
-		Assert.Equal(ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands, ssh.Capabilities);
+		Assert.Equal(ProtocolCapabilities.Terminal | ProtocolCapabilities.FileSystem | ProtocolCapabilities.Elevation | ProtocolCapabilities.Commands | ProtocolCapabilities.HostSummary, ssh.Capabilities);
 		Assert.Equal(methods, ssh.AuthenticationMethods);
 		Assert.Null(ssh.VariantOf);
 		Assert.Equal(0, ssh.Order);

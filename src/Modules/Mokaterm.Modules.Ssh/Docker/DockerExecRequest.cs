@@ -73,7 +73,7 @@ internal sealed partial record DockerExecRequest
 		foreach (string variable in Environment)
 		{
 			int equals = variable.IndexOf('=', StringComparison.Ordinal);
-			if (equals <= 0 || !VariablePattern().IsMatch(variable[..equals]))
+			if (equals <= 0 || DockerNames.VariableProblem(variable[..equals]) is not null)
 			{
 				return $"Each variable is NAME=value, with a name of letters, digits and '_'. This one is not: {DescribeName(variable)}.";
 			}
@@ -155,9 +155,6 @@ internal sealed partial record DockerExecRequest
 
 	[GeneratedRegex(@"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,63})?\z", RegexOptions.CultureInvariant)]
 	private static partial Regex UserPattern();
-
-	[GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]{0,127}\z", RegexOptions.CultureInvariant)]
-	private static partial Regex VariablePattern();
 
 	private bool PrintMembers(StringBuilder builder)
 	{

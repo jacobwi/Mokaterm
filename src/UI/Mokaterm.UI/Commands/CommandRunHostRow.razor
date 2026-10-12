@@ -14,8 +14,8 @@
 		<span class="mt-run-host__chevron">
 			<MokaIcon Icon="@(Collapsed ? MokaIcons.Navigation.ChevronRight : MokaIcons.Navigation.ChevronDown)" SizeValue="12px" />
 		</span>
-		<MokaStatusDot Size="MokaSize.Xs" Color="@CommandRunDisplay.Color(Result)" Pulse="@Result.IsPending" />
-		<span class="mt-run-host__state">@CommandRunDisplay.Label(Result.State)</span>
+		<MokaStatusDot Size="MokaSize.Xs" Color="@HostRunDisplay.Color(Result)" Pulse="@Result.IsPending" />
+		<span class="mt-run-host__state">@HostRunDisplay.Label(Result.State)</span>
 		<ProtocolIcon ProtocolId="@Result.ProtocolId" Size="MokaSize.Xs" />
 		<span class="mt-run-host__title" title="@Result.Title">@Result.Title</span>
 		@* A login with a label of its own does not say who it logs in as, so the user goes beside it. *@
@@ -28,13 +28,13 @@
 			<span class="mt-run-host__meta">@Result.HostName</span>
 		}
 		<span class="mt-run-host__end">
-			@if (CommandRunDisplay.Exit(Result) is { } exit)
+			@if (HostRunDisplay.Exit(Result) is { } exit)
 			{
 				<span class="@ExitClass">@exit</span>
 			}
 			@if (Result.Duration is { } duration)
 			{
-				<span class="mt-run-host__time">@CommandRunDisplay.Duration(duration)</span>
+				<span class="mt-run-host__time">@HostRunDisplay.Duration(duration)</span>
 			}
 		</span>
 	</div>
@@ -77,7 +77,7 @@
 				</div>
 			}
 
-			@if (Result.State == CommandHostState.Done && Result.Output.TotalBytes == 0 && Result.Error.TotalBytes == 0)
+			@if (Result.State == HostRunState.Done && Result.Output.TotalBytes == 0 && Result.Error.TotalBytes == 0)
 			{
 				<span class="mt-run-host__message">No output.</span>
 			}

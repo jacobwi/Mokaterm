@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits ComposePanelBase
 
 @if (Context is { } context)
 {
@@ -12,12 +12,17 @@
 			}
 		</MokaSegmentedControl>
 		<span class="mt-dk-spacer"></span>
+		@if (_view != ResolvedView && _text is not null)
+		{
+			@EditButtons(_view, _viewAsRoot)
+		}
 		@if (_text is { } shown)
 		{
 			<CopyButton Text="@shown" Label="Copy" />
 		}
 	</div>
 	<span class="mt-dk-note">@Note</span>
+	@EditOutcome
 	@if (LoadError is null && _text is null)
 	{
 		<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
@@ -36,12 +41,12 @@
 	private string? _text;
 	private string? _loadedFor;
 
-	[CascadingParameter]
-	private ComposeProjectContext? Context { get; set; }
+	// The file on show could only be read as root, so that is how it is edited.
+	private bool _viewAsRoot;
 
 	private string Note => _view == ResolvedView
 		? "docker compose config: every file merged and every variable filled in, so env values show here as they will run."
-		: "The file as it is on the docker host, read-only here; edit it from the session's file browser, then Up.";
+		: "The file as it is on the docker host. Edit opens it in the editor; after a save compose reads the files again, and Up applies them.";
 
 	protected override Task OnParametersSetAsync() =>
 		Context is { } context && context.Project.Name != _loadedFor ? LoadViewAsync() : Task.CompletedTask;
@@ -52,6 +57,9 @@
 		return LoadViewAsync();
 	}
 
+	/// <summary>A save changes what both views show, so the one on screen is read again.</summary>
+	private protected override Task OnProjectFileSavedAsync() => LoadViewAsync();
+
 	private Task LoadViewAsync() => LoadAsync(async (client, token) =>
 	{
 		if (Context is not { } context)
@@ -61,10 +69,11 @@
 
 		_loadedFor = context.Project.Name;
 		_text = null;
+		_viewAsRoot = false;
 		if (_view == ResolvedView)
 		{
 			_text = context.Target is { HasFiles: true } target
-				? DockerText.Plain(await client.ComposeConfigAsync(target, token))
+				? TerminalTextFilter.Plain(await client.ComposeConfigAsync(target, token))
 				: throw new DockerCommandException(DockerFailure.Other, "Compose needs the project's files to resolve it, and they are not known.");
 			return;
 		}
@@ -77,6 +86,7 @@
 		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.PermissionDenied && files.CanUseRoot)
 		{
 			_text = (await files.ReadTextAsync(_view, asRoot: true, token)).Text;
+			_viewAsRoot = true;
 		}
 	});
 }

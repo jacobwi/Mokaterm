@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.Modules.Ssh.Tools;
+using Mokaterm.UI.Common.Files;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
@@ -20,7 +24,7 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 	private const int ChangeTailLines = 60;
 
 	private readonly CancellationTokenSource _lifetime = new();
-	private CancellationTokenSource? _polling;
+	private PagePoller? _poller;
 	private CancellationTokenSource? _change;
 	private ILogger? _logger;
 	private bool _loading;
@@ -34,6 +38,10 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 	[Parameter]
 	public bool Visible { get; set; } = true;
 
+	/// <summary>Opens another page of the manager; null outside one, such as in a test.</summary>
+	[CascadingParameter]
+	private protected DockerNavigation? Navigation { get; set; }
+
 	[Inject]
 	private protected IUserInteraction Interaction { get; set; } = default!;
 
@@ -43,13 +51,27 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 	[Inject]
 	private ILoggerFactory LoggerFactory { get; set; } = default!;
 
+	[Inject]
+	private ISessionManager Sessions { get; set; } = default!;
+
+	[Inject]
+	private ISessionTabs Tabs { get; set; } = default!;
+
+	[Inject]
+	private IFileBrowserDialog FileBrowser { get; set; } = default!;
+
 	private protected DockerSessionFeature? Feature => Session.Session?.GetFeature<DockerSessionFeature>();
+
+	/// <summary>Whether "Open shell" can open a tab for this login: its protocol has to bring a terminal.</summary>
+	private protected bool CanOpenShellTab => Session.Protocol.Has(ProtocolCapabilities.Terminal);
 
 	private protected DockerClient? Client => Feature?.Client;
 
 	/// <summary>The docker host's files through the session's own file system, or null for a session that has none.</summary>
-	private protected DockerHostFiles? HostFiles =>
-		Session.Session?.GetFeature<IFileSystemFeature>() is { } files ? new DockerHostFiles(files) : null;
+	private protected DockerHostFiles? HostFiles => Feature?.HostFiles;
+
+	/// <summary>False when the connection does not run anything as root, so no page offers it.</summary>
+	private protected bool CanUseRoot => HostFiles?.CanUseRoot ?? false;
 
 	/// <summary>Cancelled when the page goes away.</summary>
 	private protected CancellationToken Lifetime => _lifetime.Token;
@@ -102,7 +124,7 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 
 		_disposed = true;
 		_lifetime.Cancel();
-		StopPolling();
+		_poller?.Dispose();
 		_change?.Cancel();
 	}
 
@@ -203,6 +225,8 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 			}
 		}
 
+		// Noted for the health watch, which never reports what the user's own change did.
+		using IDisposable? noted = Feature?.Changes.Begin(calls);
 		using CancellationTokenSource change = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
 		_change = change;
 		RunningTitle = title;
@@ -291,27 +315,24 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 	private protected void ToggleChangeOutput() => _changeOutputShown = !ChangeOutputShown;
 
 	/// <summary>
-	/// Types <c>docker exec -it NAME bash</c> (or <c>sh</c> when the image has no bash) and Enter into the session's own
-	/// terminal, the way "Open terminal here" types a <c>cd</c>. Typed, not run, so the shell belongs to the terminal.
+	/// Opens a new tab on the session's login that runs <c>docker exec -it NAME bash</c> (or <c>sh</c> when the image has
+	/// no bash) and brings it to the front. Through sudo while the manager runs as root, which asks in that terminal.
 	/// </summary>
 	/// <returns>Why it could not, or null.</returns>
 	private protected async Task<string?> OpenShellAsync(string name)
 	{
 		ArgumentNullException.ThrowIfNull(name);
-		if (Client is not { } client || Session.Terminal is not { } terminal)
+		if (Client is not { } client || !CanOpenShellTab)
 		{
-			return "This session has no terminal to open the shell in.";
+			return "This session has no terminal to open a shell in.";
 		}
 
 		try
 		{
 			string shell = await client.FindShellAsync(name, Lifetime);
-			await terminal.SendTextAsync(DockerCommands.ShellCommandLine(name, shell, client.IsElevated), Lifetime);
-			Interaction.Notify(
-				NoticeSeverity.Info,
-				client.IsElevated
-					? $"A {shell} in {name} is starting in this session's terminal through sudo, which may ask for the password there. Close this dialog to use it."
-					: $"A {shell} in {name} is starting in this session's terminal. Close this dialog to use it.");
+			(ConnectionProfile connection, SessionOpenOptions options) = DockerShellTab.For(Session.Connection, name, shell, client.IsElevated);
+			ISessionHandle opened = Sessions.OpenTransient(Session.Host, connection, options);
+			Tabs.Show(opened.Id);
 			return null;
 		}
 		catch (Exception ex) when (Describe(ex) is { } problem)
@@ -321,31 +342,57 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 	}
 
 	/// <summary>
+	/// Shows the built-in file browser over a running container's files, in this page's window, and returns once it is
+	/// closed. Every operation is a docker exec as the container's own user, through sudo when the manager uses it, and
+	/// a container that is stopped or has no shell says so inside the browser.
+	/// </summary>
+	/// <param name="startFolder">Where to open, such as the container's working directory; null for its user's home.</param>
+	private protected async Task BrowseFilesAsync(string container, string? startFolder = null)
+	{
+		ArgumentNullException.ThrowIfNull(container);
+		if (Feature is not { } feature)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "The session is not connected.");
+			return;
+		}
+
+		IFileSystemFeature files;
+		try
+		{
+			files = feature.ContainerFiles(container);
+		}
+		catch (Exception ex) when (ex is ArgumentException or ObjectDisposedException)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, ex is ArgumentException ? ex.Message : "The session is closed.", "Cannot browse " + container);
+			return;
+		}
+
+		FileBrowserRequest request = new()
+		{
+			FileSystem = files,
+			Title = $"{container} on {feature.Host}",
+			Location = container,
+			StartFolder = string.IsNullOrWhiteSpace(startFolder) ? null : startFolder,
+		};
+		await FileBrowser.ShowAsync(request, Lifetime);
+	}
+
+	/// <summary>
 	/// Calls <paramref name="tick"/> every <paramref name="interval"/> while the page is visible and nothing else is
-	/// loading. Replaces any polling already running.
+	/// loading or running. Replaces any polling already running.
 	/// </summary>
 	private protected void StartPolling(TimeSpan interval, Func<Task> tick)
 	{
-		ArgumentNullException.ThrowIfNull(tick);
-		StopPolling();
 		if (_disposed)
 		{
 			return;
 		}
 
-		CancellationTokenSource polling = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
-		_polling = polling;
-		_ = PollAsync(interval, tick, polling.Token);
+		_poller ??= new PagePoller(Time, InvokeAsync, () => Visible && !_loading && !IsBusy);
+		_poller.Start(interval, tick, Lifetime);
 	}
 
-	private protected void StopPolling()
-	{
-		if (Interlocked.Exchange(ref _polling, null) is { } polling)
-		{
-			polling.Cancel();
-			polling.Dispose();
-		}
-	}
+	private protected void StopPolling() => _poller?.Stop();
 
 	/// <summary>The sentence for a failure a page shows, or null for one that is not the user's business (a cancel).</summary>
 	private protected string? Describe(Exception exception)
@@ -376,27 +423,4 @@ public abstract partial class DockerPageBase : ComponentBase, IDisposable
 			Output = string.Join('\n', outputs.Select(output => output.Output.TrimEnd()).Where(text => text.Length > 0)),
 			Error = string.Join('\n', outputs.Select(output => output.Error.TrimEnd()).Where(text => text.Length > 0)),
 		};
-
-	private async Task PollAsync(TimeSpan interval, Func<Task> tick, CancellationToken cancellationToken)
-	{
-		try
-		{
-			using PeriodicTimer timer = new(interval, Time);
-			while (await timer.WaitForNextTickAsync(cancellationToken))
-			{
-				if (Visible && !_loading && !IsBusy)
-				{
-					await InvokeAsync(tick);
-				}
-			}
-		}
-		catch (OperationCanceledException)
-		{
-			// The page went away or polling was replaced.
-		}
-		catch (ObjectDisposedException)
-		{
-			// The renderer went away with the circuit.
-		}
-	}
 }

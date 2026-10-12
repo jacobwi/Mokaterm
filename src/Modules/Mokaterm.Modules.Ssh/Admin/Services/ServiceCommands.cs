@@ -1,5 +1,5 @@
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Modules.Ssh.Admin.Detection;
-using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Admin.Services;
 
@@ -13,6 +13,12 @@ internal sealed class ServiceCommands
 	{
 		"networking", "network", "NetworkManager", "systemd-networkd", "wicked", "netplan", "connman", "dhcpcd",
 	};
+
+	/// <summary>Every service unit systemd has loaded, one plain line each; the survey reads the failed ones from it.</summary>
+	internal const string SystemdUnits = "systemctl list-units --type=service --all --no-legend --no-pager --plain 2>/dev/null";
+
+	/// <summary>OpenRC's services with their state, crashed ones included; the survey reads it too.</summary>
+	internal const string OpenRcStatus = "rc-status --servicelist --nocolor 2>/dev/null";
 
 	private readonly SystemFacts _facts;
 
@@ -48,7 +54,7 @@ internal sealed class ServiceCommands
 			Name = "services.list",
 			Body = string.Join('\n',
 				AdminSections.Start("units"),
-				"systemctl list-units --type=service --all --no-legend --no-pager --plain 2>/dev/null",
+				SystemdUnits,
 				AdminSections.Start("files"),
 				"systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null",
 				"exit 0"),
@@ -58,7 +64,7 @@ internal sealed class ServiceCommands
 			Name = "services.list",
 			Body = string.Join('\n',
 				AdminSections.Start("status"),
-				"rc-status --servicelist --nocolor 2>/dev/null",
+				OpenRcStatus,
 				AdminSections.Start("levels"),
 				"rc-update --verbose show 2>/dev/null",
 				"exit 0"),
@@ -151,6 +157,54 @@ internal sealed class ServiceCommands
 		};
 	}
 
+	/// <summary>Only systemd has drop-in overrides and unit files to show.</summary>
+	public bool HasUnitFiles => Init == InitSystem.Systemd;
+
+	/// <summary>
+	/// Where <c>systemctl edit</c> keeps a unit's override: <c>/etc/systemd/system/nginx.service.d/override.conf</c>.
+	/// A name without a type is a service, as systemctl reads it.
+	/// </summary>
+	public static string OverridePath(string name) => OverrideFolder(name) + "/override.conf";
+
+	/// <summary>The drop-in folder of <see cref="OverridePath"/>.</summary>
+	public static string OverrideFolder(string name)
+	{
+		Require(name);
+		string unit = name.Contains('.', StringComparison.Ordinal) ? name : name + ".service";
+		return $"/etc/systemd/system/{unit}.d";
+	}
+
+	/// <summary>The unit file and every drop-in that changes it, as <c>systemctl cat</c> prints them.</summary>
+	public AdminScript Cat(string name)
+	{
+		RequireUnitFiles();
+		Require(name);
+
+		// A unit with no file of its own (one that only exists at run time) is an answer here, not a failure.
+		return new AdminScript { Name = "services.cat", Body = $"systemctl cat --no-pager -- {PosixShell.Quote(name)} 2>&1\nexit 0" };
+	}
+
+	/// <summary>Has systemd read its unit files again, which is what makes a saved override count.</summary>
+	public AdminAction DaemonReload(string name)
+	{
+		RequireUnitFiles();
+		Require(name);
+		return new AdminAction
+		{
+			Title = "Reload systemd's unit files",
+			Script = new AdminScript
+			{
+				Name = "services.daemon-reload",
+				Body = "systemctl daemon-reload",
+				AsRoot = true,
+				Timeout = AdminScript.ActionTimeout,
+				OutputLimitBytes = AdminScript.ActionOutputBytes,
+			},
+			Description = $"Reads {name}'s override, and every other changed unit file, so the next start or restart uses them. Services that run keep running as they are.",
+			ConfirmText = "Reload",
+		};
+	}
+
 	/// <summary>The unit's name without <c>.service</c>, as the warning lists spell it.</summary>
 	internal static string BareName(string name) => name.EndsWith(".service", StringComparison.Ordinal) ? name[..^".service".Length] : name;
 
@@ -174,6 +228,14 @@ internal sealed class ServiceCommands
 		}
 
 		throw new InvalidOperationException("This machine has no tool that switches services on at boot.");
+	}
+
+	private void RequireUnitFiles()
+	{
+		if (!HasUnitFiles)
+		{
+			throw new InvalidOperationException("Only systemd has unit files and overrides.");
+		}
 	}
 
 	private static void Require(string name)

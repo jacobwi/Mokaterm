@@ -39,7 +39,21 @@ internal static class PortGreeting
 				failure);
 	}
 
-	private static async Task<string?> DescribeAsync(string host, int port, CancellationToken cancellationToken)
+	/// <summary>
+	/// True when the port accepts a connection and greets with an SSH version line, which is how a machine that is
+	/// starting up says it is ready for a login. Nothing is sent and nothing is logged in to.
+	/// </summary>
+	public static async Task<bool> AnswersSshAsync(string host, int port, CancellationToken cancellationToken)
+	{
+		byte[]? greeting = await ReadGreetingAsync(host, port, cancellationToken);
+		return greeting is not null && Encoding.ASCII.GetString(greeting).StartsWith("SSH-", StringComparison.Ordinal);
+	}
+
+	private static async Task<string?> DescribeAsync(string host, int port, CancellationToken cancellationToken) =>
+		await ReadGreetingAsync(host, port, cancellationToken) is { } greeting ? Recognize(greeting) : null;
+
+	/// <summary>The first bytes the port sends after a connect, or null when it cannot be reached or stays silent.</summary>
+	private static async Task<byte[]?> ReadGreetingAsync(string host, int port, CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -49,11 +63,11 @@ internal static class PortGreeting
 			await client.ConnectAsync(host, port, probe.Token);
 			byte[] buffer = new byte[MaxBytes];
 			int read = await client.GetStream().ReadAsync(buffer, probe.Token);
-			return read > 0 ? Recognize(buffer.AsSpan(0, read)) : null;
+			return read > 0 ? buffer[..read] : null;
 		}
 		catch (Exception ex) when (ex is SocketException or IOException or ObjectDisposedException or OperationCanceledException or ArgumentException)
 		{
-			// The diagnosis is a nicety; the original failure is what matters, even when the address or port is invalid.
+			// A port that does not answer is an answer too, even when the address or the port is invalid.
 			return null;
 		}
 	}

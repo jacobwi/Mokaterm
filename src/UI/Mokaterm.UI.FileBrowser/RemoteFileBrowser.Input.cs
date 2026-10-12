@@ -299,7 +299,7 @@ public partial class RemoteFileBrowser
 		bool single = selected.Count == 1;
 		bool hasFiles = selected.Exists(item => !item.IsDirectoryLike);
 		bool hasFolders = selected.Exists(item => item.IsDirectoryLike);
-		bool canOpenTerminal = single && entry.IsDirectoryLike && Session.Terminal is not null;
+		bool canOpenTerminal = single && entry.IsDirectoryLike && Source.Terminal is not null;
 
 		List<MokaContextMenuItem> items = [];
 		if (single && entry.IsDirectoryLike)
@@ -446,7 +446,7 @@ public partial class RemoteFileBrowser
 		}
 
 		items.Add(new MokaContextMenuItem { Text = "Refresh", Icon = MokaIcons.Action.Refresh, Shortcut = "F5", OnClick = () => RefreshAsync() });
-		if (Session.Terminal is not null)
+		if (Source.Terminal is not null)
 		{
 			items.Add(new MokaContextMenuItem { Text = "Open terminal here", Icon = MokatermIcons.Terminal, OnClick = () => OpenTerminalHereAsync(_path) });
 		}

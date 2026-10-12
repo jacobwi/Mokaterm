@@ -318,7 +318,7 @@ public sealed class CommandBuilderTests
 	{
 		FirewallCommands ufw = new(FirewallKind.Ufw, sshPort: 22);
 
-		Assert.Equal("ufw status verbose 2>&1", ufw.Status().Body);
+		Assert.Equal("echo '@@mt:verbose'\nufw status verbose 2>&1\necho '@@mt:numbered'\nufw status numbered 2>/dev/null\nexit 0", ufw.Status().Body);
 		Assert.True(ufw.Status().AsRoot);
 		Assert.Equal("ufw allow '8080/tcp'", ufw.Allow(new FirewallPort(8080, "tcp")).Script.Body);
 		Assert.Equal("ufw deny '53'", ufw.Deny(new FirewallPort(53, "")).Script.Body);
@@ -450,10 +450,11 @@ public sealed class CommandBuilderTests
 	[Fact]
 	public void Logs_Journal_ClampsAndQuotes()
 	{
-		Assert.Equal("journalctl --no-pager -o short-iso -n 200 2>&1", LogCommands.Journal(null, null, 200, asRoot: false).Body);
-		Assert.Equal(
-			"journalctl --no-pager -o short-iso -n 2000 -u 'nginx.service' -p err 2>&1",
-			LogCommands.Journal("nginx.service", "err", 999_999, asRoot: true).Body);
+		Assert.EndsWith("\njournalctl --no-pager -o short-iso --utc --show-cursor -n 200 2>&1", LogCommands.Journal(null, null, 200, asRoot: false).Body, StringComparison.Ordinal);
+		Assert.EndsWith(
+			"\njournalctl --no-pager -o short-iso --utc --show-cursor -n 2000 -u 'nginx.service' -p err 2>&1",
+			LogCommands.Journal("nginx.service", "err", 999_999, asRoot: true).Body,
+			StringComparison.Ordinal);
 		Assert.Throws<ArgumentException>(() => LogCommands.Journal("x;id", null, 10, false));
 		Assert.Throws<ArgumentException>(() => LogCommands.Journal(null, "loud", 10, false));
 	}
@@ -461,7 +462,9 @@ public sealed class CommandBuilderTests
 	[Fact]
 	public void Logs_Files_StayUnderVarLog()
 	{
-		Assert.Equal("tail -n 50 -- '/var/log/nginx/error.log'", LogCommands.ReadFile("/var/log/nginx/error.log", 50, false).Body);
+		string read = LogCommands.ReadFile("/var/log/nginx/error.log", 50, false).Body;
+		Assert.Contains("mt_file='/var/log/nginx/error.log'", read, StringComparison.Ordinal);
+		Assert.Contains("head -c \"$6\" -- \"$mt_file\" | tail -n 50", read, StringComparison.Ordinal);
 		Assert.Throws<ArgumentException>(() => LogCommands.ReadFile("/var/log/../../etc/shadow", 50, true));
 		Assert.Throws<ArgumentException>(() => LogCommands.ReadFile("/etc/shadow", 50, true));
 		Assert.Equal(

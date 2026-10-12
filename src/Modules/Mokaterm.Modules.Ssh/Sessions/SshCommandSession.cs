@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Diagnostics;
+using Mokaterm.Abstractions.Fleet;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Modules.Ssh.Admin.Survey;
 using Mokaterm.Modules.Ssh.Connection;
 using Mokaterm.Modules.Ssh.Shell;
 using Renci.SshNet;
@@ -11,7 +13,8 @@ namespace Mokaterm.Modules.Ssh.Sessions;
 /// <summary>
 /// A connection opened only to run commands (<see cref="ConnectPurpose.Commands"/>): the login, jump hosts and proxy
 /// a tab would get, without the shell, the saved tunnels or the startup command. Each command takes an exec channel of
-/// its own on this connection, and disposing closes the connection, the hops and the login with it.
+/// its own on this connection, and disposing closes the connection, the hops and the login with it. The fleet
+/// overview reads its machine through the same commands.
 /// </summary>
 internal sealed class SshCommandSession : IProtocolSession
 {
@@ -19,6 +22,7 @@ internal sealed class SshCommandSession : IProtocolSession
 	private readonly SshSessionContext _context;
 	private readonly ConnectionMonitor _monitor;
 	private readonly SshCommandFeature _commands;
+	private readonly SshHostSummaryFeature _summary;
 	private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private readonly ILogger _logger;
 	private int _disposed;
@@ -32,6 +36,7 @@ internal sealed class SshCommandSession : IProtocolSession
 		_logger = logger;
 		_monitor = new ConnectionMonitor(_client);
 		_commands = new SshCommandFeature(GetClientAsync, time);
+		_summary = new SshHostSummaryFeature(_commands);
 		_ = WatchAsync();
 	}
 
@@ -39,7 +44,9 @@ internal sealed class SshCommandSession : IProtocolSession
 
 	public TFeature? GetFeature<TFeature>()
 		where TFeature : class =>
-		typeof(TFeature) == typeof(IRemoteCommandFeature) ? (TFeature)(object)_commands : null;
+		typeof(TFeature) == typeof(IRemoteCommandFeature) ? (TFeature)(object)_commands
+		: typeof(TFeature) == typeof(IHostSummaryFeature) ? (TFeature)(object)_summary
+		: null;
 
 	public async ValueTask DisposeAsync()
 	{

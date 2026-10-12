@@ -15,4 +15,5 @@ internal enum AdminPage
 	Processes,
 	Logs,
 	Firewall,
+	Security,
 }

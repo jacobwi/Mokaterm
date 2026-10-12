@@ -11,6 +11,7 @@
 				Loaded="Loaded"
 				Error="@LoadError"
 				OnRefresh="ReloadAsync"
+				LoadingText="Sampling the processes for a second"
 				ListPage
 				Detail="@(Selected is null ? null : ProcessPanel)">
 	<Chips>
@@ -19,6 +20,13 @@
 			<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => _view = value)" AriaLabel="Processes to show" />
 		}
 	</Chips>
+	<ChipsEnd>
+		@if (Capabilities.HasProcessTools)
+		{
+			<MokaCheckbox Value="_tree" ValueChanged="@(value => _tree = value)" Label="Tree" title="Show each process under the one that started it" />
+			<MokaCheckbox Value="_autoRefresh" ValueChanged="OnAutoRefreshChanged" Label="Refresh every 5 s" title="Read the list again every five seconds while this page is shown" />
+		}
+	</ChipsEnd>
 	<ChildContent>
 		@if (!Capabilities.HasProcessTools)
 		{
@@ -26,20 +34,21 @@
 		}
 		else
 		{
-			List<ProcessInfo> shown = Shown();
-			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 50px 50px 70px minmax(0, 2fr) 28px; --mta-cols-narrow: 54px 46px 46px minmax(0, 1fr) 28px">
+			IReadOnlyList<(ProcessInfo Process, int Depth)> shown = Shown();
+			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 54px 50px 40px 70px minmax(0, 2fr) 28px; --mta-cols-narrow: 54px 50px 46px minmax(0, 1fr) 28px">
 				<div class="mta-row mta-row--head">
 					<AdminSortHeader Text="PID" Key="pid" Sort="_sort" OnChanged="StateHasChanged" />
 					<AdminSortHeader Text="User" Key="user" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
 					<AdminSortHeader Text="CPU" Key="cpu" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
 					<AdminSortHeader Text="Mem" Key="mem" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+					<AdminSortHeader Text="NI" Key="nice" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
 					<AdminSortHeader Text="RSS" Key="rss" Sort="_sort" StartDescending OnChanged="StateHasChanged" Class="mta-wide" />
 					<AdminSortHeader Text="Command" Key="command" Sort="_sort" OnChanged="StateHasChanged" />
 					<span></span>
 				</div>
-				@foreach (ProcessInfo process in shown)
+				@foreach ((ProcessInfo process, int depth) in shown)
 				{
-					<div class="@(process.Pid == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+					<div class="@RowClass(process)"
 						 @key="process.Pid"
 						 role="button"
 						 tabindex="0"
@@ -49,10 +58,17 @@
 						 @oncontextmenu:preventDefault="true">
 						<span class="mta-cell mta-mono">@process.Pid</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide">@process.User</span>
-						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Cpu, "0.0")</span>
+						<span class="mta-cell mta-mono" title="@(process.CpuSampled ? "Share of one CPU over the sampling second" : "ps's average over the process's life: it started after the sample")">@CpuText(process)</span>
 						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Memory, "0.0")</span>
+						<span class="mta-cell mta-mono mta-dim mta-wide">@process.Nice</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide">@AdminFormat.Kb(process.ResidentKb)</span>
-						<span class="mta-cell mta-mono" title="@process.Command">@process.Command</span>
+						<span class="mta-cell mta-mono" title="@process.Command" style="@Indent(depth)">
+							@if (depth > 0)
+							{
+								<span class="mta-dim" aria-hidden="true">└ </span>
+							}
+							@process.Command
+						</span>
 						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
 							<MokaButton Variant="MokaVariant.Text"
 										Color="MokaColor.Surface"
@@ -65,7 +81,7 @@
 				}
 				@if (_matching > shown.Count)
 				{
-					<div class="mta-more">@($"The top {shown.Count} of {AdminFormat.Count(_matching)} by this column. Filter to find others.")</div>
+					<div class="mta-more">@(_tree ? $"The first {shown.Count} of {AdminFormat.Count(_matching)} in tree order. Filter to find others." : $"The top {shown.Count} of {AdminFormat.Count(_matching)} by this column. Filter to find others.")</div>
 				}
 			</div>
 		}
@@ -74,6 +90,10 @@
 
 @code {
 	private const int MaxRows = 200;
+	private const int MaxTreeRows = 500;
+
+	/// <summary>Deeper levels stop indenting, so a long chain of shells still leaves room for the command.</summary>
+	private const int MaxIndent = 12;
 
 	private IReadOnlyList<ProcessInfo> _processes = [];
 	private readonly AdminSort _sort = new("cpu", descending: true);
@@ -81,10 +101,25 @@
 	private string _filter = "";
 	private int? _selected;
 	private int _matching;
+	private bool _tree;
+	private bool _autoRefresh;
+	private IReadOnlySet<int> _context = new HashSet<int>();
+	private int _nice;
+	private int? _niceFor;
 
 	protected override bool ReadsMoreAsRoot => true;
 
-	private string Summary => $"{AdminFormat.Count(_processes.Count)} processes, {AdminFormat.Count(_processes.Count(process => process.User == Context.LoginName))} of them {Context.LoginName}'s · CPU is ps's average over each process's life";
+	private string Summary
+	{
+		get
+		{
+			int mine = _processes.Count(process => process.User == Context.LoginName);
+			string cpu = _processes.Any(process => process.CpuSampled)
+				? "CPU is each process's share of one core over a second"
+				: "CPU is ps's average over each process's life";
+			return $"{AdminFormat.Count(_processes.Count)} processes, {AdminFormat.Count(mine)} of them {Context.LoginName}'s · {cpu}";
+		}
+	}
 
 	private IReadOnlyList<AdminChip> Chips =>
 	[
@@ -113,6 +148,14 @@
 		}
 
 		string? blocked = Blocked(process);
+		if (_niceFor != process.Pid)
+		{
+			_niceFor = process.Pid;
+			_nice = process.Nice ?? 0;
+		}
+
+		bool reniceAsRoot = ReniceAsRoot(process, _nice);
+		string? reniceBlocked = reniceAsRoot ? Context.RootChangeBlocked : null;
 		<AdminDetailPanel Title="@($"{process.Name} ({process.Pid})")" Subtitle="@process.User" OnClose="@(() => _selected = null)">
 			<Actions>
 				@if (process.Pid > 1)
@@ -130,7 +173,21 @@
 					<dt>State</dt>
 					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@process.State</MokaText></dd>
 					<dt>CPU, memory</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{AdminFormat.Number(process.Cpu, "0.0")}% · {AdminFormat.Number(process.Memory, "0.0")}% · {AdminFormat.Kb(process.ResidentKb)}")</MokaText></dd>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{CpuText(process)}% · {AdminFormat.Number(process.Memory, "0.0")}% · {AdminFormat.Kb(process.ResidentKb)}")</MokaText></dd>
+					@if (process.ParentPid is { } parent)
+					{
+						<dt>Parent</dt>
+						<dd>
+							@if (_processes.FirstOrDefault(item => item.Pid == parent) is { } up)
+							{
+								<button type="button" class="mta-link" @onclick="@(() => Select(up.Pid))">@($"{up.Name} ({up.Pid})")</button>
+							}
+							else
+							{
+								<MokaText Element="span" Size="MokaSize.Sm" Mono>@parent</MokaText>
+							}
+						</dd>
+					}
 					<dt>Runs as</dt>
 					<dd>
 						<MokaText Element="span" Size="MokaSize.Sm" Mono>@process.User</MokaText>
@@ -139,6 +196,29 @@
 							<span class="mta-dim mta-after">ending it needs root</span>
 						}
 					</dd>
+					<dt>Nice</dt>
+					<dd>
+						<div class="mta-inline">
+							<div class="mta-nice">
+								<MokaNumericField TValue="int"
+												  Value="_nice"
+												  ValueChanged="@(value => _nice = Math.Clamp(value, ProcessCommands.MinNice, ProcessCommands.MaxNice))"
+												  Min="ProcessCommands.MinNice"
+												  Max="ProcessCommands.MaxNice"
+												  Step="1"
+												  Size="MokaSize.Sm"
+												  aria-label="New nice value" />
+							</div>
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Xs"
+										Disabled="@(Busy || reniceBlocked is not null || _nice == process.Nice)"
+										title="@(reniceBlocked ?? "Set this nice value; -20 runs first, 19 last")"
+										OnClick="@(() => ReniceAsync(process, _nice))">
+								Renice
+							</MokaButton>
+							<span class="mta-dim">@($"now {process.Nice?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}{(reniceAsRoot ? ", as root" : "")}")</span>
+						</div>
+					</dd>
 				</dl>
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command line</MokaText>
 				<pre class="mta-pre">@process.Command</pre>
@@ -146,40 +226,68 @@
 		</AdminDetailPanel>
 	};
 
-	private List<ProcessInfo> Shown()
+	private IReadOnlyList<(ProcessInfo Process, int Depth)> Shown()
 	{
 		string filter = _filter.Trim();
-		List<ProcessInfo> matching =
-		[
-			.. _processes.Where(process => (_view != "mine" || process.User == Context.LoginName)
-				&& (filter.Length == 0
-					|| process.Command.Contains(filter, StringComparison.OrdinalIgnoreCase)
-					|| process.User.Contains(filter, StringComparison.OrdinalIgnoreCase)
-					|| process.Pid.ToString(CultureInfo.InvariantCulture) == filter)),
-		];
+		bool Matches(ProcessInfo process) => (_view != "mine" || process.User == Context.LoginName)
+			&& (filter.Length == 0
+				|| process.Command.Contains(filter, StringComparison.OrdinalIgnoreCase)
+				|| process.User.Contains(filter, StringComparison.OrdinalIgnoreCase)
+				|| process.Pid.ToString(CultureInfo.InvariantCulture) == filter);
 
-		_matching = matching.Count;
-		IEnumerable<ProcessInfo> sorted = _sort.Key switch
+		if (_tree)
 		{
-			"pid" => _sort.Apply(matching, process => (double)process.Pid),
-			"user" => _sort.Apply(matching, process => process.User),
-			"mem" => _sort.Apply(matching, process => process.Memory ?? 0),
-			"rss" => _sort.Apply(matching, process => (double)(process.ResidentKb ?? 0)),
-			"command" => _sort.Apply(matching, process => process.Command),
-			_ => _sort.Apply(matching, process => process.Cpu ?? 0),
-		};
+			(IReadOnlyList<ProcessInfo> kept, IReadOnlySet<int> context) = ProcessTree.WithAncestors(_processes, Matches);
+			_context = context;
+			_matching = kept.Count;
+			return [.. ProcessTree.Flatten(kept, Sorted).Take(MaxTreeRows)];
+		}
 
-		return [.. sorted.Take(MaxRows)];
+		List<ProcessInfo> matching = [.. _processes.Where(Matches)];
+		_context = new HashSet<int>();
+		_matching = matching.Count;
+		return [.. Sorted(matching).Take(MaxRows).Select(process => (process, 0))];
+	}
+
+	private IEnumerable<ProcessInfo> Sorted(IEnumerable<ProcessInfo> processes) => _sort.Key switch
+	{
+		"pid" => _sort.Apply(processes, process => (double)process.Pid),
+		"user" => _sort.Apply(processes, process => process.User),
+		"mem" => _sort.Apply(processes, process => process.Memory ?? 0),
+		"nice" => _sort.Apply(processes, process => (double)(process.Nice ?? 0)),
+		"rss" => _sort.Apply(processes, process => (double)(process.ResidentKb ?? 0)),
+		"command" => _sort.Apply(processes, process => process.Command),
+		_ => _sort.Apply(processes, process => process.Cpu ?? 0),
+	};
+
+	private static string CpuText(ProcessInfo process) => AdminFormat.Number(process.Cpu, "0.0");
+
+	private static string? Indent(int depth) => depth == 0
+		? null
+		: string.Create(CultureInfo.InvariantCulture, $"padding-left:{Math.Min(depth, MaxIndent) * 12}px");
+
+	private string RowClass(ProcessInfo process)
+	{
+		string css = process.Pid == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable";
+		return _context.Contains(process.Pid) ? css + " mta-row--context" : css;
 	}
 
 	/// <summary>Another user's process needs root; the login's own does not.</summary>
 	private bool NeedsRoot(ProcessInfo process) => !Profile.Facts.IsRoot && process.User != Context.LoginName;
+
+	private bool ReniceAsRoot(ProcessInfo process, int nice) => !Profile.Facts.IsRoot && ProcessCommands.ReniceNeedsRoot(process, nice, Context.LoginName);
 
 	private string? Blocked(ProcessInfo process) => NeedsRoot(process) ? Context.RootChangeBlocked : null;
 
 	private IReadOnlyList<MokaContextMenuItem> MenuFor(ProcessInfo process)
 	{
 		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => _selected = process.Pid }];
+		if (_tree && process.ParentPid is { } parent && _processes.Any(item => item.Pid == parent))
+		{
+			items.Add(new MokaContextMenuItem { Text = "Go to parent", OnClickSync = () => _selected = parent });
+		}
+
+		items.Add(new MokaContextMenuItem { Text = "Renice...", DividerBefore = true, OnClickSync = () => _selected = process.Pid });
 		if (process.Pid > 1)
 		{
 			bool blocked = Busy || Blocked(process) is not null;
@@ -200,12 +308,35 @@
 		}
 	}
 
+	private void OnAutoRefreshChanged(bool value)
+	{
+		_autoRefresh = value;
+		if (value)
+		{
+			StartPolling(ProcessCommands.RefreshInterval, ReloadAsync);
+		}
+		else
+		{
+			StopPolling();
+		}
+	}
+
 	private async Task SignalAsync(ProcessInfo process, bool force)
 	{
 		_selected = process.Pid;
 		if (await RunAsync(ProcessCommands.Signal(process, force, NeedsRoot(process))) is { Succeeded: true })
 		{
 			_selected = null;
+		}
+	}
+
+	private async Task ReniceAsync(ProcessInfo process, int nice)
+	{
+		_selected = process.Pid;
+		if (await RunAsync(ProcessCommands.Renice(process, nice, ReniceAsRoot(process, nice))) is { Succeeded: true })
+		{
+			// The list read again after the change, so the field starts from the value the process has now.
+			_niceFor = null;
 		}
 	}
 }

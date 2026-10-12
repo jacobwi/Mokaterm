@@ -1,4 +1,5 @@
 using System.Text;
+using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Admin;
 
@@ -25,13 +26,9 @@ internal sealed record AdminOutcome
 	/// <summary>The first line of stderr, or a sentence naming the exit code when there is none.</summary>
 	public string Problem()
 	{
-		foreach (string line in Error.Split('\n'))
+		if (RemoteText.FirstLine(Error) is { Length: > 0 } line)
 		{
-			string trimmed = line.Trim();
-			if (trimmed.Length > 0)
-			{
-				return trimmed;
-			}
+			return line;
 		}
 
 		return ExitCode is { } code ? $"The command ended with exit code {code}." : $"The command was ended by {ExitSignal ?? "a signal"}.";

@@ -1,5 +1,5 @@
 using Mokaterm.Abstractions.Commands;
-using Mokaterm.Modules.Ssh.Shell;
+using Mokaterm.Abstractions.Connections;
 
 namespace Mokaterm.Modules.Ssh.Admin;
 
@@ -11,10 +11,12 @@ internal sealed class CommandFeatureAdminShell : IAdminShell
 {
 	private readonly IRemoteCommandFeature _commands;
 
-	public CommandFeatureAdminShell(IRemoteCommandFeature commands, string account)
+	/// <param name="loginMethod">How the session logged in, as its connection says, or null when nothing says.</param>
+	public CommandFeatureAdminShell(IRemoteCommandFeature commands, string account, AuthenticationMethod? loginMethod = null)
 	{
 		_commands = commands;
 		Account = account;
+		LoginMethod = loginMethod;
 	}
 
 	public string? ElevationBlockedReason => "This session cannot run commands as root.";
@@ -22,6 +24,8 @@ internal sealed class CommandFeatureAdminShell : IAdminShell
 	public bool HasRoot => false;
 
 	public string Account { get; }
+
+	public AuthenticationMethod? LoginMethod { get; }
 
 	public bool SupportsInput => false;
 
@@ -50,7 +54,7 @@ internal sealed class CommandFeatureAdminShell : IAdminShell
 		try
 		{
 			RemoteCommandOutcome outcome = await _commands.RunAsync(AdminScriptText.Request(script, command), deadline.Token);
-			return AdminScriptText.ToOutcome(outcome, AdminScriptText.ErrorText(outcome));
+			return AdminScriptText.ToOutcome(outcome, outcome.Error.ToText());
 		}
 		catch (OperationCanceledException ex) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
 		{

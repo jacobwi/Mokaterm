@@ -52,7 +52,7 @@ public sealed class DockerLiveTests
 		await using (session)
 		{
 			IRemoteCommandFeature commands = session.GetFeature<IRemoteCommandFeature>() ?? throw new InvalidOperationException("No commands.");
-			using DockerSessionFeature docker = DockerSessionFeature.ForCommands(commands, TimeProvider.System, server.Host, user);
+			await using DockerSessionFeature docker = DockerSessionFeature.ForCommands(commands, TimeProvider.System, server.Host, user);
 
 			DockerEngineStatus status = await docker.DetectAsync(token);
 			if (!status.IsReady)

@@ -9,6 +9,8 @@ using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Maui.ToolWindows;
 using Mokaterm.UI.Commands;
+using Mokaterm.UI.Common.Editing;
+using Mokaterm.UI.Common.Files;
 using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Connections;
@@ -41,16 +43,21 @@ public sealed class ToolPageServicesTests
 	[InlineData(typeof(UserInteractionService))]
 	public void PageServices_AreTheToolWindowsOwn(Type service) => Assert.True(Classified().IsPerPage(service), service.Name);
 
-	// Built over a JS wrapper, so a tool window that resolved one would get one wired to its own page.
+	// Built over a JS wrapper or the page's dialogs, so a tool window that resolved one would get one wired to its own
+	// page: a tool's editor and file browser open in the tool's window, and a link it opens leaves from there.
 	[Theory]
 	[InlineData(typeof(ShellInputBridge))]
 	[InlineData(typeof(ConnectionActions))]
+	[InlineData(typeof(IRemoteTextEditor))]
+	[InlineData(typeof(IFileBrowserDialog))]
+	[InlineData(typeof(IUrlOpener))]
 	public void ServicesBuiltOverThePage_AreTheToolWindowsOwnToo(Type service) => Assert.True(Classified().IsPerPage(service), service.Name);
 
 	[Theory]
 	[InlineData(typeof(IVault))]
 	[InlineData(typeof(ISessionManager))]
 	[InlineData(typeof(SessionWorkspace))]
+	[InlineData(typeof(ISessionTabs))]
 	[InlineData(typeof(SessionToolActions))]
 	[InlineData(typeof(UiStateStore))]
 	[InlineData(typeof(ShellState))]

@@ -1,3 +1,4 @@
+@using Moka.Red.ContextMenu
 @using Mokaterm.Modules.Ssh.Admin.Firewall
 @inherits AdminPageBase
 
@@ -15,7 +16,7 @@
 				Error="@LoadError"
 				OnRefresh="ReloadAsync"
 				ListPage
-				Detail="@(_adding ? AddPanel : null)">
+				Detail="@(_adding ? AddPanel : SelectedRule is null ? null : RulePanel)">
 	<Chips>
 		@if (_status is { } status && Capabilities.Firewall is { } firewall)
 		{
@@ -73,18 +74,34 @@
 
 			@if (status.Rules.Count > 0)
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 104px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 90px">
+				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 104px minmax(0, 1fr) 28px; --mta-cols-narrow: minmax(0, 1fr) 90px 28px">
 					<div class="mta-row mta-row--head">
 						<span>Rule</span>
 						<span>Action</span>
 						<span class="mta-wide">From</span>
+						<span></span>
 					</div>
 					@foreach ((FirewallRule rule, int index) in status.Rules.Select((rule, index) => (rule, index)).Where(pair => Matches(pair.rule)))
 					{
-						<div class="mta-row" @key="index">
+						<div class="@(index == _selected && !_adding ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
+							 @key="index"
+							 role="button"
+							 tabindex="0"
+							 @onclick="@(() => Select(index))"
+							 @onkeydown="@(args => OnRowKey(args, index))"
+							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(rule, index, firewall, status)))"
+							 @oncontextmenu:preventDefault="true">
 							<span class="mta-cell mta-mono" title="@rule.Target">@rule.Target</span>
 							<span class="mta-cell mta-mono" style="@ActionStyle(rule.Action)">@rule.Action</span>
 							<span class="mta-cell mta-mono mta-dim mta-wide" title="@rule.From">@rule.From</span>
+							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
+								<MokaButton Variant="MokaVariant.Text"
+											Color="MokaColor.Surface"
+											Size="MokaSize.Xs"
+											StartIcon="MokaIcons.Navigation.MoreHorizontal"
+											OnClick="@(args => ShowRowMenu(args, MenuFor(rule, index, firewall, status)))"
+											aria-label="@($"Actions for {rule.Target}")" />
+							</span>
 						</div>
 					}
 				</div>
@@ -114,6 +131,7 @@
 	private string _filter = "";
 	private bool _adding;
 	private int _formVersion;
+	private int? _selected;
 	private FirewallPort? _port;
 
 	protected override bool ReadsMoreAsRoot => true;
@@ -137,6 +155,8 @@
 		}
 	}
 
+	private FirewallRule? SelectedRule => _selected is { } index && _status is { } status && index < status.Rules.Count ? status.Rules[index] : null;
+
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
 		if (Capabilities.Firewall is not { } firewall || !ReadAsRoot)
@@ -145,8 +165,111 @@
 			return;
 		}
 
+		FirewallRule? selected = SelectedRule;
 		AdminOutcome outcome = await ReadAsync(firewall.Status(), cancellationToken);
 		_status = firewall.Parse(outcome);
+
+		// Rules move up when one before them goes, so the selection follows the rule, not the line.
+		int found = selected is null ? -1 : _status.Rules.ToList().FindIndex(rule => rule.Target == selected.Target && rule.Action == selected.Action && rule.From == selected.From);
+		_selected = found < 0 ? null : found;
+	}
+
+	private RenderFragment RulePanel => __builder =>
+	{
+		if (SelectedRule is not { } rule || _status is not { } status || Capabilities.Firewall is not { } firewall)
+		{
+			return;
+		}
+
+		string? refusal = firewall.WhyNotDelete(rule);
+		<AdminDetailPanel Title="@rule.Target" Subtitle="@rule.Action" OnClose="@(() => _selected = null)">
+			<Actions>
+				@if (firewall.CanChange)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(Busy || refusal is not null)"
+								title="@refusal"
+								OnClick="@(() => DeleteAsync(rule, firewall, status))">
+						Delete
+					</MokaButton>
+				}
+			</Actions>
+			<ChildContent>
+				<dl class="mta-kv">
+					@if (rule.Number is { } number)
+					{
+						<dt>Number</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@number</MokaText></dd>
+					}
+					<dt>Rule</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.Target</MokaText></dd>
+					<dt>Action</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.Action</MokaText></dd>
+					@if (rule.From.Length > 0)
+					{
+						<dt>From</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.From</MokaText></dd>
+					}
+				</dl>
+				@if (firewall.AllowsSsh(rule))
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"This rule lets in port {firewall.SshPort}, which this session arrived on.")</MokaText>
+				}
+				@if (!firewall.CanChange)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"{firewall.DisplayName} rules are shown here, not changed.")</MokaText>
+				}
+				else if (refusal is not null)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@refusal</MokaText>
+				}
+			</ChildContent>
+		</AdminDetailPanel>
+	};
+
+	private IReadOnlyList<MokaContextMenuItem> MenuFor(FirewallRule rule, int index, FirewallCommands firewall, FirewallStatus status)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(index, keepOpen: true) }];
+		if (firewall.CanChange)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Delete",
+				Icon = MokaIcons.Action.Delete,
+				DividerBefore = true,
+				Disabled = Busy || firewall.WhyNotDelete(rule) is not null,
+				OnClick = () => DeleteAsync(rule, firewall, status),
+			});
+		}
+
+		return items;
+	}
+
+	private void Select(int index) => Select(index, keepOpen: false);
+
+	private void Select(int index, bool keepOpen)
+	{
+		_adding = false;
+		_selected = _selected == index && !keepOpen ? null : index;
+	}
+
+	private void OnRowKey(KeyboardEventArgs args, int index)
+	{
+		if (args.Key is "Enter" or " ")
+		{
+			Select(index);
+		}
+	}
+
+	private async Task DeleteAsync(FirewallRule rule, FirewallCommands firewall, FirewallStatus status)
+	{
+		if (firewall.WhyNotDelete(rule) is null && await RunAsync(firewall.Delete(rule, status)) is { Succeeded: true })
+		{
+			_selected = null;
+		}
 	}
 
 	private RenderFragment AddPanel => __builder =>
@@ -191,6 +314,7 @@
 
 	private void StartAdd()
 	{
+		_selected = null;
 		_adding = true;
 		_port = null;
 		_formVersion++;

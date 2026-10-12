@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Moka.Red.ContextMenu;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Tools;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
@@ -17,7 +18,9 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 /// </remarks>
 public abstract class AdminPageBase : ComponentBase, IDisposable
 {
+	private readonly CancellationTokenSource _lifetime = new();
 	private CancellationTokenSource? _load;
+	private PagePoller? _poller;
 	private bool? _rootSeen;
 	private bool _disposed;
 
@@ -50,6 +53,9 @@ public abstract class AdminPageBase : ComponentBase, IDisposable
 	[Inject]
 	private IMokaContextMenuService Menu { get; set; } = default!;
 
+	[Inject]
+	private TimeProvider Time { get; set; } = default!;
+
 	public void Dispose()
 	{
 		Dispose(disposing: true);
@@ -64,6 +70,8 @@ public abstract class AdminPageBase : ComponentBase, IDisposable
 		}
 
 		_disposed = true;
+		_lifetime.Cancel();
+		_poller?.Dispose();
 		_load?.Cancel();
 		_load?.Dispose();
 		_load = null;
@@ -129,6 +137,26 @@ public abstract class AdminPageBase : ComponentBase, IDisposable
 			Menu.Show(args, items);
 		}
 	}
+
+	/// <summary>
+	/// Calls <paramref name="tick"/> every <paramref name="interval"/> while the view is shown and the page is neither
+	/// loading nor busy with a change. Replaces any polling already running.
+	/// </summary>
+	private protected void StartPolling(TimeSpan interval, Func<Task> tick)
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_poller ??= new PagePoller(Time, InvokeAsync, () => Context.IsVisible() && !Loading && !Busy);
+		_poller.Start(interval, tick, _lifetime.Token);
+	}
+
+	private protected void StopPolling() => _poller?.Stop();
+
+	/// <summary>Ends when the page goes away: what a polling tick reads under, since a tick has no load of its own to cancel.</summary>
+	private protected CancellationToken Lifetime => _lifetime.Token;
 
 	/// <summary>Reads <paramref name="script"/> and hands back its output, or throws with what went wrong.</summary>
 	private protected async Task<AdminOutcome> ReadAsync(AdminScript script, CancellationToken cancellationToken) =>

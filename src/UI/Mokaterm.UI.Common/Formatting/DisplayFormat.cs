@@ -47,6 +47,24 @@ public static class DisplayFormat
 	public static string Timestamp(DateTimeOffset? value) =>
 		value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "";
 
+	/// <summary><c>12d 4h</c>, <c>4h 13m</c>, <c>13m</c>: the two largest units, enough for an uptime. Empty for null.</summary>
+	public static string Span(TimeSpan? span)
+	{
+		if (span is not { } value)
+		{
+			return "";
+		}
+
+		if (value.TotalDays >= 1)
+		{
+			return string.Create(CultureInfo.InvariantCulture, $"{(int)value.TotalDays}d {value.Hours}h");
+		}
+
+		return value.TotalHours >= 1
+			? string.Create(CultureInfo.InvariantCulture, $"{(int)value.TotalHours}h {value.Minutes}m")
+			: string.Create(CultureInfo.InvariantCulture, $"{Math.Max(0, value.Minutes)}m");
+	}
+
 	/// <summary><c>1:05:09</c> or <c>05:09</c>.</summary>
 	public static string Duration(TimeSpan value) =>
 		value.TotalHours >= 1

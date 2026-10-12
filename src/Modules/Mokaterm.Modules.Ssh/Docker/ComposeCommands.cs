@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Modules.Ssh.Tools;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -85,7 +86,7 @@ internal static class ComposeCommands
 				throw new ArgumentException("docker-compose 1.x has no --since.", nameof(since));
 			}
 
-			if (!DockerLogParser.IsTimestamp(since) || since.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+			if (!LogLines.IsTimestampWord(since))
 			{
 				throw new ArgumentException("That is not a docker timestamp.", nameof(since));
 			}

@@ -1,0 +1,183 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+<div class="mt-dk-toolbar">
+	<span class="mt-dk-label">Disk usage</span>
+	<span class="mt-dk-cell">docker system df</span>
+	<span class="mt-dk-spacer"></span>
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" title="Measure again" aria-label="Measure again" />
+</div>
+
+@LoadErrorPanel(RefreshAsync)
+@ChangePanel
+
+<div class="mt-dk-scroll">
+	@if (IsFirstLoad)
+	{
+		<div class="mt-dk-center"><MokaSpinner Label="Measuring what Docker keeps on disk" /></div>
+	}
+
+	@if (_summary.Count > 0)
+	{
+		<table class="mt-dk-table">
+			<thead><tr><th>Type</th><th>Total</th><th>Active</th><th>Size</th><th>Reclaimable</th></tr></thead>
+			<tbody>
+				@foreach (DockerDiskUsage row in _summary)
+				{
+					<tr @key="row.Type">
+						<td>@row.Type</td>
+						<td>@row.TotalCount</td>
+						<td>@row.Active</td>
+						<td>@row.Size</td>
+						<td>@row.Reclaimable</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+
+	@if (!IsFirstLoad && _usage is null && LoadError is null)
+	{
+		<span class="mt-dk-note">This docker prints no item by item listing, so nothing can be previewed or removed from here.</span>
+	}
+
+	@if (_usage is not null)
+	{
+		<span class="mt-dk-note">
+			Each list is exactly what its button removes, and the confirmation shows the command, which names every one of them.
+		</span>
+
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Stopped containers</span>
+				<span class="mt-dk-mono mt-dk-muted">@Totals(_containers.Count, _containers.Sum(container => DockerSizes.Parse(container.Row.Size) ?? 0))</span>
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+							Disabled="@(IsBusy || _containers.Count == 0)" OnClick="@(() => RunAsync(DockerCleanupPlans.RemoveContainers(_containers)))">
+					@RemoveText(_containers.Count)
+				</MokaButton>
+			</div>
+			@if (_containers.Count == 0)
+			{
+				<span class="mt-dk-note">None: every container is running or paused.</span>
+			}
+			@foreach (DockerContainer container in Capped(_containers, "containers"))
+			{
+				<div class="mt-dk-row" @key="container.Id">
+					<div class="mt-dk-row-main mt-dk-row-static">
+						<span class="mt-dk-cell-name mt-dk-cell--w30" title="@container.Id">@container.Name</span>
+						<span class="mt-dk-cell mt-dk-cell--grow" title="@container.Image">@container.Image</span>
+						<span class="mt-dk-cell mt-dk-cell--optional">@container.Status</span>
+						<span class="mt-dk-cell mt-dk-cell--size">@container.Row.Size</span>
+					</div>
+				</div>
+			}
+			@MoreLine(_containers.Count, "containers")
+		</div>
+
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Images</span>
+				<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_taggedImages ? "unused" : "dangling")" ValueChanged="OnImageScopeChanged" AriaLabel="Which images">
+					<MokaSegment Value="dangling" Text="@($"Dangling {DanglingCount.ToString(CultureInfo.CurrentCulture)}")" />
+					<MokaSegment Value="unused" Text="@($"Unused {UnusedImageCount.ToString(CultureInfo.CurrentCulture)}")" />
+				</MokaSegmentedControl>
+				<span class="mt-dk-mono mt-dk-muted">@Totals(_images.Count, _images.DistinctBy(image => image.Id).Sum(image => image.FreedBytes ?? 0))</span>
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+							Disabled="@(IsBusy || _images.Count == 0)" OnClick="@(() => RunAsync(DockerCleanupPlans.RemoveImages(_images, _taggedImages)))">
+					@RemoveText(_images.Count)
+				</MokaButton>
+			</div>
+			<span class="mt-dk-note">
+				@(_taggedImages
+					? "Every image no container was made from, tagged or not. Sizes are what each one alone holds; layers shared with a kept image stay."
+					: "Images no tag points at and no container uses, usually left behind when a tag moved to a newer build or pull.")
+			</span>
+			@foreach (DockerImage image in Capped(_images, "images"))
+			{
+				<div class="mt-dk-row" @key="image.Reference + image.Id">
+					<div class="mt-dk-row-main mt-dk-row-static">
+						<span class="mt-dk-cell-name mt-dk-cell--w45" title="@image.Id">@image.Reference</span>
+						<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>
+						<span class="mt-dk-cell mt-dk-cell--size" title="Freed when it goes">@(image.UniqueSize.Length > 0 ? image.UniqueSize : image.Size)</span>
+					</div>
+				</div>
+			}
+			@MoreLine(_images.Count, "images")
+		</div>
+
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Volumes</span>
+				<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_namedVolumes ? "all" : "anonymous")" ValueChanged="OnVolumeScopeChanged" AriaLabel="Which volumes">
+					<MokaSegment Value="anonymous" Text="@($"Anonymous {AnonymousCount.ToString(CultureInfo.CurrentCulture)}")" />
+					<MokaSegment Value="all" Text="@($"All unused {UnusedVolumeCount.ToString(CultureInfo.CurrentCulture)}")" />
+				</MokaSegmentedControl>
+				<span class="mt-dk-mono mt-dk-muted">@Totals(_volumes.Count, _volumes.Sum(volume => volume.SizeBytes ?? 0))</span>
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+							Disabled="@(IsBusy || _volumes.Count == 0)" OnClick="@(() => RunAsync(DockerCleanupPlans.RemoveVolumes(_volumes)))">
+					@($"Delete {_volumes.Count.ToString(CultureInfo.CurrentCulture)} and their data")
+				</MokaButton>
+			</div>
+			<span class="mt-dk-note mt-dk-cell--error">
+				A volume holds a container's data. No container uses these now, but deleting one deletes what it stores, for good.
+			</span>
+			@foreach (DockerVolume volume in Capped(_volumes, "volumes"))
+			{
+				<div class="mt-dk-row" @key="volume.Name">
+					<div class="mt-dk-row-main mt-dk-row-static">
+						<span class="mt-dk-cell-name mt-dk-cell--w45" title="@volume.Mountpoint">@volume.Name</span>
+						<span class="mt-dk-label mt-dk-cell--w12">@(volume.IsAnonymous ? "anonymous" : "")</span>
+						<span class="mt-dk-cell mt-dk-cell--grow">@volume.Driver</span>
+						<span class="mt-dk-cell mt-dk-cell--size">@volume.Size</span>
+					</div>
+				</div>
+			}
+			@MoreLine(_volumes.Count, "volumes")
+		</div>
+
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Build cache</span>
+				<span class="mt-dk-mono mt-dk-muted">@Totals(_cache.Count, _cache.Sum(entry => entry.SizeBytes ?? 0))</span>
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+							Disabled="@(IsBusy || _cache.Count == 0)" OnClick="@(() => RunAsync(DockerCleanupPlans.ClearBuildCache(_cache)))">
+					Clear
+				</MokaButton>
+			</div>
+			@if (_cache.Count == 0)
+			{
+				<span class="mt-dk-note">Nothing unused.</span>
+			}
+			@foreach (DockerBuildCacheEntry entry in Capped(_cache, "cache"))
+			{
+				<div class="mt-dk-row" @key="entry.Id">
+					<div class="mt-dk-row-main mt-dk-row-static">
+						<span class="mt-dk-cell-name mt-dk-cell--w12" title="@entry.Id">@entry.ShortId</span>
+						<span class="mt-dk-label mt-dk-cell--w12">@entry.CacheType</span>
+						<span class="mt-dk-cell mt-dk-cell--grow" title="@entry.Description">@entry.Description</span>
+						<span class="mt-dk-cell mt-dk-cell--time mt-dk-cell--optional">@entry.LastUsedSince</span>
+						<span class="mt-dk-cell mt-dk-cell--size">@entry.Size</span>
+					</div>
+				</div>
+			}
+			@MoreLine(_cache.Count, "cache")
+		</div>
+	}
+</div>
+
+@code {
+	private RenderFragment MoreLine(int count, string list) => @<text>
+		@if (count > ShownRows && !_expanded.Contains(list))
+		{
+			<div class="mt-dk-toolbar">
+				<span class="mt-dk-note">@($"{(count - ShownRows).ToString(CultureInfo.CurrentCulture)} more, all of them in the command.")</span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="@(() => Expand(list))">Show all</MokaButton>
+			</div>
+		}
+	</text>;
+}

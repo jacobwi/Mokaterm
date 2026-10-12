@@ -47,5 +47,5 @@ internal sealed class FakeDockerShell : IDockerShell
 		return Task.FromResult(answer);
 	}
 
-	public DockerClient Client(string host = "build-server") => new(this, host, new SemaphoreSlim(DockerClient.MaxConcurrentCommands));
+	public DockerClient Client(string host = "build-server") => new(this, host);
 }

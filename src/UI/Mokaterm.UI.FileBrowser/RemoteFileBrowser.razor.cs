@@ -12,9 +12,9 @@ using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
-using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Files;
 using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.Interop;
@@ -29,7 +29,8 @@ namespace Mokaterm.UI.FileBrowser;
 /// <summary>
 /// Remote file browser for any session exposing <see cref="Abstractions.FileSystem.IFileSystemFeature"/>: listing,
 /// navigation, context menus, user/root switching, drag and drop uploads and downloads through the transfer queue.
-/// Re-opens the file system when the session reconnects.
+/// Re-opens the file system when the session reconnects. The same browser shows a file system a module hands over
+/// (<see cref="Files"/>), which <see cref="IFileBrowserDialog"/> puts in a dialog.
 /// </summary>
 public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 {
@@ -68,8 +69,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private bool _activeSentToJs;
 	private bool _disposed;
 
-	private ISessionHandle? _session;
-	private IProtocolSession? _protocolSession;
+	private BrowserSource? _source;
+	private object? _live;
 	private IFileSystemFeature? _feature;
 	private IRemoteFileSystem? _userFileSystem;
 	private IRemoteFileSystem? _rootFileSystem;
@@ -103,8 +104,13 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private bool _restoreFocus;
 	private string? _focusSelector;
 
-	[Parameter, EditorRequired]
-	public ISessionHandle Session { get; set; } = default!;
+	/// <summary>The session tab whose files to show. Exactly one of this and <see cref="Files"/> is set.</summary>
+	[Parameter]
+	public ISessionHandle? Session { get; set; }
+
+	/// <summary>A file system a module handed over, shown instead of a session's. Exactly one of this and <see cref="Session"/> is set.</summary>
+	[Parameter]
+	public FileBrowserRequest? Files { get; set; }
 
 	/// <summary>True while visible. Hidden browsers stop polling and ignore keyboard shortcuts.</summary>
 	[Parameter]
@@ -155,7 +161,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private CancellationToken ConnectionToken =>
 		_disposed ? new CancellationToken(canceled: true) : _connection?.Token ?? _lifetime.Token;
 
-	private IProtocolSession? LiveSession => Session.State == SessionState.Connected ? Session.Session : null;
+	private BrowserSource Source => _source ?? throw new InvalidOperationException("The file browser has no files to show yet.");
 
 	/// <summary>A file system is open and a listing is on screen.</summary>
 	private bool CanBrowse => _fileSystem is not null && _loaded;
@@ -171,13 +177,13 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	// While root is being opened (and the sudo prompt may be up) the control already shows the requested mode.
 	private string ModeValue => IsElevated || _switchingMode ? RootMode : UserMode;
 
-	private TransferOrigin Origin => new(Session.Title, Session.Host.Address);
+	private TransferOrigin Origin => new(Source.Group, Source.Location);
 
 	private List<RemoteFileEntry> SelectedEntries => _selection.SelectedIn(_view);
 
 	private string RootClass => $"fb{(IsElevated ? " fb--root" : "")} {Class}".TrimEnd();
 
-	private string AccountLabel => _fileSystem is null ? "" : _fileSystem.UserName + "@" + Session.Host.Address;
+	private string AccountLabel => _fileSystem is null ? "" : _fileSystem.UserName + "@" + Source.Location;
 
 	private string DropAccountText => "as " + _fileSystem?.UserName;
 
@@ -217,10 +223,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 
 		_disposed = true;
-		if (_session is not null)
-		{
-			_session.Changed -= OnSessionChanged;
-		}
+		_source?.Unsubscribe(OnSessionChanged);
 
 		Settings.Changed -= OnSettingsChanged;
 		Bookmarks.Changed -= OnBookmarksChanged;
@@ -258,18 +261,21 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	protected override void OnParametersSet()
 	{
 		ApplyFollowParameters();
-		if (ReferenceEquals(Session, _session))
+		object key = (Session, Files) switch
+		{
+			({ } session, null) => session,
+			(null, { } files) => files,
+			_ => throw new InvalidOperationException("Give the file browser either a Session or Files, and not both."),
+		};
+
+		if (ReferenceEquals(key, _source?.Key))
 		{
 			return;
 		}
 
-		if (_session is not null)
-		{
-			_session.Changed -= OnSessionChanged;
-		}
-
-		_session = Session;
-		_session.Changed += OnSessionChanged;
+		_source?.Unsubscribe(OnSessionChanged);
+		_source = Session is { } tab ? BrowserSource.For(tab) : BrowserSource.For(Files!);
+		_source.Subscribe(OnSessionChanged);
 		ResetForSession();
 
 		// A prerender has no circuit to hold a connection for; the interactive render opens the file system.
@@ -404,7 +410,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private void ResetForSession()
 	{
 		CancelConnection();
-		_protocolSession = null;
+		_live = null;
 		_feature = null;
 		_userFileSystem = null;
 		_rootFileSystem = null;
@@ -448,8 +454,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			return;
 		}
 
-		IProtocolSession? live = LiveSession;
-		if (ReferenceEquals(live, _protocolSession))
+		object? live = Source.Connection;
+		if (ReferenceEquals(live, _live))
 		{
 			StateHasChanged();
 			return;
@@ -457,8 +463,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 		// The file systems of the old connection belong to the session, which disposes them; only forget them here.
 		CancelConnection();
-		_protocolSession = live;
-		_feature = live?.GetFeature<IFileSystemFeature>();
+		_live = live;
+		_feature = live is null ? null : Source.FeatureOf(live);
 		_userFileSystem = null;
 		_rootFileSystem = null;
 		_fileSystem = null;
@@ -613,15 +619,12 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 				return InitialPath.Trim();
 			}
 
-			foreach (string key in InitialDirectoryOptions)
+			if (Files?.StartFolder is { } startFolder && !string.IsNullOrWhiteSpace(startFolder))
 			{
-				if (Session.Connection.Options.GetString(key) is { } value && !string.IsNullOrWhiteSpace(value))
-				{
-					return value.Trim();
-				}
+				return startFolder.Trim();
 			}
 
-			return null;
+			return Source.ConfiguredStartFolder(InitialDirectoryOptions);
 		}
 	}
 
@@ -970,18 +973,18 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private StateInfo DescribeState()
 	{
-		if (Session.State == SessionState.Connecting)
+		if (Source.Session is { State: SessionState.Connecting } connecting)
 		{
-			return new StateInfo(MokatermIcons.Connect, "Connecting...", Session.StatusMessage, CanRetry: false);
+			return new StateInfo(MokatermIcons.Connect, "Connecting...", connecting.StatusMessage, CanRetry: false);
 		}
 
 		// The states a reconnect acts on are the states with no file system behind them.
-		if (ISessionHandle.CanReconnect(Session.State))
+		if (Source.Session is { } session && ISessionHandle.CanReconnect(session.State))
 		{
-			return new StateInfo(MokatermIcons.Disconnect, "Disconnected", Session.StatusMessage, CanRetry: false);
+			return new StateInfo(MokatermIcons.Disconnect, "Disconnected", session.StatusMessage, CanRetry: false);
 		}
 
-		if (_protocolSession is not null && _feature is null)
+		if (_live is not null && _feature is null)
 		{
 			return new StateInfo(MokatermIcons.Folder, "No file access", "This connection does not offer a file system.", CanRetry: false);
 		}

@@ -1,5 +1,5 @@
-using System.Text;
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Modules.Ssh.Shell;
 using Renci.SshNet;
@@ -61,17 +61,13 @@ internal sealed class RemoteAccountNames : IDisposable
 		timeout.CancelAfter(LoadTimeout);
 		try
 		{
-			RemoteCommandResult result = await RemoteCommand.RunAsync(client, PosixShell.ScriptCommand(RemoteScripts.Accounts, []), null, timeout.Token);
+			RemoteCommandResult result = await RemoteCommand.RunAsync(client, PosixShell.ScriptCommand(RemoteScripts.Accounts, []), null, runsLong: false, timeout.Token);
 			if (!RemoteOutput.TryGetPayload(result.Output, out ReadOnlyMemory<byte> payload))
 			{
 				return AccountDirectory.Empty;
 			}
 
-			string text = Encoding.UTF8.GetString(payload.Span);
-			int separator = text.IndexOf('\0', StringComparison.Ordinal);
-			return separator < 0
-				? AccountDirectory.Parse(text, "")
-				: AccountDirectory.Parse(text[..separator], text[(separator + 1)..]);
+			return AccountDirectory.FromScript(payload.Span);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
 		{

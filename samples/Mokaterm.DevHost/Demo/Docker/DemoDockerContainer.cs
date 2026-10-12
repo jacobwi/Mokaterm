@@ -22,6 +22,9 @@ internal sealed class DemoDockerContainer
 
 	public int ExitCode { get; set; }
 
+	/// <summary>How often the daemon restarted it under its restart policy, which <c>inspect</c> reports.</summary>
+	public int RestartCount { get; set; }
+
 	/// <summary><c>healthy</c>, <c>unhealthy</c>, <c>starting</c> or empty for no health check.</summary>
 	public string Health { get; set; } = "";
 

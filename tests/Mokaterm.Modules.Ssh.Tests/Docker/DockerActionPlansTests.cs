@@ -48,6 +48,19 @@ public sealed class DockerActionPlansTests
 	}
 
 	[Fact]
+	public void Compose_Update_PullsThenBringsUp_ThroughTheSamePlans()
+	{
+		ComposeActionPlan project = ComposeActions.Plan("update", Shop, Services)!;
+		ComposeActionPlan service = ComposeActions.Plan("update", Shop, Services, "api")!;
+
+		Assert.Equal("Update shop (web, api, db)", project.Title);
+		Assert.Equal([$"{Prefix} pull", $"{Prefix} up --detach"], project.Calls.Select(call => call.Display));
+		Assert.Equal("Update api", service.Title);
+		Assert.Equal([$"{Prefix} pull api", $"{Prefix} up --detach --no-deps api"], service.Calls.Select(call => call.Display));
+		Assert.Contains("outside volumes, is lost", service.Confirm, StringComparison.Ordinal);
+	}
+
+	[Fact]
 	public void Compose_Down_SaysWhetherTheVolumesGo()
 	{
 		Assert.Contains("Its volumes are kept.", ComposeActions.Plan("down", Shop, Services)!.Confirm, StringComparison.Ordinal);

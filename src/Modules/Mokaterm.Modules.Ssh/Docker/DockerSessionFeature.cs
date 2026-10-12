@@ -1,26 +1,32 @@
+using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Commands;
+using Mokaterm.Abstractions.Containers;
+using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Modules.Ssh.Elevation;
+using Mokaterm.Modules.Ssh.FileSystem;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
 /// <summary>
 /// The Docker manager's state for one SSH session, which outlives the dialog it is shown in: what looking for Docker
-/// found, and whether commands go through sudo. Reached through <c>GetFeature&lt;DockerSessionFeature&gt;()</c> and
-/// disposed with the session, which wipes the sudo password it holds.
+/// found, whether commands go through sudo, and the docker host's files. Reached through
+/// <c>GetFeature&lt;DockerSessionFeature&gt;()</c> and disposed with the session, which wipes the sudo password it holds.
+/// The root file system it reads and edits through is the session's, shared with the system view.
 /// </summary>
 /// <remarks>
 /// Public only so another session can offer the manager over its own commands (<see cref="ForCommands"/>), which is how
 /// the workbench shows it without a docker host; everything the manager itself uses stays internal.
 /// </remarks>
-public sealed class DockerSessionFeature : IDisposable
+public sealed class DockerSessionFeature : IAsyncDisposable
 {
 	private const int MaxExecHistory = 15;
 
 	private readonly List<DockerExecRequest> _history = [];
 	private readonly Func<CancellationToken, Task<SudoRunner>>? _authenticate;
 	private readonly TimeProvider _time;
-	private readonly SemaphoreSlim _slots = new(DockerClient.MaxConcurrentCommands, DockerClient.MaxConcurrentCommands);
 	private readonly SemaphoreSlim _switching = new(1, 1);
+	private readonly Dictionary<string, ContainerFileSystemFeature> _containerFiles = new(StringComparer.Ordinal);
+	private readonly ILogger? _logger;
 	private SudoRunner? _runner;
 	private DockerClient _client;
 	private DockerEngineStatus? _status;
@@ -30,12 +36,20 @@ public sealed class DockerSessionFeature : IDisposable
 	/// <param name="authenticate">Gets sudo going for this session, asking for a password when it needs one; null when the connection does not allow running as root.</param>
 	/// <param name="host">The server, for messages.</param>
 	/// <param name="userName">The login's user, for the docker group advice.</param>
+	/// <param name="files">The session's files, for the env and compose files and volume folders; null when it has none.</param>
+	/// <param name="stagingDirectory">Where uploads into containers wait on the docker host; null for <c>/tmp</c>.</param>
+	/// <param name="logger">Hears about staging files that could not be removed.</param>
+	/// <param name="rootFiles">The session's one root file system over <paramref name="files"/>, which the session owns; null makes one of the manager's own.</param>
 	internal DockerSessionFeature(
 		IDockerShell userShell,
 		Func<CancellationToken, Task<SudoRunner>>? authenticate,
 		TimeProvider time,
 		string host,
-		string userName)
+		string userName,
+		IFileSystemFeature? files,
+		Func<string>? stagingDirectory = null,
+		ILogger? logger = null,
+		SessionRootFiles? rootFiles = null)
 	{
 		ArgumentNullException.ThrowIfNull(userShell);
 		ArgumentNullException.ThrowIfNull(time);
@@ -43,13 +57,28 @@ public sealed class DockerSessionFeature : IDisposable
 		_time = time;
 		Host = host;
 		UserName = userName;
-		_client = new DockerClient(userShell, host, _slots);
+		_client = new DockerClient(userShell, host);
+		_logger = logger;
+		HostFiles = rootFiles is not null
+			? new DockerHostFiles(rootFiles, stagingDirectory)
+			: files is null ? null : new DockerHostFiles(files, stagingDirectory);
+		ImageUpdates = new DockerImageUpdates(time);
+		Changes = new DockerChangeLog(time);
 	}
 
 	/// <summary>Raised when the status or the shell changes. Handlers may run on any thread.</summary>
 	public event Action? Changed;
 
 	internal DockerClient Client => Volatile.Read(ref _client);
+
+	/// <summary>The docker host's files, or null for a session without a file system.</summary>
+	internal DockerHostFiles? HostFiles { get; }
+
+	/// <summary>The update checks run this session, which every page reads to mark what has a newer image.</summary>
+	internal DockerImageUpdates ImageUpdates { get; }
+
+	/// <summary>The changes the user ran this session, so the health watch never reports them.</summary>
+	internal DockerChangeLog Changes { get; }
 
 	/// <summary>What the last look found, or null before the first one.</summary>
 	internal DockerEngineStatus? Status => Volatile.Read(ref _status);
@@ -112,10 +141,40 @@ public sealed class DockerSessionFeature : IDisposable
 
 	/// <summary>
 	/// A manager over any session's command feature, as the login and never through sudo. The SSH session builds its
-	/// own with sudo; this is for a session that only has commands to offer.
+	/// own with sudo; this is for a session that only has commands to offer, and the files it may have beside them.
 	/// </summary>
-	public static DockerSessionFeature ForCommands(IRemoteCommandFeature commands, TimeProvider time, string host, string userName) =>
-		new(new UserDockerShell(commands), authenticate: null, time, host, userName);
+	public static DockerSessionFeature ForCommands(
+		IRemoteCommandFeature commands,
+		TimeProvider time,
+		string host,
+		string userName,
+		IFileSystemFeature? files = null) =>
+		new(new UserDockerShell(commands), authenticate: null, time, host, userName, files);
+
+	/// <summary>
+	/// The files of the running container named <paramref name="container"/>, through this manager's client as the login or
+	/// through sudo, whichever it uses at each call. One per name for the session, so every browser and transfer of that
+	/// container shares it; the session disposes it.
+	/// </summary>
+	/// <exception cref="ArgumentException">The name is not a container name.</exception>
+	internal IFileSystemFeature ContainerFiles(string container)
+	{
+		ArgumentNullException.ThrowIfNull(container);
+		string trimmed = container.Trim();
+		string name = DockerCommands.Checked(trimmed, DockerNames.ContainerProblem(trimmed));
+		lock (_containerFiles)
+		{
+			// Checked under the lock the dispose empties the table under, so nothing is added after it.
+			ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+			if (!_containerFiles.TryGetValue(name, out ContainerFileSystemFeature? files))
+			{
+				files = new ContainerFileSystemFeature(() => Client, name, HostFiles, _logger);
+				_containerFiles.Add(name, files);
+			}
+
+			return files;
+		}
+	}
 
 	/// <summary>Looks for Docker again with the current shell and keeps what it found.</summary>
 	internal async Task<DockerEngineStatus> DetectAsync(CancellationToken cancellationToken)
@@ -152,7 +211,7 @@ public sealed class DockerSessionFeature : IDisposable
 				}
 
 				Interlocked.Exchange(ref _runner, runner)?.Dispose();
-				Volatile.Write(ref _client, new DockerClient(new SudoDockerShell(runner, _time), Host, _slots));
+				Volatile.Write(ref _client, new DockerClient(new SudoDockerShell(runner, _time), Host));
 			}
 		}
 		finally
@@ -163,7 +222,7 @@ public sealed class DockerSessionFeature : IDisposable
 		return await DetectAsync(cancellationToken);
 	}
 
-	public void Dispose()
+	public async ValueTask DisposeAsync()
 	{
 		if (Interlocked.Exchange(ref _disposed, 1) != 0)
 		{
@@ -171,5 +230,21 @@ public sealed class DockerSessionFeature : IDisposable
 		}
 
 		Interlocked.Exchange(ref _runner, null)?.Dispose();
+		ContainerFileSystemFeature[] containers;
+		lock (_containerFiles)
+		{
+			containers = [.. _containerFiles.Values];
+			_containerFiles.Clear();
+		}
+
+		foreach (ContainerFileSystemFeature container in containers)
+		{
+			await container.DisposeAsync();
+		}
+
+		if (HostFiles is { } files)
+		{
+			await files.DisposeAsync();
+		}
 	}
 }

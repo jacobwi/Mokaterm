@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits ComposePanelBase
 
 @if (Context is { } context)
 {
@@ -20,6 +20,8 @@
 		}
 	</div>
 
+	@EditOutcome
+
 	<div class="mt-dk-section">
 		<span class="mt-dk-label">Compose files</span>
 		@if (context.Project.ConfigFiles.Count == 0)
@@ -31,6 +33,11 @@
 			<div class="mt-dk-variable" @key="file">
 				@StateDot(file)
 				@PathLine(file, "Copy the path")
+				@if (_exists.GetValueOrDefault(file))
+				{
+					<span class="mt-dk-spacer"></span>
+					@EditButtons(file, asRoot: false)
+				}
 			</div>
 		}
 	</div>
@@ -46,21 +53,18 @@
 					@PathLine(file, "Copy the path")
 				</div>
 			}
-			<span class="mt-dk-note">Every command here passes these again, so compose reads the same values it started with.</span>
+			<span class="mt-dk-note">Every command here passes these again, so compose reads the same values it started with. They are edited on the Env tab.</span>
 		</div>
 	}
 
 	@LoadErrorPanel(CheckAsync)
 	<span class="mt-dk-note">@MissingText</span>
-	<span class="mt-dk-note">Edit a compose file from the session's file browser: a module cannot open the browser at a folder, so it is not offered here.</span>
+	<span class="mt-dk-note">Edit opens a file in the editor the file browser uses. After a save compose reads the files again, and Up applies them.</span>
 }
 
 @code {
 	private IReadOnlyDictionary<string, bool> _exists = new Dictionary<string, bool>();
 	private string? _checked;
-
-	[CascadingParameter]
-	private ComposeProjectContext? Context { get; set; }
 
 	private string MissingText => _exists.Count(entry => !entry.Value) switch
 	{

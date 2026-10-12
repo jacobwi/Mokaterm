@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Terminal;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -21,6 +22,9 @@ internal sealed record DockerOutput
 	public string Output { get; init; } = "";
 
 	public bool OutputTruncated { get; init; }
+
+	/// <summary>stdout as it came, for a call with <see cref="DockerCall.BinaryOutput"/>; empty for every other call.</summary>
+	public ReadOnlyMemory<byte> RawOutput { get; init; }
 
 	/// <summary>stderr, without what sudo itself printed before the command started.</summary>
 	public string Error { get; init; } = "";
@@ -43,8 +47,8 @@ internal sealed record DockerOutput
 	{
 		get
 		{
-			string output = DockerText.Plain(Output).TrimEnd();
-			string error = DockerText.Plain(Error).TrimEnd();
+			string output = TerminalTextFilter.Plain(Output).TrimEnd();
+			string error = TerminalTextFilter.Plain(Error).TrimEnd();
 			return output.Length == 0 ? error : error.Length == 0 ? output : output + "\n" + error;
 		}
 	}

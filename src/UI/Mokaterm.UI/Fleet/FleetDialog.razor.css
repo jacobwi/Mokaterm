@@ -1,0 +1,277 @@
+/* The rows are FleetHostRow's markup, styled from here with ::deep so the header and the rows share one set of rules
+   and one column template. */
+.mt-fleet {
+	container-type: inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-fleet-bar,
+.mt-fleet-picked {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.mt-fleet-bar__tools {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+
+.mt-fleet-bar__tools ::deep .mt-fleet-filter {
+	width: 280px;
+	max-width: 100%;
+}
+
+.mt-fleet-picked__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+
+.mt-fleet-count {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-fleet-empty {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-lg) var(--moka-spacing-md);
+}
+
+.mt-fleet-table {
+	--mt-fleet-columns: 22px 92px minmax(150px, 1.5fr) minmax(110px, 1.1fr) 60px 52px 100px 100px 64px 60px 48px 56px 56px;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+	min-width: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-row {
+	display: grid;
+	grid-template-columns: var(--mt-fleet-columns);
+	align-items: center;
+	column-gap: var(--moka-spacing-sm);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
+	cursor: pointer;
+	min-width: 0;
+	transition: background var(--moka-transition-fast);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row:last-child {
+	border-bottom: none;
+}
+
+.mt-fleet-table ::deep .mt-fleet-row:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row:focus-visible {
+	outline: none;
+	box-shadow: var(--moka-focus-ring);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row--picked {
+	box-shadow: inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row--stale .mt-fleet-cell:not(.mt-fleet-cell--state, .mt-fleet-cell--login, .mt-fleet-cell--pick, .mt-fleet-cell--actions) {
+	opacity: 0.5;
+}
+
+/* The header stays in view while the rows scroll under it inside the dialog. */
+.mt-fleet-table ::deep .mt-fleet-row--head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	cursor: default;
+	background: var(--moka-color-surface-2);
+	border-radius: var(--moka-radius-md) var(--moka-radius-md) 0 0;
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row--head:hover {
+	background: var(--moka-color-surface-2);
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--moka-font-size-sm);
+	color: var(--moka-color-on-surface);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row--head .mt-fleet-cell {
+	font-size: 10px;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell--os {
+	display: block;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell--usage {
+	display: grid;
+	grid-template-columns: 34px 1fr;
+	gap: var(--moka-spacing-xs);
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell--count,
+.mt-fleet-table ::deep .mt-fleet-cell--uptime {
+	justify-content: flex-end;
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell--actions {
+	justify-content: flex-end;
+	gap: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-state {
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-fleet-table ::deep .mt-fleet-row--problem .mt-fleet-state {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-fleet-table ::deep .mt-fleet-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mt-fleet-table ::deep .mt-fleet-dim {
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-fleet-table ::deep .mt-fleet-alert {
+	color: var(--moka-color-error);
+}
+
+.mt-fleet-table ::deep .mt-fleet-micro {
+	font-family: var(--moka-font-family);
+	font-size: 9px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+}
+
+.mt-fleet-table ::deep .mt-fleet-bar {
+	min-width: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.mt-fleet-table ::deep .mt-fleet-details {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	margin: var(--moka-spacing-xs) 0 var(--moka-spacing-xxs) calc(22px + var(--moka-spacing-sm));
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	cursor: default;
+	min-width: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-details__message {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-fleet-table ::deep .mt-fleet-details__note {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-warning);
+}
+
+.mt-fleet-table ::deep .mt-fleet-details__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xxs);
+}
+
+.mt-fleet-table ::deep .mt-fleet-facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	column-gap: var(--moka-spacing-md);
+	row-gap: 2px;
+	margin: 0;
+	min-width: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-facts dt {
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-fleet-table ::deep .mt-fleet-facts dd {
+	margin: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface);
+}
+
+/* Narrower dialogs drop the columns the details still carry, widest first. */
+@container (max-width: 980px) {
+	.mt-fleet-table {
+		--mt-fleet-columns: 22px 92px minmax(150px, 1.5fr) 60px 52px 100px 100px 64px 60px 48px 56px;
+	}
+
+	.mt-fleet-table ::deep .mt-fleet-cell--os,
+	.mt-fleet-table ::deep .mt-fleet-cell--actions {
+		display: none;
+	}
+}
+
+@container (max-width: 720px) {
+	.mt-fleet-table {
+		--mt-fleet-columns: 22px 92px minmax(120px, 1fr) 90px 90px 60px 48px;
+	}
+
+	.mt-fleet-table ::deep .mt-fleet-cell--uptime,
+	.mt-fleet-table ::deep .mt-fleet-cell--load,
+	.mt-fleet-table ::deep .mt-fleet-cell--updates,
+	.mt-fleet-table ::deep .mt-fleet-cell--docker {
+		display: none;
+	}
+}

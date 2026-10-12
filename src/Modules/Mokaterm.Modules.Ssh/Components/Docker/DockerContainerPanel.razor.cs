@@ -93,6 +93,8 @@ public sealed partial class DockerContainerPanel : DockerPageBase
 
 	private async Task ShellAsync() => _shellProblem = await OpenShellAsync(Name);
 
+	private Task BrowseAsync() => BrowseFilesAsync(Name, _details?.WorkingDirectory);
+
 	private async Task AfterChangeAsync()
 	{
 		await LoadDetailsAsync();
@@ -110,6 +112,9 @@ public sealed partial class DockerContainerPanel : DockerPageBase
 		{
 			case "shell":
 				await ShellAsync();
+				return;
+			case "files":
+				await BrowseAsync();
 				return;
 			case "logs" or "inspect" or "stats" or "mounts" or "run":
 				await TabChanged.InvokeAsync(action);

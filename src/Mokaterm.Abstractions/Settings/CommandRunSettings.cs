@@ -2,7 +2,9 @@ namespace Mokaterm.Abstractions.Settings;
 
 /// <summary>
 /// Running one command on several saved logins. The run dialog edits these and remembers them for the next run; the
-/// command itself is never kept here, because a command line can carry a token and this file is not encrypted.
+/// command itself is never kept here, because a command line can carry a token and this file is not encrypted. A survey
+/// of the machines for the fleet overview connects the same way, so it takes the parallel limit and the time per host
+/// from here too.
 /// </summary>
 public sealed record CommandRunSettings : ISettingsSection
 {

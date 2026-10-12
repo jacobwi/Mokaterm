@@ -1,3 +1,4 @@
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
 using Mokaterm.Modules.Ssh.Admin.Storage;
 
 namespace Mokaterm.Modules.Ssh.Admin.Overview;
@@ -5,6 +6,9 @@ namespace Mokaterm.Modules.Ssh.Admin.Overview;
 /// <summary>The overview's numbers, read from <c>/proc</c> and df in one go.</summary>
 internal sealed record OverviewSnapshot
 {
+	/// <summary>The live sample taken with the read, which the overview's history starts from.</summary>
+	public SystemSample Sample { get; init; } = new();
+
 	public TimeSpan? Uptime { get; init; }
 
 	/// <summary>Seconds since the epoch on the server when it was read.</summary>

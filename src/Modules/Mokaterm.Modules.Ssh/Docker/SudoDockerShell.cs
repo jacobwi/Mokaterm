@@ -28,7 +28,7 @@ internal sealed class SudoDockerShell : IDockerShell
 		ArgumentNullException.ThrowIfNull(call);
 		string line = DockerCommandLine.Build(call);
 		(string script, IReadOnlyList<string> arguments) = DockerCommandLine.ForScript(call);
-		RemoteCommandRequest request = new() { Command = line, OutputLimitBytes = call.OutputLimitBytes };
+		RemoteCommandRequest request = DockerShellRun.Request(call, line);
 		RemoteCommandOutcome outcome;
 		try
 		{
@@ -42,13 +42,13 @@ internal sealed class SudoDockerShell : IDockerShell
 			throw new DockerCommandException(DockerFailure.ElevationFailed, ex.Message, innerException: ex);
 		}
 
-		(bool elevated, string sudoOutput, string commandError) = SudoErrors.Split(DockerShellRun.ErrorText(outcome));
+		(bool elevated, string sudoOutput, string commandError) = SudoErrors.Split(outcome.Error.ToText());
 		if (!elevated)
 		{
 			string message = SudoErrors.Describe(SudoErrors.Classify(sudoOutput, outcome.ExitCode), _runner.Account, sudoOutput);
 			throw new DockerCommandException(DockerFailure.ElevationFailed, message);
 		}
 
-		return DockerShellRun.ToOutput(line, outcome, commandError, elevated: true);
+		return DockerShellRun.ToOutput(line, outcome, commandError, elevated: true, call.BinaryOutput);
 	}
 }

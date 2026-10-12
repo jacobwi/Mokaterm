@@ -1,0 +1,10 @@
+/* A variable's name keeps a third of the row and its value takes the rest, so long values do not push the name away. */
+.mt-dkn-variable-name {
+	flex: 0 1 34%;
+	min-width: 96px;
+}
+
+.mt-dkn-retries {
+	flex: 0 1 180px;
+	min-width: 120px;
+}
