@@ -4,6 +4,7 @@
    can raise. It runs on the services of the window that opened it, so the session, the vault and the settings are
    that window's; only what belongs to a page (scripts, menus, dialogs, its prompts and toasts) is its own. *@
 <MokaThemeProvider Theme="_theme">
+	<PluginStyles />
 	<div class="mt-toolwin">
 		@if (_session is { } session && _tool is { } tool)
 		{

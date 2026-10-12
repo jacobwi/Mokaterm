@@ -8,7 +8,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// The engine at a glance: versions, what the daemon runs on, counts, and one line per kind of what <c>docker system
 /// df</c> counts, with the way to the cleanup page, which is where anything is removed.
 /// </summary>
-public sealed partial class DockerOverviewPage : DockerPageBase
+public sealed partial class DockerOverviewPage : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerDiskUsage> _usage = [];
 

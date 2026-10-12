@@ -129,6 +129,10 @@ public static class MokatermIcons
 	public static readonly MokaIconDefinition Modules = new("mt-modules",
 		"M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z");
 
+	/// <summary>A plugin package, drawn as the box a <c>.mokaplugin</c> file arrives in.</summary>
+	public static readonly MokaIconDefinition Plugin = new("mt-plugin",
+		"M16.5 9.4l-9-5.19 M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12");
+
 	/// <summary>One pane, drawn as the frame <see cref="SplitView"/> divides.</summary>
 	public static readonly MokaIconDefinition SinglePane = new("mt-pane-single",
 		"M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z");

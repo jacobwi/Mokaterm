@@ -2,7 +2,7 @@
 @using Mokaterm.UI.Common.Formatting
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Disks"
+<ToolPageFrame Title="Disks"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -145,7 +145,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private const string SpaceTab = "space";
@@ -397,7 +397,7 @@
 			return;
 		}
 
-		<AdminDetailPanel Title="@device.Name" Subtitle="@(device.Model.Length > 0 ? device.Model : device.Type)" OnClose="@(() => _device = null)">
+		<ToolDetailPanel Title="@device.Name" Subtitle="@(device.Model.Length > 0 ? device.Model : device.Type)" OnClose="@(() => _device = null)">
 			<Actions>
 				@if (CanReadSmart(device) && ReadAsRoot)
 				{
@@ -456,7 +456,7 @@
 					@SmartView(report)
 				}
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private static RenderFragment SmartView(SmartReport report) => __builder =>

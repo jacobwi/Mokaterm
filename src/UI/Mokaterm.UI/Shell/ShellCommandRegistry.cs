@@ -223,6 +223,7 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 		new(ShellCommandIds.ClearTerminal, "Clear the terminal", "Sessions", MokatermIcons.Eraser, () => Press(SessionToolbarButtons.Clear), null, "reset scrollback cls"),
 		new(ShellCommandIds.RecordSession, "Record to a file", "Sessions", MokatermIcons.Record, () => Press(SessionToolbarButtons.Record), "Start or stop writing what the active session prints to a file", "log logging transcript"),
 		.. BuildToolDefinitions(),
+		.. BuildAppToolDefinitions(),
 		.. BuildPaneDefinitions(),
 	];
 
@@ -250,6 +251,19 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 
 		return definitions;
 	}
+
+	/// <summary>One "Open" command per app tool, which needs no session and so works with no tab open.</summary>
+	private List<CommandDefinition> BuildAppToolDefinitions() =>
+	[
+		.. _contributions.AppTools.Select(tool => new CommandDefinition(
+			ShellCommandIds.ForAppTool(tool),
+			$"Open {tool.Title}",
+			"Tools",
+			tool.Icon,
+			Sync(() => _shell.OpenAppTool(tool)),
+			tool.Description,
+			$"app tool {tool.Title}")),
+	];
 
 	private Task OpenToolAsync(string key, string title) => WithActiveSession(session =>
 	{

@@ -2,7 +2,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Network
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Network"
+<ToolPageFrame Title="Network"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -169,7 +169,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private NetworkSnapshot? _snapshot;
@@ -207,7 +207,7 @@
 			return;
 		}
 
-		<AdminDetailPanel Title="@networkInterface.Name"
+		<ToolDetailPanel Title="@networkInterface.Name"
 						  Subtitle="@($"{networkInterface.LinkType} · {(networkInterface.State.Length > 0 ? networkInterface.State : "state unknown")}")"
 						  DotColor="@LinkColor(networkInterface)"
 						  DotGlow="networkInterface.IsUp"
@@ -255,7 +255,7 @@
 					}
 				</dl>
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private static MokaColor LinkColor(NetInterface networkInterface) => networkInterface.IsUp

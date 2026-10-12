@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Core.Extensions;
+using Mokaterm.Core.Plugins;
 using Mokaterm.Modules.Ftp;
 using Mokaterm.Modules.Mqtt;
 using Mokaterm.Modules.Rdp;
@@ -55,7 +56,14 @@ builder.Services.AddSingleton<IAppEnvironment, WebAppEnvironment>();
 builder.Services.AddSingleton<DownloadTicketStore>();
 builder.Services.AddScoped<ILocalFileAccess, BrowserLocalFileAccess>();
 
-builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt());
+// Plugins load before the container is built: a plugin registers services like any module.
+PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
+{
+	Directory = WebAppEnvironment.ResolvePluginsDirectory(builder.Configuration, builder.Environment),
+	Host = HostKind.Web,
+	SkipAll = PluginCatalogOptions.SkipAllRequested(),
+});
+builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddPlugins(plugins));
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
 
@@ -77,11 +85,15 @@ app.UseSecurityHeaders();
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 
+app.UsePluginFiles(plugins);
 app.MapStaticAssets();
 app.MapHealthChecks("/health");
 app.MapDownloads();
 app.MapRazorComponents<App>()
 	.AddInteractiveServerRenderMode();
+
+// Listening with its plugins loaded, so the next start may load them again (see PluginCatalog).
+app.Lifetime.ApplicationStarted.Register(plugins.ConfirmStarted);
 
 app.Lifetime.ApplicationStopping.Register(() =>
 {

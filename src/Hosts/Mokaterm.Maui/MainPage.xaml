@@ -2,18 +2,19 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
 	xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
 	xmlns:local="clr-namespace:Mokaterm.Maui.Components"
+	xmlns:plugins="clr-namespace:Mokaterm.Maui.Plugins"
 	xmlns:web="clr-namespace:Microsoft.AspNetCore.Components.Web;assembly=Microsoft.AspNetCore.Components.Web"
 	x:Class="Mokaterm.Maui.MainPage"
 	BackgroundColor="#060608">
 
-	<BlazorWebView x:Name="BlazorWebView"
+	<plugins:MokatermWebView x:Name="BlazorWebView"
 		HostPage="wwwroot/index.html"
 		BlazorWebViewInitialized="OnBlazorWebViewInitialized"
 		UrlLoading="OnUrlLoading">
-		<BlazorWebView.RootComponents>
+		<plugins:MokatermWebView.RootComponents>
 			<RootComponent Selector="head::after" ComponentType="{x:Type web:HeadOutlet}" />
 			<RootComponent Selector="#app" ComponentType="{x:Type local:DesktopRoot}" />
-		</BlazorWebView.RootComponents>
-	</BlazorWebView>
+		</plugins:MokatermWebView.RootComponents>
+	</plugins:MokatermWebView>
 
 </ContentPage>

@@ -30,4 +30,8 @@
 		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Local\Mokaterm.Modules.Local.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Compile Include="../../src/Hosts/Mokaterm.Web/Services/PluginFiles.cs" Link="Hosting/PluginFiles.cs" />
+	</ItemGroup>
+
 </Project>

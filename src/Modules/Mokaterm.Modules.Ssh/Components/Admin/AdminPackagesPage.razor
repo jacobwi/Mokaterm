@@ -3,7 +3,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Reboot
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Packages"
+<ToolPageFrame Title="Packages"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -176,7 +176,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private const int MaxRows = 400;
@@ -269,7 +269,7 @@
 		}
 
 		PackageUpdate? update = _updates?.FirstOrDefault(candidate => candidate.Name == package.Name);
-		<AdminDetailPanel Title="@package.Name" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@package.Name" OnClose="@(() => _selected = null)">
 			<Actions>
 				<MokaButton Variant="MokaVariant.Outlined"
 							Color="MokaColor.Error"
@@ -296,12 +296,12 @@
 					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@packages.DisplayName</MokaText></dd>
 				</dl>
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment InstallPanel => __builder =>
 	{
-		<AdminDetailPanel Title="Install a package" Mono="false" OnClose="@(() => _installing = false)">
+		<ToolDetailPanel Title="Install a package" Mono="false" OnClose="@(() => _installing = false)">
 			<TextSetting Label="Package name"
 						 Value="@_newPackage"
 						 ValueChanged="@(value => _newPackage = value)"
@@ -318,7 +318,7 @@
 					Install
 				</MokaButton>
 			</div>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private IEnumerable<InstalledPackage> Sorted(IEnumerable<InstalledPackage> packages) => _sort.Key switch

@@ -12,10 +12,10 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// no longer parses shows at once instead of at the next up, and the project's own Up is offered to put the change to
 /// use. A file the login may not open is offered as root, through the session's one root file system.
 /// </summary>
-public abstract partial class ComposePanelBase : DockerPageBase
+public abstract partial class ComposePanelBase : DockerManagerPageBase
 {
 	[CascadingParameter]
-	private protected ComposeProjectContext? Context { get; set; }
+	private protected ComposeProjectContext? ProjectContext { get; set; }
 
 	[Inject]
 	private IRemoteTextEditor Editor { get; set; } = default!;
@@ -93,7 +93,7 @@ public abstract partial class ComposePanelBase : DockerPageBase
 	private protected async Task UpAsync()
 	{
 		LastEdit = null;
-		if (Context is { } context)
+		if (ProjectContext is { } context)
 		{
 			await context.RunAction("up");
 		}
@@ -104,7 +104,7 @@ public abstract partial class ComposePanelBase : DockerPageBase
 	/// <summary>Has compose read the project's files again, the way <c>config</c> on the Config tab does.</summary>
 	private async Task<ProjectFileEdit> CheckAsync(string path, bool asRoot)
 	{
-		if (Context?.Target is not { HasFiles: true } target || Client is not { } client)
+		if (ProjectContext?.Target is not { HasFiles: true } target || Client is not { } client)
 		{
 			return ProjectFileEdit.Written(path, asRoot, checkedByCompose: false);
 		}

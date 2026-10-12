@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.UI.Common.Platform;
 
@@ -9,7 +10,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// One container under the list: a header with its state, the two actions used most and the menu with the rest, then
 /// its logs, inspect output, stats, environment, mounts and a command box, one tab at a time.
 /// </summary>
-public sealed partial class DockerContainerPanel : DockerPageBase
+public sealed partial class DockerContainerPanel : DockerManagerPageBase
 {
 	private static readonly IReadOnlyList<(string Id, string Text)> Tabs =
 	[

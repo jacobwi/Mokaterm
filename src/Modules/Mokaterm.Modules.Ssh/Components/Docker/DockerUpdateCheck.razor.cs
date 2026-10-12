@@ -10,7 +10,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// The "Check for updates" button of the images page and a compose project: it asks again even for images checked a
 /// moment ago, because the user asked, and the answers stay in the session for every page to mark.
 /// </summary>
-public sealed partial class DockerUpdateCheck : DockerPageBase
+public sealed partial class DockerUpdateCheck : DockerManagerPageBase
 {
 	private bool _checking;
 	private int _done;

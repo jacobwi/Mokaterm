@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Monitoring;
-using Mokaterm.Modules.Ssh.Tools;
+using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Modules.Ssh.Tests.Admin;
 

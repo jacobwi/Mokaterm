@@ -1,0 +1,54 @@
+@namespace Mokaterm.Plugins.Sample.Subnets
+@inherits AppToolBase
+
+<div class="subnet">
+	<MokaTextField Label="Address and prefix"
+				   Value="@_input"
+				   ValueChanged="OnInputChanged"
+				   Placeholder="192.168.1.10/24 or 2001:db8::/48"
+				   ErrorText="@ShownProblem"
+				   HelperText="A prefix length, or for IPv4 a mask such as /255.255.255.0. An address alone is its own /32 or /128."
+				   Size="MokaSize.Sm"
+				   spellcheck="false"
+				   autocomplete="off"
+				   data-autofocus />
+
+	@if (_info is { } info)
+	{
+		<dl class="subnet-facts">
+			<dt>Prefix</dt>
+			<dd>
+				<span class="subnet-value">@info.Cidr</span>
+				<CopyButton Text="@info.Cidr" Label="Copy the prefix" />
+			</dd>
+			<dt>Mask</dt>
+			<dd><span class="subnet-value">@info.Mask</span></dd>
+			@if (info.Wildcard is { } wildcard)
+			{
+				<dt>Wildcard</dt>
+				<dd><span class="subnet-value">@wildcard</span></dd>
+			}
+			<dt>Network</dt>
+			<dd><span class="subnet-value">@info.Network</span></dd>
+			<dt>Broadcast</dt>
+			<dd>
+				@if (info.Broadcast is { } broadcast)
+				{
+					<span class="subnet-value">@broadcast</span>
+				}
+				else
+				{
+					<span class="subnet-note">@(info.IsIPv6 ? "None: IPv6 has no broadcast address." : "None: every address is a host's.")</span>
+				}
+			</dd>
+			<dt>First host</dt>
+			<dd><span class="subnet-value">@info.FirstHost</span></dd>
+			<dt>Last host</dt>
+			<dd><span class="subnet-value">@info.LastHost</span></dd>
+			<dt>Hosts</dt>
+			<dd><span class="subnet-value">@Count(info.HostCount, info)</span></dd>
+			<dt>Addresses</dt>
+			<dd><span class="subnet-value">@Count(info.AddressCount, info)</span></dd>
+		</dl>
+	}
+</div>

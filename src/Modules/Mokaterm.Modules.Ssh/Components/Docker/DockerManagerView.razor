@@ -48,36 +48,13 @@
 		@switch (_status.Availability)
 		{
 			case DockerAvailability.Ready:
-				<ToolNavigation TPage="DockerManagerPage" Entries="NavEntries" Current="_page" CurrentChanged="Show" Label="Docker pages">
+				<ToolNavigation Entries="NavEntries()" Current="@_page" CurrentChanged="Show" Label="Docker pages">
 					<div class="mt-dk-page" @key="(_feature.Client, _feature.ComposePreference)">
-						<CascadingValue Value="_navigation" IsFixed="true">
-						@switch (_page)
-						{
-							case DockerManagerPage.Overview:
-								<DockerOverviewPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Containers:
-								<DockerContainersPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Stats:
-								<DockerStatsPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Compose:
-								<DockerComposePage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Images:
-								<DockerImagesPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Volumes:
-								<DockerVolumesPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Networks:
-								<DockerNetworksPage Session="Session" Visible="IsActive" />
-								break;
-							case DockerManagerPage.Cleanup:
-								<DockerCleanupPage Session="Session" Visible="IsActive" />
-								break;
-						}
+						<CascadingValue Value="_context" IsFixed="true">
+							@if (CurrentPage is { } page)
+							{
+								<DynamicComponent @key="page.Id" Type="page.Component" Parameters="PageParameters" />
+							}
 						</CascadingValue>
 					</div>
 				</ToolNavigation>

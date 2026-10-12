@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The build side of writing a Mokaterm plugin, as a NuGet package: the props and targets in build/ that pack a Razor
+		class library into a .mokaplugin, their inline tasks, and the settings search generator as an analyzer. It ships no
+		assembly of its own; the empty one this project compiles stays out of the package. Plugins in this repository import
+		build/ directly.
+	-->
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<IsPackable>true</IsPackable>
+		<PackageId>Mokaterm.Plugin.Sdk</PackageId>
+		<Description>Builds a Mokaterm plugin: packs a Razor class library into a .mokaplugin with its manifest, its private dependencies, its static files and its themes, leaving out everything the host provides.</Description>
+		<PackageTags>mokaterm;plugin;msbuild</PackageTags>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+		<DevelopmentDependency>true</DevelopmentDependency>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="build/**" />
+		<None Include="build/*" Pack="true" PackagePath="build/" />
+	</ItemGroup>
+
+	<!-- Built first so the pack step can take its output; nothing here compiles against it. -->
+	<ItemGroup>
+		<ProjectReference Include="../Mokaterm.Generators/Mokaterm.Generators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddMokatermPluginSdkPackageFiles</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<!--
+		The generator goes where NuGet looks for C# analyzers, the way Directory.Build.targets adds it to the repository's
+		own Razor projects. The version file tells a plugin with no Mokaterm.Abstractions reference (a theme pack) which
+		Mokaterm it was built for, since in the repository that comes from VersionPrefix instead.
+	-->
+	<Target Name="_AddMokatermPluginSdkPackageFiles">
+		<MSBuild Projects="../Mokaterm.Generators/Mokaterm.Generators.csproj" Targets="GetTargetPath" RemoveProperties="TargetFramework;RuntimeIdentifier">
+			<Output TaskParameter="TargetOutputs" ItemName="_MokatermPluginSdkGenerator" />
+		</MSBuild>
+
+		<PropertyGroup>
+			<_MokatermPluginSdkVersionProps>$(IntermediateOutputPath)Mokaterm.Plugin.Sdk.Version.props</_MokatermPluginSdkVersionProps>
+		</PropertyGroup>
+
+		<WriteLinesToFile File="$(_MokatermPluginSdkVersionProps)"
+						  Lines="&lt;Project&gt;;%09&lt;PropertyGroup&gt;;%09%09&lt;MokatermPluginSdkVersion Condition=&quot;'%24(MokatermPluginSdkVersion)' == ''&quot;&gt;$(PackageVersion)&lt;/MokatermPluginSdkVersion&gt;;%09&lt;/PropertyGroup&gt;;&lt;/Project&gt;"
+						  Overwrite="true"
+						  WriteOnlyWhenDifferent="true" />
+
+		<ItemGroup>
+			<TfmSpecificPackageFile Include="@(_MokatermPluginSdkGenerator)" PackagePath="analyzers/dotnet/cs/" />
+			<TfmSpecificPackageFile Include="$(_MokatermPluginSdkVersionProps)" PackagePath="build/" />
+			<FileWrites Include="$(_MokatermPluginSdkVersionProps)" />
+		</ItemGroup>
+	</Target>
+
+</Project>

@@ -260,7 +260,7 @@ internal static partial class DemoSystemOutput
 			.Append("user=").Append(account.Name).Append('\n')
 			.Append("pid1=systemd\ninit_link=/lib/systemd/systemd\nssh=203.0.113.9 51234 10.0.0.5 22\nufw=yes\n")
 			.Append("@@mt:commands\n");
-		foreach (string command in (string[])["systemctl", "journalctl", "timedatectl", "hostnamectl", "resolvectl", "service", "apt-get", "dpkg-query", "ufw", "nft", "iptables", "ip", "ss", "lsblk", "df", "ps", "kill", "crontab", "sudo", "getent", "useradd", "usermod", "userdel", "chpasswd", "passwd", "smartctl"])
+		foreach (string command in (string[])["systemctl", "journalctl", "timedatectl", "hostnamectl", "resolvectl", "service", "apt-get", "dpkg-query", "ufw", "nft", "iptables", "ip", "ss", "lsblk", "df", "ps", "kill", "crontab", "sudo", "getent", "useradd", "usermod", "userdel", "chpasswd", "passwd", "smartctl", "fail2ban-client"])
 		{
 			text.Append(command).Append('\n');
 		}

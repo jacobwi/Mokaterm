@@ -88,6 +88,9 @@ public sealed class SshModule : IMokatermModule
 			Size = SessionToolSize.Wide,
 		});
 
+		AdminPages.Register(services);
+		DockerPages.Register(services);
+
 		services.AddSettingsPage(new SettingsPageDescriptor
 		{
 			Id = "ssh",

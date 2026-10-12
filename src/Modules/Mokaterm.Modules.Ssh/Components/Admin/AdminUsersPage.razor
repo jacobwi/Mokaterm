@@ -2,7 +2,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Accounts
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Users"
+<ToolPageFrame Title="Users"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -131,7 +131,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private AccountsSnapshot? _snapshot;
@@ -219,7 +219,7 @@
 
 		string? refusal = AccountCommands.WhyNotDelete(user, Context.LoginName);
 		bool blocked = Busy || Context.RootChangeBlocked is not null;
-		<AdminDetailPanel Title="@user.Name" Subtitle="@(user.Comment.Length > 0 ? user.Comment : null)" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@user.Name" Subtitle="@(user.Comment.Length > 0 ? user.Comment : null)" OnClose="@(() => _selected = null)">
 			<Actions>
 				@if (Capabilities.Accounts.CanChange)
 				{
@@ -295,7 +295,7 @@
 
 				<AdminAuthorizedKeys UserName="@user.Name" @key="user.Name" />
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment GroupPanel => __builder =>
@@ -307,7 +307,7 @@
 
 		string? refusal = AccountCommands.WhyNotDeleteGroup(group, snapshot);
 		List<string> primaryOf = [.. snapshot.Users.Where(user => user.Gid == group.Gid).Select(user => user.Name)];
-		<AdminDetailPanel Title="@group.Name" Subtitle="@($"gid {group.Gid}")" OnClose="@(() => _selectedGroup = null)">
+		<ToolDetailPanel Title="@group.Name" Subtitle="@($"gid {group.Gid}")" OnClose="@(() => _selectedGroup = null)">
 			<Actions>
 				@if (Capabilities.Accounts.CanChange)
 				{
@@ -334,12 +334,12 @@
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@refusal</MokaText>
 				}
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment AddGroupPanel => __builder =>
 	{
-		<AdminDetailPanel Title="Add group" Mono="false" OnClose="@(() => _addingGroup = false)">
+		<ToolDetailPanel Title="Add group" Mono="false" OnClose="@(() => _addingGroup = false)">
 			<TextSetting Label="Name" Value="@_newGroup" ValueChanged="@(value => _newGroup = value)" Validate="ValidateNewGroup" Placeholder="deploy" @key="_formVersion" />
 			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The group gets the next free group id and no members; add users to it from their own panel.</MokaText>
 			<div class="mta-form-actions">
@@ -351,12 +351,12 @@
 					Add group
 				</MokaButton>
 			</div>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment AddPanel => __builder =>
 	{
-		<AdminDetailPanel Title="Add user" Mono="false" OnClose="CancelAdd">
+		<ToolDetailPanel Title="Add user" Mono="false" OnClose="CancelAdd">
 			<div class="mta-form" @key="_formVersion">
 				<TextSetting Label="Name" Value="@_newName" ValueChanged="@(value => _newName = value)" Validate="ValidateNewName" Placeholder="alice" />
 				<TextSetting Label="Full name" Value="@_newComment" ValueChanged="@(value => _newComment = value)" Validate="AdminNames.CheckComment" AllowEmpty Placeholder="optional" />
@@ -380,7 +380,7 @@
 				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CancelAdd">Cancel</MokaButton>
 				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || !CanAdd || Context.RootChangeBlocked is not null)" OnClick="AddAsync">Add user</MokaButton>
 			</div>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private IReadOnlyList<string> Shells => _snapshot is { Shells.Count: > 0 } snapshot ? snapshot.Shells : ["/bin/sh"];

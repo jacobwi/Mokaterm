@@ -1,0 +1,106 @@
+@using Mokaterm.Abstractions.Plugins
+
+@{
+	PluginRecord plugin = Plugin;
+}
+
+<div class="plugin-row" data-plugin="@plugin.Id">
+	<div class="plugin-row__main">
+		<div class="plugin-row__head">
+			<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@plugin.Name</MokaText>
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@plugin.Version</MokaText>
+			<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
+					 Size="MokaSize.Xs"
+					 Color="PluginDisplay.KindColor(plugin.HasCode)"
+					 title="@PluginDisplay.KindTitle(plugin.HasCode)" />
+			<span class="plugin-row__status" title="@PluginDisplay.StatusTitle(plugin.Status)">
+				<MokaStatusDot Size="MokaSize.Xs"
+							   Label="@PluginDisplay.StatusLabel(plugin.Status)"
+							   Color="PluginDisplay.StatusColor(plugin.Status)"
+							   Glow="PluginDisplay.StatusGlows(plugin.Status)" />
+			</span>
+		</div>
+
+		<div class="plugin-row__by">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@PluginDisplay.Publisher(plugin.Publisher)</MokaText>
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@plugin.Id</MokaText>
+		</div>
+
+		@if (!string.IsNullOrWhiteSpace(plugin.Description))
+		{
+			<MokaText Element="div" Size="MokaSize.Xs">@plugin.Description</MokaText>
+		}
+
+		<div class="plugin-row__facts">
+			@foreach (string host in PluginDisplay.HostNames(plugin.Hosts))
+			{
+				<MokaTag Text="@host" Icon="PluginDisplay.HostIcon(host)" Size="MokaSize.Xs" />
+			}
+			@if (plugin.ThemeCount > 0)
+			{
+				<MokaTag Text="@PluginDisplay.Themes(plugin.ThemeCount)" Icon="MokatermIcons.Palette" Size="MokaSize.Xs" />
+			}
+		</div>
+
+		@if (!string.IsNullOrWhiteSpace(plugin.Problem))
+		{
+			<MokaText Element="div" Size="MokaSize.Xs" Style="@($"color:{PluginDisplay.ProblemColor(plugin.Status)}")">@plugin.Problem</MokaText>
+		}
+
+		@if (PluginDisplay.PendingText(plugin) is { } pending)
+		{
+			<div class="plugin-row__pending">
+				<MokaIcon Icon="MokaIcons.Status.Clock" SizeValue="12px" />
+				<MokaText Element="span" Size="MokaSize.Xs">@pending</MokaText>
+			</div>
+		}
+	</div>
+
+	@if (CanManage && plugin.Pending != PluginPendingChange.Remove)
+	{
+		<div class="plugin-row__actions">
+			@if (plugin.Status == PluginStatus.Changed && plugin.IsEnabled)
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.ShieldCheck"
+							Disabled="Busy"
+							OnClick="() => OnTrust.InvokeAsync(plugin)">
+					Trust the new files
+				</MokaButton>
+			}
+			@if (plugin.IsEnabled)
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Power"
+							Disabled="Busy"
+							OnClick="() => OnTurnOff.InvokeAsync(plugin)"
+							aria-label="@($"Turn off {plugin.Name}")">
+					Turn off
+				</MokaButton>
+			}
+			else
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Power"
+							Disabled="@(Busy || plugin.Status == PluginStatus.Incompatible)"
+							OnClick="() => OnTurnOn.InvokeAsync(plugin)"
+							title="@(plugin.Status == PluginStatus.Incompatible ? plugin.Problem : null)"
+							aria-label="@($"Turn on {plugin.Name}")">
+					Turn on
+				</MokaButton>
+			}
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Sm"
+						Color="MokaColor.Error"
+						StartIcon="MokaIcons.Action.Delete"
+						Disabled="Busy"
+						OnClick="() => OnRemove.InvokeAsync(plugin)"
+						title="Remove"
+						aria-label="@($"Remove {plugin.Name}")" />
+		</div>
+	}
+</div>
+

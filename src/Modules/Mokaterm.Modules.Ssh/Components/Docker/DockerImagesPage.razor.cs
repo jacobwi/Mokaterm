@@ -11,7 +11,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// newer image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu
 /// only). Pruning lives on the cleanup page, which lists what would go first.
 /// </summary>
-public sealed partial class DockerImagesPage : DockerPageBase
+public sealed partial class DockerImagesPage : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerImage> _images = [];
 	private IReadOnlyList<DockerImage> _shown = [];

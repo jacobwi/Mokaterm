@@ -1,4 +1,5 @@
 using System.Globalization;
+using Mokaterm.Abstractions.ServerAdmin;
 
 namespace Mokaterm.Modules.Ssh.Admin.Detection;
 
@@ -30,7 +31,14 @@ internal static class SystemProbe
 		"/run/.containerenv", "/etc/login.defs", "/etc/rc.d/init.d",
 	];
 
-	public static AdminScript Script { get; } = new()
+	/// <summary>The probe for the System view's own pages.</summary>
+	public static AdminScript Script { get; } = ScriptFor([]);
+
+	/// <summary>
+	/// The probe with the commands registered pages name (<c>SystemPageDescriptor.Commands</c>) looked for along with its
+	/// own. A name that is not a plain program name never reaches the script.
+	/// </summary>
+	public static AdminScript ScriptFor(IEnumerable<string> extraCommands) => new()
 	{
 		Name = "detect",
 		Timeout = TimeSpan.FromSeconds(20),
@@ -47,7 +55,7 @@ internal static class SystemProbe
 			"printf 'ssh=%s\\n' \"$SSH_CONNECTION\"",
 			"printf 'ufw=%s\\n' \"$(sed -n 's/^ENABLED=//p' /etc/ufw/ufw.conf 2>/dev/null)\"",
 			AdminSections.Start("commands"),
-			$"for c in {string.Join(' ', ProbedCommands)}; do",
+			$"for c in {string.Join(' ', CommandsWith(extraCommands))}; do",
 			"\tif command -v \"$c\" >/dev/null 2>&1; then printf '%s\\n' \"$c\"; fi",
 			"done",
 			AdminSections.Start("paths"),
@@ -65,8 +73,12 @@ internal static class SystemProbe
 			"exit 0"),
 	};
 
-	public static SystemFacts Parse(string output)
+	public static SystemFacts Parse(string output) => Parse(output, []);
+
+	/// <summary>What <see cref="ScriptFor"/> with the same <paramref name="extraCommands"/> printed.</summary>
+	public static SystemFacts Parse(string output, IEnumerable<string> extraCommands)
 	{
+		HashSet<string> probed = new(CommandsWith(extraCommands), StringComparer.Ordinal);
 		AdminSections sections = AdminSections.Parse(output);
 		Dictionary<string, string> facts = KeyValues(sections.Get("facts"));
 		(string? sshAddress, int? sshPort) = ParseSshConnection(Value(facts, "ssh"));
@@ -87,12 +99,26 @@ internal static class SystemProbe
 				"no" => false,
 				_ => null,
 			},
-			Commands = new HashSet<string>(AdminSections.Lines(sections.Get("commands")).Where(ProbedCommands.Contains), StringComparer.Ordinal),
+			Commands = new HashSet<string>(AdminSections.Lines(sections.Get("commands")).Where(probed.Contains), StringComparer.Ordinal),
 			Paths = new HashSet<string>(AdminSections.Lines(sections.Get("paths")).Where(ProbedPaths.Contains), StringComparer.Ordinal),
 			UnitStates = KeyValues(sections.Get("units")),
 			OsRelease = OsRelease.Parse(sections.Get("os-release")),
 			MacProduct = MacProduct(sections.Get("sw_vers")),
 		};
+	}
+
+	/// <summary>The probe's own commands, then the extra ones it does not have, each once and in a fixed order.</summary>
+	internal static IReadOnlyList<string> CommandsWith(IEnumerable<string> extraCommands)
+	{
+		ArgumentNullException.ThrowIfNull(extraCommands);
+		return
+		[
+			.. ProbedCommands,
+			.. extraCommands
+				.Where(command => ServerFacts.IsCommandName(command) && !ProbedCommands.Contains(command))
+				.Distinct(StringComparer.Ordinal)
+				.Order(StringComparer.Ordinal),
+		];
 	}
 
 	/// <summary><c>client_ip client_port server_ip server_port</c>; the server half is what this session came in on.</summary>

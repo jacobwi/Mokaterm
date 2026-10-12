@@ -49,6 +49,17 @@
 	</PropertyGroup>
 
 	<!--
+		Packages: only what plugin authors build against is packed (Mokaterm.Abstractions, Mokaterm.UI.Common and
+		Mokaterm.Plugin.Sdk), and each of those says so itself. Everything else is the app.
+	-->
+	<PropertyGroup>
+		<IsPackable>false</IsPackable>
+		<PackageProjectUrl>https://github.com/jacobwi/Mokaterm</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/jacobwi/Mokaterm</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+	</PropertyGroup>
+
+	<!--
 		CI servers set CI (GitHub Actions, GitLab, AppVeyor) or TF_BUILD (Azure Pipelines). Their builds map source paths
 		to /_/, so binaries and PDBs do not depend on where the tree was checked out. Local builds keep real paths for
 		debugging.

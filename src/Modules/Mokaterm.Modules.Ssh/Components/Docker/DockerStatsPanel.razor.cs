@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// visible. A sample takes docker about two seconds (it measures CPU over an interval), and the polling never starts a
 /// sample while the last one is still out, so a slow server gets fewer samples rather than a queue of them.
 /// </summary>
-public sealed partial class DockerStatsPanel : DockerPageBase
+public sealed partial class DockerStatsPanel : DockerManagerPageBase
 {
 	private readonly DockerStatsHistory _history = new();
 	private DockerContainerStats? _stats;

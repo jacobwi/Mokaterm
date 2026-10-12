@@ -1,7 +1,7 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
 @inherits ComposePanelBase
 
-@if (Context is { } context)
+@if (ProjectContext is { } context)
 {
 	<div class="mt-dk-toolbar">
 		<MokaSegmentedControl Size="MokaSize.Xs" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Which configuration">
@@ -49,7 +49,7 @@
 		: "The file as it is on the docker host. Edit opens it in the editor; after a save compose reads the files again, and Up applies them.";
 
 	protected override Task OnParametersSetAsync() =>
-		Context is { } context && context.Project.Name != _loadedFor ? LoadViewAsync() : Task.CompletedTask;
+		ProjectContext is { } context && context.Project.Name != _loadedFor ? LoadViewAsync() : Task.CompletedTask;
 
 	private Task OnViewChangedAsync(string? value)
 	{
@@ -62,7 +62,7 @@
 
 	private Task LoadViewAsync() => LoadAsync(async (client, token) =>
 	{
-		if (Context is not { } context)
+		if (ProjectContext is not { } context)
 		{
 			return;
 		}

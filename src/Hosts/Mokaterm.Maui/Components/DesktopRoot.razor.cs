@@ -6,6 +6,7 @@ using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Transfers;
+using Mokaterm.Core.Plugins;
 using Mokaterm.Maui.Services;
 
 namespace Mokaterm.Maui.Components;
@@ -41,6 +42,8 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 	{
 		if (firstRender)
 		{
+			// The window is up with its plugins loaded, so the next start may load them again (see PluginCatalog).
+			Services.GetService<PluginCatalog>()?.ConfirmStarted();
 			await CheckForUpdatesAsync();
 		}
 	}

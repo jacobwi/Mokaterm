@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
+using Mokaterm.Abstractions.Plugins;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
@@ -140,6 +141,7 @@ public sealed partial class SettingsSearchIndexTests
 				services.AddSingleton<ILocalFileAccess, NoLocalFiles>();
 				services.AddSingleton<ISettingsBackup, NoBackup>();
 				services.AddSingleton<ISessionLogRecorder, NoRecorder>();
+				services.AddSingleton<IPluginManager>(new FakePluginManager());
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal) { ["Type"] = page })
 			.WaitAsync(TimeSpan.FromSeconds(10), Ct);
@@ -152,21 +154,6 @@ public sealed partial class SettingsSearchIndexTests
 		public TerminalThemeImport Import(string text, string? fileName = null) => throw new NotSupportedException();
 
 		public string Export(TerminalTheme theme, TerminalThemeFormat format) => throw new NotSupportedException();
-	}
-
-	/// <summary>Present so the parts of a page that need a picker show; a static render never opens one.</summary>
-	private sealed class NoLocalFiles : ILocalFileAccess
-	{
-		public bool CanPickFolders => false;
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<bool> SaveFileAsync(string suggestedName, long? length, Func<Stream, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
 	}
 
 	private sealed class NoBackup : ISettingsBackup

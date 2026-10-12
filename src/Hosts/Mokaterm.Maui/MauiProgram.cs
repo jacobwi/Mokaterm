@@ -3,6 +3,7 @@ using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
+using Mokaterm.Core.Plugins;
 using Mokaterm.Maui.Services;
 using Mokaterm.Maui.ToolWindows;
 using Mokaterm.Modules.Ftp;
@@ -45,7 +46,15 @@ public static class MauiProgram
 		builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<ToolWebView, ToolWebViewHandler>());
 
 		// Serial and the local shell belong to a host that runs on the machine they reach, which is this one.
-		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal());
+		// Plugins load before the container is built: a plugin registers services like any module.
+		PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
+		{
+			Directory = Path.Combine(DesktopPaths.DataDirectory, "plugins"),
+			Host = HostKind.Desktop,
+			UserManaged = true,
+			SkipAll = PluginCatalogOptions.SkipAllRequested(),
+		});
+		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddPlugins(plugins));
 		builder.Services.AddMokatermSessions();
 		builder.Services.AddMokatermUI();
 
@@ -97,6 +106,9 @@ public static class MauiProgram
 			Keywords = "update updates upgrade version release feed channel velopack download install restart startup check",
 		});
 #endif
+
+		// Plugin changes apply at the next start, which the Plugins page can start from here.
+		builder.Services.AddSingleton<IAppRestarter, Platforms.Windows.DesktopRestarter>();
 
 		// One window, so one chrome: the shell's top bar becomes that window's title bar.
 		builder.Services.AddSingleton<Platforms.Windows.WindowChrome>();

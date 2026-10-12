@@ -1,0 +1,36 @@
+@namespace Mokaterm.UI.Common.ToolPages
+@using Moka.Red.Forms.SelectField
+
+@* The page list down the side of a paged tool (System, Docker) with the page beside it. It narrows to icons and then
+   becomes a dropdown above the page, following the tool's own width through the mt-tool-nav container, which the
+   tool's root names itself beside its own name. *@
+<div class="mt-toolnav">
+	<nav class="mt-toolnav-list" aria-label="@Label">
+		@foreach (ToolNavEntry entry in Entries)
+		{
+			<button type="button"
+					class="@ItemClass(entry)"
+					aria-current="@(IsCurrent(entry) ? "page" : null)"
+					title="@(entry.Unavailable is { } reason ? $"{entry.Label}: {reason}" : entry.Label)"
+					@key="entry.Id"
+					@onclick="@(() => CurrentChanged.InvokeAsync(entry.Id))">
+				<MokaIcon Icon="entry.Icon" Size="MokaSize.Xs" />
+				<span class="mt-toolnav-label">@entry.Label</span>
+			</button>
+		}
+	</nav>
+
+	<div class="mt-toolnav-select">
+		<MokaSelect TValue="string"
+					Items="_pages"
+					Value="Current"
+					ValueChanged="CurrentChanged"
+					ValueSelector="SelectLabel"
+					Size="MokaSize.Sm"
+					aria-label="@Label" />
+	</div>
+
+	<div class="mt-toolnav-stage">
+		@ChildContent
+	</div>
+</div>

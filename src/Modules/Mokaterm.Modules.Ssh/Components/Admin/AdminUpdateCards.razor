@@ -55,7 +55,7 @@
 	}
 
 	private void OpenSecurity() =>
-		Context.NavigateWith(AdminPage.Packages, Context.Profile.Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
+		Context.Navigate(AdminPageIds.Packages, Context.Profile.Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
 
-	private void OpenPackages() => Context.NavigateWith(AdminPage.Packages, "updates");
+	private void OpenPackages() => Context.Navigate(AdminPageIds.Packages, "updates");
 }

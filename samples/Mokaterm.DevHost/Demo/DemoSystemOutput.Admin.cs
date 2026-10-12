@@ -70,6 +70,33 @@ internal static partial class DemoSystemOutput
 			[Service]
 			LimitNOFILE=65536
 			""",
+
+		// The sample plugin's fail2ban page (samples/Mokaterm.Plugins.Sample), the same jails the security page reads.
+		"fail2ban.status" => """
+			Status
+			|- Number of jail:	2
+			`- Jail list:	nginx-http-auth, sshd
+			@@f2b:jail nginx-http-auth
+			Status for the jail: nginx-http-auth
+			|- Filter
+			|  |- Currently failed:	0
+			|  |- Total failed:	41
+			|  `- File list:	/var/log/nginx/error.log
+			`- Actions
+			   |- Currently banned:	2
+			   |- Total banned:	7
+			   `- Banned IP list:	203.0.113.77 2001:db8:4::1f
+			@@f2b:jail sshd
+			Status for the jail: sshd
+			|- Filter
+			|  |- Currently failed:	2
+			|  |- Total failed:	1288
+			|  `- Journal matches:	_SYSTEMD_UNIT=ssh.service + _COMM=sshd
+			`- Actions
+			   |- Currently banned:	1
+			   |- Total banned:	93
+			   `- Banned IP list:	198.51.100.23
+			""",
 		_ => null,
 	};
 

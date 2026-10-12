@@ -8,7 +8,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// The host's networks with the containers on each, read from the container list, so a network a stopped container
 /// still names counts as in use. Built-in networks and networks in use cannot be removed from here.
 /// </summary>
-public sealed partial class DockerNetworksPage : DockerPageBase
+public sealed partial class DockerNetworksPage : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerNetwork> _networks = [];
 	private IReadOnlyList<DockerNetwork> _shown = [];

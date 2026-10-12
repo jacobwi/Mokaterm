@@ -1,0 +1,183 @@
+<Project>
+
+	<!--
+		Themes go into the package and nowhere else. The Razor and Web SDKs make every .json file content that is copied to
+		the output, where nothing reads it.
+	-->
+	<ItemGroup>
+		<Content Remove="@(MokatermPluginTheme)" />
+		<None Remove="@(MokatermPluginTheme)" />
+		<None Include="@(MokatermPluginTheme)" />
+	</ItemGroup>
+
+	<!-- Inline tasks, so the package carries no assembly: MSBuild compiles them on first use. -->
+	<UsingTask TaskName="MokatermPluginWriteManifest" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+		<Task>
+			<Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)MokatermPluginWriteManifest.cs" />
+		</Task>
+	</UsingTask>
+
+	<UsingTask TaskName="MokatermPluginSelectLibFiles" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+		<Task>
+			<Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)MokatermPluginSelectLibFiles.cs" />
+		</Task>
+	</UsingTask>
+
+	<UsingTask TaskName="MokatermPluginZip" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+		<Task>
+			<Code Type="Class" Language="cs" Source="$(MSBuildThisFileDirectory)MokatermPluginZip.cs" />
+		</Task>
+	</UsingTask>
+
+	<!--
+		The host's contracts reach a plugin at compile time only: the host loads its own copy of each, and of everything they
+		bring along, whatever the plugin carries. So none of that is copied to the output, which also keeps it out of the
+		package. It is decided here, from the restore graph, rather than by marking the references: NuGet never lets a
+		package's targets change what restore resolves, so a package reference could not be marked in time.
+	-->
+	<Target Name="_MokatermPluginSplitCopyLocal"
+			AfterTargets="ResolveReferences"
+			Condition="'$(DesignTimeBuild)' != 'true'">
+		<MokatermPluginSelectLibFiles Candidates="@(ReferenceCopyLocalPaths);@(ReferenceSatellitePaths)"
+									  AssetsFile="$(ProjectAssetsFile)"
+									  TargetFramework="$(TargetFramework)"
+									  HostRoots="$(MokatermPluginHostRoots)"
+									  HostAssemblyPrefixes="$(MokatermPluginHostAssemblyPrefixes)">
+			<Output TaskParameter="PrivateFiles" ItemName="_MokatermPluginPrivateCopy" />
+			<Output TaskParameter="HostFiles" ItemName="_MokatermPluginHostCopy" />
+		</MokatermPluginSelectLibFiles>
+
+		<ItemGroup>
+			<ReferenceCopyLocalPaths Remove="@(_MokatermPluginHostCopy)" />
+			<ReferenceSatellitePaths Remove="@(_MokatermPluginHostCopy)" />
+		</ItemGroup>
+	</Target>
+
+	<PropertyGroup>
+		<_MokatermPluginPackDependsOn>Build;_MokatermPluginCollectLib;_MokatermPluginCollectWebRoot;_MokatermPluginCollectThemes</_MokatermPluginPackDependsOn>
+	</PropertyGroup>
+
+	<!--
+		Everything here is read when the targets run rather than when the file is read: an in-repo plugin imports this file
+		at the end of its own project, before the SDK has set Version, OutDir or Description.
+	-->
+	<Target Name="_MokatermPluginResolve">
+		<Error Code="MOKP001"
+			   Condition="'$(MokatermPluginId)' == ''"
+			   Text="Set MokatermPluginId to build a Mokaterm plugin: lower-case letters and digits joined by dots or dashes, such as acme.proxmox." />
+
+		<!--
+			The rule the app reads plugin.json with. Checked before anything else, because the id names folders this target
+			empties and the package file it writes.
+		-->
+		<Error Code="MOKP002"
+			   Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(MokatermPluginId)', '^[a-z0-9]+([.-][a-z0-9]+)*$')) or $(MokatermPluginId.Length) &gt; 64"
+			   Text="The plugin id &quot;$(MokatermPluginId)&quot; is not allowed: use lower-case letters and digits, joined by single dots or dashes, up to 64 characters (MokatermPluginId)." />
+
+		<PropertyGroup>
+			<_MokatermPluginName>$(MokatermPluginName)</_MokatermPluginName>
+			<_MokatermPluginName Condition="'$(_MokatermPluginName)' == ''">$(AssemblyName)</_MokatermPluginName>
+			<_MokatermPluginPublisher>$(MokatermPluginPublisher)</_MokatermPluginPublisher>
+			<_MokatermPluginPublisher Condition="'$(_MokatermPluginPublisher)' == ''">$(Company)</_MokatermPluginPublisher>
+			<_MokatermPluginDescription>$(MokatermPluginDescription)</_MokatermPluginDescription>
+			<!-- NuGet's pack targets fill an empty Description with this placeholder, which is not the plugin's to show. -->
+			<_MokatermPluginDescription Condition="'$(_MokatermPluginDescription)' == '' and '$(Description)' != 'Package Description'">$(Description)</_MokatermPluginDescription>
+			<_MokatermPluginAssembly Condition="'$(MokatermPluginDataOnly)' != 'true'">$(TargetFileName)</_MokatermPluginAssembly>
+			<_MokatermPluginStageRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'mokaplugin'))</_MokatermPluginStageRoot>
+			<_MokatermPluginStageDirectory>$([MSBuild]::NormalizeDirectory('$(_MokatermPluginStageRoot)', '$(MokatermPluginId)'))</_MokatermPluginStageDirectory>
+			<MokatermPluginPackagePath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(OutDir)', '$(MokatermPluginId)-$(Version).mokaplugin'))</MokatermPluginPackagePath>
+		</PropertyGroup>
+
+		<ItemGroup>
+			<_MokatermPluginPackage Remove="@(_MokatermPluginPackage)" />
+			<_MokatermPluginPackage Include="$(MokatermPluginPackagePath)" PluginId="$(MokatermPluginId)" PluginVersion="$(Version)" />
+		</ItemGroup>
+	</Target>
+
+	<!-- The plugin assembly, its deps.json and symbols, its satellites, and the dependencies the host does not provide. -->
+	<Target Name="_MokatermPluginCollectLib"
+			Condition="'$(MokatermPluginDataOnly)' != 'true'"
+			DependsOnTargets="_MokatermPluginResolve;_MokatermPluginSplitCopyLocal">
+		<ItemGroup>
+			<_MokatermPluginFile Include="@(_MokatermPluginPrivateCopy)" />
+			<_MokatermPluginFile Include="$(TargetPath)" PackagePath="lib/$(TargetFileName)" />
+			<_MokatermPluginFile Include="$(ProjectDepsFilePath)"
+								 Condition="'$(ProjectDepsFilePath)' != '' and Exists('$(ProjectDepsFilePath)')"
+								 PackagePath="lib/$([System.IO.Path]::GetFileName('$(ProjectDepsFilePath)'))" />
+			<_MokatermPluginFile Include="$(TargetDir)$(TargetName).pdb"
+								 Condition="Exists('$(TargetDir)$(TargetName).pdb')"
+								 PackagePath="lib/$(TargetName).pdb" />
+			<_MokatermPluginFile Include="@(IntermediateSatelliteAssembliesWithTargetPath)"
+								 PackagePath="lib/%(IntermediateSatelliteAssembliesWithTargetPath.Culture)/$(TargetName).resources.dll" />
+		</ItemGroup>
+	</Target>
+
+	<!--
+		The project's own static web assets, as a project referencing it would see them: no compressed copies, no
+		application bundle, no assets of its references. Paths drop the fingerprint pattern, because the host serves the
+		folder as it is, and the scoped CSS bundle is named after the assembly, which is the name the shell links.
+	-->
+	<Target Name="_MokatermPluginCollectWebRoot"
+			Condition="'$(MokatermPluginDataOnly)' != 'true' and '$(UsingMicrosoftNETSdkStaticWebAssets)' == 'true'"
+			DependsOnTargets="_MokatermPluginResolve;ResolveStaticWebAssetsConfiguration">
+		<Error Code="MOKP005"
+			   Condition="'$(StaticWebAssetBasePath)' != '_content/$(AssemblyName)'"
+			   Text="Mokaterm serves a plugin's wwwroot at _content/$(AssemblyName)/, but this project puts its static web assets at $(StaticWebAssetBasePath)/. Leave StaticWebAssetBasePath and PackageId at their defaults." />
+
+		<CallTarget Targets="GetCurrentProjectBuildStaticWebAssetItems">
+			<Output TaskParameter="TargetOutputs" ItemName="_MokatermPluginWebItem" />
+		</CallTarget>
+
+		<ItemGroup>
+			<_MokatermPluginWebAsset Include="@(_MokatermPluginWebItem)"
+									 Condition="'%(_MokatermPluginWebItem.ResultType)' == 'StaticWebAsset' and '%(_MokatermPluginWebItem.AssetRole)' == 'Primary'" />
+			<_MokatermPluginStyleBundle Include="@(_MokatermPluginWebAsset)"
+										Condition="'%(_MokatermPluginWebAsset.AssetTraitName)' == 'ScopedCss' and '%(_MokatermPluginWebAsset.AssetTraitValue)' == 'ProjectBundle'" />
+			<_MokatermPluginWebAsset Remove="@(_MokatermPluginStyleBundle)" />
+			<_MokatermPluginFile Include="@(_MokatermPluginStyleBundle)" PackagePath="wwwroot/$(AssemblyName).bundle.scp.css" />
+			<_MokatermPluginFile Include="@(_MokatermPluginWebAsset)"
+								 PackagePath="wwwroot/$([System.Text.RegularExpressions.Regex]::Replace('%(_MokatermPluginWebAsset.RelativePath)', '#\[.*?\][?!]?', ''))" />
+		</ItemGroup>
+	</Target>
+
+	<Target Name="_MokatermPluginCollectThemes" DependsOnTargets="_MokatermPluginResolve">
+		<ItemGroup>
+			<_MokatermPluginFile Include="@(MokatermPluginTheme)"
+								 PackagePath="themes/%(MokatermPluginTheme.RecursiveDir)%(MokatermPluginTheme.Filename)%(MokatermPluginTheme.Extension)" />
+		</ItemGroup>
+	</Target>
+
+	<!--
+		Stages the package in obj/<configuration>/<framework>/mokaplugin/<id>/, which is also a plugin folder the hosts can
+		load as it is, then zips it into the output folder as <id>-<version>.mokaplugin.
+	-->
+	<Target Name="PackMokatermPlugin" DependsOnTargets="$(_MokatermPluginPackDependsOn)" Returns="@(_MokatermPluginPackage)">
+		<RemoveDir Directories="$(_MokatermPluginStageDirectory)" />
+		<Copy SourceFiles="@(_MokatermPluginFile)" DestinationFiles="@(_MokatermPluginFile->'$(_MokatermPluginStageDirectory)%(PackagePath)')" />
+
+		<MokatermPluginWriteManifest ManifestPath="$(_MokatermPluginStageDirectory)plugin.json"
+									 Id="$(MokatermPluginId)"
+									 Name="$(_MokatermPluginName)"
+									 PluginVersion="$(Version)"
+									 Publisher="$(_MokatermPluginPublisher)"
+									 Description="$(_MokatermPluginDescription)"
+									 Hosts="$(MokatermPluginHosts)"
+									 Assembly="$(_MokatermPluginAssembly)"
+									 ContractsReference="@(ReferencePath->WithMetadataValue('Filename', 'Mokaterm.Abstractions'))"
+									 FallbackSdkVersion="$(MokatermPluginSdkVersion)" />
+
+		<MokatermPluginZip SourceDirectory="$(_MokatermPluginStageDirectory)" PackagePath="$(MokatermPluginPackagePath)" />
+		<Message Importance="high" Text="$(MSBuildProjectName) -> $(MokatermPluginPackagePath)" />
+	</Target>
+
+	<Target Name="_MokatermPluginPackOnBuild" AfterTargets="Build" Condition="'$(MokatermPluginPackOnBuild)' == 'true'" DependsOnTargets="PackMokatermPlugin" />
+
+	<!-- Where PackMokatermPlugin writes the package, without building anything: for projects and tests that pick it up. -->
+	<Target Name="GetMokatermPluginPackagePath" DependsOnTargets="_MokatermPluginResolve" Returns="@(_MokatermPluginPackage)" />
+
+	<Target Name="_MokatermPluginClean" AfterTargets="Clean" Condition="'$(MokatermPluginId)' != ''" DependsOnTargets="_MokatermPluginResolve">
+		<Delete Files="$(MokatermPluginPackagePath)" />
+		<RemoveDir Directories="$(_MokatermPluginStageRoot)" />
+	</Target>
+
+</Project>

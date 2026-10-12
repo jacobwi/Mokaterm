@@ -20,6 +20,9 @@ public static class Program
 		// process before the app does anything else.
 		VelopackApp.Build().Run();
 
+		// A restart starts this copy before the old one has gone; it holds the key and the lock checked below.
+		DesktopRestarter.WaitForPreviousRun(Environment.GetCommandLineArgs());
+
 		WinRT.ComWrappersSupport.InitializeComWrappers();
 
 		if (StartupProblem() is { } problem)

@@ -1,0 +1,48 @@
+.subnet {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.subnet-facts {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 6px var(--moka-spacing-lg);
+	margin: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.subnet-facts dt {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 22px;
+	text-transform: uppercase;
+}
+
+.subnet-facts dd {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	margin: 0;
+}
+
+.subnet-value {
+	min-width: 0;
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	letter-spacing: 0.02em;
+	overflow-wrap: anywhere;
+}
+
+.subnet-note {
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-sm);
+}

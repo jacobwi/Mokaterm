@@ -12,6 +12,7 @@
 		<Project Path="src/Mokaterm.Core/Mokaterm.Core.csproj" />
 		<Project Path="src/Mokaterm.Sessions/Mokaterm.Sessions.csproj" />
 		<Project Path="src/Mokaterm.Generators/Mokaterm.Generators.csproj" />
+		<Project Path="src/Mokaterm.Plugin.Sdk/Mokaterm.Plugin.Sdk.csproj" />
 	</Folder>
 	<Folder Name="/src/UI/">
 		<Project Path="src/UI/Mokaterm.UI.Common/Mokaterm.UI.Common.csproj" />
@@ -38,6 +39,7 @@
 	</Folder>
 	<Folder Name="/samples/">
 		<Project Path="samples/Mokaterm.DevHost/Mokaterm.DevHost.csproj" />
+		<Project Path="samples/Mokaterm.Plugins.Sample/Mokaterm.Plugins.Sample.csproj" />
 	</Folder>
 	<Folder Name="/tests/">
 		<File Path="tests/Directory.Build.props" />
@@ -54,5 +56,7 @@
 		<Project Path="tests/Mokaterm.UI.Tests/Mokaterm.UI.Tests.csproj" />
 		<Project Path="tests/Mokaterm.Modules.Local.Tests/Mokaterm.Modules.Local.Tests.csproj" />
 		<Project Path="tests/Mokaterm.Generators.Tests/Mokaterm.Generators.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Plugins.Tests/Mokaterm.Plugins.Tests.csproj" />
+		<Project Path="tests/Mokaterm.Plugins.Sample.Tests/Mokaterm.Plugins.Sample.Tests.csproj" />
 	</Folder>
 </Solution>

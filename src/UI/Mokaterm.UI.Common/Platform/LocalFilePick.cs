@@ -3,10 +3,11 @@ using Mokaterm.Abstractions.Platform;
 namespace Mokaterm.UI.Common.Platform;
 
 /// <summary>
-/// Picks one file and reads it, for the editors and dialogs that take a config, a color scheme or a key. Two rules live
-/// here rather than at each of them: the pick is released in a finally, because the web host keeps every picked file
-/// alive in the page until <see cref="ILocalFileAccess.ReleaseAsync"/> runs, and a file past the cap is refused with a
-/// message instead of cut, because a truncated key or scheme looks complete to whatever parses it next.
+/// Picks one file and reads it, for the editors and dialogs that take a config, a color scheme, a key or a plugin
+/// package. Two rules live here rather than at each of them: the pick is released in a finally, because the web host
+/// keeps every picked file alive in the page until <see cref="ILocalFileAccess.ReleaseAsync"/> runs, and a file past the
+/// cap is refused with a message instead of cut, because a truncated key or scheme looks complete to whatever parses it
+/// next.
 /// </summary>
 public static class LocalFilePick
 {
@@ -41,6 +42,33 @@ public static class LocalFilePick
 	{
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCharacters);
 		return ReadAsync(files, maxCharacters, what, (stream, token) => ReadTextAsync(stream, maxCharacters, token), cancellationToken);
+	}
+
+	/// <summary>
+	/// Picks one file and hands its stream to <paramref name="readAsync"/>, for a reader that keeps what it reads in a form
+	/// of its own (a plugin package) and would only copy a byte array once more. The stream stops at
+	/// <paramref name="maxBytes"/>, and a file past it is refused with the same message the other reads give, whatever
+	/// the reader made of the refusal.
+	/// </summary>
+	/// <param name="files">The host's picker.</param>
+	/// <param name="maxBytes">The largest file the reader may take. Anything over it is refused.</param>
+	/// <param name="what">What the file was meant to be, for the message: "a plugin package".</param>
+	/// <param name="readAsync">
+	/// Reads the stream, which cannot seek and is closed once this returns. Its exceptions reach the caller, except when
+	/// the file was too large.
+	/// </param>
+	/// <param name="cancellationToken">Cancels the pick and the read.</param>
+	public static Task<PickedFile<TResult>> ReadStreamAsync<TResult>(
+		ILocalFileAccess files,
+		long maxBytes,
+		string what,
+		Func<Stream, CancellationToken, Task<TResult>> readAsync,
+		CancellationToken cancellationToken = default)
+		where TResult : class
+	{
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
+		ArgumentNullException.ThrowIfNull(readAsync);
+		return ReadAsync(files, maxBytes, what, (stream, token) => ReadCappedAsync(stream, maxBytes, readAsync, token), cancellationToken);
 	}
 
 	private static async Task<PickedFile<TContent>> ReadAsync<TContent>(
@@ -96,6 +124,36 @@ public static class LocalFilePick
 		}
 
 		return buffer.ToArray();
+	}
+
+	private static async Task<TResult?> ReadCappedAsync<TResult>(
+		Stream stream,
+		long maxBytes,
+		Func<Stream, CancellationToken, Task<TResult>> readAsync,
+		CancellationToken cancellationToken)
+		where TResult : class
+	{
+		await using CappedReadStream capped = new(stream, maxBytes);
+		TResult result;
+		try
+		{
+			result = await readAsync(capped, cancellationToken);
+		}
+		catch (Exception) when (capped.WentPastCap)
+		{
+			// The reader may have turned the refusal into a complaint of its own, such as "not a zip file", which would
+			// send the user looking for the wrong problem.
+			return null;
+		}
+
+		if (capped.WentPastCap)
+		{
+			// A reader that swallowed the refusal still read only part of the file.
+			(result as IDisposable)?.Dispose();
+			return null;
+		}
+
+		return result;
 	}
 
 	private static async Task<string?> ReadTextAsync(Stream stream, int maxCharacters, CancellationToken cancellationToken)

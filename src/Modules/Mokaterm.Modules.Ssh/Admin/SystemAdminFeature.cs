@@ -91,15 +91,23 @@ internal sealed class SystemAdminFeature : IAsyncDisposable
 	/// <paramref name="refresh"/> asks again; a probe that failed is tried again on the next call.
 	/// </summary>
 	/// <exception cref="AdminException">The probe could not run.</exception>
-	public Task<SystemProfile> DetectAsync(bool refresh, CancellationToken cancellationToken)
+	public Task<SystemProfile> DetectAsync(bool refresh, CancellationToken cancellationToken) => DetectAsync(refresh, [], cancellationToken);
+
+	/// <summary>
+	/// <see cref="DetectAsync(bool, CancellationToken)"/>, also looking for <paramref name="extraCommands"/>: the ones the
+	/// registered pages name. They are the same for every call in a process, so the answer kept for later calls is too.
+	/// </summary>
+	/// <exception cref="AdminException">The probe could not run.</exception>
+	public Task<SystemProfile> DetectAsync(bool refresh, IReadOnlyCollection<string> extraCommands, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(extraCommands);
 		ThrowIfDisposed();
 		Task<SystemProfile> detection;
 		lock (_lock)
 		{
 			if (refresh || _detection is null || _detection.IsFaulted || _detection.IsCanceled)
 			{
-				_detection = DetectCoreAsync();
+				_detection = DetectCoreAsync(extraCommands);
 			}
 
 			detection = _detection;
@@ -234,10 +242,10 @@ internal sealed class SystemAdminFeature : IAsyncDisposable
 		_closed.Dispose();
 	}
 
-	private async Task<SystemProfile> DetectCoreAsync()
+	private async Task<SystemProfile> DetectCoreAsync(IReadOnlyCollection<string> extraCommands)
 	{
-		AdminOutcome outcome = await _shell.RunAsync(SystemProbe.Script, elevated: false, input: null, _closed.Token);
-		SystemProfile profile = SystemProfile.From(SystemProbe.Parse(outcome.Output));
+		AdminOutcome outcome = await _shell.RunAsync(SystemProbe.ScriptFor(extraCommands), elevated: false, input: null, _closed.Token);
+		SystemProfile profile = SystemProfile.From(SystemProbe.Parse(outcome.Output, extraCommands));
 		Profile = profile;
 		Raise();
 		return profile;

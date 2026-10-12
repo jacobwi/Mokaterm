@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// one service on request. Following polls with <c>--since</c> the newest line shown; the Python compose has no
 /// <c>--since</c>, so there it fetches the tail again.
 /// </summary>
-public sealed partial class ComposeLogsPanel : DockerPageBase
+public sealed partial class ComposeLogsPanel : DockerManagerPageBase
 {
 	private const string AllServices = "";
 	private static readonly int[] TailChoices = [100, 500, 2_000];
@@ -26,9 +26,9 @@ public sealed partial class ComposeLogsPanel : DockerPageBase
 	public string? Service { get; set; }
 
 	[CascadingParameter]
-	private ComposeProjectContext? Context { get; set; }
+	private ComposeProjectContext? ProjectContext { get; set; }
 
-	private IReadOnlyList<string> Choices => [AllServices, .. (Context?.Services ?? []).Select(service => service.Name)];
+	private IReadOnlyList<string> Choices => [AllServices, .. (ProjectContext?.Services ?? []).Select(service => service.Name)];
 
 	private string EmptyText => IsFirstLoad ? "Reading the logs..." : "Nothing logged.";
 
@@ -48,11 +48,11 @@ public sealed partial class ComposeLogsPanel : DockerPageBase
 
 	private static string ChoiceLabel(string choice) => choice.Length == 0 ? "All services" : choice;
 
-	private int? SourceHue(string source) => Context?.SourceHue(source);
+	private int? SourceHue(string source) => ProjectContext?.SourceHue(source);
 
 	private Task ReloadAsync() => LoadAsync(async (client, token) =>
 	{
-		if (Context?.Target is { } target)
+		if (ProjectContext?.Target is { } target)
 		{
 			_lines.Reset(await client.ComposeLogsAsync(target, ServiceArgument, _tail, since: null, token));
 		}
@@ -60,7 +60,7 @@ public sealed partial class ComposeLogsPanel : DockerPageBase
 
 	private Task FetchNewAsync()
 	{
-		if (Context?.Target is not { } target)
+		if (ProjectContext?.Target is not { } target)
 		{
 			return Task.CompletedTask;
 		}

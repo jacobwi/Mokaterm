@@ -3,6 +3,7 @@ using Moka.Red.Feedback.CommandPalette;
 using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.ToolPages;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Tests.Fakes;
@@ -11,8 +12,8 @@ using Mokaterm.UI.Workspace;
 namespace Mokaterm.UI.Tests;
 
 /// <summary>
-/// The palette reaches every session tool and every toolbar button, so a button hidden from the bar is never lost, and
-/// none of them takes a default key the rules do not allow.
+/// The palette reaches every session tool, every app tool and every toolbar button, so a button hidden from the bar is
+/// never lost, and none of them takes a default key the rules do not allow.
 /// </summary>
 public sealed class ToolCommandsTests
 {
@@ -55,7 +56,45 @@ public sealed class ToolCommandsTests
 	// Tools come from modules and change with them; a default gesture would be taken from whatever held it.
 	[Fact]
 	public void NoToolCommand_HasADefaultKey() =>
-		Assert.DoesNotContain(ShellShortcuts.DefaultBindings, binding => binding.Id.StartsWith(ShellCommandIds.ToolPrefix, StringComparison.Ordinal));
+		Assert.DoesNotContain(
+			ShellShortcuts.DefaultBindings,
+			binding => binding.Id.StartsWith(ShellCommandIds.ToolPrefix, StringComparison.Ordinal)
+				|| binding.Id.StartsWith(ShellCommandIds.AppToolPrefix, StringComparison.Ordinal));
+
+	[Fact]
+	public void EveryAppTool_GetsAnOpenCommand_UnderItsId()
+	{
+		IReadOnlyList<ShellCommandInfo> commands = Registry(
+			[],
+			[AppTool("subnet-calculator", "Subnet calculator"), AppTool("jwt", "JWT decoder")]).Commands;
+
+		ShellCommandInfo subnet = Assert.Single(commands, command => command.Id == "mokaterm.app-tool.subnet-calculator");
+		Assert.Equal("Open Subnet calculator", subnet.Title);
+		Assert.Equal("Tools", subnet.Group);
+		Assert.Single(commands, command => command.Id == "mokaterm.app-tool.jwt");
+	}
+
+	[Fact]
+	public void AnAppTool_OpensInTheShell_AndGoesWithTheTransientUi()
+	{
+		ShellState shell = new(new UiStateStore(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance));
+		AppToolDescriptor tool = AppTool("subnet-calculator", "Subnet calculator");
+		int changes = 0;
+		shell.Changed += () => changes++;
+
+		shell.OpenAppTool(tool);
+		shell.OpenAppTool(tool);
+		Assert.Same(tool, shell.AppTool);
+		Assert.Equal(1, changes);
+
+		// The vault locked: nothing a tool shows may stay on screen.
+		shell.ResetTransientUi();
+		Assert.Null(shell.AppTool);
+
+		shell.OpenAppTool(tool);
+		shell.CloseAppTool();
+		Assert.Null(shell.AppTool);
+	}
 
 	private static SessionToolDescriptor Tool(string protocol, string? id, string title) => new()
 	{
@@ -66,7 +105,17 @@ public sealed class ToolCommandsTests
 		Component = typeof(NoView),
 	};
 
-	private static ShellCommandRegistry Registry(params SessionToolDescriptor[] tools)
+	private static AppToolDescriptor AppTool(string id, string title) => new()
+	{
+		Id = id,
+		Title = title,
+		Icon = MokatermIcons.Tools,
+		Component = typeof(NoAppTool),
+	};
+
+	private static ShellCommandRegistry Registry(params SessionToolDescriptor[] tools) => Registry(tools, []);
+
+	private static ShellCommandRegistry Registry(SessionToolDescriptor[] tools, AppToolDescriptor[] appTools)
 	{
 		ShellState shell = new(new UiStateStore(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance));
 		ManualSessionManager sessions = new();
@@ -83,7 +132,7 @@ public sealed class ToolCommandsTests
 			null!,
 			null!,
 			null!,
-			new UiContributions([], [], tools),
+			new UiContributions([], [], tools, appTools: appTools),
 			interaction,
 			null!,
 			null!,
@@ -92,4 +141,6 @@ public sealed class ToolCommandsTests
 
 	/// <summary>A tool's component; these tests never render it.</summary>
 	private sealed class NoView : SessionViewBase;
+
+	private sealed class NoAppTool : AppToolBase;
 }

@@ -1,3 +1,4 @@
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Modules.Ssh.Admin.Packages;
 
 namespace Mokaterm.Modules.Ssh.Admin.Detection;
@@ -10,6 +11,7 @@ namespace Mokaterm.Modules.Ssh.Admin.Detection;
 internal sealed record SystemProfile
 {
 	private SystemCapabilities? _capabilities;
+	private ServerFacts? _serverFacts;
 
 	/// <summary>
 	/// The order package managers are looked for when the distribution does not name one. The survey's script picks a
@@ -42,6 +44,47 @@ internal sealed record SystemProfile
 
 	/// <summary>The command sets for this machine, built on first use.</summary>
 	public SystemCapabilities Capabilities => _capabilities ??= new SystemCapabilities(this);
+
+	/// <summary>What pages from other modules see of this profile, built on first use.</summary>
+	public ServerFacts ServerFacts => _serverFacts ??= new ServerFacts
+	{
+		DisplayName = DisplayName,
+		DistributionId = Facts.OsRelease.Id,
+		DistributionLike = Facts.OsRelease.IdLike,
+		DistributionVersion = Facts.OsRelease.VersionId,
+		Kernel = Facts.Kernel,
+		HostName = Facts.HostName,
+		UserName = Facts.UserName,
+		IsRootLogin = Facts.IsRoot,
+		InitSystem = Init switch
+		{
+			InitSystem.Systemd => "systemd",
+			InitSystem.OpenRc => "openrc",
+			InitSystem.SysV => "sysvinit",
+			InitSystem.BusyBox => "busybox",
+			_ => "none",
+		},
+		PackageManager = PackageManager switch
+		{
+			PackageManagerKind.Apt => "apt",
+			PackageManagerKind.Dnf => "dnf",
+			PackageManagerKind.Yum => "yum",
+			PackageManagerKind.Zypper => "zypper",
+			PackageManagerKind.Pacman => "pacman",
+			PackageManagerKind.Apk => "apk",
+			_ => "none",
+		},
+		Firewall = Firewall switch
+		{
+			FirewallKind.Ufw => "ufw",
+			FirewallKind.Firewalld => "firewalld",
+			FirewallKind.Nftables => "nftables",
+			FirewallKind.Iptables => "iptables",
+			_ => "none",
+		},
+		IsContainer = IsContainer,
+		Commands = Facts.Commands,
+	};
 
 	/// <summary>timedatectl, hostnamectl and journalctl talk to systemd's services, which only run when systemd booted the machine.</summary>
 	public bool HasSystemdTools => Init == InitSystem.Systemd;

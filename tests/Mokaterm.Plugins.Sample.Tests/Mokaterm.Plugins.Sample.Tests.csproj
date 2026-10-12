@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The sample plugin's own logic (the fail2ban parser and commands, the subnet math) and what it registers through the
+		public descriptors, the way a plugin's own tests would check them.
+	-->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\samples\Mokaterm.Plugins.Sample\Mokaterm.Plugins.Sample.csproj" />
+
+		<!-- The plugin takes UI.Common from its host and does not copy it; a test project is its own host. -->
+		<ProjectReference Include="..\..\src\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

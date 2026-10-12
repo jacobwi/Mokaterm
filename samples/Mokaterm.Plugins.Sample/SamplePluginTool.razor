@@ -1,0 +1,8 @@
+@namespace Mokaterm.Plugins.Sample
+@inherits SessionViewBase
+
+<div class="sample-plugin">
+	<p class="sample-plugin-label">Loaded from a plugin</p>
+	<p>@Session.Title is @Session.State.ToString().ToLowerInvariant().</p>
+	<p class="sample-plugin-script" @ref="_stamp">Waiting for the plugin's script.</p>
+</div>

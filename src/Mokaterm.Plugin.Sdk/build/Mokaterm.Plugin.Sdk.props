@@ -1,0 +1,50 @@
+<Project>
+
+	<!--
+		Builds a Mokaterm plugin into a .mokaplugin. A plugin project outside this repository references the
+		Mokaterm.Plugin.Sdk package, which imports this file before the project's own properties; a plugin in the repository
+		imports it at the top of its project. Anything that depends on what the project sets is worked out in
+		Mokaterm.Plugin.Sdk.targets, after the project has had its say.
+
+		Properties a plugin sets:
+			MokatermPluginId           required: lower-case letters and digits joined by dots or dashes ("acme.proxmox")
+			MokatermPluginName         default: the assembly name
+			MokatermPluginPublisher    default: $(Company)
+			MokatermPluginDescription  default: $(Description)
+			MokatermPluginHosts        "desktop", "web" or both ("desktop;web"); empty means every host
+			MokatermPluginDataOnly     true for a plugin that carries no code (a theme pack)
+			MokatermPluginPackOnBuild  true to write the package after every build; otherwise run -t:PackMokatermPlugin
+		Items:
+			MokatermPluginTheme        terminal theme files, copied into the package's themes folder
+	-->
+
+	<!-- Written by the package's own pack step with the package version; the repository has no such file. -->
+	<Import Project="$(MSBuildThisFileDirectory)Mokaterm.Plugin.Sdk.Version.props"
+			Condition="Exists('$(MSBuildThisFileDirectory)Mokaterm.Plugin.Sdk.Version.props')" />
+
+	<PropertyGroup>
+		<!--
+			The Mokaterm version a plugin that compiles against no Mokaterm.Abstractions (a theme pack) is stamped with; a
+			code plugin is stamped from the Mokaterm.Abstractions it compiled against. In the repository this reads the
+			repository version here, before a plugin project sets a version of its own.
+		-->
+		<MokatermPluginSdkVersion Condition="'$(MokatermPluginSdkVersion)' == ''">$(VersionPrefix)</MokatermPluginSdkVersion>
+
+		<!--
+			Class libraries leave their package dependencies in the package cache. A plugin's lib folder has to carry the
+			private ones, so they are copied to the output like an application's; the host's stay out (see the targets).
+		-->
+		<CopyLocalLockFileAssemblies Condition="'$(CopyLocalLockFileAssemblies)' == ''">true</CopyLocalLockFileAssemblies>
+
+		<MokatermPluginDataOnly Condition="'$(MokatermPluginDataOnly)' == ''">false</MokatermPluginDataOnly>
+		<MokatermPluginPackOnBuild Condition="'$(MokatermPluginPackOnBuild)' == ''">false</MokatermPluginPackOnBuild>
+
+		<!--
+			What the host provides, as the roots of the restore graph: these and everything they depend on stay out of the
+			output and the package. The prefixes only decide for a file whose origin the graph cannot tell.
+		-->
+		<MokatermPluginHostRoots Condition="'$(MokatermPluginHostRoots)' == ''">Mokaterm.Abstractions;Mokaterm.UI.Common</MokatermPluginHostRoots>
+		<MokatermPluginHostAssemblyPrefixes Condition="'$(MokatermPluginHostAssemblyPrefixes)' == ''">Mokaterm.;Moka.Red;Microsoft.AspNetCore.;Microsoft.Extensions.;Microsoft.JSInterop;System.</MokatermPluginHostAssemblyPrefixes>
+	</PropertyGroup>
+
+</Project>

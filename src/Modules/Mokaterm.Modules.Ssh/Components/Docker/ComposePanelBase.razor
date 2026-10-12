@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits DockerManagerPageBase
 
 @code {
 	/// <summary>
@@ -43,7 +43,7 @@
 			<MokaAlert Severity="MokaToastSeverity.Success" Dense Closable OnClose="DismissEdit">
 				<div class="mt-dk-alert-line">
 					<span>@SavedText(saved)</span>
-					@if (Context?.Target is { HasFiles: true })
+					@if (ProjectContext?.Target is { HasFiles: true })
 					{
 						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp" Disabled="@(IsEditing || IsBusy)" OnClick="UpAsync">
 							Up

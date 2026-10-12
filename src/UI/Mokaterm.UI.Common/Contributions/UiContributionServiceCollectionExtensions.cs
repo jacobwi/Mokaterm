@@ -1,13 +1,16 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.UI.Common.Contributions;
 
-public static class UiContributionServiceCollectionExtensions
+public static partial class UiContributionServiceCollectionExtensions
 {
 	// SectionKey is a static abstract member, which only a generic method can read from a type known at run time.
 	private static readonly MethodInfo SectionTypeFactory =
@@ -59,6 +62,70 @@ public static class UiContributionServiceCollectionExtensions
 		return services;
 	}
 
+	/// <summary>
+	/// Adds a page to the System view's side menu, among the view's own pages by its order. A later registration with the
+	/// same id replaces an earlier one. Everything is checked here, so a mistake fails at startup.
+	/// </summary>
+	public static IServiceCollection AddSystemPage(this IServiceCollection services, SystemPageDescriptor descriptor)
+	{
+		ArgumentNullException.ThrowIfNull(descriptor);
+		EnsurePage(descriptor.Id, descriptor.Title, descriptor.Component);
+		EnsureDerivesFrom<SystemPageBase>(descriptor.Component, nameof(descriptor.Component));
+		ArgumentNullException.ThrowIfNull(descriptor.Commands);
+		if (descriptor.Commands.FirstOrDefault(command => !ServerFacts.IsCommandName(command)) is { } command)
+		{
+			throw new ArgumentException($"\"{command}\" is not a program name the System view can look for.", nameof(descriptor));
+		}
+
+		services.AddSingleton(descriptor);
+		services.TryAddSingleton<IUiContributions, UiContributions>();
+		return services;
+	}
+
+	/// <summary>
+	/// Adds a page to the Docker manager's side menu, among the manager's own pages by its order. A later registration
+	/// with the same id replaces an earlier one.
+	/// </summary>
+	public static IServiceCollection AddDockerPage(this IServiceCollection services, DockerPageDescriptor descriptor)
+	{
+		ArgumentNullException.ThrowIfNull(descriptor);
+		EnsurePage(descriptor.Id, descriptor.Title, descriptor.Component);
+		EnsureDerivesFrom<DockerPageBase>(descriptor.Component, nameof(descriptor.Component));
+
+		services.AddSingleton(descriptor);
+		services.TryAddSingleton<IUiContributions, UiContributions>();
+		return services;
+	}
+
+	/// <summary>
+	/// Adds a tool that needs no session to the top bar's Tools menu and the command palette. A later registration with
+	/// the same id replaces an earlier one.
+	/// </summary>
+	public static IServiceCollection AddAppTool(this IServiceCollection services, AppToolDescriptor descriptor)
+	{
+		ArgumentNullException.ThrowIfNull(descriptor);
+		EnsurePage(descriptor.Id, descriptor.Title, descriptor.Component);
+		EnsureDerivesFrom<AppToolBase>(descriptor.Component, nameof(descriptor.Component));
+
+		services.AddSingleton(descriptor);
+		services.TryAddSingleton<IUiContributions, UiContributions>();
+		return services;
+	}
+
+	/// <summary>Whether <paramref name="id"/> can name a tool page or an app tool.</summary>
+	public static bool IsToolId(string? id) => id is not null && ToolIdPattern().IsMatch(id);
+
+	private static void EnsurePage(string id, string title, Type component)
+	{
+		if (!IsToolId(id))
+		{
+			throw new ArgumentException($"\"{id}\" is not an id: use lower case letters, digits and dashes, starting with a letter or a digit.", nameof(id));
+		}
+
+		ArgumentException.ThrowIfNullOrWhiteSpace(title);
+		ArgumentNullException.ThrowIfNull(component);
+	}
+
 	private static SettingsSectionType? SectionTypeOf(Type component)
 	{
 		for (Type? type = component; type is not null; type = type.BaseType)
@@ -79,4 +146,8 @@ public static class UiContributionServiceCollectionExtensions
 			throw new ArgumentException($"{type.FullName} must derive from or implement {typeof(TBase).Name}.", parameterName);
 		}
 	}
+
+	// \z rather than $: an id ends palette command ids and saved shortcut names.
+	[GeneratedRegex(@"^[a-z0-9][a-z0-9-]{0,63}\z", RegexOptions.CultureInvariant)]
+	private static partial Regex ToolIdPattern();
 }

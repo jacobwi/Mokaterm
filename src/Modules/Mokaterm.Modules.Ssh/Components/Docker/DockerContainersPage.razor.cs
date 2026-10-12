@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.UI.Common.Platform;
 
@@ -11,7 +12,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// a wide page). "New container" swaps the list for the docker run form. The list refreshes every few seconds while it
 /// shows.
 /// </summary>
-public sealed partial class DockerContainersPage : DockerPageBase
+public sealed partial class DockerContainersPage : DockerManagerPageBase
 {
 	private const string StandaloneKey = "";
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);

@@ -6,7 +6,7 @@
 @using Mokaterm.UI.Common.Formatting
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Overview" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" LoadingText="Reading the machine">
+<ToolPageFrame Title="Overview" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" LoadingText="Reading the machine">
 	<ChipsEnd>
 		@if (_snapshot is not null)
 		{
@@ -27,19 +27,19 @@
 		SystemRates? rates = History.Rates;
 		MemoryInfo memory = sample?.Memory ?? MemoryInfo.Unknown;
 		<div class="mta-cards">
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.HostName))">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.HostName))">
 				<span class="mta-card-label">System</span>
 				<span class="mta-stat mta-stat--small" title="@Profile.DisplayName">@Profile.DisplayName</span>
 				<span class="mta-card-sub" title="@Profile.Facts.Kernel">@Profile.Facts.Kernel</span>
 			</button>
 
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Logs))">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Logs))">
 				<span class="mta-card-label">Uptime</span>
 				<span class="mta-stat">@(AdminFormat.Span(Uptime(sample) ?? snapshot.Uptime) is { Length: > 0 } up ? up : "?")</span>
 				<span class="mta-card-sub">@(snapshot.BootedAt is { } booted ? $"booted {DisplayFormat.Timestamp(booted)}" : "boot time unknown")</span>
 			</button>
 
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
 				<span class="mta-card-label">CPU</span>
 				<span class="mta-stat">@(rates?.CpuPercent is { } cpu ? AdminFormat.Percent(cpu) : "...")</span>
 				<UsageBar Percent="rates?.CpuPercent" />
@@ -47,7 +47,7 @@
 				<span class="mta-card-sub">@CpuText(rates, snapshot)</span>
 			</button>
 
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
 				<span class="mta-card-label">CPU load</span>
 				<span class="mta-stat">@(sample?.Load is { } load ? AdminFormat.Number(load.One) : "?")</span>
 				@if (LoadPercent(sample, snapshot) is { } loadPercent)
@@ -60,7 +60,7 @@
 
 			@if (memory.TotalKb is { } total && total > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
 					<span class="mta-card-label">Memory</span>
 					<span class="mta-stat">@AdminFormat.Percent(memory.UsedPercent ?? 0)</span>
 					<UsageBar Percent="memory.UsedPercent" />
@@ -71,7 +71,7 @@
 
 			@if (memory.SwapTotalKb is { } swap && swap > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Processes))">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
 					<span class="mta-card-label">Swap</span>
 					<span class="mta-stat">@AdminFormat.Percent(memory.SwapUsedPercent ?? 0)</span>
 					<UsageBar Percent="memory.SwapUsedPercent" />
@@ -82,7 +82,7 @@
 
 			@if (sample?.Interfaces.Count > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Network))" title="@NetworkTitle(rates)">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Network))" title="@NetworkTitle(rates)">
 					<span class="mta-card-label">Network</span>
 					<span class="mta-stat">@(rates?.ReceivedPerSecond is { } received ? AdminFormat.Rate(received) : "...")</span>
 					<span class="mta-spark-pair">
@@ -98,7 +98,7 @@
 
 			@if (sample?.Disks.Count > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Disks))" title="@DiskTitle(rates)">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))" title="@DiskTitle(rates)">
 					<span class="mta-card-label">Disk I/O</span>
 					<span class="mta-stat">@(rates?.ReadPerSecond is { } read ? AdminFormat.Rate(read) : "...")</span>
 					<span class="mta-spark-pair">
@@ -126,7 +126,7 @@
 
 			<AdminUpdateCards />
 
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPage.Time))">
+			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Time))">
 				<span class="mta-card-label">Time zone</span>
 				<span class="mta-stat mta-stat--small" title="@_clock?.LocalTime">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</span>
 				<span class="mta-card-sub">
@@ -137,7 +137,7 @@
 
 			@foreach (FileSystemUsage disk in snapshot.Disks)
 			{
-				<button type="button" class="mta-card" @key="disk.MountPoint" @onclick="@(() => Context.Navigate(AdminPage.Disks))" title="@($"{disk.Source} on {disk.MountPoint}")">
+				<button type="button" class="mta-card" @key="disk.MountPoint" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))" title="@($"{disk.Source} on {disk.MountPoint}")">
 					<span class="mta-card-label">@($"Disk {disk.MountPoint}")</span>
 					<span class="mta-stat">@AdminFormat.Percent(disk.UsedPercent)</span>
 					<UsageBar Percent="disk.UsedPercent" />
@@ -195,7 +195,7 @@
 		}
 	}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	/// <summary>The busiest interfaces and disks listed under the cards; the totals count them all.</summary>
@@ -271,9 +271,9 @@
 		? "Measuring"
 		: $"Summed over {rates.Disks.Count} whole {(rates.Disks.Count == 1 ? "disk" : "disks")}; partitions and volumes on them are not counted twice.";
 
-	private void OpenFailedServices() => Context.NavigateWith(AdminPage.Services, "failed");
+	private void OpenFailedServices() => Context.Navigate(AdminPageIds.Services, "failed");
 
-	private void OpenUpdates() => Context.NavigateWith(AdminPage.Packages, "updates");
+	private void OpenUpdates() => Context.Navigate(AdminPageIds.Packages, "updates");
 
 	private async Task SampleAsync()
 	{

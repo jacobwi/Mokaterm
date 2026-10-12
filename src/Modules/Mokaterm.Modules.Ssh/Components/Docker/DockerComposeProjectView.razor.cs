@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Core.Enums;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
@@ -11,7 +12,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// actions; and its logs, files, env files and configuration as tabs. Every action shows what it touches while it
 /// runs, keeps the tail of its output from the last run, and refreshes the project after.
 /// </summary>
-public sealed partial class DockerComposeProjectView : DockerPageBase
+public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 {
 	private static readonly IReadOnlyList<(string Id, string Text)> Tabs =
 	[

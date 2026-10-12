@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
@@ -9,7 +10,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// shown), restart policy, network and command. Every value is checked against Docker's rules before the exact command
 /// is shown for confirmation, and a container that came up is handed to the list to open.
 /// </summary>
-public sealed partial class DockerNewContainerView : DockerPageBase
+public sealed partial class DockerNewContainerView : DockerManagerPageBase
 {
 	private const string DefaultNetwork = "";
 

@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits DockerManagerPageBase
 
 <div class="mt-dk-panel">
 	<LogView Tail="_lines"
@@ -11,9 +11,9 @@
 			 LineCountChanged="OnTailChangedAsync"
 			 Following="_follow"
 			 FollowingChanged="OnFollowingChanged"
-			 CanFollow="@(Context?.Target is not null)"
+			 CanFollow="@(ProjectContext?.Target is not null)"
 			 OnRefresh="ReloadAsync"
-			 RefreshDisabled="@(IsLoading || Context?.Target is null)"
+			 RefreshDisabled="@(IsLoading || ProjectContext?.Target is null)"
 			 SourceHue="SourceHue">
 		<Controls>
 			<MokaSelect TValue="string"

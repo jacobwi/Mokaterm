@@ -16,8 +16,10 @@ using Mokaterm.Modules.Ssh.Admin.Detection;
 using Mokaterm.Modules.Ssh.Admin.Reboot;
 using Mokaterm.Modules.Ssh.FileSystem;
 using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Common.Editing;
 using Mokaterm.UI.Common.Formatting;
-using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
@@ -26,9 +28,10 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 /// that shows the exact commands of a change before it runs, and the last change's result at the bottom.
 /// </summary>
 /// <remarks>
-/// It opens as a session tool, which is the only surface the shell gives a module beside a terminal. The navigation
-/// shows labels when the view is wide, icons when it is not, and a dropdown when it is narrow; each page lays out its
-/// list and detail panel side by side or one above the other by its own width.
+/// It opens as a session tool, which is the only surface the shell gives a module beside a terminal. The pages are the
+/// registered <see cref="SystemPageDescriptor"/>s, this module's and any other's, opened by id. The navigation shows
+/// labels when the view is wide, icons when it is not, and a dropdown when it is narrow; each page lays out its list
+/// and detail panel side by side or one above the other by its own width.
 /// </remarks>
 public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 {
@@ -41,7 +44,8 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	private Task<SessionLogin>? _login;
 	private SystemProfile? _profile;
 	private AdminPageContext? _context;
-	private AdminPage _page = AdminPage.Overview;
+	private string _page = AdminPageIds.Overview;
+	private IReadOnlyCollection<string>? _probedCommands;
 	private bool _detecting;
 	private string? _detectError;
 	private bool _rootBusy;
@@ -68,9 +72,23 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	[Inject]
 	private ICredentialStore Credentials { get; set; } = default!;
 
+	[Inject]
+	private IUiContributions Contributions { get; set; } = default!;
+
+	[Inject]
+	private IRemoteTextEditor Editor { get; set; } = default!;
+
 	private bool IsBusy => _review is not null || _feature?.Running is not null;
 
 	private AdminActionResult? Result => _feature?.Running ?? _feature?.Last;
+
+	/// <summary>The page on show: the one picked, or the first when no page has that id (one a plugin took with it).</summary>
+	private SystemPageDescriptor? CurrentPage =>
+		Contributions.SystemPages.FirstOrDefault(page => page.Id == _page) ?? (Contributions.SystemPages is [var first, ..] ? first : null);
+
+	/// <summary>The commands registered pages ask about, which detection looks for along with its own.</summary>
+	private IReadOnlyCollection<string> ProbedCommands =>
+		_probedCommands ??= [.. Contributions.SystemPages.SelectMany(page => page.Commands).Distinct(StringComparer.Ordinal)];
 
 	public async ValueTask DisposeAsync()
 	{
@@ -151,26 +169,20 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 	}
 
 	/// <summary>Every page, with the reason the detected system cannot use it. Such pages stay in the list, greyed.</summary>
-	private List<ToolNavEntry<AdminPage>> NavEntries(SystemProfile profile)
+	private List<ToolNavEntry> NavEntries(SystemProfile profile)
 	{
-		SystemCapabilities capabilities = profile.Capabilities;
+		if (_context is not { } context || !ReferenceEquals(context.Profile, profile))
+		{
+			return [.. Contributions.SystemPages.Select(page => new ToolNavEntry(page.Id, page.Title, page.Icon))];
+		}
+
 		return
 		[
-			new(AdminPage.Overview, "Overview", SshIcons.Pulse, null),
-			new(AdminPage.Services, "Services", SshIcons.Gear, capabilities.Services is null ? capabilities.ServicesMissing : null),
-			new(AdminPage.Packages, "Packages", SshIcons.Package, capabilities.Packages is null ? capabilities.PackagesMissing : null),
-			new(AdminPage.Cron, "Cron", SshIcons.Calendar, capabilities.HasCrontab || capabilities.HasTimers ? null : "Neither cron nor systemd timers are installed."),
-			new(AdminPage.Time, "Time", SshIcons.Clock, null),
-			new(AdminPage.HostName, "Hostname", MokatermIcons.Tag, null),
-			new(AdminPage.Network, "Network", SshIcons.Network, capabilities.HasNetworkTools ? null : "There is no ip command (iproute2), so only name servers and ports can be read."),
-			new(AdminPage.Users, "Users", SshIcons.Users, null),
-			new(AdminPage.Disks, "Disks", SshIcons.Disk, null),
-			new(AdminPage.Processes, "Processes", SshIcons.Chip, capabilities.HasProcessTools ? null : "There is no ps command."),
-			new(AdminPage.Logs, "Logs", SshIcons.Log, null),
-			new(AdminPage.Firewall, "Firewall", MokatermIcons.Shield, capabilities.Firewall is null
-				? capabilities.FirewallMissing
-				: _feature?.RootBlockedReason is { } blocked ? $"The firewall only answers root. {blocked}" : null),
-			new(AdminPage.Security, "Security", MokatermIcons.ShieldCheck, null),
+			.. Contributions.SystemPages.Select(page => new ToolNavEntry(
+				page.Id,
+				page.Title,
+				page.Icon,
+				ToolPageRules.Evaluate(page.Unavailable, (ISystemPageContext)context, Logger, page.Id))),
 		];
 	}
 
@@ -341,7 +353,7 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 		StateHasChanged();
 		try
 		{
-			_profile = await feature.DetectAsync(refresh, _closed.Token);
+			_profile = await feature.DetectAsync(refresh, ProbedCommands, _closed.Token);
 			BuildContext();
 		}
 		catch (AdminException ex)
@@ -377,12 +389,13 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			Profile = profile,
 			Run = ReviewAndRunAsync,
 			EnableRoot = EnableRootAsync,
-			Navigate = Show,
+			Show = Show,
 			SessionAddress = Session.Host.Address,
 			IsBusy = () => IsBusy,
 			IsVisible = () => IsActive,
 			Reboot = RebootAsync,
 			Login = () => _login ??= ResolveLoginAsync(feature, profile),
+			Editor = Editor,
 		};
 	}
 
@@ -465,7 +478,7 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 
 	private void OnRebootChanged() => _ = InvokeAsync(StateHasChanged);
 
-	private void Show(AdminPage page)
+	private void Show(string page)
 	{
 		_page = page;
 		_ = InvokeAsync(StateHasChanged);

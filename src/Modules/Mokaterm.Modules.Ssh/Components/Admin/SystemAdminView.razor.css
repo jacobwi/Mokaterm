@@ -9,7 +9,7 @@
 	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
 	min-width: 0;
 	container-type: inline-size;
-	container-name: mt-admin mt-ssh-tool;
+	container-name: mt-admin mt-tool-nav;
 }
 
 .mta-center {
@@ -206,97 +206,10 @@
 	letter-spacing: 0.02em;
 }
 
-.mt-admin ::deep .mta-page {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-	min-height: 0;
-}
-
-.mt-admin ::deep .mta-head {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--moka-spacing-sm) var(--moka-spacing-md);
-	min-width: 0;
-}
-
-.mt-admin ::deep .mta-head-title {
-	display: flex;
-	flex: 1 1 200px;
-	flex-direction: column;
-	min-width: 0;
-}
-
-/* The filter, the primary action and refresh wrap as one group, so refresh never ends up alone on a line. Only the
-   filter gives way when the group is short of room; a shrunk button would cut its own label. */
-.mt-admin ::deep .mta-head-actions {
-	display: flex;
-	flex: 0 1 auto;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	margin-left: auto;
-}
-
-.mt-admin ::deep .mta-head-actions > :not(.mta-search) {
-	flex-shrink: 0;
-}
-
-/*
-	Wide enough for the longest placeholder ("Filter by name or description") while there is room. A width rather than a
-	basis alone: the group sizes itself from what its children ask for, and the search box would otherwise ask for its
-	own 200px.
-*/
-.mt-admin ::deep .mta-search {
-	flex: 0 1 280px;
-	width: 280px;
-	min-width: 130px;
-}
-
-.mt-admin ::deep .mta-subhead {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-}
-
 .mt-admin ::deep .mta-loading {
 	display: flex;
 	justify-content: center;
 	padding: var(--moka-spacing-xl) 0;
-}
-
-.mt-admin ::deep .mta-scroll {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	gap: var(--moka-spacing-md);
-	min-height: 0;
-	padding-right: 2px;
-	overflow-y: auto;
-}
-
-/* The list and its detail panel: side by side when there is room, one above the other when not. */
-.mt-admin ::deep .mta-md {
-	display: grid;
-	flex: 1;
-	grid-template-columns: minmax(0, 1fr);
-	gap: var(--moka-spacing-md);
-	min-height: 0;
-}
-
-.mt-admin ::deep .mta-md--open {
-	grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
-}
-
-.mt-admin ::deep .mta-md-list,
-.mt-admin ::deep .mta-md-detail {
-	min-width: 0;
-	min-height: 0;
-	overflow-y: auto;
 }
 
 .mt-admin ::deep .mta-chips {
@@ -471,46 +384,6 @@
 	border-top: 1px solid var(--moka-color-outline-variant);
 	color: var(--moka-color-on-surface-variant);
 	font-size: var(--moka-font-size-xs);
-}
-
-.mt-admin ::deep .mta-detail {
-	display: flex;
-	flex-direction: column;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-	min-height: 100%;
-	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
-	border: 1px solid var(--moka-color-outline-variant);
-	border-radius: var(--moka-radius-md);
-	background: var(--moka-color-surface);
-}
-
-.mt-admin ::deep .mta-detail-head {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-}
-
-.mt-admin ::deep .mta-detail-title {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	min-width: 0;
-}
-
-.mt-admin ::deep .mta-detail-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.mt-admin ::deep .mta-detail-body {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
 }
 
 .mt-admin ::deep .mta-kv {
@@ -699,18 +572,6 @@
 	font-size: var(--moka-font-size-xs);
 }
 
-/* The list and its panel stack once the page is narrower than a usable side panel. */
-@container mta-main (max-width: 719px) {
-	.mt-admin ::deep .mta-md--open {
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(0, 1fr) minmax(0, 1.2fr);
-	}
-
-	.mt-admin ::deep .mta-detail {
-		min-height: 0;
-	}
-}
-
 /* Columns that only fit a wide list step aside on a narrow one. */
 @container mta-main (max-width: 559px) {
 	.mt-admin ::deep .mta-row {
@@ -728,13 +589,5 @@
 
 	.mt-admin ::deep .mta-kv dd {
 		margin-bottom: var(--moka-spacing-xs);
-	}
-
-	.mt-admin ::deep .mta-head-actions {
-		flex: 1 1 100%;
-	}
-
-	.mt-admin ::deep .mta-search {
-		flex: 1 1 auto;
 	}
 }

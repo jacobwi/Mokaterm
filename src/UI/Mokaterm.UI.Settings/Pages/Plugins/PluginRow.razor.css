@@ -1,0 +1,66 @@
+.plugin-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--moka-spacing-sm) var(--moka-spacing-xl);
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+	transition: background 0.12s ease;
+}
+
+.plugin-row + .plugin-row {
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+.plugin-row:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.plugin-row__main {
+	display: flex;
+	flex: 1 1 320px;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.plugin-row__head,
+.plugin-row__by {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.plugin-row__status {
+	display: inline-flex;
+}
+
+.plugin-row__facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xxs);
+}
+
+/* What the next start changes: the one line on the row that is about the future rather than this run. */
+.plugin-row__pending {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: var(--moka-spacing-xs);
+	padding: var(--moka-spacing-xxs) var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-primary-glow-faint);
+	color: var(--moka-color-on-surface);
+}
+
+/* Beside the text on a wide row, under it on a narrow one, and then lined up with the text rather than the edge. */
+.plugin-row__actions {
+	display: flex;
+	flex: 0 1 auto;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}

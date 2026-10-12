@@ -11,10 +11,7 @@ internal sealed class WebAppEnvironment : IAppEnvironment
 {
 	public WebAppEnvironment(IConfiguration configuration, IHostEnvironment hostEnvironment)
 	{
-		string? configured = configuration["Mokaterm:DataDirectory"];
-		DataDirectory = Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
-			? Path.Combine(hostEnvironment.ContentRootPath, "App_Data")
-			: configured);
+		DataDirectory = ResolveDataDirectory(configuration, hostEnvironment);
 
 		// Inside the data directory rather than the shared system temp folder, where another account on the server could
 		// create the folder first. Nothing is created until something needs it.
@@ -26,6 +23,30 @@ internal sealed class WebAppEnvironment : IAppEnvironment
 	}
 
 	public HostKind Kind => HostKind.Web;
+
+	/// <summary><c>Mokaterm:DataDirectory</c>, or <c>App_Data</c> under the content root.</summary>
+	public static string ResolveDataDirectory(IConfiguration configuration, IHostEnvironment hostEnvironment)
+	{
+		ArgumentNullException.ThrowIfNull(configuration);
+		ArgumentNullException.ThrowIfNull(hostEnvironment);
+		string? configured = configuration["Mokaterm:DataDirectory"];
+		return Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
+			? Path.Combine(hostEnvironment.ContentRootPath, "App_Data")
+			: configured);
+	}
+
+	/// <summary>
+	/// <c>Mokaterm:Plugins:Directory</c>, or <c>plugins</c> in the data directory. The operator's folder: whatever is in
+	/// it runs on the server, so nothing is ever installed into it through the page.
+	/// </summary>
+	public static string ResolvePluginsDirectory(IConfiguration configuration, IHostEnvironment hostEnvironment)
+	{
+		ArgumentNullException.ThrowIfNull(configuration);
+		string? configured = configuration["Mokaterm:Plugins:Directory"];
+		return Path.GetFullPath(string.IsNullOrWhiteSpace(configured)
+			? Path.Combine(ResolveDataDirectory(configuration, hostEnvironment), "plugins")
+			: configured);
+	}
 
 	public string PlatformName => "Web";
 

@@ -4,7 +4,7 @@
 @using Mokaterm.UI.Common.Editing
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Security"
+<ToolPageFrame Title="Security"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="FilterChanged"
@@ -45,7 +45,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private SecuritySnapshot? _snapshot;
@@ -300,7 +300,7 @@
 		}
 
 		SshdConfig sshd = snapshot.Sshd;
-		<AdminDetailPanel Title="@check.Title"
+		<ToolDetailPanel Title="@check.Title"
 						  Subtitle="@check.Keyword"
 						  Mono="false"
 						  DotColor="@LevelColor(check.Level)"
@@ -365,7 +365,7 @@
 					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@($"sshd -T refused its settings: {broken}")</MokaAlert>
 				}
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment JailPanel => __builder =>
@@ -375,7 +375,7 @@
 			return;
 		}
 
-		<AdminDetailPanel Title="@jail.Name" Subtitle="@jail.Watches" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@jail.Name" Subtitle="@jail.Watches" OnClose="@(() => _selected = null)">
 			<dl class="mta-kv">
 				<dt>Failing now</dt>
 				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.CurrentlyFailed</MokaText></dd>
@@ -393,7 +393,7 @@
 			{
 				<pre class="mta-pre">@string.Join("\n", jail.Banned)</pre>
 			}
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private const int MaxRows = 400;
@@ -478,13 +478,13 @@
 	{
 		if (shows == "security-updates")
 		{
-			Context.NavigateWith(AdminPage.Packages, Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
+			Context.Navigate(AdminPageIds.Packages, Capabilities.Packages?.KnowsSecurityUpdates == true ? "security" : "updates");
 			return;
 		}
 
 		if (shows == "packages")
 		{
-			Context.Navigate(AdminPage.Packages);
+			Context.Navigate(AdminPageIds.Packages);
 			return;
 		}
 

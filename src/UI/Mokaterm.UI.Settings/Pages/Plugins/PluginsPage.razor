@@ -1,0 +1,88 @@
+@using Mokaterm.Abstractions.Plugins
+
+@{
+	IReadOnlyList<PluginRecord> plugins = Listed;
+}
+
+<SettingsPage Title="Plugins">
+	@if (Plugins.IsSafeStart)
+	{
+		<MokaCallout Type="MokaCalloutType.Warning" Title="Plugins are off for this start">
+			The last start ended while plugins were loading, or MOKATERM_NO_PLUGINS was set, so this one loaded none. The
+			ones marked Skipped load again at the next start.
+			@if (Plugins.CanInstall)
+			{
+				<text>If one of them stopped the app, turn it off before you restart.</text>
+			}
+		</MokaCallout>
+	}
+
+	@if (Plugins.RestartRequired)
+	{
+		<MokaCallout Type="MokaCalloutType.Note" Title="Restart Mokaterm to apply">
+			Plugin changes take effect at the next start, because a plugin that is loaded cannot be unloaded.
+			@if (Restarter is not null)
+			{
+				<MokaFlexbox Direction="MokaDirection.Row" Style="margin-top: var(--moka-spacing-xs)">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								StartIcon="MokatermIcons.Reconnect"
+								Loading="_restarting"
+								Disabled="Busy"
+								OnClick="RestartAsync">
+						Restart now
+					</MokaButton>
+				</MokaFlexbox>
+			}
+		</MokaCallout>
+	}
+
+	<SettingsSection Title="Installed" Description="@InstalledDescription">
+		<Actions>
+			@if (CanInstall)
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokaIcons.Action.Upload"
+							Loading="_picking"
+							Disabled="Busy"
+							OnClick="PickPackageAsync">
+					Install from file
+				</MokaButton>
+			}
+		</Actions>
+		<ChildContent>
+			@if (plugins.Count == 0)
+			{
+				<MokaEmptyState Icon="MokatermIcons.Plugin" Title="No plugins installed" Description="@EmptyDescription" />
+			}
+			@foreach (PluginRecord plugin in plugins)
+			{
+				<PluginRow @key="plugin.Id"
+						   Plugin="plugin"
+						   CanManage="Plugins.CanInstall"
+						   Busy="Busy"
+						   OnTurnOn="TurnOnAsync"
+						   OnTurnOff="TurnOffAsync"
+						   OnTrust="TrustChangedFilesAsync"
+						   OnRemove="RemoveAsync" />
+			}
+		</ChildContent>
+	</SettingsSection>
+
+	<SettingsSection Title="Folder">
+		<SettingsRow Label="Plugins folder" Description="@FolderDescription">
+			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+				<MokaText Element="span"
+						  Size="MokaSize.Xs"
+						  Mono
+						  Truncate
+						  Style="@TextStyles.TruncateBox"
+						  title="@Plugins.Directory">@Plugins.Directory</MokaText>
+				<CopyButton Text="@Plugins.Directory" Label="Copy folder path" />
+			</MokaFlexbox>
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>
+
+<PluginInstallDialog Open="_installOpen" OpenChanged="OnInstallOpenChanged" Package="_package" />

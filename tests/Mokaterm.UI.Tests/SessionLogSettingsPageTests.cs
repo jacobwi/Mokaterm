@@ -108,21 +108,6 @@ public sealed class SessionLogSettingsPageTests
 		public Stream OpenRead(string name) => throw new NotSupportedException();
 	}
 
-	/// <summary>Present so the save action shows; a static render can never press it.</summary>
-	private sealed class NoLocalFiles : ILocalFileAccess
-	{
-		public bool CanPickFolders => false;
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public ValueTask<bool> SaveFileAsync(string suggestedName, long? length, Func<Stream, CancellationToken, Task> writeAsync, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-	}
-
 	private sealed class SilentInteraction : IUserInteraction
 	{
 		public Task<HostTrustDecision> ConfirmHostIdentityAsync(HostTrustPrompt prompt, CancellationToken cancellationToken = default) =>

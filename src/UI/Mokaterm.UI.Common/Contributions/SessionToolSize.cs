@@ -1,6 +1,6 @@
 namespace Mokaterm.UI.Common.Contributions;
 
-/// <summary>How much room a session tool asks for when the shell opens it in a dialog.</summary>
+/// <summary>How much room a session tool or an app tool asks for when the shell opens it in a dialog.</summary>
 public enum SessionToolSize
 {
 	/// <summary>A form-sized dialog that grows with its content, such as the tunnels panel.</summary>

@@ -1,0 +1,50 @@
+.mt-detail {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 100%;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-detail-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-detail-title {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.mt-detail-title ::deep .mt-detail-subtitle {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.mt-detail-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* ToolPageFrame puts the panel under the list at this width, where it takes the room it gets instead of the list's. */
+@container mt-page (max-width: 719px) {
+	.mt-detail {
+		min-height: 0;
+	}
+}

@@ -12,7 +12,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// module's sudo file system when the login may not, which is the usual case under <c>/var/lib/docker</c>. It never
 /// writes and never walks above the folder it was opened on.
 /// </summary>
-public sealed partial class DockerFileViewer : DockerPageBase
+public sealed partial class DockerFileViewer : DockerManagerPageBase
 {
 	private string _path = "";
 	private IReadOnlyList<RemoteFileEntry>? _entries;

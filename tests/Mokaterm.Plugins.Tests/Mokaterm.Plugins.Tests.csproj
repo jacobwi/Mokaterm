@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Plugins as the app meets them, starting from the package the plugin SDK builds out of samples/Mokaterm.Plugins.Sample.
+		Core and UI.Common stand in for the host: what this process can load is what a host provides.
+	-->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Mokaterm.Core\Mokaterm.Core.csproj" />
+		<ProjectReference Include="..\..\src\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+	<Import Project="..\Shared\Plugins\SamplePluginPackage.targets" />
+
+</Project>

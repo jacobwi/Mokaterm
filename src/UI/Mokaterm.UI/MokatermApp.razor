@@ -1,6 +1,7 @@
 @namespace Mokaterm.UI
 
 <MokaThemeProvider Theme="_theme">
+	<PluginStyles />
 	@if (_bootError is not null)
 	{
 		<MokaBootScreen Brand="mokaterm" StatusText="startup failed" ShowBar="false" ShowScanline="false">

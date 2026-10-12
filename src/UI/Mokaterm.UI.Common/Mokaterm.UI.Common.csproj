@@ -10,6 +10,14 @@
 		<RootNamespace>Mokaterm.UI.Common</RootNamespace>
 	</PropertyGroup>
 
+	<!-- Packed for plugin authors, who compile against it; the host supplies the assembly and its static files at run time. -->
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<PackageId>Mokaterm.UI.Common</PackageId>
+		<Description>Shared Blazor building blocks for Mokaterm plugins and modules: UI contributions, session views, editor and settings base classes, the settings fields, icons and the page interop helpers. Plugins compile against it; the Mokaterm host supplies it at run time.</Description>
+		<PackageTags>mokaterm;plugin;blazor;terminal</PackageTags>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<InternalsVisibleTo Include="Mokaterm.UI.Tests" />
 	</ItemGroup>

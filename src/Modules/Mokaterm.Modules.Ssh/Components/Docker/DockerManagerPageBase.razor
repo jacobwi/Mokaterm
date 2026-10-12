@@ -1,0 +1,12 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerPageBase
+
+@code {
+	/// <summary>A chip for an image this session's update check found behind its tag; nothing otherwise.</summary>
+	private protected RenderFragment UpdateChip(string? image) => @<text>
+		@if (Feature?.ImageUpdates.Find(image) is { HasUpdate: true } update)
+		{
+			<MokaTag Text="UPDATE" Size="MokaSize.Xs" Color="MokaColor.Info" title="@update.Detail" />
+		}
+	</text>;
+}

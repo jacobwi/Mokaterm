@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits DockerManagerPageBase
 
 <div class="mt-dk-toolbar">
 	<span class="mt-dk-label">Engine</span>
@@ -76,7 +76,7 @@
 			@if (Navigation is { } navigation)
 			{
 				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
-							OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))">
+							OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
 					Clean up
 				</MokaButton>
 			}

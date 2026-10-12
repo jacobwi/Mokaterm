@@ -1,5 +1,6 @@
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
+using Mokaterm.Core.Plugins;
 using Mokaterm.DevHost.Components;
 using Mokaterm.DevHost.Demo;
 using Mokaterm.DevHost.Demo.Mqtt;
@@ -16,6 +17,7 @@ using Mokaterm.Modules.Telnet;
 using Mokaterm.Modules.Vnc;
 using Mokaterm.Sessions.Extensions;
 using Mokaterm.UI.Extensions;
+using Mokaterm.Web.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -44,7 +46,17 @@ builder.Services.AddSingleton<DevVaultSeeder>();
 // Serial is registered so its editor, settings page and session panel can be looked at. It opens a real port on this
 // machine, and there is no demo device to seed a login against: plug something in, or add a virtual pair. The local
 // shell runs a real shell on this machine for whoever opens the page, which this host only allows in Development.
-builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddModule(new DemoModule()));
+// Plugins are installed through the page here, as on the desktop, so the Plugins page can be tried. The folder outlives
+// a run (unlike the vault), so an install survives the restart it waits for. Mokaterm:Plugins:Directory moves it.
+string? pluginsDirectory = builder.Configuration["Mokaterm:Plugins:Directory"];
+PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
+{
+	Directory = string.IsNullOrWhiteSpace(pluginsDirectory) ? Path.Combine(Path.GetTempPath(), "mokaterm-devhost", "plugins") : pluginsDirectory,
+	Host = HostKind.Web,
+	UserManaged = true,
+	SkipAll = PluginCatalogOptions.SkipAllRequested(),
+});
+builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddModule(new DemoModule()).AddPlugins(plugins));
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
 
@@ -68,8 +80,12 @@ await app.Services.GetRequiredService<DevVaultSeeder>().SeedAsync(app.Lifetime.A
 
 app.UseAntiforgery();
 
+app.UsePluginFiles(plugins);
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
 	.AddInteractiveServerRenderMode();
+
+// Listening with its plugins loaded, so the next start may load them again (see PluginCatalog).
+app.Lifetime.ApplicationStarted.Register(plugins.ConfirmStarted);
 
 await app.RunAsync();

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<Import Project="../../src/Mokaterm.Plugin.Sdk/build/Mokaterm.Plugin.Sdk.props" />
+
+	<!--
+		A plugin built the way an outside one would be: it references UI.Common and nothing else of ours, the host supplies
+		that at run time, and the plugin SDK packs it into a .mokaplugin after every build. It shows that a plugin's view, its
+		script, its scoped CSS and its themes load, and it adds a System view page (fail2ban) and an app tool (a subnet
+		calculator) through the same descriptors the built-in ones use. The plugin tests install the package it builds.
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Plugins.Sample</RootNamespace>
+		<VersionPrefix>1.0.0</VersionPrefix>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<MokatermPluginId>moka.sample</MokatermPluginId>
+		<MokatermPluginName>Sample plugin</MokatermPluginName>
+		<MokatermPluginPublisher>Moka</MokatermPluginPublisher>
+		<MokatermPluginDescription>Shows that a plugin's view, script, styles and themes load.</MokatermPluginDescription>
+		<MokatermPluginHosts>desktop;web</MokatermPluginHosts>
+		<MokatermPluginPackOnBuild>true</MokatermPluginPackOnBuild>
+	</PropertyGroup>
+
+	<!-- Private="false" also keeps UI.Common's own output files out of bin; the SDK keeps its assemblies out either way. -->
+	<ItemGroup>
+		<ProjectReference Include="../../src/UI/Mokaterm.UI.Common/Mokaterm.UI.Common.csproj" Private="false" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<MokatermPluginTheme Include="themes/*.json" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Mokaterm.Plugins.Sample.Tests" />
+	</ItemGroup>
+
+	<Import Project="../../src/Mokaterm.Plugin.Sdk/build/Mokaterm.Plugin.Sdk.targets" />
+
+</Project>

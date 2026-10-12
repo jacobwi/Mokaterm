@@ -1,4 +1,5 @@
 using System.Text;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 
 namespace Mokaterm.Modules.Ssh.Tests.Fakes;

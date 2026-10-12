@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
+using Mokaterm.Maui.Plugins;
 
 namespace Mokaterm.Maui.ToolWindows;
 
@@ -7,7 +7,7 @@ namespace Mokaterm.Maui.ToolWindows;
 /// The BlazorWebView of a tool window. It carries the scope factory its page is created from, which
 /// <see cref="ToolWebViewHandler"/> hands to Blazor in place of the window's own.
 /// </summary>
-internal sealed class ToolWebView : BlazorWebView
+internal sealed class ToolWebView : MokatermWebView
 {
 	public ToolWebView(IServiceScopeFactory pageScopes)
 	{

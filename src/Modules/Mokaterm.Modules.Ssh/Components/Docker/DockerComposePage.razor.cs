@@ -8,7 +8,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// which are the whole list on a host with the Python compose. A row opens the project; "Find compose files" searches
 /// the usual folders for files that run as no project yet, and each can be brought up from here.
 /// </summary>
-public sealed partial class DockerComposePage : DockerPageBase
+public sealed partial class DockerComposePage : DockerManagerPageBase
 {
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
 

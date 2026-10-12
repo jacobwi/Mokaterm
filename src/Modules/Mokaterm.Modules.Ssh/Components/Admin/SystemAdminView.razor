@@ -114,50 +114,12 @@
 			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _rootError = null)">@rootError</MokaAlert>
 		}
 
-		<ToolNavigation TPage="AdminPage" Entries="NavEntries(profile)" Current="_page" CurrentChanged="Show" Label="System pages">
+		<ToolNavigation Entries="NavEntries(profile)" Current="@_page" CurrentChanged="Show" Label="System pages">
 			<div class="mta-main">
 				<CascadingValue Value="_context" IsFixed="false">
-					@switch (_page)
+					@if (CurrentPage is { } page)
 					{
-						case AdminPage.Overview:
-							<AdminOverviewPage @key="profile" />
-							break;
-						case AdminPage.Services:
-							<AdminServicesPage @key="profile" />
-							break;
-						case AdminPage.Packages:
-							<AdminPackagesPage @key="profile" />
-							break;
-						case AdminPage.Cron:
-							<AdminCronPage @key="profile" />
-							break;
-						case AdminPage.Time:
-							<AdminTimePage @key="profile" />
-							break;
-						case AdminPage.HostName:
-							<AdminHostNamePage @key="profile" />
-							break;
-						case AdminPage.Network:
-							<AdminNetworkPage @key="profile" />
-							break;
-						case AdminPage.Users:
-							<AdminUsersPage @key="profile" />
-							break;
-						case AdminPage.Disks:
-							<AdminDisksPage @key="profile" />
-							break;
-						case AdminPage.Processes:
-							<AdminProcessesPage @key="profile" />
-							break;
-						case AdminPage.Logs:
-							<AdminLogsPage @key="profile" />
-							break;
-						case AdminPage.Firewall:
-							<AdminFirewallPage @key="profile" />
-							break;
-						case AdminPage.Security:
-							<AdminSecurityPage @key="profile" />
-							break;
+						<DynamicComponent @key="(profile, page.Id)" Type="page.Component" />
 					}
 				</CascadingValue>
 			</div>

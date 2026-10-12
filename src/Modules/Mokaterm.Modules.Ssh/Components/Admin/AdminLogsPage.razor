@@ -1,7 +1,7 @@
 @using Mokaterm.Modules.Ssh.Admin.SystemLogs
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Logs" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" ListPage>
+<ToolPageFrame Title="Logs" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync" ListPage>
 	<Chips>
 		@if (Capabilities.HasJournal)
 		{
@@ -79,7 +79,7 @@
 			</div>
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private static readonly IReadOnlyList<string> PriorityChoices = ["", .. LogCommands.Priorities];

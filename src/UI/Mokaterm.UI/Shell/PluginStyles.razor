@@ -1,0 +1,13 @@
+@namespace Mokaterm.UI.Shell
+@using Mokaterm.Abstractions.Plugins
+@inject IEnumerable<PluginInfo> Plugins
+
+@* A host's own *.styles.css holds only the libraries it was built with, so each plugin's scoped CSS is linked here.
+   Body links apply like head ones, and this way a tool window, which has no head outlet, gets them too. *@
+@foreach (PluginInfo plugin in Plugins)
+{
+	if (plugin.StyleSheet is { } href)
+	{
+		<link rel="stylesheet" href="@href" />
+	}
+}

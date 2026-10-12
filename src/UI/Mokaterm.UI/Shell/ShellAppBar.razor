@@ -14,6 +14,13 @@
 		<QuickConnectBox />
 	</ChildContent>
 	<EndContent>
+		@if (Contributions.AppTools.Count > 0)
+		{
+			<IconAction Icon="MokatermIcons.Tools"
+						Title="Tools"
+						Active="@(Shell.AppTool is not null)"
+						OnClick="ShowToolsMenu" />
+		}
 		<IconAction Icon="MokatermIcons.Command"
 					Title="Command palette"
 					Shortcut="Ctrl+K"

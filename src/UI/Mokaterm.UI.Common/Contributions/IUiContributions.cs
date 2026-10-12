@@ -13,6 +13,15 @@ public interface IUiContributions
 	/// <summary>Ordered by order, then title.</summary>
 	IReadOnlyList<SessionToolDescriptor> SessionTools { get; }
 
+	/// <summary>The System view's pages, built in and added, one per id, ordered by order, then title.</summary>
+	IReadOnlyList<SystemPageDescriptor> SystemPages { get; }
+
+	/// <summary>The Docker manager's pages, built in and added, one per id, ordered by order, then title.</summary>
+	IReadOnlyList<DockerPageDescriptor> DockerPages { get; }
+
+	/// <summary>The tools that need no session, one per id, ordered by order, then title.</summary>
+	IReadOnlyList<AppToolDescriptor> AppTools { get; }
+
 	ProtocolUiDescriptor? FindProtocol(string protocolId);
 
 	/// <summary>

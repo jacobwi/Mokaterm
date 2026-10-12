@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <c>docker stats --no-stream</c> every few seconds while the page shows, each with its recent CPU as a line. Any
 /// column sorts; the busiest CPU comes first until the user picks another.
 /// </summary>
-public sealed partial class DockerStatsPage : DockerPageBase
+public sealed partial class DockerStatsPage : DockerManagerPageBase
 {
 	private static readonly IReadOnlyList<(StatsColumn Column, string Text)> Columns =
 	[

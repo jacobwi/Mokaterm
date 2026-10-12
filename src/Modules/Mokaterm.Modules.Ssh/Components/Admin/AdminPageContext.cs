@@ -1,11 +1,18 @@
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
 using Mokaterm.Modules.Ssh.Admin.Monitoring;
+using Mokaterm.UI.Common.Editing;
+using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
-/// <summary>What every page of the system view gets from the view around it.</summary>
-internal sealed class AdminPageContext
+/// <summary>
+/// What every page of the system view gets from the view around it. The view's own pages use it with the module's
+/// types; a page from another module gets the same object through <see cref="ISystemPageContext"/>, whose scripts and
+/// changes go through the same feature, review and limits.
+/// </summary>
+internal sealed class AdminPageContext : ISystemPageContext
 {
 	private string? _hint;
 	private MonitorSampler? _liveSampler;
@@ -20,8 +27,8 @@ internal sealed class AdminPageContext
 	/// <summary>Turns root mode on from inside a page, the way the header's button does.</summary>
 	public required Func<Task> EnableRoot { get; init; }
 
-	/// <summary>Opens another page, as an overview card does.</summary>
-	public required Action<AdminPage> Navigate { get; init; }
+	/// <summary>Shows another page by its id; <see cref="Navigate"/> is what pages call.</summary>
+	public required Action<string> Show { get; init; }
 
 	/// <summary>The address this session connected to, as the connection names it.</summary>
 	public required string SessionAddress { get; init; }
@@ -38,6 +45,9 @@ internal sealed class AdminPageContext
 	/// <summary>How this session logged in, for the changes that could refuse its next login. Read once and kept.</summary>
 	public required Func<Task<SessionLogin>> Login { get; init; }
 
+	/// <summary>The editor of the window the view is in, for pages that open a file.</summary>
+	public required IRemoteTextEditor Editor { get; init; }
+
 	/// <summary>
 	/// The overview's live figures, kept for as long as the view is open: leaving the page and coming back keeps the
 	/// lines drawn so far, and the next sample's rates cover the time away.
@@ -53,11 +63,24 @@ internal sealed class AdminPageContext
 	/// <summary>Why changes that need root are not offered, or null.</summary>
 	public string? RootChangeBlocked => CanChangeAsRoot ? null : Feature.RootBlockedReason;
 
-	/// <summary>Opens <paramref name="page"/> with a filter already chosen, such as the failed services.</summary>
-	public void NavigateWith(AdminPage page, string hint)
+	public ServerFacts Server => Profile.ServerFacts;
+
+	public bool RootModeOn => Feature.RootModeOn;
+
+	public bool CanReadAsRoot => Feature.CanActAsRoot;
+
+	bool ISystemPageContext.IsBusy => IsBusy();
+
+	bool ISystemPageContext.IsVisible => IsVisible();
+
+	Task ISystemPageContext.EnableRootAsync() => EnableRoot();
+
+	/// <summary>Opens the page with <paramref name="pageId"/>, with a filter already chosen when there is a hint, such as the failed services.</summary>
+	public void Navigate(string pageId, string? hint = null)
 	{
+		ArgumentNullException.ThrowIfNull(pageId);
 		_hint = hint;
-		Navigate(page);
+		Show(pageId);
 	}
 
 	/// <summary>The filter the page was opened with, once; later calls get null.</summary>
@@ -66,5 +89,22 @@ internal sealed class AdminPageContext
 		string? hint = _hint;
 		_hint = null;
 		return hint;
+	}
+
+	public async Task<SystemScriptResult> ReadAsync(SystemScript script, CancellationToken cancellationToken) =>
+		SystemPageScripts.ToResult(await Feature.ReadAsync(SystemPageScripts.ToAdminScript(script, change: false, readsInput: false), cancellationToken));
+
+	public async Task<SystemChangeResult?> RunChangeAsync(SystemChange change)
+	{
+		AdminAction action = SystemPageScripts.ToAction(change);
+		using AdminInput? input = SystemPageScripts.ToInput(change);
+		AdminActionResult? result = await Run(action, input);
+		return result is null ? null : SystemPageScripts.ToResult(result);
+	}
+
+	public Task<RemoteTextEditResult> EditFileAsync(string path, bool asRoot, bool createNew, CancellationToken cancellationToken)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(path);
+		return AdminFileEditing.EditAsync(Editor, Feature, path, asRoot, createNew, cancellationToken);
 	}
 }

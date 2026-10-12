@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// files, which usually takes root. Only unused volumes can be removed, one here or together on the cleanup page, and
 /// nothing is ever written into one from here.
 /// </summary>
-public sealed partial class DockerVolumesPage : DockerPageBase
+public sealed partial class DockerVolumesPage : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerVolume> _volumes = [];
 	private IReadOnlyList<DockerVolume> _shown = [];

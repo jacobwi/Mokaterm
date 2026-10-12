@@ -30,6 +30,44 @@ internal static class AdminFileEditing
 		}
 	}
 
+	/// <summary>
+	/// Edits <paramref name="path"/> as the login, on the session's own files, or as root; with
+	/// <paramref name="createNew"/> it is created empty first.
+	/// </summary>
+	public static async Task<RemoteTextEditResult> EditAsync(
+		IRemoteTextEditor editor,
+		SystemAdminFeature feature,
+		string path,
+		bool asRoot,
+		bool createNew,
+		CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(editor);
+		ArgumentNullException.ThrowIfNull(feature);
+		if (asRoot)
+		{
+			return await EditAsRootAsync(editor, feature, path, path, createNew, cancellationToken);
+		}
+
+		if (feature.RootFiles is not { } rootFiles)
+		{
+			const string problem = "This session has no files to open.";
+			return RemoteTextEditResult.Failed(new InvalidOperationException(problem), problem);
+		}
+
+		IRemoteFileSystem files;
+		try
+		{
+			files = await rootFiles.Files.OpenAsync(cancellationToken);
+		}
+		catch (RemoteFileSystemException ex)
+		{
+			return RemoteTextEditResult.Failed(ex, ex.Message);
+		}
+
+		return await editor.EditAsync(new RemoteTextEditRequest { FileSystem = files, Path = path, DisplayName = path, CreateNew = createNew }, cancellationToken);
+	}
+
 	/// <summary>Edits <paramref name="path"/> as root; with <paramref name="createNew"/> it is created empty first.</summary>
 	public static async Task<RemoteTextEditResult> EditAsRootAsync(
 		IRemoteTextEditor editor,

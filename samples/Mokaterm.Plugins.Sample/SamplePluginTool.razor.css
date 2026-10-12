@@ -1,0 +1,20 @@
+.sample-plugin {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	padding: var(--moka-spacing-md);
+	border: 1px dashed var(--moka-color-primary-border);
+	color: var(--moka-color-on-surface);
+}
+
+.sample-plugin-label {
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.sample-plugin-script {
+	font-family: var(--moka-font-family-mono);
+}

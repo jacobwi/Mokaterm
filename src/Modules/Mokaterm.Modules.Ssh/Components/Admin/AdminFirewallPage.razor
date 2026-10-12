@@ -2,7 +2,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Firewall
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Firewall"
+<ToolPageFrame Title="Firewall"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -124,7 +124,7 @@
 			}
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private FirewallStatus? _status;
@@ -182,7 +182,7 @@
 		}
 
 		string? refusal = firewall.WhyNotDelete(rule);
-		<AdminDetailPanel Title="@rule.Target" Subtitle="@rule.Action" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@rule.Target" Subtitle="@rule.Action" OnClose="@(() => _selected = null)">
 			<Actions>
 				@if (firewall.CanChange)
 				{
@@ -227,7 +227,7 @@
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@refusal</MokaText>
 				}
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private IReadOnlyList<MokaContextMenuItem> MenuFor(FirewallRule rule, int index, FirewallCommands firewall, FirewallStatus status)
@@ -274,7 +274,7 @@
 
 	private RenderFragment AddPanel => __builder =>
 	{
-		<AdminDetailPanel Title="Add a rule" Mono="false" OnClose="@(() => _adding = false)">
+		<ToolDetailPanel Title="Add a rule" Mono="false" OnClose="@(() => _adding = false)">
 			<TextSetting Label="Port"
 						 Value="@(_port?.ToString() ?? "")"
 						 ValueChanged="OnPortChanged"
@@ -290,7 +290,7 @@
 				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || _port is null)" OnClick="@(() => PortAsync(allow: true))">Allow</MokaButton>
 				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Sm" Disabled="@(Busy || _port is null)" OnClick="@(() => PortAsync(allow: false))">Deny</MokaButton>
 			</div>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private static string? PortProblem(string text)

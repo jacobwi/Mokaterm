@@ -1,0 +1,136 @@
+@using Moka.Red.Forms.Checkbox
+@using Mokaterm.Abstractions.Plugins
+@inherits DraftDialogBase
+
+<HeadedDialog Open="Open"
+			  OpenChanged="OnOpenChangedAsync"
+			  Title="Install a plugin"
+			  Icon="MokatermIcons.Plugin"
+			  DialogSize="MokaDialogSize.Medium"
+			  CloseOnBackdropClick="false"
+			  CloseOnEscape="!IsBusy"
+			  ShowCloseButton="!IsBusy">
+	<ChildContent>
+		@if (_package is { } package)
+		{
+			<div class="plugin-install">
+				<div class="plugin-install__head">
+					<div class="plugin-install__title">
+						<MokaText Element="span" Size="MokaSize.Lg" Weight="MokaFontWeight.Semibold">@package.Name</MokaText>
+						<MokaText Element="span" Size="MokaSize.Sm" Mono Style="@TextStyles.Muted">@package.Version</MokaText>
+						<MokaTag Text="@PluginDisplay.Kind(package.HasCode)"
+								 Size="MokaSize.Xs"
+								 Color="PluginDisplay.KindColor(package.HasCode)"
+								 title="@PluginDisplay.KindTitle(package.HasCode)" />
+					</div>
+					<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@PluginDisplay.Publisher(package.Publisher)</MokaText>
+				</div>
+
+				@if (!string.IsNullOrWhiteSpace(package.Description))
+				{
+					<MokaText Element="div" Size="MokaSize.Sm">@package.Description</MokaText>
+				}
+
+				@if (PluginDisplay.VersionChange(package.InstalledVersion, package.Version) is { } change)
+				{
+					<div class="plugin-install__update">
+						<MokaIcon Icon="MokatermIcons.Reconnect" SizeValue="12px" />
+						<MokaText Element="span" Size="MokaSize.Xs">@change</MokaText>
+					</div>
+				}
+
+				<dl class="plugin-install__facts">
+					<dt>Id</dt>
+					<dd><span class="plugin-install__mono">@package.Id</span></dd>
+					<dt>Hosts</dt>
+					<dd>
+						@foreach (string host in PluginDisplay.HostNames(package.Hosts))
+						{
+							<MokaTag Text="@host" Icon="PluginDisplay.HostIcon(host)" Size="MokaSize.Xs" />
+						}
+					</dd>
+					@if (package.ThemeCount > 0)
+					{
+						<dt>Themes</dt>
+						<dd><MokaText Element="span" Size="MokaSize.Xs">@PluginDisplay.Themes(package.ThemeCount)</MokaText></dd>
+					}
+				</dl>
+
+				@if (!string.IsNullOrWhiteSpace(package.Problem))
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@package.Problem</MokaAlert>
+				}
+				else if (package.HasCode)
+				{
+					<MokaCallout Type="MokaCalloutType.Warning" Title="This plugin runs code">@PluginDisplay.CodeWarning</MokaCallout>
+
+					<div class="plugin-install__block">
+						<span class="plugin-install__label">@FilesLabel(package)</span>
+						<ul class="plugin-install__files" aria-label="Files in the package">
+							@foreach (PluginPackageFile file in package.Files)
+							{
+								<li>
+									<span class="plugin-install__file">
+										<span class="plugin-install__path">@file.Path</span>
+										<span class="plugin-install__size">@DisplayFormat.Bytes(file.Length)</span>
+									</span>
+									<span class="plugin-install__sha">@file.Sha256</span>
+								</li>
+							}
+						</ul>
+					</div>
+
+					<div class="plugin-install__block">
+						<span class="plugin-install__label">Package hash</span>
+						<div class="plugin-install__hash">
+							<span class="plugin-install__mono">@package.Hash</span>
+							<CopyButton Text="@package.Hash" Label="Copy package hash" />
+						</div>
+					</div>
+
+					<MokaCheckbox Value="_trusted"
+								  ValueChanged="SetTrusted"
+								  Label="@TrustLabel(package)"
+								  HelperText="Needed to turn it on. Installing it turned off runs nothing."
+								  Disabled="_busy" />
+				}
+				else
+				{
+					<MokaText Element="div" Size="MokaSize.Xs" Style="@TextStyles.Muted">@PluginDisplay.KindTitle(false)</MokaText>
+				}
+
+				@if (_error is not null)
+				{
+					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+				}
+			</div>
+		}
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_busy" OnClick="CloseAsync">Cancel</MokaButton>
+		@if (_package is { HasCode: true })
+		{
+			<MokaButton Variant="MokaVariant.Outlined"
+						Disabled="@(!CanInstall || _busy)"
+						Loading="@(_busy && !_enabling)"
+						OnClick="() => InstallAsync(enable: false)">
+				Install turned off
+			</MokaButton>
+			<MokaButton StartIcon="MokatermIcons.Plugin"
+						Disabled="@(!CanInstall || !_trusted || _busy)"
+						Loading="@(_busy && _enabling)"
+						OnClick="() => InstallAsync(enable: true)">
+				Install and turn on
+			</MokaButton>
+		}
+		else
+		{
+			<MokaButton StartIcon="MokatermIcons.Plugin"
+						Disabled="@(!CanInstall || _busy)"
+						Loading="_busy"
+						OnClick="() => InstallAsync(enable: true)">
+				Install
+			</MokaButton>
+		}
+	</Actions>
+</HeadedDialog>

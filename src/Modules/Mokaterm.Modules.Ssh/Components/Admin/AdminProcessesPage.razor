@@ -2,7 +2,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Processes
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Processes"
+<ToolPageFrame Title="Processes"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -86,7 +86,7 @@
 			</div>
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private const int MaxRows = 200;
@@ -156,7 +156,7 @@
 
 		bool reniceAsRoot = ReniceAsRoot(process, _nice);
 		string? reniceBlocked = reniceAsRoot ? Context.RootChangeBlocked : null;
-		<AdminDetailPanel Title="@($"{process.Name} ({process.Pid})")" Subtitle="@process.User" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@($"{process.Name} ({process.Pid})")" Subtitle="@process.User" OnClose="@(() => _selected = null)">
 			<Actions>
 				@if (process.Pid > 1)
 				{
@@ -223,7 +223,7 @@
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command line</MokaText>
 				<pre class="mta-pre">@process.Command</pre>
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private IReadOnlyList<(ProcessInfo Process, int Depth)> Shown()

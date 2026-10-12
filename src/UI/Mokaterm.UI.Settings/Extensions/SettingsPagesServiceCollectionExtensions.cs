@@ -9,6 +9,7 @@ using Mokaterm.UI.Settings.Pages.Files;
 using Mokaterm.UI.Settings.Pages.General;
 using Mokaterm.UI.Settings.Pages.Keychain;
 using Mokaterm.UI.Settings.Pages.KnownHosts;
+using Mokaterm.UI.Settings.Pages.Plugins;
 using Mokaterm.UI.Settings.Pages.Security;
 using Mokaterm.UI.Settings.Pages.SessionLogs;
 using Mokaterm.UI.Settings.Pages.Terminal;
@@ -95,6 +96,19 @@ public static class SettingsPagesServiceCollectionExtensions
 			Order = 35,
 			Keywords = "session log logging record transcript capture output file folder size limit plain text raw escape sequences save download "
 				+ "timed asciicast asciinema cast play playback replay",
+		});
+
+		services.AddSettingsPage(new SettingsPageDescriptor
+		{
+			Id = "plugins",
+			Title = "Plugins",
+			Description = "Protocols, tools and terminal themes added from a .mokaplugin file. A plugin that runs code asks for your trust first, and every change applies at the next start.",
+			Icon = MokatermIcons.Plugin,
+			Component = typeof(PluginsPage),
+			Group = SettingsPageGroup.Application,
+			Order = 45,
+			Keywords = "plugins plugin extensions add-ons addons mokaplugin package install from file update enable disable turn on off "
+				+ "remove uninstall trust publisher code data theme pack sha-256 hash checksum safe start restart folder",
 		});
 
 		services.AddSettingsPage(new SettingsPageDescriptor

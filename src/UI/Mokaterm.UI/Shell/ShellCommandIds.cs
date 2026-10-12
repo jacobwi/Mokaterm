@@ -109,6 +109,16 @@ internal static class ShellCommandIds
 		return ToolPrefix + tool.Key;
 	}
 
+	/// <summary>Opening an app tool, followed by the tool's id, such as <c>mokaterm.app-tool.subnet-calculator</c>.</summary>
+	public const string AppToolPrefix = "mokaterm.app-tool.";
+
+	/// <summary>The command that opens <paramref name="tool"/>.</summary>
+	public static string ForAppTool(AppToolDescriptor tool)
+	{
+		ArgumentNullException.ThrowIfNull(tool);
+		return AppToolPrefix + tool.Id;
+	}
+
 	/// <summary>The focus command for each pane, by position.</summary>
 	public static IReadOnlyList<string> FocusPane { get; } = [FocusPane1, FocusPane2, FocusPane3, FocusPane4];
 

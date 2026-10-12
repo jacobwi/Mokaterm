@@ -70,6 +70,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<FleetOverview>();
 		services.AddScoped<VaultScreenState>();
 		services.AddScoped<DamagedDocumentNotices>();
+		services.AddScoped<PluginNotices>();
 
 		// The shell's own settings page: it lists the shell's commands, which only this assembly knows.
 		services.AddSettingsPage(new SettingsPageDescriptor

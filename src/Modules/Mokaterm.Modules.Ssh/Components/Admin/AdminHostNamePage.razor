@@ -1,7 +1,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Naming
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Hostname" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
+<ToolPageFrame Title="Hostname" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
 	@if (_info is { } info)
 	{
 		<dl class="mta-kv">
@@ -54,7 +54,7 @@
 			</MokaText>
 		</section>
 	}
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private HostNameInfo? _info;

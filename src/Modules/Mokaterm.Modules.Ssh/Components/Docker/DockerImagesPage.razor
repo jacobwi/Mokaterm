@@ -1,7 +1,7 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
 @using Moka.Red.Feedback.Dropdown
 @using Moka.Red.Feedback.Popover
-@inherits DockerPageBase
+@inherits DockerManagerPageBase
 
 <div class="mt-dk-toolbar">
 	<div class="mt-dk-toolbar-search">
@@ -15,7 +15,7 @@
 	@if (Navigation is { } navigation)
 	{
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
-					OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))" title="Dangling and unused images, with what each frees">
+					OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))" title="Dangling and unused images, with what each frees">
 			@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
 		</MokaButton>
 	}

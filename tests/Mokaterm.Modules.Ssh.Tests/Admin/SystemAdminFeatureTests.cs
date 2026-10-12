@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Tests.Fakes;
 
 namespace Mokaterm.Modules.Ssh.Tests.Admin;
 
@@ -11,7 +12,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Detection_RunsOnce_UntilAskedAgain()
 	{
-		FakeShell shell = new();
+		FakeAdminShell shell = new();
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 
 		SystemProfile first = await feature.DetectAsync(refresh: false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
@@ -28,7 +29,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Detection_ThatFailed_IsTriedAgain()
 	{
-		FakeShell shell = new() { FailNext = new AdminException("The connection to the server was lost.") };
+		FakeAdminShell shell = new() { FailNext = new AdminException("The connection to the server was lost.") };
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 
 		await Assert.ThrowsAsync<AdminException>(() => feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken));
@@ -40,7 +41,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Reads_AsRoot_NeedRootMode_AndNeverPromptOnTheirOwn()
 	{
-		FakeShell shell = new();
+		FakeAdminShell shell = new();
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 		await feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
 		AdminScript script = new() { Name = "firewall.status", Body = "ufw status", AsRoot = true };
@@ -60,7 +61,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task RootLogin_RunsRootScriptsWithoutSudo()
 	{
-		FakeShell shell = new() { DetectOutput = DetectionFixtures.Ubuntu2404 };
+		FakeAdminShell shell = new() { DetectOutput = DetectionFixtures.Ubuntu2404 };
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 		await feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
 
@@ -75,7 +76,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Actions_TurnRootOnFirst_AndKeepTheirResult()
 	{
-		FakeShell shell = new();
+		FakeAdminShell shell = new();
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 		await feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
 		int changes = 0;
@@ -98,7 +99,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Actions_ThatCouldNotRun_RecordWhy()
 	{
-		FakeShell shell = new();
+		FakeAdminShell shell = new();
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 		await feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
 		shell.FailNext = new AdminException("sudo did not accept the password for alice@web1.") { RootRefused = true };
@@ -118,7 +119,7 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task Actions_RunOneAtATime()
 	{
-		FakeShell shell = new() { Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
+		FakeAdminShell shell = new() { Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
 		await using SystemAdminFeature feature = new(shell, TimeProvider.System, NullLogger.Instance);
 		shell.Gate.SetResult();
 		await feature.DetectAsync(false, TestContext.Current.CancellationToken).WaitAsync(Wait, TestContext.Current.CancellationToken);
@@ -136,65 +137,9 @@ public sealed class SystemAdminFeatureTests
 	[Fact]
 	public async Task ClosedFeature_RefusesWork()
 	{
-		SystemAdminFeature feature = new(new FakeShell(), TimeProvider.System, NullLogger.Instance);
+		SystemAdminFeature feature = new(new FakeAdminShell(), TimeProvider.System, NullLogger.Instance);
 		await feature.DisposeAsync();
 
 		Assert.Throws<AdminException>(() => { _ = feature.DetectAsync(false, TestContext.Current.CancellationToken); });
-	}
-
-	/// <summary>Answers detection from a fixture and every other script with exit 0, recording what ran and how.</summary>
-	private sealed class FakeShell : IAdminShell
-	{
-		private bool _root;
-
-		public List<(AdminScript Script, bool Elevated)> Runs { get; } = [];
-
-		public string DetectOutput { get; init; } = DetectionFixtures.Debian12;
-
-		public AdminException? FailNext { get; set; }
-
-		public TaskCompletionSource? Gate { get; set; }
-
-		public int RootPrompts { get; private set; }
-
-		public string? ElevationBlockedReason => null;
-
-		public bool HasRoot => _root;
-
-		public string Account => "alice@web1";
-
-		public bool SupportsInput => true;
-
-		public Task EnableRootAsync(CancellationToken cancellationToken)
-		{
-			RootPrompts++;
-			_root = true;
-			return Task.CompletedTask;
-		}
-
-		public void DisableRoot() => _root = false;
-
-		public async Task<AdminOutcome> RunAsync(AdminScript script, bool elevated, AdminInput? input, CancellationToken cancellationToken)
-		{
-			lock (Runs)
-			{
-				Runs.Add((script, elevated));
-			}
-
-			if (Gate is { } gate)
-			{
-				await gate.Task.WaitAsync(cancellationToken);
-			}
-
-			if (FailNext is { } failure)
-			{
-				FailNext = null;
-				throw failure;
-			}
-
-			return new AdminOutcome { ExitCode = 0, Output = script.Name == "detect" ? DetectOutput.ReplaceLineEndings("\n") : "" };
-		}
-
-		public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 	}
 }

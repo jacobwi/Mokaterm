@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// or unused images, unused volumes and unused build cache from its verbose listing, each list exactly what its button
 /// removes. The images and volumes pages send their "remove unused" here, so there is one place that prunes.
 /// </summary>
-public sealed partial class DockerCleanupPage : DockerPageBase
+public sealed partial class DockerCleanupPage : DockerManagerPageBase
 {
 	/// <summary>How many rows a list shows before "Show all"; the command always names every one.</summary>
 	private const int ShownRows = 50;

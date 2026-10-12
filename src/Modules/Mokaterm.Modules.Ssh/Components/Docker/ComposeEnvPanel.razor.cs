@@ -22,7 +22,7 @@ public sealed partial class ComposeEnvPanel : ComposePanelBase
 		$"Only the first {DockerHostFiles.MaxViewBytes / 1024} KB were read, so variables after that are not listed. Edit opens the whole file.");
 
 	protected override Task OnParametersSetAsync() =>
-		Context is { } context && context.Project.Name != _loadedFor ? LoadAllAsync() : Task.CompletedTask;
+		ProjectContext is { } context && context.Project.Name != _loadedFor ? LoadAllAsync() : Task.CompletedTask;
 
 	/// <summary>A saved file changes its variables and maybe what is unset, so everything is read again.</summary>
 	private protected override Task OnProjectFileSavedAsync() => LoadAllAsync();
@@ -36,7 +36,7 @@ public sealed partial class ComposeEnvPanel : ComposePanelBase
 	/// <summary>Works out which files feed the project, which exist, what they hold, and what is used but unset.</summary>
 	private Task LoadAllAsync() => LoadAsync(async (client, token) =>
 	{
-		if (Context is not { } context || HostFiles is not { } files)
+		if (ProjectContext is not { } context || HostFiles is not { } files)
 		{
 			return;
 		}

@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
@@ -11,7 +12,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// The commands run here stay in a short list for the session only; nothing typed here is saved or logged. The
 /// interactive shell is the other way in, typed into the session's terminal.
 /// </summary>
-public sealed partial class DockerExecPanel : DockerPageBase
+public sealed partial class DockerExecPanel : DockerManagerPageBase
 {
 	private string _command = "";
 	private string _user = "";

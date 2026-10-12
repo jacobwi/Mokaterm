@@ -1,0 +1,37 @@
+<Project>
+
+	<!--
+		Puts the sample plugin's package next to the tests of any project that imports this file. The sample builds first,
+		through a project reference that adds no assembly, and packs itself on build; its .mokaplugin is then copied into
+		TestPlugins/ in the output, and SamplePluginPackage.FilePath finds it there by the name recorded in the assembly.
+		The path is asked of the sample's own targets rather than worked out here, so a new version or a new output folder
+		needs nothing changed.
+	-->
+	<ItemGroup>
+		<ProjectReference Include="$(MSBuildThisFileDirectory)../../../samples/Mokaterm.Plugins.Sample/Mokaterm.Plugins.Sample.csproj"
+						  ReferenceOutputAssembly="false"
+						  Private="false"
+						  MokatermSamplePlugin="true" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Include="$(MSBuildThisFileDirectory)SamplePluginPackage.cs" LinkBase="Shared/Plugins" />
+	</ItemGroup>
+
+	<Target Name="_AddSamplePluginPackage" BeforeTargets="AssignTargetPaths;GetAssemblyAttributes">
+		<MSBuild Projects="@(ProjectReference->WithMetadataValue('MokatermSamplePlugin', 'true'))"
+				 Targets="GetMokatermPluginPackagePath"
+				 Properties="Configuration=$(Configuration)">
+			<Output TaskParameter="TargetOutputs" ItemName="_SamplePluginPackage" />
+		</MSBuild>
+
+		<ItemGroup>
+			<None Include="@(_SamplePluginPackage)" Link="TestPlugins/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+			<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+				<_Parameter1>SamplePluginPackage</_Parameter1>
+				<_Parameter2>TestPlugins/%(_SamplePluginPackage.Filename)%(_SamplePluginPackage.Extension)</_Parameter2>
+			</AssemblyAttribute>
+		</ItemGroup>
+	</Target>
+
+</Project>

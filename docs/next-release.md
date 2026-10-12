@@ -54,8 +54,8 @@ terms, open or closed.
 
 ## Plugins
 
-15. **Plugins**: features we, and later other people, build and the user installs. The design is in `plugins.md`;
-    phase 1 is planned for this release. The findings that led to it are below.
+15. **Plugins**: features we, and later other people, build and the user installs. Phase 1 is built (see
+    `plugins.md` for what it covers and what phase 2 adds). The findings that led to it are below.
 
 ### What we already have
 

@@ -1,5 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@inherits DockerPageBase
+@inherits DockerManagerPageBase
 
 <div class="mt-dk-toolbar">
 	<div class="mt-dk-toolbar-search">
@@ -15,7 +15,7 @@
 					Color="MokaColor.Surface"
 					Size="MokaSize.Xs"
 					StartIcon="DockerIcons.Prune"
-					OnClick="@(() => navigation.Show(DockerManagerPage.Cleanup))"
+					OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))"
 					title="Unused volumes with their sizes, removed together">
 			@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
 		</MokaButton>

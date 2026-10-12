@@ -4,7 +4,7 @@
 @using Mokaterm.UI.Common.Editing
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Services"
+<ToolPageFrame Title="Services"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="OnFilterChanged"
@@ -80,7 +80,7 @@
 			</div>
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private const int MaxRows = 400;
@@ -153,7 +153,7 @@
 			return;
 		}
 
-		<AdminDetailPanel Title="@unit.Name"
+		<ToolDetailPanel Title="@unit.Name"
 						  Subtitle="@unit.Description"
 						  DotColor="@StateColor(unit.State)"
 						  DotGlow="@(unit.State is ServiceState.Running or ServiceState.Failed)"
@@ -223,7 +223,7 @@
 					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
 				}
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private static MokaColor StateColor(ServiceState state) => state switch

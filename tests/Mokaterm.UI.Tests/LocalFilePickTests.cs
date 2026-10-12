@@ -92,7 +92,144 @@ public sealed class LocalFilePickTests
 		Assert.Equal(1, files.Released);
 	}
 
+	[Fact]
+	public async Task ReadStreamAsync_HandsTheReaderTheWholeFile_AndReleasesThePick()
+	{
+		byte[] content = new byte[300_000];
+		Random.Shared.NextBytes(content);
+		FakeFileAccess files = new(content, length: null);
+
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, content.Length, "a plugin package", CopyAsync, Ct);
+
+		Assert.True(picked.WasRead);
+		Assert.Equal(content, picked.Content);
+		Assert.Equal(1, files.Released);
+	}
+
+	// A package reader that meets the cap halfway through a zip says "not a zip file"; the user has to hear the real reason.
+	[Fact]
+	public async Task ReadStreamAsync_PastTheCap_IsRefusedWhateverTheReaderMadeOfIt()
+	{
+		FakeFileAccess files = new(new byte[200], length: null);
+
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync<byte[]>(
+			files,
+			100,
+			"a plugin package",
+			async (stream, token) =>
+			{
+				try
+				{
+					return await CopyAsync(stream, token);
+				}
+				catch (IOException ex)
+				{
+					throw new InvalidDataException("Not a zip file.", ex);
+				}
+			},
+			Ct);
+
+		Assert.False(picked.WasRead);
+		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
+		Assert.Equal(1, files.Released);
+	}
+
+	[Fact]
+	public async Task ReadStreamAsync_WhenTheReaderSwallowsTheCap_StillRefusesAndDisposesWhatItMade()
+	{
+		FakeFileAccess files = new(new byte[200], length: null);
+		Disposable? made = null;
+
+		PickedFile<Disposable> picked = await LocalFilePick.ReadStreamAsync(
+			files,
+			100,
+			"a plugin package",
+			async (stream, token) =>
+			{
+				try
+				{
+					await CopyAsync(stream, token);
+				}
+				catch (IOException)
+				{
+					// A careless reader that keeps what it had.
+				}
+
+				made = new Disposable();
+				return made;
+			},
+			Ct);
+
+		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
+		Assert.NotNull(made);
+		Assert.True(made.IsDisposed);
+	}
+
+	[Fact]
+	public async Task ReadStreamAsync_AFileThatSaysItsSize_NeverReachesTheReader()
+	{
+		FakeFileAccess files = new(new byte[200], length: 200);
+		bool read = false;
+
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(
+			files,
+			100,
+			"a plugin package",
+			(stream, token) =>
+			{
+				read = true;
+				return CopyAsync(stream, token);
+			},
+			Ct);
+
+		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
+		Assert.False(read);
+		Assert.Equal(0, files.Opened);
+	}
+
+	[Fact]
+	public async Task ReadStreamAsync_TheReadersOwnComplaint_ReachesTheCaller()
+	{
+		FakeFileAccess files = new(new byte[50], length: null);
+
+		InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => LocalFilePick.ReadStreamAsync<byte[]>(
+			files,
+			100,
+			"a plugin package",
+			(_, _) => throw new InvalidDataException("plugin.json is missing."),
+			Ct));
+
+		Assert.Equal("plugin.json is missing.", refused.Message);
+		Assert.Equal(1, files.Released);
+	}
+
+	[Fact]
+	public async Task ReadStreamAsync_WhenThePickerIsClosed_SaysNothingAtAll()
+	{
+		FakeFileAccess files = new(content: null, length: null);
+
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, 100, "a plugin package", CopyAsync, Ct);
+
+		Assert.False(picked.WasRead);
+		Assert.Null(picked.Error);
+		Assert.Equal(1, files.Released);
+	}
+
+	private static async Task<byte[]> CopyAsync(Stream stream, CancellationToken cancellationToken)
+	{
+		using MemoryStream copy = new();
+		await stream.CopyToAsync(copy, cancellationToken);
+		return copy.ToArray();
+	}
+
 	private static byte[] Text(string value) => Encoding.UTF8.GetBytes(value);
+
+	private sealed class Disposable : IDisposable
+	{
+		public bool IsDisposed { get; private set; }
+
+		public void Dispose() => IsDisposed = true;
+	}
 
 	private sealed class FakeFileAccess(byte[]? content, long? length, bool failOnOpen = false) : ILocalFileAccess
 	{

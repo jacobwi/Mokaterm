@@ -54,6 +54,9 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 	private DamagedDocumentNotices DamagedDocuments { get; set; } = default!;
 
 	[Inject]
+	private PluginNotices PluginNotices { get; set; } = default!;
+
+	[Inject]
 	private ILogger<MokatermApp> Logger { get; set; } = default!;
 
 	public void Dispose()
@@ -69,6 +72,7 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 		Settings.Changed += OnSettingsChanged;
 		Vault.StatusChanged += OnVaultStatusChanged;
 		DamagedDocuments.Start();
+		PluginNotices.Show();
 	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)

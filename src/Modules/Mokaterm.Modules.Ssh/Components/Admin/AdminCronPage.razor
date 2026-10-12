@@ -3,7 +3,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Cron
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Cron"
+<ToolPageFrame Title="Cron"
 				Summary="@Summary"
 				Search="@_filter"
 				SearchChanged="@(value => _filter = value)"
@@ -186,7 +186,7 @@
 				break;
 		}
 	</ChildContent>
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private static readonly (string Label, string Schedule)[] Presets =
@@ -307,7 +307,7 @@
 			return;
 		}
 
-		<AdminDetailPanel Title="@entry.Schedule.Describe()" Subtitle="@entry.Schedule.Text" Mono="false" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@entry.Schedule.Describe()" Subtitle="@entry.Schedule.Text" Mono="false" OnClose="@(() => _selected = null)">
 			<Actions>
 				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" Disabled="Busy" OnClick="@(() => StartEdit(index, entry))">Edit</MokaButton>
 				<MokaButton Variant="MokaVariant.Outlined"
@@ -325,13 +325,13 @@
 				<pre class="mta-pre mta-pre--commands">@entry.Command</pre>
 				@NextRunsFragment(entry.Schedule)
 			</ChildContent>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment EditorPanel => __builder =>
 	{
 		CrontabEntry? draft = Draft(out string? problem);
-		<AdminDetailPanel Title="@(_editIndex is null ? $"New cron job for {Owner}" : "Edit cron job")" Mono="false" OnClose="CancelEdit">
+		<ToolDetailPanel Title="@(_editIndex is null ? $"New cron job for {Owner}" : "Edit cron job")" Mono="false" OnClose="CancelEdit">
 			<div class="mta-chips">
 				@foreach ((string label, string preset) in Presets)
 				{
@@ -385,7 +385,7 @@
 				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CancelEdit">Cancel</MokaButton>
 				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Disabled="@(Busy || draft is null || WriteBlocked is not null)" OnClick="SaveEntryAsync">Save</MokaButton>
 			</div>
-		</AdminDetailPanel>
+		</ToolDetailPanel>
 	};
 
 	private RenderFragment NextRunsFragment(CronSchedule schedule) => __builder =>

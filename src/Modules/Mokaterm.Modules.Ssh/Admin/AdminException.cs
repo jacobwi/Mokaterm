@@ -1,11 +1,14 @@
+using Mokaterm.Abstractions.ServerAdmin;
+
 namespace Mokaterm.Modules.Ssh.Admin;
 
 /// <summary>
 /// A system view command that did not run to its end, with a message written for the user: the connection went away,
 /// sudo refused, the time ran out, or the server never started the script. A command that ran and failed is not this;
-/// its exit code and output come back in an <see cref="AdminOutcome"/>.
+/// its exit code and output come back in an <see cref="AdminOutcome"/>. Pages from other modules see it as the
+/// <see cref="SystemScriptException"/> it is.
 /// </summary>
-internal sealed class AdminException : Exception
+internal sealed class AdminException : SystemScriptException
 {
 	public AdminException()
 	{

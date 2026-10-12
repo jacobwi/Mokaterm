@@ -9,7 +9,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// arrived since the newest line shown. Polling rather than <c>docker logs --follow</c>, because a follow is an exec
 /// channel SSH.NET keeps reading into memory whether or not anyone draws it.
 /// </summary>
-public sealed partial class DockerLogsPanel : DockerPageBase
+public sealed partial class DockerLogsPanel : DockerManagerPageBase
 {
 	private static readonly int[] TailChoices = [100, 500, 2_000, 10_000];
 	private static readonly TimeSpan FollowInterval = TimeSpan.FromSeconds(2);

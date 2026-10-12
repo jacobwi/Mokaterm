@@ -20,6 +20,11 @@
 		<Compile Include="..\Shared\Rendering\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
+	<!-- Eventually.AdvanceUntilAsync, for the page poller. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
 	<!--
 		NativeDropPoint: the desktop host's screen-to-page arithmetic for native file drops. Plain numbers with no
 		Windows call in them, compiled in here because the host targets net10.0-windows and no test project can

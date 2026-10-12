@@ -1,0 +1,82 @@
+@namespace Mokaterm.UI.Common.ToolPages
+@using Moka.Red.Feedback.Alert
+@using Moka.Red.Feedback.Loading
+@using Moka.Red.Feedback.Toast
+@using Moka.Red.Primitives.Tag
+@using Mokaterm.UI.Common.Components
+
+@* The manager styles these through its own root (mt-dk), so they look the same on every page drawn inside it. *@
+@code {
+	/// <summary>
+	/// The running change with a way to stop waiting, or the last one: its title, exit, command, and the tail of its
+	/// output folded away unless it failed.
+	/// </summary>
+	protected RenderFragment ChangePanel => @<text>
+		@if (RunningCommand is { } running)
+		{
+			<div class="mt-dk-change mt-dk-change--running" role="status">
+				<div class="mt-dk-change-head">
+					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
+					@if (RunningTitle is { } title)
+					{
+						<span class="mt-dk-change-title">@title</span>
+					}
+					<span class="mt-dk-spacer"></span>
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="CancelChange">Stop waiting</MokaButton>
+				</div>
+				<span class="mt-dk-change-command mt-dk-mono" title="@running">$ @running</span>
+			</div>
+		}
+		else if (LastChange is { } change)
+		{
+			<div class="@(change.Succeeded ? "mt-dk-change mt-dk-change--ok" : "mt-dk-change mt-dk-change--failed")" role="status">
+				<div class="mt-dk-change-head">
+					<span class="mt-dk-change-title" title="@change.Title">@change.Title</span>
+					<MokaTag Text="@change.ExitText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@(change.Succeeded ? MokaColor.Success : MokaColor.Error)" />
+					<span class="mt-dk-spacer"></span>
+					@if (change.Text.Length > 0)
+					{
+						<MokaButton Variant="MokaVariant.Text"
+									Color="MokaColor.Surface"
+									Size="MokaSize.Xs"
+									StartIcon="@(ChangeOutputShown ? MokaIcons.Navigation.ChevronUp : MokaIcons.Navigation.ChevronDown)"
+									OnClick="ToggleChangeOutput"
+									aria-expanded="@(ChangeOutputShown ? "true" : "false")"
+									aria-label="Output" />
+					}
+					<CopyButton Text="@change.Command" Label="Copy the command" />
+					<MokaButton Variant="MokaVariant.Text"
+								Color="MokaColor.Surface"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Navigation.Close"
+								OnClick="DismissChange"
+								aria-label="Dismiss" />
+				</div>
+				<span class="mt-dk-change-command mt-dk-mono" title="@change.Command">$ @change.Command</span>
+				@if (ChangeOutputShown && change.Text.Length > 0)
+				{
+					<pre class="mt-dk-box mt-dk-box--short">@ChangeTail(change)</pre>
+				}
+			</div>
+		}
+	</text>;
+
+	/// <summary>The last load's failure, with a way to try again.</summary>
+	protected RenderFragment LoadErrorPanel(Func<Task> retry) => @<text>
+		@if (LoadError is { } error)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+				<div class="mt-dk-alert-line">
+					<span>@error</span>
+					<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh" OnClick="retry">Try again</MokaButton>
+				</div>
+			</MokaAlert>
+		}
+	</text>;
+
+	/// <summary>A path in mono with a copy button, cut at its end when the line is short.</summary>
+	protected static RenderFragment PathLine(string path, string label) => @<div class="mt-dk-path">
+		<span class="mt-dk-path-text" title="@path">@path</span>
+		<CopyButton Text="@path" Label="@label" />
+	</div>;
+}

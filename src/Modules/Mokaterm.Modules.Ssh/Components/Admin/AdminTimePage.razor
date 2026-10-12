@@ -1,7 +1,7 @@
 @using Mokaterm.Modules.Ssh.Admin.Clock
 @inherits AdminPageBase
 
-<AdminPageFrame Title="Time" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
+<ToolPageFrame Title="Time" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
 	@if (_clock is { } clock)
 	{
 		<dl class="mta-kv">
@@ -82,7 +82,7 @@
 			</MokaText>
 		</section>
 	}
-</AdminPageFrame>
+</ToolPageFrame>
 
 @code {
 	private ClockInfo? _clock;

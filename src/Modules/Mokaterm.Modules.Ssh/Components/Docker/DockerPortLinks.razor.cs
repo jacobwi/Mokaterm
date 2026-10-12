@@ -12,7 +12,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// a free port on this computer, reused while it stays open; on the web host, where a tunnel would end on the server,
 /// only a port published on every interface opens, straight at the session's host, and the others say why not.
 /// </summary>
-public sealed partial class DockerPortLinks : DockerPageBase
+public sealed partial class DockerPortLinks : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerPortRoute> _routes = [];
 	private bool _opening;
