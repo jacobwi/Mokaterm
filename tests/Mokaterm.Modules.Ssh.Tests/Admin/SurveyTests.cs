@@ -226,8 +226,13 @@ public sealed class SurveyTests
 			return;
 		}
 
+		// A docker on the test machine (the CI runner has one) answers as slowly as it likes, and a part running out of time
+		// is noted in the summary. The time limits are the script's business, not this test's, so the survey meets a docker
+		// that refuses at once.
+		const string RefusingDocker =
+			"mokaterm_fake=$(mktemp -d) && printf '#!/bin/sh\\nexit 1\\n' > \"$mokaterm_fake/docker\" && chmod +x \"$mokaterm_fake/docker\" && PATH=\"$mokaterm_fake:$PATH\" && export PATH\n";
 		(int exitCode, byte[] output, string error) = await PosixShellLocator
-			.RunAsync(shell, PosixShellLocator.UnixPathPrefix + AdminScriptText.Compose(SurveyCommands.Script), [])
+			.RunAsync(shell, PosixShellLocator.UnixPathPrefix + RefusingDocker + AdminScriptText.Compose(SurveyCommands.Script), [])
 			.WaitAsync(ShellTimeout, TestContext.Current.CancellationToken);
 
 		Assert.True(exitCode == 0, error);
