@@ -60,6 +60,7 @@ public sealed partial class SettingsView : ComponentBase, IDisposable
 		SettingsPageGroup.Application => "Application",
 		SettingsPageGroup.Security => "Security",
 		SettingsPageGroup.Protocols => "Protocols",
+		SettingsPageGroup.Plugins => "Plugins",
 		_ => "About",
 	};
 

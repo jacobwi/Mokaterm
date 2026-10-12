@@ -56,50 +56,63 @@
 		}
 	</div>
 
-	@if (CanManage && plugin.Pending != PluginPendingChange.Remove)
+	@if (Manages || SettingsPageId is not null)
 	{
 		<div class="plugin-row__actions">
-			@if (plugin.Status == PluginStatus.Changed && plugin.IsEnabled)
+			@if (SettingsPageId is { } settingsPage)
 			{
 				<MokaButton Variant="MokaVariant.Outlined"
 							Size="MokaSize.Sm"
-							StartIcon="MokatermIcons.ShieldCheck"
+							StartIcon="MokaIcons.Action.Settings"
+							OnClick="() => OnOpenSettings.InvokeAsync(settingsPage)"
+							aria-label="@($"Settings of {plugin.Name}")">
+					Settings
+				</MokaButton>
+			}
+			@if (Manages)
+			{
+				@if (plugin.Status == PluginStatus.Changed && plugin.IsEnabled)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								StartIcon="MokatermIcons.ShieldCheck"
+								Disabled="Busy"
+								OnClick="() => OnTrust.InvokeAsync(plugin)">
+						Trust the new files
+					</MokaButton>
+				}
+				@if (plugin.IsEnabled)
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								StartIcon="MokatermIcons.Power"
+								Disabled="Busy"
+								OnClick="() => OnTurnOff.InvokeAsync(plugin)"
+								aria-label="@($"Turn off {plugin.Name}")">
+						Turn off
+					</MokaButton>
+				}
+				else
+				{
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								StartIcon="MokatermIcons.Power"
+								Disabled="@(Busy || plugin.Status == PluginStatus.Incompatible)"
+								OnClick="() => OnTurnOn.InvokeAsync(plugin)"
+								title="@(plugin.Status == PluginStatus.Incompatible ? plugin.Problem : null)"
+								aria-label="@($"Turn on {plugin.Name}")">
+						Turn on
+					</MokaButton>
+				}
+				<MokaButton Variant="MokaVariant.Text"
+							Size="MokaSize.Sm"
+							Color="MokaColor.Error"
+							StartIcon="MokaIcons.Action.Delete"
 							Disabled="Busy"
-							OnClick="() => OnTrust.InvokeAsync(plugin)">
-					Trust the new files
-				</MokaButton>
+							OnClick="() => OnRemove.InvokeAsync(plugin)"
+							title="Remove"
+							aria-label="@($"Remove {plugin.Name}")" />
 			}
-			@if (plugin.IsEnabled)
-			{
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Sm"
-							StartIcon="MokatermIcons.Power"
-							Disabled="Busy"
-							OnClick="() => OnTurnOff.InvokeAsync(plugin)"
-							aria-label="@($"Turn off {plugin.Name}")">
-					Turn off
-				</MokaButton>
-			}
-			else
-			{
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Sm"
-							StartIcon="MokatermIcons.Power"
-							Disabled="@(Busy || plugin.Status == PluginStatus.Incompatible)"
-							OnClick="() => OnTurnOn.InvokeAsync(plugin)"
-							title="@(plugin.Status == PluginStatus.Incompatible ? plugin.Problem : null)"
-							aria-label="@($"Turn on {plugin.Name}")">
-					Turn on
-				</MokaButton>
-			}
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Sm"
-						Color="MokaColor.Error"
-						StartIcon="MokaIcons.Action.Delete"
-						Disabled="Busy"
-						OnClick="() => OnRemove.InvokeAsync(plugin)"
-						title="Remove"
-						aria-label="@($"Remove {plugin.Name}")" />
 		</div>
 	}
 </div>

@@ -1,18 +1,20 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Moka.Red.Core.Enums;
 using Mokaterm.Abstractions.ServerAdmin;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Plugins.Sample.Fail2ban;
 
 /// <summary>
 /// fail2ban's jails and the addresses each one bans, with a reviewed Unban as root. It reads every jail in one script,
-/// as root when root mode allows it, and again every half minute while the view shows, since bans come and go.
+/// as root when root mode allows it, and again on the plugin's refresh setting while the view shows, since bans come and
+/// go.
 /// </summary>
 public sealed partial class Fail2banPage : SystemPageBase
 {
-	private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
 
 	private Fail2banStatus _status = Fail2banStatus.Empty;
 	private List<Fail2banJail> _shown = [];
@@ -35,7 +37,12 @@ public sealed partial class Fail2banPage : SystemPageBase
 			? "needs root mode"
 			: string.Create(CultureInfo.CurrentCulture, $"{_status.Jails.Count} jails, {_status.BannedNow} addresses banned");
 
-	protected override void OnInitialized() => StartPolling(PollInterval, PollAsync);
+	[Inject]
+	private ISettingsService SettingsService { get; set; } = default!;
+
+	// Read once when the page opens: a changed interval applies the next time it is shown.
+	protected override void OnInitialized() =>
+		StartPolling(TimeSpan.FromSeconds(SettingsService.Get<SampleSettings>().Clamped().Fail2banRefreshSeconds), PollAsync);
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{

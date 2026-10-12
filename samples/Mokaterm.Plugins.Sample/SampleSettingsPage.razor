@@ -1,0 +1,29 @@
+@inherits SettingsSectionBase<SampleSettings>
+
+@{
+	SampleSettings settings = Settings.Clamped();
+}
+
+<SettingsPage Title="Sample plugin" OnReset="ResetAsync">
+	<SettingsSection Title="Fail2ban">
+		<SettingsRow Label="Refresh every" Description="How often the Fail2ban page reads the jails again while it is open.">
+			<NumberSetting TValue="int"
+						   Value="settings.Fail2banRefreshSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { Fail2banRefreshSeconds = value })"
+						   Min="SampleSettings.MinFail2banRefreshSeconds"
+						   Max="SampleSettings.MaxFail2banRefreshSeconds"
+						   Suffix="s"
+						   AriaLabel="Fail2ban refresh in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Subnet calculator">
+		<SettingsRow Label="Opens with" Description="The address and prefix the calculator shows when it opens.">
+			<TextSetting Value="@settings.SubnetStart"
+						 ValueChanged="value => SaveAsync(s => s with { SubnetStart = value })"
+						 Validate="ValidateSubnet"
+						 Width="220px"
+						 AriaLabel="Subnet the calculator opens with" />
+		</SettingsRow>
+	</SettingsSection>
+</SettingsPage>

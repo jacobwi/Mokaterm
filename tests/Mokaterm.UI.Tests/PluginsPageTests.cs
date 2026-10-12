@@ -6,7 +6,9 @@ using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Plugins;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Settings.Pages.Plugins;
 using Mokaterm.UI.Tests.Fakes;
 
@@ -188,6 +190,37 @@ public sealed partial class PluginsPageTests
 	}
 
 	[Fact]
+	public async Task Render_ALoadedPluginWithASettingsPage_LinksToIt_OnEveryHost()
+	{
+		PluginRecord withSettings = Plugin("moka.sample", "Sample plugin", PluginStatus.Enabled, hasCode: true, enabled: true);
+		PluginRecord without = Plugin("moka.other", "Other plugin", PluginStatus.Enabled, hasCode: true, enabled: true);
+		void Pages(IServiceCollection services)
+		{
+			// The page's component comes from this test assembly, which stands in for the plugin's.
+			services.AddSingleton(new PluginInfo("moka.sample", "Sample plugin", "1.0.0", typeof(PluginsPageTests).Assembly.GetName().Name!));
+			services.AddSingleton(new PluginInfo("moka.other", "Other plugin", "1.0.0", "Acme.Other"));
+			services.AddSettingsPage(new SettingsPageDescriptor
+			{
+				Id = "plugin.moka.sample",
+				Title = "Sample plugin",
+				Group = SettingsPageGroup.Plugins,
+				Icon = MokatermIcons.Plugin,
+				Component = typeof(PluginSettingsStandIn),
+			});
+		}
+
+		string desktop = await RenderPageAsync(new FakePluginManager { Plugins = [withSettings, without] }, extra: Pages);
+		string web = await RenderPageAsync(new FakePluginManager { Plugins = [withSettings, without], CanInstall = false }, extra: Pages);
+
+		Assert.Contains("Settings", Button(desktop, "Settings of Sample plugin"), StringComparison.Ordinal);
+		Assert.DoesNotContain("Settings of Other plugin", desktop, StringComparison.Ordinal);
+
+		// The web host's list only reports, but a plugin's own settings are still the operator's to change.
+		Assert.Contains("aria-label=\"Settings of Sample plugin\"", web, StringComparison.Ordinal);
+		Assert.DoesNotContain("Turn off Sample plugin", web, StringComparison.Ordinal);
+	}
+
+	[Fact]
 	public async Task Render_WithoutAFilePicker_OffersNoInstall()
 	{
 		string html = await RenderPageAsync(new FakePluginManager(), withPicker: false);
@@ -302,7 +335,7 @@ public sealed partial class PluginsPageTests
 		IsEnabled = enabled,
 	};
 
-	private static Task<string> RenderPageAsync(FakePluginManager plugins, bool withPicker = true) =>
+	private static Task<string> RenderPageAsync(FakePluginManager plugins, bool withPicker = true, Action<IServiceCollection>? extra = null) =>
 		StaticRender.RenderAsync<PluginsPage>(
 			services =>
 			{
@@ -311,6 +344,8 @@ public sealed partial class PluginsPageTests
 				{
 					services.AddSingleton<ILocalFileAccess, NoLocalFiles>();
 				}
+
+				extra?.Invoke(services);
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal))
 			.WaitAsync(TimeSpan.FromSeconds(10), Ct);

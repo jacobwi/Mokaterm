@@ -51,6 +51,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<IUserInteraction>(provider => provider.GetRequiredService<UserInteractionService>());
 		services.AddScoped<UiStateStore>();
 		services.AddScoped<ShellState>();
+		services.AddScoped<ISettingsNavigator, ShellSettingsNavigator>();
 		services.AddScoped<ShellInterop>();
 		services.AddScoped<ShellInputBridge>();
 		services.AddScoped<ShellCommandRegistry>();

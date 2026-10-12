@@ -5,6 +5,7 @@ using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Plugins;
+using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.UI.Settings.Pages.Plugins;
@@ -43,6 +44,9 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 
 	// Only the desktop can start itself again; elsewhere the callout just says to restart.
 	private IAppRestarter? Restarter => Services.GetService<IAppRestarter>();
+
+	[Inject]
+	private IEnumerable<PluginInfo> Loaded { get; set; } = default!;
 
 	private bool _restarting;
 
@@ -85,6 +89,18 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	protected override void OnInitialized() => Plugins.Changed += OnPluginsChanged;
 
 	private void OnPluginsChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+	/// <summary>
+	/// The plugin's own settings page: one whose component comes from the plugin's assembly. Only a plugin this start
+	/// loaded has one, since its pages exist only once it is loaded.
+	/// </summary>
+	private string? SettingsPageOf(PluginRecord plugin) =>
+		Loaded.FirstOrDefault(info => info.Id == plugin.Id) is { } info
+			&& Services.GetService<IUiContributions>() is { } contributions
+			? PluginSettingsPages.For(info, contributions.SettingsPages)?.Id
+			: null;
+
+	private void OpenSettings(string pageId) => Services.GetService<ISettingsNavigator>()?.Open(pageId);
 
 	private async Task PickPackageAsync()
 	{

@@ -32,4 +32,13 @@ public sealed partial class PluginRow : ComponentBase
 
 	[Parameter]
 	public EventCallback<PluginRecord> OnRemove { get; set; }
+
+	/// <summary>The plugin's own settings page, when it has one and is loaded; the row then links to it.</summary>
+	[Parameter]
+	public string? SettingsPageId { get; set; }
+
+	[Parameter]
+	public EventCallback<string> OnOpenSettings { get; set; }
+
+	private bool Manages => CanManage && Plugin.Pending != PluginPendingChange.Remove;
 }

@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Numerics;
+using Microsoft.AspNetCore.Components;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Plugins.Sample.Subnets;
@@ -7,14 +9,21 @@ namespace Mokaterm.Plugins.Sample.Subnets;
 /// <summary>An app tool: the network, broadcast, host range, host count and mask of an IPv4 or IPv6 prefix, as it is typed.</summary>
 public sealed partial class SubnetCalculatorTool : AppToolBase
 {
-	private string _input = "192.168.1.10/24";
+	private string _input = SampleSettings.DefaultSubnetStart;
 	private SubnetInfo? _info;
 	private string? _problem;
 
 	/// <summary>What is wrong with the text, once there is text to be wrong.</summary>
 	private string? ShownProblem => _input.Trim().Length > 0 ? _problem : null;
 
-	protected override void OnInitialized() => Calculate();
+	[Inject]
+	private ISettingsService SettingsService { get; set; } = default!;
+
+	protected override void OnInitialized()
+	{
+		_input = SettingsService.Get<SampleSettings>().Clamped().SubnetStart;
+		Calculate();
+	}
 
 	/// <summary>A count in full, and for a large IPv6 one the power of two it is, which reads better than 20 digits.</summary>
 	private static string Count(BigInteger count, SubnetInfo info)

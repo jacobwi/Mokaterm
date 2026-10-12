@@ -46,6 +46,18 @@ public sealed class SampleModule : IMokatermModule
 			Unavailable = context => Fail2banCommands.Unavailable(context.Server),
 		});
 
+		// The page id starts with plugin. and the plugin's id, like its settings key; the loader refuses anything else.
+		services.AddSettingsPage(new SettingsPageDescriptor
+		{
+			Id = SampleSettings.SectionKey,
+			Title = "Sample plugin",
+			Description = "How often the Fail2ban page refreshes, and what the subnet calculator opens with.",
+			Group = SettingsPageGroup.Plugins,
+			Icon = MokatermIcons.Plugin,
+			Component = typeof(SampleSettingsPage),
+			Keywords = "sample plugin fail2ban refresh subnet calculator",
+		});
+
 		services.AddAppTool(new AppToolDescriptor
 		{
 			Id = "subnet-calculator",

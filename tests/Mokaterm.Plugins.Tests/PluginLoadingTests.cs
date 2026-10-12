@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Plugins;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.Core.Extensions;
 using Mokaterm.Core.Plugins;
 using Mokaterm.UI.Common.Components;
@@ -94,6 +95,47 @@ public sealed class PluginLoadingTests : IDisposable
 	}
 
 	[Fact]
+	public async Task LoadedPlugin_BringsItsSettingsPage_UnderItsOwnName()
+	{
+		await InstallTrustedAsync();
+		PluginCatalog catalog = Open();
+		catalog.ConfirmStarted();
+
+		using ServiceProvider services = Services(catalog);
+
+		SettingsPageDescriptor page = Assert.Single(services.GetServices<SettingsPageDescriptor>());
+		Assert.Equal("plugin.moka.sample", page.Id);
+		Assert.Equal(SettingsPageGroup.Plugins, page.Group);
+		Assert.Equal(SamplePluginPackage.AssemblyName, page.Component.Assembly.GetName().Name);
+		SettingsSectionType section = Assert.Single(services.GetServices<SettingsSectionType>());
+		Assert.Equal("plugin.moka.sample", section.Key);
+		Assert.Equal(PluginStatus.Enabled, Assert.Single(services.GetRequiredService<IPluginManager>().Plugins).Status);
+	}
+
+	[Fact]
+	public async Task PluginWhoseSettingsKeyIsTaken_HasEverythingItAddedTakenBackOut()
+	{
+		await InstallTrustedAsync();
+		PluginCatalog catalog = Open();
+		catalog.ConfirmStarted();
+
+		// Something else already stores another type under the sample's key.
+		ServiceCollection services = new();
+		services.AddSingleton(SettingsSectionType.Of<SomeoneElsesSettings>());
+		new MokatermBuilder(services).AddPlugins(catalog);
+		using ServiceProvider provider = services.BuildServiceProvider();
+
+		PluginRecord record = Assert.Single(provider.GetRequiredService<IPluginManager>().Plugins);
+		Assert.Equal(PluginStatus.Failed, record.Status);
+		Assert.Contains("plugin.moka.sample", record.Problem, StringComparison.Ordinal);
+		Assert.Empty(provider.GetServices<SettingsPageDescriptor>());
+		Assert.Empty(provider.GetServices<SessionToolDescriptor>());
+		Assert.DoesNotContain(provider.GetServices<ModuleInfo>(), info => info.Id == "sample-plugin");
+		Assert.Empty(provider.GetServices<PluginInfo>());
+		Assert.Same(typeof(SomeoneElsesSettings), Assert.Single(provider.GetServices<SettingsSectionType>()).Type);
+	}
+
+	[Fact]
 	public void OperatorFolder_OnTheWebHost_LoadsWithoutAnyTrustStep()
 	{
 		// What an operator does: unzip the package into the server's plugins folder.
@@ -116,6 +158,11 @@ public sealed class PluginLoadingTests : IDisposable
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
 		}
+	}
+
+	private sealed record SomeoneElsesSettings : ISettingsSection
+	{
+		public static string SectionKey => "plugin.moka.sample";
 	}
 
 	private sealed class TakenModule : IMokatermModule

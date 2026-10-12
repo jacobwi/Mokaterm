@@ -65,7 +65,9 @@
 						   OnTurnOn="TurnOnAsync"
 						   OnTurnOff="TurnOffAsync"
 						   OnTrust="TrustChangedFilesAsync"
-						   OnRemove="RemoveAsync" />
+						   OnRemove="RemoveAsync"
+						   SettingsPageId="@SettingsPageOf(plugin)"
+						   OnOpenSettings="OpenSettings" />
 			}
 		</ChildContent>
 	</SettingsSection>

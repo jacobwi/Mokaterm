@@ -7,6 +7,9 @@ public enum SettingsPageGroup
 	Application,
 	Security,
 	Protocols,
+
+	/// <summary>Pages that plugins add for their own settings.</summary>
+	Plugins,
 	About,
 }
 

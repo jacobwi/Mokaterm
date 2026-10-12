@@ -59,6 +59,17 @@ public sealed class SampleModuleTests
 		Assert.Single(contributions.FindSessionTools("local"));
 	}
 
+	[Fact]
+	public void TheSettingsPage_SitsInThePluginsGroup_UnderThePluginsOwnName()
+	{
+		SettingsPageDescriptor page = Assert.Single(Contributions().SettingsPages);
+
+		Assert.Equal(SampleSettings.SectionKey, page.Id);
+		Assert.Equal(SettingsPageGroup.Plugins, page.Group);
+		Assert.Equal(typeof(SampleSettingsPage), page.Component);
+		Assert.StartsWith("plugin.moka.sample", SampleSettings.SectionKey, StringComparison.Ordinal);
+	}
+
 	private static IUiContributions Contributions()
 	{
 		ServiceCollection services = new();

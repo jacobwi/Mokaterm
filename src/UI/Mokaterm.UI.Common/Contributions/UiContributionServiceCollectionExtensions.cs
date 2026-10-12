@@ -53,6 +53,7 @@ public static partial class UiContributionServiceCollectionExtensions
 		EnsureDerivesFrom<IComponent>(descriptor.Component, nameof(descriptor.Component));
 
 		services.AddSingleton(descriptor);
+		services.AddSingleton(new SettingsPageName(descriptor.Id));
 		services.TryAddSingleton<IUiContributions, UiContributions>();
 		if (SectionTypeOf(descriptor.Component) is { } section)
 		{

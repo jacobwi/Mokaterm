@@ -53,12 +53,21 @@ none names a machine.
 | --- | --- | --- |
 | Protocol | `IProtocolProvider` and `AddProtocolUi` | A new protocol with its options editor and, if it needs one, its own session view. |
 | Session tool | `AddSessionTool` | A toolbar tool like Docker or System, with its palette command. |
-| Settings page | `AddSettingsPage` | The plugin's own settings, built from the shared fields. |
+| Settings page | `AddSettingsPage` | The plugin's own settings, built from the shared fields, in the settings list's Plugins group (the sample's refresh and subnet settings). |
 | Importer | `IConnectionImportSource` | Logins from another client. |
 | System page | `AddSystemPage` | A page in the System view's side menu (the sample's fail2ban page). |
 | Docker page | `AddDockerPage` | A page in the Docker manager's side menu. |
 | App tool | `AddAppTool` | A tool that needs no session (the sample's subnet calculator), in the top bar's Tools menu and the palette. |
 | Themes | `themes/` in the package | Terminal themes, listed after the built-in ones. |
+
+### Settings
+
+A plugin's settings are a record implementing `ISettingsSection`, stored in `settings.json` and carried by the settings
+backup, with a page on `SettingsSectionBase<T>` registered through `AddSettingsPage` in `SettingsPageGroup.Plugins`.
+Its section key and its page id both start with `plugin.` and the plugin's id (`plugin.moka.sample`), which the loader
+checks: a plugin that picks another name (`ssh`, `terminal`) is refused and everything it registered is taken out again,
+so it can never overwrite one of Mokaterm's own sections. The Plugins page links each loaded plugin to its page with a
+Settings button, on the web host too. A removed plugin's section stays in `settings.json` untouched.
 
 ### System and Docker pages
 
@@ -87,7 +96,8 @@ At start, before the service container is built (`PluginCatalog.Open`, then `Add
 4. The assembly names its module with `[assembly: MokatermPlugin(typeof(SampleModule))]`, so nothing is scanned, and
    `AddPlugins` adds it like any built-in module.
 5. Anything that fails is a record, never a crash: a plugin that fails to load, whose assembly name or module id is
-   already taken, is marked failed with the reason, shown on the Plugins page and in a notice after unlock.
+   already taken, or whose settings are not under its own name, is marked failed with the reason, shown on the Plugins
+   page and in a notice after unlock.
 
 Installing, enabling, disabling and removing all apply at the next start. The desktop page offers "Restart now".
 
@@ -179,6 +189,9 @@ MSIX build, and the Store build restarts through the platform.
   packages.
 
 ## Known gaps
+
+- Settings are held to the plugin's own names, but other ids are not: a plugin's session tool, System or Docker page or
+  app tool with the id of a built-in one replaces it, since the last registration with an id wins.
 
 - No unloading: every change to a plugin means a restart.
 - The `mta-*` row and chip classes a System page uses come from `SystemAdminView.razor.css`, which reaches any page drawn

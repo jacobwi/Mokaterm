@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Plugins;
+using Mokaterm.Abstractions.Settings;
 
 namespace Mokaterm.Core.Plugins;
 
@@ -39,7 +40,29 @@ public static class PluginBuilderExtensions
 				continue;
 			}
 
+			// What the module registers is checked after the fact, because only then is it known; a plugin that breaks a
+			// rule has what it added taken out again before anything was built from it.
+			Dictionary<string, Type> sectionsInUse = SectionsIn(builder.Services, 0, builder.Services.Count);
+			int before = builder.Services.Count;
 			builder.AddModule(plugin.Module);
+			List<ServiceDescriptor> added = [.. builder.Services.Skip(before)];
+			string? problem = PluginSettingsRules.Problem(
+				plugin.Info.Id,
+				added.Select(descriptor => descriptor.ImplementationInstance).OfType<SettingsSectionType>(),
+				added.Select(descriptor => descriptor.ImplementationInstance).OfType<SettingsPageName>().Select(page => page.Id),
+				sectionsInUse);
+			if (problem is not null)
+			{
+				for (int index = builder.Services.Count - 1; index >= before; index--)
+				{
+					builder.Services.RemoveAt(index);
+				}
+
+				moduleIds.Remove(moduleId);
+				catalog.Reject(plugin.Info.Id, problem);
+				continue;
+			}
+
 			builder.Services.AddSingleton(plugin.Info);
 		}
 
@@ -47,6 +70,20 @@ public static class PluginBuilderExtensions
 		builder.Services.AddSingleton(new PluginThemeSet(catalog.Themes));
 		builder.Services.AddSingleton<IPluginManager>(_ => new PluginManager(catalog));
 		return builder;
+	}
+
+	private static Dictionary<string, Type> SectionsIn(IServiceCollection services, int from, int to)
+	{
+		Dictionary<string, Type> sections = new(StringComparer.Ordinal);
+		for (int index = from; index < to; index++)
+		{
+			if (services[index].ImplementationInstance is SettingsSectionType section)
+			{
+				sections.TryAdd(section.Key, section.Type);
+			}
+		}
+
+		return sections;
 	}
 
 	private static string? ModuleId(LoadedPlugin plugin)
