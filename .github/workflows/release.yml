@@ -6,14 +6,14 @@ on:
 
 permissions:
   contents: write
+  # nuget.org Trusted Publishing: the push below trades GitHub's OIDC token for a key that lasts an hour, so no
+  # long-lived NuGet key is stored anywhere.
+  id-token: write
 
 env:
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  # Set the repository secret to publish the plugin SDK to nuget.org; without it the packages are only attached to the
-  # GitHub release.
-  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
 
 jobs:
   release:
@@ -98,13 +98,20 @@ jobs:
             artifacts/windows/RELEASES
             artifacts/nuget/*.nupkg
 
-      # After the release, so a release that failed to publish never leaves packages on nuget.org without it.
+      # After the release, so a release that failed to publish never leaves packages on nuget.org without it. The
+      # nuget.org policy "Mokaterm releases" trusts this repository and this workflow file (release.yml): renaming the
+      # file means updating the policy. The key lasts an hour, so it is asked for just before the push.
+      - name: Sign in to nuget.org
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: BCat
+
       # --skip-duplicate lets a re-run of the same tag finish instead of failing on what already went up.
       - name: Publish the plugin SDK to nuget.org
-        if: env.NUGET_API_KEY != ''
         shell: bash
         run: >
           dotnet nuget push "artifacts/nuget/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}"
           --skip-duplicate

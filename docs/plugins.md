@@ -136,9 +136,11 @@ starts without them and says so. `MOKATERM_NO_PLUGINS=1` does the same on purpos
   (`dotnet new mokaterm-plugin`).
 - `build/pack-nuget.ps1 -Version <version>` packs all four into `artifacts/nuget`, and `build/test-plugin-template.ps1`
   checks them the way an outside author meets them (see Starting a plugin). CI packs them on every push, and the
-  release workflow packs them at the tag's version, attaches them to the GitHub release and pushes them to nuget.org when
-  the repository secret `NUGET_API_KEY` is set. Before the first push, reserve the `Mokaterm.` id prefix on nuget.org
-  so nobody else can publish under it.
+  release workflow packs them at the tag's version, attaches them to the GitHub release and pushes them to nuget.org
+  through Trusted Publishing: the nuget.org policy "Mokaterm releases" (owner BCat) trusts `release.yml` in this
+  repository, and each release trades GitHub's OIDC token for a key that lasts an hour, so no NuGet key is stored. The
+  `Mokaterm.` id prefix should be reserved on nuget.org (by email to account@nuget.org) so nobody else can publish
+  under it.
 - The targets keep every assembly the host provides out of `lib` (decided from the restore graph), write `plugin.json`
   with the `sdk` of the Mokaterm.Abstractions the plugin compiled against, take only the project's own static assets plus
   its scoped CSS bundle, and zip deterministically to `<id>-<version>.mokaplugin`.
@@ -236,8 +238,8 @@ hand):
 
 **Order of work.**
 
-1. Published packages and the template, so anyone can build a plugin at all (done for 0.2.0, waiting on the
-   `NUGET_API_KEY` secret and the first release).
+1. Published packages and the template, so anyone can build a plugin at all (ready for 0.2.0; the first release
+   tag publishes them).
 2. PublicApiAnalyzers on Abstractions and UI.Common, so the surface plugins build against only changes on purpose.
 3. The gallery repository: submission format, build and check workflow, the signing key kept as a GitHub secret.
 4. The Browse tab, signature check and update chips in the app.
