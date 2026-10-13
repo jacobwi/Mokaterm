@@ -1,6 +1,7 @@
 # Next release (0.2.0)
 
-What we plan to put in the release after 0.1.9. Nothing here is started unless it says so.
+What we planned for the release after 0.1.9. Released as 0.2.0 with the plugin system, the gallery, plugin settings, the
+SDK packages and template, and automatic updates (items 2 and 15); the rest moves to the next release.
 
 ## Carried over
 

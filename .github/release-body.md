@@ -1,3 +1,33 @@
+## What's new in 0.2.0
+
+**Plugins**
+
+- Mokaterm now takes plugins: new protocols, server tools, pages in the System view and the Docker manager, tools in the
+  new Tools menu at the top, and terminal themes.
+- Install one from a `.mokaplugin` file in Settings, Plugins. A plugin that runs code installs turned off until you trust
+  it: the install dialog lists every file with its hash, and a plugin whose files change on disk turns itself off until
+  you trust the new files.
+- Browse the plugin gallery from the same page on the desktop. The list is signed, every download is checked against
+  it, and nothing is fetched until you open the tab. Installed plugins show when an update is available.
+- Plugins can have settings of their own, under Plugins in the settings list.
+- If a plugin stops Mokaterm from starting, the next start skips every plugin and says so. Setting
+  `MOKATERM_NO_PLUGINS=1` does the same on purpose.
+- The first plugin in the gallery is **Certificates**: read, make, convert, sign and encrypt with certificates and keys,
+  check the certificate a server sends, and see the certificates a Linux server uses in the System view.
+- On the web host, plugins come only from the operator's plugins folder (`Mokaterm:Plugins:Directory`, by default
+  `plugins` in the data folder), and the page lists them without changing anything.
+- Writing a plugin: `dotnet new install Mokaterm.Plugin.Templates`, then `dotnet new mokaterm-plugin`. The packages it
+  builds against are on NuGet.
+
+**Updates**
+
+- Mokaterm now looks for new versions on GitHub by default. A check asks GitHub for the list of releases and sends
+  nothing about you or this computer. Turn it off, or use another feed, in Settings, Updates.
+
+**Other**
+
+- Mokaterm is now MIT licensed.
+
 ## What's new in 0.1.9
 
 **Docker**
@@ -100,5 +130,8 @@ are left alone.
 
 ## Updating
 
-In-app updates are off until you set an update feed in Settings, Updates. Nothing downloads or restarts
-without a click, because a restart closes every live session.
+From 0.2.0, Mokaterm looks for a new version on GitHub shortly after it starts and shows a notice when there is
+one. Nothing downloads or restarts without a click, because a restart closes every live session. Settings, Updates
+turns the check off or points it at another feed.
+
+Coming from 0.1.9 or earlier, run this version's Setup once: those versions had updates off.
