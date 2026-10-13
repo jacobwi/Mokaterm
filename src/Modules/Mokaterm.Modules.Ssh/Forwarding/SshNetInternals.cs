@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Text;
 using Renci.SshNet;
 using Renci.SshNet.Messages;
 using Renci.SshNet.Messages.Connection;
@@ -7,25 +8,33 @@ using Renci.SshNet.Messages.Connection;
 namespace Mokaterm.Modules.Ssh.Forwarding;
 
 /// <summary>
-/// Every place this module reaches inside SSH.NET 2026.0.0 without a public API, which agent and X11 forwarding need and
-/// nothing else does. Each lookup runs once. One that fails turns off the feature that needs it, with the reason, and never
-/// throws into a session; the tests for this type fail when an SSH.NET update moves any of it.
+/// Every place this module reaches inside SSH.NET 2026.0.0 without a public API, which agent and X11 forwarding and
+/// keepalives that want a reply need and nothing else does. Each lookup runs once. One that fails turns off the feature
+/// that needs it, with the reason, and never throws into a session; the tests for this type fail when an SSH.NET update
+/// moves any of it.
 /// </summary>
 /// <remarks>
-/// What is public: <see cref="Session"/> and its channel events, the channel messages and <see cref="RequestInfo"/>.
-/// What is not: <c>BaseClient.Session</c>, which is the only way from a client to its session; <c>Session.SendMessage</c>,
-/// which is the only way to write a message; and the message table, which has no class for the
-/// <c>auth-agent@openssh.com</c> channel type and so fails the whole connection when a server opens one.
+/// What is public: <see cref="Session"/> with its channel events and its global request reply events, the channel
+/// messages and <see cref="RequestInfo"/>. What is not: <c>BaseClient.Session</c>, which is the only way from a client to
+/// its session; <c>Session.SendMessage</c>, which is the only way to write a message; the message table, which has no
+/// class for the <c>auth-agent@openssh.com</c> channel type and so fails the whole connection when a server opens one;
+/// and the <see cref="GlobalRequestMessage"/> constructor that takes a request name, whose public one leaves the name
+/// empty and then cannot write it.
 /// </remarks>
 internal static class SshNetInternals
 {
 	public const string ChannelOpenMessageName = "SSH_MSG_CHANNEL_OPEN";
+
+	/// <summary>OpenSSH's keepalive, which every server answers: a server answers a request it does not know with a failure.</summary>
+	public const string KeepAliveRequestName = "keepalive@openssh.com";
 
 	private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
 	private const BindingFlags Static = BindingFlags.Static | BindingFlags.NonPublic;
 
 	private static readonly Lazy<SessionAccess> Access = new(LoadSessionAccess, LazyThreadSafetyMode.ExecutionAndPublication);
+
+	private static readonly Lazy<KeepAliveAccess> KeepAlive = new(LoadKeepAliveAccess, LazyThreadSafetyMode.ExecutionAndPublication);
 
 	private static readonly Lock PatchLock = new();
 
@@ -64,6 +73,12 @@ internal static class SshNetInternals
 		ArgumentNullException.ThrowIfNull(session);
 		return Access.Value.Send is { } send ? new SessionMessageSender(session, send) : null;
 	}
+
+	/// <summary>Why a keepalive that wants a reply cannot be built, or null when it can.</summary>
+	public static string? KeepAliveProblem => KeepAlive.Value.Problem;
+
+	/// <summary>A new <c>keepalive@openssh.com</c> global request that wants a reply, or null when none can be built.</summary>
+	public static GlobalRequestMessage? CreateKeepAliveRequest() => KeepAlive.Value.Create?.Invoke();
 
 	/// <summary>
 	/// Makes SSH.NET read a channel open of a type it has no class for, such as <c>auth-agent@openssh.com</c>, instead of
@@ -113,6 +128,33 @@ internal static class SshNetInternals
 		catch (Exception ex) when (ex is ArgumentException or MemberAccessException or AmbiguousMatchException)
 		{
 			return new SessionAccess(null, null, $"SSH.NET's session could not be reached ({ex.GetType().Name}).");
+		}
+	}
+
+	/// <summary>
+	/// Finds the constructor that takes a request name and a reply flag, and checks once that a message built through it
+	/// says what it was given, since <see cref="GlobalRequestMessage"/> writes exactly those two fields.
+	/// </summary>
+	private static KeepAliveAccess LoadKeepAliveAccess()
+	{
+		try
+		{
+			ConstructorInfo? constructor = typeof(GlobalRequestMessage).GetConstructor(Instance, [typeof(byte[]), typeof(bool)]);
+			if (constructor is null)
+			{
+				return KeepAliveAccess.Missing("GlobalRequestMessage(byte[], bool)");
+			}
+
+			GlobalRequestMessage Create() => (GlobalRequestMessage)constructor.Invoke([Encoding.ASCII.GetBytes(KeepAliveRequestName), true]);
+
+			GlobalRequestMessage sample = Create();
+			return string.Equals(sample.RequestName, KeepAliveRequestName, StringComparison.Ordinal) && sample.WantReply
+				? new KeepAliveAccess(Create, null)
+				: new KeepAliveAccess(null, "SSH.NET's global request no longer keeps the name and reply flag it is given.");
+		}
+		catch (Exception ex) when (ex is ArgumentException or MemberAccessException or TargetInvocationException or AmbiguousMatchException or InvalidCastException)
+		{
+			return new KeepAliveAccess(null, $"SSH.NET's global request could not be built ({ex.GetType().Name}).");
 		}
 	}
 
@@ -216,5 +258,10 @@ internal static class SshNetInternals
 	private sealed record SessionAccess(Func<BaseClient, object?>? ReadSession, Action<Session, Message>? Send, string? Problem)
 	{
 		public static SessionAccess Missing(string member) => new(null, null, $"SSH.NET no longer has {member}.");
+	}
+
+	private sealed record KeepAliveAccess(Func<GlobalRequestMessage>? Create, string? Problem)
+	{
+		public static KeepAliveAccess Missing(string member) => new(null, $"SSH.NET no longer has {member}.");
 	}
 }

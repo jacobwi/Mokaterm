@@ -1,3 +1,4 @@
+using Mokaterm.Modules.Ssh.KeepAlive;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
@@ -5,7 +6,8 @@ namespace Mokaterm.Modules.Ssh.Connection;
 
 /// <summary>
 /// Notices when an SSH.NET client loses its connection. Socket errors raise <see cref="BaseClient.ErrorOccurred"/>, but a
-/// disconnect message from the server closes the session without any public event, so the client is also polled.
+/// disconnect message from the server closes the session without any public event, so the client is also polled. Neither
+/// sees a connection whose other end silently went away, which only the keepalive's judgement catches before TCP gives up.
 /// </summary>
 internal sealed class ConnectionMonitor : IAsyncDisposable
 {
@@ -16,11 +18,16 @@ internal sealed class ConnectionMonitor : IAsyncDisposable
 	private readonly CancellationTokenSource _stop = new();
 	private readonly Task _polling;
 
-	public ConnectionMonitor(BaseClient client)
+	/// <param name="stoppedAnswering">Completes when the keepalive judged the connection lost; never faults.</param>
+	public ConnectionMonitor(BaseClient client, Task<KeepAliveTimeoutException>? stoppedAnswering = null)
 	{
 		_client = client;
 		_client.ErrorOccurred += OnErrorOccurred;
 		_polling = PollAsync(_stop.Token);
+		if (stoppedAnswering is not null)
+		{
+			_ = ReportAsync(stoppedAnswering);
+		}
 	}
 
 	/// <summary>Completes with the cause once the connection is gone. Never faults.</summary>
@@ -47,6 +54,8 @@ internal sealed class ConnectionMonitor : IAsyncDisposable
 	}
 
 	private void OnErrorOccurred(object? sender, ExceptionEventArgs e) => _lost.TrySetResult(e.Exception);
+
+	private async Task ReportAsync(Task<KeepAliveTimeoutException> stoppedAnswering) => _lost.TrySetResult(await stoppedAnswering);
 
 	private async Task PollAsync(CancellationToken cancellationToken)
 	{

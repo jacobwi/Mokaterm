@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Commands;
+using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
@@ -13,6 +14,7 @@ using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Elevation;
 using Mokaterm.Modules.Ssh.FileSystem;
 using Mokaterm.Modules.Ssh.Forwarding;
+using Mokaterm.Modules.Ssh.KeepAlive;
 using Mokaterm.Modules.Ssh.Shell;
 using Mokaterm.Modules.Ssh.Terminal;
 using Mokaterm.Modules.Ssh.Tunnels;
@@ -41,10 +43,11 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 	private readonly SshForwardingIndicators? _indicators;
 	private readonly SystemAdminFeature _admin;
 	private readonly DockerSessionFeature _docker;
+	private readonly ConnectionKeepAlive _keepAlive;
 	private readonly ConnectionMonitor _monitor;
 	private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private readonly ILogger _logger;
-	private int _disposed;
+	private readonly Lazy<Task> _teardown;
 
 	private SshSession(SshConnector connector, SshConnection<SshClient> connection, SshTerminalChannel terminal, SshForwarding? forwarding, ILogger logger)
 	{
@@ -55,12 +58,40 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 		_forwarding = forwarding;
 		_indicators = forwarding is null ? null : new SshForwardingIndicators(forwarding);
 		_logger = logger;
+		_teardown = new Lazy<Task>(TearDownAsync, LazyThreadSafetyMode.ExecutionAndPublication);
 		AccountNames = new RemoteAccountNames(() => ConnectedSshClient, logger);
 		SudoPasswords = new SudoPasswordCache();
-		_sftp = new CompanionConnection<SftpClient>(cancellationToken => connector.ConnectCompanionAsync(Context, SftpClients.Create, cancellationToken));
+
+		// The jump hosts need no keepalive of their own: every byte of this connection and of the SFTP one passes through
+		// each hop, so a hop that went away leaves this connection's keepalives unanswered too.
+		SshSettings settings = connector.Settings;
+		KeepAlivePolicy? keepAlive = settings.GetKeepAlivePolicy(Context.Options);
+		_keepAlive = ConnectionKeepAlive.Open(
+			_client,
+			keepAlive,
+			settings.ConnectTimeout,
+			connector.Time,
+			terminal.ReceiveHold,
+			() => _logger.LogInformation("The server of SSH session {SessionId} does not answer keepalive requests, so the session is never dropped for missing them", Context.SessionId));
+		if (_keepAlive.Problem is { } problem)
+		{
+			_logger.LogInformation("SSH session {SessionId} cannot tell when the server stops answering: {Problem}", Context.SessionId, problem);
+		}
+
+		_sftp = new CompanionConnection<SftpClient>(
+			cancellationToken => connector.ConnectCompanionAsync(Context, SftpClients.Create, cancellationToken),
+			client => keepAlive is { IsOn: true }
+				? ConnectionKeepAlive.Open(
+					client,
+					keepAlive,
+					settings.ConnectTimeout,
+					connector.Time,
+					notAnswering: () => _logger.LogInformation("The SFTP connection of SSH session {SessionId} does not answer keepalive requests, so it is never closed for missing them", Context.SessionId))
+				: null,
+			cause => _logger.LogInformation("The SFTP connection of SSH session {SessionId} stopped answering and was closed: {Cause}", Context.SessionId, LogSafe.Describe(cause)));
 		_fileSystem = new SshFileSystemFeature(this, logger);
 		_rootFiles = new SessionRootFiles(_fileSystem);
-		_tunnels = new SshTunnelManager(_client, Context.SessionId, Context.Interaction, logger);
+		_tunnels = new SshTunnelManager(_client, Context.SessionId, Context.Interaction, logger, _keepAlive.Forwards);
 		_commands = new SshCommandFeature(GetSshClientAsync, connector.Time);
 		_admin = new SystemAdminFeature(new SshAdminShell(this, logger), connector.Time, logger, _rootFiles);
 		_docker = new DockerSessionFeature(
@@ -73,7 +104,7 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			() => connector.Settings.EffectiveStagingDirectory,
 			logger,
 			_rootFiles);
-		_monitor = new ConnectionMonitor(_client);
+		_monitor = new ConnectionMonitor(_client, _keepAlive.Lost);
 		_ = WatchAsync();
 	}
 
@@ -218,18 +249,22 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			? Task.FromResult(client)
 			: Task.FromException<SshClient>(new RemoteFileSystemException(RemoteFileErrorKind.ConnectionLost, "The SSH connection is closed."));
 
-	public async ValueTask DisposeAsync()
-	{
-		if (Interlocked.Exchange(ref _disposed, 1) != 0)
-		{
-			return;
-		}
+	/// <summary>
+	/// Closes every part. A second call waits for the same teardown, so closing a session that is already closing itself
+	/// (after its keepalives went unanswered) still waits for its tunnels to let go of their ports.
+	/// </summary>
+	public ValueTask DisposeAsync() => new(_teardown.Value);
 
+	private async Task TearDownAsync()
+	{
 		_completion.TrySetResult();
 
 		// Each part closes even when one before it fails: the connection, the jump hosts and the login must not outlive the session.
 		Guid id = Context.SessionId;
 		await SessionTeardown.ReleaseAsync(_monitor.DisposeAsync, _logger, id, "the connection monitor");
+
+		// Before the tunnels: a remote tunnel still waiting to start gives up at once instead of after the settle limit.
+		await SessionTeardown.ReleaseAsync(_keepAlive.DisposeAsync, _logger, id, "the keepalive");
 		await SessionTeardown.ReleaseAsync(_docker.DisposeAsync, _logger, id, "the Docker manager");
 		await SessionTeardown.ReleaseAsync(_admin.DisposeAsync, _logger, id, "the system view");
 		await SessionTeardown.ReleaseAsync(_rootFiles.DisposeAsync, _logger, id, "the tools' root file system");
@@ -276,7 +311,7 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			Task<Exception> lost = _monitor.Lost;
 			if (await Task.WhenAny(_terminal.Ended, lost) == lost)
 			{
-				Fail(await lost);
+				await FailAsync(await lost);
 				await _terminal.DisposeAsync();
 				return;
 			}
@@ -284,7 +319,7 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			Task decided = await Task.WhenAny(_terminal.ClosedByServer, lost, Task.Delay(ShellEndGracePeriod));
 			if (decided == lost)
 			{
-				Fail(await lost);
+				await FailAsync(await lost);
 			}
 			else if (decided == _terminal.ClosedByServer || ConnectionMonitor.IsConnected(_client))
 			{
@@ -292,20 +327,35 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			}
 			else
 			{
-				Fail(new SshConnectionException("The server closed the connection."));
+				await FailAsync(new SshConnectionException("The server closed the connection."));
 			}
 		}
 		catch (Exception ex)
 		{
-			Fail(ex);
+			await FailAsync(ex);
 		}
 	}
 
-	private void Fail(Exception cause)
+	private async Task FailAsync(Exception cause)
 	{
-		if (_completion.TrySetException(cause))
+		if (cause is not KeepAliveTimeoutException)
 		{
-			_logger.LogInformation(cause, "SSH session {SessionId} lost its connection", Context.SessionId);
+			if (_completion.TrySetException(cause))
+			{
+				_logger.LogInformation(cause, "SSH session {SessionId} lost its connection", Context.SessionId);
+			}
+
+			return;
 		}
+
+		if (!_completion.TrySetException(cause))
+		{
+			return;
+		}
+
+		// The socket still looks open, so nothing else lets go of it: the shell, the tunnels' listeners, the SFTP connection
+		// and the jump hosts would wait for TCP to give up. The session shows as dropped first, then releases all of it.
+		_logger.LogInformation("SSH session {SessionId} stopped answering keepalives and is closed: {Cause}", Context.SessionId, LogSafe.Describe(cause));
+		await DisposeAsync();
 	}
 }

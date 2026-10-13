@@ -1,5 +1,6 @@
 using Mokaterm.Modules.Ssh.Connection;
 using Mokaterm.Modules.Ssh.FileSystem;
+using Mokaterm.Modules.Ssh.KeepAlive;
 using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Tests;
@@ -66,6 +67,21 @@ public sealed class SmallHelpersTests
 		Assert.Null(settings.GetKeepAlive(new SshConnectionOptions()));
 		Assert.Equal(TimeSpan.FromSeconds(20), settings.GetKeepAlive(new SshConnectionOptions { KeepAliveSeconds = 20 }));
 		Assert.Null(new SshSettings().GetKeepAlive(new SshConnectionOptions { KeepAliveSeconds = 0 }));
+	}
+
+	[Fact]
+	public void KeepAlivePolicy_TakesTheIntervalAndAClampedMissCount()
+	{
+		Assert.Equal(new KeepAlivePolicy(TimeSpan.FromSeconds(30), 3), new SshSettings().GetKeepAlivePolicy(new SshConnectionOptions()));
+		Assert.Equal(SshSettings.MinKeepAliveMissedReplies, new SshSettings { KeepAliveMissedReplies = 0 }.EffectiveKeepAliveMissedReplies);
+		Assert.Equal(SshSettings.MaxKeepAliveMissedReplies, new SshSettings { KeepAliveMissedReplies = 500 }.EffectiveKeepAliveMissedReplies);
+		Assert.Equal(
+			new KeepAlivePolicy(TimeSpan.FromSeconds(5), SshSettings.MaxKeepAliveMissedReplies),
+			new SshSettings { KeepAliveMissedReplies = 500 }.GetKeepAlivePolicy(new SshConnectionOptions { KeepAliveSeconds = 5 }));
+
+		// An interval of 0 keeps today's behaviour: nothing that wants a reply goes out and nothing is judged.
+		Assert.Null(new SshSettings { KeepAliveSeconds = 0 }.GetKeepAlivePolicy(new SshConnectionOptions()));
+		Assert.Null(new SshSettings().GetKeepAlivePolicy(new SshConnectionOptions { KeepAliveSeconds = 0 }));
 	}
 
 	[Fact]

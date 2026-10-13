@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.Modules.Ssh.KeepAlive;
 
 namespace Mokaterm.Modules.Ssh;
 
@@ -6,6 +7,10 @@ namespace Mokaterm.Modules.Ssh;
 public sealed record SshSettings : ISettingsSection
 {
 	public const int MaxKeepAliveSeconds = 3600;
+
+	public const int MinKeepAliveMissedReplies = 1;
+
+	public const int MaxKeepAliveMissedReplies = 10;
 
 	public const int MinConnectTimeoutSeconds = 1;
 
@@ -23,6 +28,12 @@ public sealed record SshSettings : ISettingsSection
 
 	/// <summary>Seconds between keepalive messages. 0 turns keepalives off.</summary>
 	public int KeepAliveSeconds { get; init; } = 30;
+
+	/// <summary>
+	/// Keepalives in a row the server may leave unanswered before the connection counts as lost, like OpenSSH's
+	/// <c>ServerAliveCountMax</c>.
+	/// </summary>
+	public int KeepAliveMissedReplies { get; init; } = 3;
 
 	/// <summary>How long each connection step may wait for the server.</summary>
 	public int ConnectTimeoutSeconds { get; init; } = 15;
@@ -55,6 +66,9 @@ public sealed record SshSettings : ISettingsSection
 	internal int EffectiveAuthenticationAttempts =>
 		Math.Clamp(AuthenticationAttempts, MinAuthenticationAttempts, MaxAuthenticationAttempts);
 
+	internal int EffectiveKeepAliveMissedReplies =>
+		Math.Clamp(KeepAliveMissedReplies, MinKeepAliveMissedReplies, MaxKeepAliveMissedReplies);
+
 	internal string EffectiveSudoCommand => IsValidSudoCommand(SudoCommand) ? SudoCommand : "sudo";
 
 	internal string EffectiveStagingDirectory => IsValidStagingDirectory(StagingDirectory) ? StagingDirectory : "/tmp";
@@ -71,4 +85,8 @@ public sealed record SshSettings : ISettingsSection
 		int seconds = Math.Min(options.KeepAliveSeconds ?? KeepAliveSeconds, MaxKeepAliveSeconds);
 		return seconds > 0 ? TimeSpan.FromSeconds(seconds) : null;
 	}
+
+	/// <summary>When a connection counts as lost for not answering keepalives, or null when keepalives are off for it.</summary>
+	internal KeepAlivePolicy? GetKeepAlivePolicy(SshConnectionOptions options) =>
+		GetKeepAlive(options) is { } interval ? new KeepAlivePolicy(interval, EffectiveKeepAliveMissedReplies) : null;
 }

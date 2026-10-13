@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Mokaterm.Modules.Ssh.KeepAlive;
 
 namespace Mokaterm.Modules.Ssh.Terminal;
 
@@ -6,9 +7,10 @@ namespace Mokaterm.Modules.Ssh.Terminal;
 /// Carries a shell's output from SSH.NET's blocking read to <see cref="ReadAsync"/> with memory bounded end to end.
 /// SSH.NET opens the channel window again as soon as data arrives and keeps whatever the server sends in its own buffer,
 /// so the only way to slow a server down is to hold up the message loop that fills that buffer. <see cref="Throttle"/>
-/// does that once too much output waits unread, and TCP then pushes back on the server.
+/// does that once too much output waits unread, and TCP then pushes back on the server. Keepalive replies wait behind it
+/// too, which is why it says when it holds.
 /// </summary>
-internal sealed class ShellOutput
+internal sealed class ShellOutput : IReceiveHold
 {
 	/// <summary>The most one read takes off the shell.</summary>
 	internal const int ChunkBytes = 32 * 1024;
@@ -42,6 +44,8 @@ internal sealed class ShellOutput
 	private byte[]? _pending;
 	private int _pendingOffset;
 	private bool _finished;
+	private long _holds;
+	private bool _held;
 
 	/// <param name="read">
 	/// Blocks until output is available, copies it into the buffer and returns how much; 0 once the shell ended. An exception
@@ -64,6 +68,12 @@ internal sealed class ShellOutput
 
 	/// <summary>Completes once no more output will be queued: the shell ended, reading failed or <see cref="Stop"/> was called.</summary>
 	public Task Ended => _ended.Task;
+
+	/// <summary>How many times <see cref="Throttle"/> started holding up the thread that calls it.</summary>
+	public long Holds => Interlocked.Read(ref _holds);
+
+	/// <summary>True while <see cref="Throttle"/> holds up the thread that calls it.</summary>
+	public bool IsHeld => Volatile.Read(ref _held);
 
 	/// <summary>Takes queued output in the order it was read. Returns 0 once the output ended and the queue is empty.</summary>
 	public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
@@ -112,9 +122,23 @@ internal sealed class ShellOutput
 
 			lock (_drained)
 			{
-				while (!_finished && Backlog() > ResumeBacklogBytes)
+				if (_finished || Backlog() <= ResumeBacklogBytes)
 				{
-					_ = Monitor.Wait(_drained, RecheckInterval);
+					return;
+				}
+
+				_ = Interlocked.Increment(ref _holds);
+				Volatile.Write(ref _held, true);
+				try
+				{
+					while (!_finished && Backlog() > ResumeBacklogBytes)
+					{
+						_ = Monitor.Wait(_drained, RecheckInterval);
+					}
+				}
+				finally
+				{
+					Volatile.Write(ref _held, false);
 				}
 			}
 		}

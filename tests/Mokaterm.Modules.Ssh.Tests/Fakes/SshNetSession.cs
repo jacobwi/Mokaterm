@@ -39,6 +39,8 @@ internal static class SshNetSession
 			ChannelEofMessage => ("OnChannelEofReceived", typeof(ChannelEofMessage)),
 			ChannelCloseMessage => ("OnChannelCloseReceived", typeof(ChannelCloseMessage)),
 			ChannelRequestMessage => ("OnChannelRequestReceived", typeof(ChannelRequestMessage)),
+			RequestSuccessMessage => ("OnRequestSuccessReceived", typeof(RequestSuccessMessage)),
+			RequestFailureMessage => ("OnRequestFailureReceived", typeof(RequestFailureMessage)),
 			_ => throw new ArgumentException($"No handler for {message.GetType().Name}.", nameof(message)),
 		};
 

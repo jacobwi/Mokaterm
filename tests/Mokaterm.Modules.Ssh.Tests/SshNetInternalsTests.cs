@@ -29,6 +29,51 @@ public sealed class SshNetInternalsTests
 	}
 
 	[Fact]
+	public void KeepAliveRequest_IsOpenSshsKeepAlive_AndWantsAReply()
+	{
+		Assert.Null(SshNetInternals.KeepAliveProblem);
+
+		GlobalRequestMessage message = SshNetInternals.CreateKeepAliveRequest()!;
+
+		Assert.Equal(SshNetInternals.KeepAliveRequestName, message.RequestName);
+		Assert.True(message.WantReply);
+
+		// SSH_MSG_GLOBAL_REQUEST, string "keepalive@openssh.com", boolean want_reply (RFC 4254 section 4).
+		byte[] expected = [80, 0, 0, 0, 21, .. "keepalive@openssh.com"u8, 1];
+		Assert.Equal(expected, message.GetBytes());
+
+		// Each call builds a message of its own, so two writes never share one.
+		Assert.NotSame(message, SshNetInternals.CreateKeepAliveRequest());
+	}
+
+	[Fact]
+	public void SshNetsOwnGlobalRequests_AreStillOnlyTheRemoteForwardOnes()
+	{
+		// GlobalRequestLine counts every global request that wants a reply. When SSH.NET gains another one of its own, it
+		// has to be counted there too, or a keepalive reply could pass for its answer.
+		string[] requests = [.. typeof(Session).Assembly.GetTypes()
+			.Where(type => type.IsSubclassOf(typeof(GlobalRequestMessage)))
+			.Select(type => type.Name)
+			.Order(StringComparer.Ordinal)];
+
+		Assert.Equal(["CancelTcpIpForwardGlobalRequestMessage", "TcpIpForwardGlobalRequestMessage"], requests);
+	}
+
+	[Fact]
+	public void ARemoteForward_StillWaitsOnOneHandleForAnyReply()
+	{
+		// Why forward starts wait until nothing is owed: the remote forward takes whatever reply comes next for its own,
+		// through one auto-reset handle that stays subscribed while the port runs. When this stops holding, look at
+		// GlobalRequestLine again; it stays correct either way, only stricter than needed.
+		FieldInfo? response = typeof(ForwardedPortRemote).GetField("_globalRequestResponse", Hidden);
+		Assert.NotNull(response);
+		using ForwardedPortRemote port = new("127.0.0.1", 8080, "127.0.0.1", 80);
+		Assert.IsType<AutoResetEvent>(response.GetValue(port));
+		Assert.NotNull(typeof(ForwardedPortRemote).GetMethod("Session_RequestSuccess", Hidden));
+		Assert.NotNull(typeof(ForwardedPortRemote).GetMethod("Session_RequestFailure", Hidden));
+	}
+
+	[Fact]
 	public void AnUnconnectedSession_RefusesToSendWithoutThrowing()
 	{
 		ISshMessageSender sender = SshNetInternals.CreateSender(SshNetSession.Create())!;

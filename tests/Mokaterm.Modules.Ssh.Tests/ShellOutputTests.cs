@@ -97,6 +97,25 @@ public sealed class ShellOutputTests
 	}
 
 	[Fact]
+	public async Task AHeldProducer_ShowsAsAHold_UntilItGoesOn()
+	{
+		FakeShellBuffer shell = new();
+		ShellOutput output = new(shell.Read, () => shell.Length, "test shell reader");
+		Assert.Equal((0L, false), (output.Holds, output.IsHeld));
+		using Flood flood = new(shell, output);
+
+		// Nobody reads, so the producer, which stands in for SSH.NET's message loop, ends up held: keepalive replies
+		// would wait behind it, and the keepalive must not take that for a server that stopped answering.
+		await Eventually.TrueAsync(() => output.IsHeld, "the producer is held");
+		Assert.True(output.Holds >= 1);
+
+		output.Stop();
+		await flood.StopAsync();
+		Assert.False(output.IsHeld);
+		shell.Close();
+	}
+
+	[Fact]
 	public async Task AReadThatThrows_EndsTheOutputInsteadOfTheProcess()
 	{
 		ShellOutput output = new(_ => throw new InvalidOperationException("The channel broke in a new way."), () => 0, "test shell reader");

@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Modules.Ssh.KeepAlive;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
@@ -17,17 +18,23 @@ internal sealed class SshTunnelManager : ISshTunnelFeature, IAsyncDisposable
 	private readonly IUserInteraction? _interaction;
 	private readonly ILogger _logger;
 	private readonly Guid _sessionId;
+	private readonly IForwardRequests _forwards;
 	private readonly Lock _lock = new();
 	private readonly List<TunnelEntry> _entries = [];
 	private readonly SemaphoreSlim _gate = new(1, 1);
 	private int _disposed;
 
-	public SshTunnelManager(SshClient client, Guid sessionId, IUserInteraction? interaction, ILogger logger)
+	/// <param name="forwards">
+	/// How remote tunnels send their forward requests: through the session's request line, so a keepalive reply can never
+	/// be taken for a forward's. Null runs them as SSH.NET does.
+	/// </param>
+	public SshTunnelManager(SshClient client, Guid sessionId, IUserInteraction? interaction, ILogger logger, IForwardRequests? forwards = null)
 	{
 		_client = client;
 		_sessionId = sessionId;
 		_interaction = interaction;
 		_logger = logger;
+		_forwards = forwards ?? DirectForwardRequests.Instance;
 	}
 
 	public event Action? Changed;
@@ -132,8 +139,11 @@ internal sealed class SshTunnelManager : ISshTunnelFeature, IAsyncDisposable
 				entry.Attach(port, OnPortException);
 				_client.AddForwardedPort(port);
 
-				// Start binds a socket, and a remote tunnel waits for the server's answer, so keep it off the caller.
-				await Task.Run(port.Start, cancellationToken);
+				// Start binds a socket, and a remote tunnel waits for the server's answer, so keep it off the caller. A remote
+				// one sends a global request, which goes through the request line so no other reply is mistaken for its own.
+				await (port is ForwardedPortRemote
+					? _forwards.StartAsync(port.Start, cancellationToken)
+					: Task.Run(port.Start, cancellationToken));
 				SetState(entry, SshTunnelState.Open, null, BoundPortOf(port));
 				_logger.LogInformation("SSH session {SessionId} opened tunnel {TunnelId}", _sessionId, tunnelId);
 			}
@@ -290,15 +300,15 @@ internal sealed class SshTunnelManager : ISshTunnelFeature, IAsyncDisposable
 			return;
 		}
 
-		Detach(entry);
+		port.Exception -= OnPortException;
+		entry.Port = null;
 		try
 		{
-			// Stop waits for pending channels, and dispose sends a cancel request to the server.
-			await Task.Run(() =>
-			{
-				port.Stop();
-				port.Dispose();
-			});
+			// Removing stops the port, which waits for pending channels and, for a remote tunnel, sends the server a cancel
+			// request; that one is counted on the request line, since SSH.NET may stop waiting before its answer arrives.
+			await (port is ForwardedPortRemote { IsStarted: true }
+				? _forwards.StopAsync(() => Release(port), sendsRequest: true)
+				: Task.Run(() => Release(port)));
 		}
 		catch (Exception ex)
 		{
@@ -306,15 +316,8 @@ internal sealed class SshTunnelManager : ISshTunnelFeature, IAsyncDisposable
 		}
 	}
 
-	private void Detach(TunnelEntry entry)
+	private void Release(ForwardedPort port)
 	{
-		if (entry.Port is not { } port)
-		{
-			return;
-		}
-
-		port.Exception -= OnPortException;
-		entry.Port = null;
 		try
 		{
 			_client.RemoveForwardedPort(port);
@@ -323,6 +326,9 @@ internal sealed class SshTunnelManager : ISshTunnelFeature, IAsyncDisposable
 		{
 			// The session is already going away, which takes its ports with it.
 		}
+
+		port.Stop();
+		port.Dispose();
 	}
 
 	private void OnPortException(object? sender, ExceptionEventArgs e)

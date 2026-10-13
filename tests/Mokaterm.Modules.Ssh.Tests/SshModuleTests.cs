@@ -139,12 +139,24 @@ public sealed class SshModuleTests
 
 		Assert.Equal("ssh", SshSettings.SectionKey);
 		Assert.Equal(30, settings.KeepAliveSeconds);
+		Assert.Equal(3, settings.KeepAliveMissedReplies);
 		Assert.Equal(15, settings.ConnectTimeoutSeconds);
 		Assert.Equal(3, settings.AuthenticationAttempts);
 		Assert.Equal("sudo", settings.SudoCommand);
 		Assert.Equal("/tmp", settings.StagingDirectory);
 		Assert.Equal(120, settings.PromptTimeoutSeconds);
 		Assert.Equal("", settings.AgentEndpoint);
+	}
+
+	[Fact]
+	public void SettingsSearch_FindsTheMissedKeepAliveRow_UnderConnections()
+	{
+		SettingsSearchEntry row = Assert.Single(
+			SettingsSearchIndex.For(typeof(SshSettingsPage)),
+			entry => entry.Label == "Missed keepalive replies");
+
+		Assert.Equal("Connections", row.Section);
+		Assert.Contains("counts as lost", row.Description, StringComparison.Ordinal);
 	}
 
 	private static ServiceProvider BuildServices()

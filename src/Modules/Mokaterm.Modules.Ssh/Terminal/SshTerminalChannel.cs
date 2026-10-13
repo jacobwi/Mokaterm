@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Terminal;
+using Mokaterm.Modules.Ssh.KeepAlive;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
@@ -32,6 +33,9 @@ internal sealed class SshTerminalChannel : ITerminalChannel
 
 	/// <summary>Completes when the server closed the shell channel, as it does when the shell exits.</summary>
 	public Task ClosedByServer => _closedByServer.Task;
+
+	/// <summary>Says when the shell's flow control holds up SSH.NET's message loop, which keeps keepalive replies unread.</summary>
+	public IReceiveHold ReceiveHold => _output;
 
 	/// <summary>Opens a pseudo-terminal running the login shell.</summary>
 	public static async Task<SshTerminalChannel> OpenAsync(SshClient client, string terminalType, TerminalSize size, CancellationToken cancellationToken)

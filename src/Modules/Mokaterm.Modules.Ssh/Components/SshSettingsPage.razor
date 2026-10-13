@@ -7,7 +7,7 @@
 <SettingsPage Title="SSH" OnReset="ResetAsync">
 	<SettingsSection Title="Connections">
 		<SettingsRow Label="Keepalive"
-					 Description="Keeps idle connections open through NAT and firewalls. 0 turns keepalives off.">
+					 Description="Keeps idle connections open through NAT and firewalls, and asks the server for a reply each time. 0 turns keepalives off.">
 			<NumberSetting TValue="int"
 						   Value="settings.KeepAliveSeconds"
 						   ValueChanged="value => UpdateAsync(s => s with { KeepAliveSeconds = value })"
@@ -15,6 +15,15 @@
 						   Max="SshSettings.MaxKeepAliveSeconds"
 						   Suffix="s"
 						   AriaLabel="Keepalive interval in seconds" />
+		</SettingsRow>
+		<SettingsRow Label="Missed keepalive replies"
+					 Description="Keepalives in a row the server may leave unanswered before the connection counts as lost and the session can reconnect, instead of waiting for TCP to give up.">
+			<NumberSetting TValue="int"
+						   Value="settings.KeepAliveMissedReplies"
+						   ValueChanged="value => UpdateAsync(s => s with { KeepAliveMissedReplies = value })"
+						   Min="SshSettings.MinKeepAliveMissedReplies"
+						   Max="SshSettings.MaxKeepAliveMissedReplies"
+						   AriaLabel="Missed keepalive replies before giving up" />
 		</SettingsRow>
 		<SettingsRow Label="Connect timeout" Description="How long each step of connecting may wait for the server.">
 			<NumberSetting TValue="int"
