@@ -59,9 +59,16 @@ jobs:
       - name: Build
         run: dotnet build Mokaterm.slnx --configuration Release
 
-      # A tag on a commit that does not pass is not a release.
+      # A tag on a commit that does not pass is not a release. A failing run goes once more before the release stops:
+      # timing-sensitive tests have flaked on busy runners (0.1.6 never published because of one), while a real failure
+      # fails both runs.
       - name: Test
-        run: dotnet test --solution Mokaterm.slnx --no-build --configuration Release
+        shell: bash
+        run: |
+          dotnet test --solution Mokaterm.slnx --no-build --configuration Release || {
+            echo "::warning::The test run failed; running it once more before giving up."
+            dotnet test --solution Mokaterm.slnx --no-build --configuration Release
+          }
 
       # Publishes the desktop host and packs it with Velopack into artifacts/windows. The
       # script targets Windows PowerShell, which is what the maintainer's machine has.
@@ -92,6 +99,8 @@ jobs:
         shell: powershell
         run: ./build/pack-nuget.ps1 -Version ${{ steps.version.outputs.version }}
 
+      # Only this version's packages: the output folder also holds the previous release's full package, which the
+      # Package step downloads so vpk can build the delta, and which belongs to that release (v0.2.0 carried 0.1.9's).
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -100,7 +109,7 @@ jobs:
           files: |
             artifacts/windows/Moka.Mokaterm-win-Setup.exe
             artifacts/windows/Moka.Mokaterm-win-Portable.zip
-            artifacts/windows/*.nupkg
+            artifacts/windows/Moka.Mokaterm-${{ steps.version.outputs.version }}-*.nupkg
             artifacts/windows/releases.win.json
             artifacts/windows/assets.win.json
             artifacts/windows/RELEASES
