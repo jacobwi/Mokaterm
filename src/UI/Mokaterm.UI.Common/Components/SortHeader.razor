@@ -1,0 +1,28 @@
+@namespace Mokaterm.UI.Common.Components
+@using Moka.Red.Data.Table
+
+@* The click is taken on the whole cell, so the column's width is the target, and the button inside is what the keyboard
+   reaches: Enter and Space press it, and its click comes up to the cell. aria-sort stays on the column header, the only
+   role it belongs to, and only on the column the rows follow. A real table gets a th, which is a column header already. *@
+@{
+	RenderFragment content =
+		@<Hint Text="@Description" Class="mt-sort-header__hint">
+			<button type="button" class="@ButtonClass">
+				<span class="mt-sort-header__label">@Label</span>
+				@if (Direction != MokaSortDirection.None)
+				{
+					<MokaIcon Icon="@(Direction == MokaSortDirection.Descending ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronUp)"
+							  SizeValue="10px"
+							  Class="mt-sort-header__icon" />
+				}
+			</button>
+		</Hint>;
+}
+@if (TableCell)
+{
+	<th class="@CssClass" aria-sort="@AriaSort" @onclick="OnSort">@content</th>
+}
+else
+{
+	<span class="@CssClass" role="columnheader" aria-sort="@AriaSort" @onclick="OnSort">@content</span>
+}

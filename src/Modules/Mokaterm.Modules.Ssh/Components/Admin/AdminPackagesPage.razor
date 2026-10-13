@@ -99,10 +99,10 @@
 				List<PackageUpdate> updates = [.. Sorted(_updates.Where(Matches).Where(update => _view != "security" || IsSecurity(update)))];
 				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr)">
 					<div class="mta-row mta-row--head">
-						<AdminSortHeader Text="Package" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
+						<SortHeader Label="Package" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
 						<span class="mta-wide">Installed</span>
 						<span>Available</span>
-						<AdminSortHeader Text="From" Key="source" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+						<SortHeader Label="From" Direction="@(_sort.DirectionOf("source"))" OnSort="@(() => _sort.Toggle("source", startDescending: false))" Class="mta-wide" />
 					</div>
 					@foreach (PackageUpdate update in updates.Take(MaxRows))
 					{
@@ -141,8 +141,8 @@
 			{
 				<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) minmax(0, 1fr) 64px 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) 28px">
 					<div class="mta-row mta-row--head">
-						<AdminSortHeader Text="Package" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
-						<AdminSortHeader Text="Version" Key="version" Sort="_sort" OnChanged="StateHasChanged" />
+						<SortHeader Label="Package" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
+						<SortHeader Label="Version" Direction="@(_sort.DirectionOf("version"))" OnSort="@(() => _sort.Toggle("version", startDescending: false))" />
 						<span class="mta-wide">Arch</span>
 						<span></span>
 					</div>

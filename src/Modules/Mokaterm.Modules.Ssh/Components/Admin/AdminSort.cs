@@ -1,3 +1,5 @@
+using Moka.Red.Data.Table;
+
 namespace Mokaterm.Modules.Ssh.Components.Admin;
 
 /// <summary>Which column a list is sorted by. Clicking the same header again turns the order around.</summary>
@@ -12,6 +14,12 @@ public sealed class AdminSort
 	public string Key { get; private set; }
 
 	public bool Descending { get; private set; }
+
+	/// <summary>What a <c>SortHeader</c> for <paramref name="key"/> draws: the direction while it is the sorted column.</summary>
+	public MokaSortDirection DirectionOf(string key) =>
+		Key != key ? MokaSortDirection.None
+		: Descending ? MokaSortDirection.Descending
+		: MokaSortDirection.Ascending;
 
 	/// <summary>Sorts by <paramref name="key"/>; numbers usually start with the largest, names with A.</summary>
 	public void Toggle(string key, bool startDescending)

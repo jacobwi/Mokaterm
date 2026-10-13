@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Moka.Red.Data.Table;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Settings;
@@ -26,6 +27,7 @@ public sealed partial class FleetDialog : ShellEditorBase<FleetEditorRequest>
 	private readonly HashSet<Guid> _picked = [];
 	private readonly HashSet<Guid> _expanded = [];
 	private IReadOnlyList<FleetRow> _rows = [];
+	private IReadOnlyList<Guid>? _held;
 	private string _filter = "";
 	private FleetView _view = FleetView.All;
 	private string? _error;
@@ -66,7 +68,17 @@ public sealed partial class FleetDialog : ShellEditorBase<FleetEditorRequest>
 	/// <summary>Only while a refresh is being handed to the survey; a read that is going may be left behind, and goes on.</summary>
 	protected override bool IsBusy => _refreshing;
 
+	/// <summary>The rows the view and the filter let through, in the chosen order, or in the held one while the pointer is on the table.</summary>
 	private IReadOnlyList<FleetRow> Visible
+	{
+		get
+		{
+			IReadOnlyList<FleetRow> sorted = FleetSort.Order(Filtered, Fleet.Sort);
+			return _held is null ? sorted : FleetSort.Hold(sorted, _held);
+		}
+	}
+
+	private List<FleetRow> Filtered
 	{
 		get
 		{
@@ -160,6 +172,7 @@ public sealed partial class FleetDialog : ShellEditorBase<FleetEditorRequest>
 	{
 		_picked.Clear();
 		_expanded.Clear();
+		_held = null;
 		_filter = "";
 		_view = FleetView.All;
 		_error = null;
@@ -211,9 +224,43 @@ public sealed partial class FleetDialog : ShellEditorBase<FleetEditorRequest>
 		});
 	}
 
-	private void SetView(FleetView view) => _view = view;
+	private void SetView(FleetView view)
+	{
+		_view = view;
+		Rehold();
+	}
 
-	private void OnFilterChanged(string filter) => _filter = filter;
+	private void OnFilterChanged(string filter)
+	{
+		_filter = filter;
+		Rehold();
+	}
+
+	private MokaSortDirection DirectionOf(FleetColumn column) => FleetSort.DirectionOf(Fleet.Sort, column);
+
+	/// <summary>The window keeps the order, so the next opening of the dialog shows the table sorted the same way.</summary>
+	private void SortBy(FleetColumn column)
+	{
+		Fleet.Sort = FleetSort.Next(Fleet.Sort, column);
+		Rehold();
+	}
+
+	private void HoldOrder() => _held ??= [.. Visible.Select(row => row.Login.Id)];
+
+	private void ReleaseOrder() => _held = null;
+
+	/// <summary>
+	/// A sort, a filter or a view the user picked applies at once, even with the pointer on the table: it is the user's
+	/// own reordering, not one that arrived under the pointer. What it shows is then what holds.
+	/// </summary>
+	private void Rehold()
+	{
+		if (_held is not null)
+		{
+			_held = null;
+			HoldOrder();
+		}
+	}
 
 	private void TogglePick(Guid connectionId)
 	{

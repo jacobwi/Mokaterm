@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moka.Red.Data.Table;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
@@ -72,6 +73,40 @@ public sealed class FleetViewTests
 		Assert.True(html.IndexOf("10.0.0.30", StringComparison.Ordinal) < html.IndexOf("10.0.0.20", StringComparison.Ordinal));
 		Assert.Contains("role=\"grid\"", html, StringComparison.Ordinal);
 		Assert.Contains("data-mt-row", html, StringComparison.Ordinal);
+
+		// Every column with a figure or a name sorts from a button, and nothing is sorted yet.
+		Assert.Equal(11, Occurrences(html, "<button type=\"button\" class=\"mt-sort-header__button\""));
+		Assert.DoesNotContain("aria-sort", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("mt-sort-header__button--active", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task SortedTable_AnnouncesItsColumn_AndOrdersTheRowsByIt()
+	{
+		FakeSurveyRunner runner = new()
+		{
+			Results =
+			[
+				Result(WebRoot, HostRunState.Done, Busy()),
+				Result(DbOps, HostRunState.Done, Busy() with { FullestDisk = new HostDiskUsage { MountPoint = "/", UsedPercent = 40 } }),
+			],
+		};
+
+		string html = await RenderAsync(runner, read: true, new FleetSortOrder(FleetColumn.Disk, MokaSortDirection.Descending));
+
+		// aria-sort sits on the column header, on that one header only.
+		Assert.Equal(1, Occurrences(html, "aria-sort="));
+		Assert.Matches(
+			"mt-fleet-cell--disk\" role=\"columnheader\" aria-sort=\"descending\"[^>]*>(?:(?!columnheader)[\\s\\S])*"
+			+ "<button type=\"button\" class=\"mt-sort-header__button mt-sort-header__button--active\"[^>]*><span class=\"mt-sort-header__label\"[^>]*>Disk</span>",
+			html);
+		Assert.Equal(1, Occurrences(html, "mt-sort-header__button--active"));
+
+		// The fullest disk first (web01, 92%), then db (40%), then nas, which was never read; by name it would be db, nas, web01.
+		int web = html.IndexOf("10.0.0.20", StringComparison.Ordinal);
+		int db = html.IndexOf("10.0.0.10", StringComparison.Ordinal);
+		int nas = html.IndexOf("10.0.0.30", StringComparison.Ordinal);
+		Assert.True(web < db && db < nas, $"Rows came out as web01 {web}, db {db}, nas {nas}.");
 	}
 
 	[Fact]
@@ -208,7 +243,18 @@ public sealed class FleetViewTests
 		vault,
 		NullLogger<FleetOverview>.Instance);
 
-	private static async Task<string> RenderAsync(FakeSurveyRunner runner, bool read)
+	private static int Occurrences(string html, string text)
+	{
+		int count = 0;
+		for (int at = html.IndexOf(text, StringComparison.Ordinal); at >= 0; at = html.IndexOf(text, at + text.Length, StringComparison.Ordinal))
+		{
+			count++;
+		}
+
+		return count;
+	}
+
+	private static async Task<string> RenderAsync(FakeSurveyRunner runner, bool read, FleetSortOrder sort = default)
 	{
 		MemoryAppDataStore store = new();
 		await using UiStateStore uiState = new(store, TimeProvider.System, NullLogger<UiStateStore>.Instance);
@@ -222,7 +268,7 @@ public sealed class FleetViewTests
 		_ = shell.OpenEditor(new FleetEditorRequest());
 		UnlockedVault vault = new();
 		CatalogState catalog = new(new EditableCatalog(Catalog), vault, NullLogger<CatalogState>.Instance);
-		using FleetOverview overview = new(runner, catalog, new TwoProtocols(), settings, vault, NullLogger<FleetOverview>.Instance);
+		using FleetOverview overview = new(runner, catalog, new TwoProtocols(), settings, vault, NullLogger<FleetOverview>.Instance) { Sort = sort };
 		if (read)
 		{
 			_ = await overview.RefreshAsync().WaitAsync(Patience, Ct);

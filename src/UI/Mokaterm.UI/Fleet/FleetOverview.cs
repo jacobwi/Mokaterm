@@ -53,6 +53,13 @@ internal sealed class FleetOverview : IDisposable
 	public bool IsRunning => Volatile.Read(ref _survey)?.IsRunning == true;
 
 	/// <summary>
+	/// How the dialog sorts the rows. It is kept here so that closing the dialog to open a tab and coming back finds the
+	/// table as it was left; it says nothing about any machine, so locking the vault keeps it, and nothing writes it down.
+	/// Read and written on the renderer only.
+	/// </summary>
+	public FleetSortOrder Sort { get; set; }
+
+	/// <summary>
 	/// Every saved login whose protocol can report on its machine, in the tree's order (machines by name, then their
 	/// logins), each with what the window last read from it.
 	/// </summary>

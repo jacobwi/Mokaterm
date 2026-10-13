@@ -1,4 +1,5 @@
 using System.Globalization;
+using Moka.Red.Data.Table;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.UI.Common.Formatting;
 
@@ -55,7 +56,10 @@ public sealed partial class DockerStatsPage : DockerManagerPageBase
 
 	private static string ColumnClass(StatsColumn column) => column is StatsColumn.Network or StatsColumn.Block ? "mt-dks-optional" : "";
 
-	private string AriaSort(StatsColumn column) => column != _sort ? "none" : _descending ? "descending" : "ascending";
+	private MokaSortDirection DirectionOf(StatsColumn column) =>
+		column != _sort ? MokaSortDirection.None
+		: _descending ? MokaSortDirection.Descending
+		: MokaSortDirection.Ascending;
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{

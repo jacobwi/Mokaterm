@@ -1,32 +1,7 @@
-/* The shared table look comes from the manager; this adds sortable headers and the CPU line beside its figure. */
+/* The shared table look comes from the manager and the sorting headers are SortHeaders; this adds the CPU line beside
+   its figure. */
 .mt-dks-table td {
 	vertical-align: middle;
-}
-
-.mt-dks-sort {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	padding: 0;
-	border: none;
-	border-radius: var(--moka-radius-sm);
-	background: none;
-	color: inherit;
-	font: inherit;
-	letter-spacing: inherit;
-	text-transform: inherit;
-	cursor: pointer;
-	transition: color var(--moka-transition-fast);
-}
-
-.mt-dks-sort:hover,
-.mt-dks-sort--active {
-	color: var(--moka-color-on-surface);
-}
-
-.mt-dks-sort:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
 }
 
 .mt-dks-name {
@@ -53,8 +28,9 @@
 	width: 72px;
 }
 
+/* ::deep because the header cells are SortHeader's markup, and the narrow page drops their column as well as its cells. */
 @container mt-dk-page (max-width: 560px) {
-	.mt-dks-optional {
+	.mt-dks-table ::deep .mt-dks-optional {
 		display: none;
 	}
 }

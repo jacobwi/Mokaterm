@@ -1,0 +1,65 @@
+.mt-sort-header {
+	cursor: pointer;
+}
+
+/* The span lines its button up like header text; a th keeps its table cell display. A list's own cell classes can
+   change the display and alignment, which is how a column of figures puts its header at the right. */
+span.mt-sort-header {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.mt-sort-header ::deep .mt-sort-header__hint {
+	min-width: 0;
+	max-width: 100%;
+}
+
+/* The tooltip sits inside the header, whose micro-label type it would otherwise take. */
+.mt-sort-header ::deep [role="tooltip"] {
+	font-weight: var(--moka-font-weight-normal);
+	letter-spacing: normal;
+	text-transform: none;
+}
+
+/* A button that reads as the header text it replaces; the column the rows follow is brighter and carries its arrow. */
+.mt-sort-header__button {
+	display: inline-flex;
+	align-items: center;
+	gap: 1px;
+	min-width: 0;
+	max-width: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: var(--moka-radius-sm);
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	cursor: pointer;
+	transition: color var(--moka-transition-fast);
+}
+
+.mt-sort-header:hover .mt-sort-header__button,
+.mt-sort-header__button--active {
+	color: var(--moka-color-on-surface);
+}
+
+.mt-sort-header__button:focus-visible {
+	outline: none;
+	box-shadow: var(--moka-focus-ring);
+}
+
+/* A narrow column cuts the label rather than the arrow: the 10px arrow and its 1px gap fit beside "Failed" in 48px. */
+.mt-sort-header__label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-sort-header ::deep .mt-sort-header__icon {
+	flex: none;
+	color: var(--moka-color-primary);
+}

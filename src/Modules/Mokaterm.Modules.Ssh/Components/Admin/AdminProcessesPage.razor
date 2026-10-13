@@ -41,13 +41,13 @@
 			IReadOnlyList<(ProcessInfo Process, int Depth)> shown = Shown();
 			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 54px 50px 40px 70px minmax(0, 2fr) 28px; --mta-cols-narrow: 54px 50px 46px minmax(0, 1fr) 28px">
 				<div class="mta-row mta-row--head">
-					<AdminSortHeader Text="PID" Key="pid" Sort="_sort" OnChanged="StateHasChanged" />
-					<AdminSortHeader Text="User" Key="user" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
-					<AdminSortHeader Text="CPU" Key="cpu" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
-					<AdminSortHeader Text="Mem" Key="mem" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
-					<AdminSortHeader Text="NI" Key="nice" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
-					<AdminSortHeader Text="RSS" Key="rss" Sort="_sort" StartDescending OnChanged="StateHasChanged" Class="mta-wide" />
-					<AdminSortHeader Text="Command" Key="command" Sort="_sort" OnChanged="StateHasChanged" />
+					<SortHeader Label="PID" Direction="@(_sort.DirectionOf("pid"))" OnSort="@(() => _sort.Toggle("pid", startDescending: false))" />
+					<SortHeader Label="User" Direction="@(_sort.DirectionOf("user"))" OnSort="@(() => _sort.Toggle("user", startDescending: false))" Class="mta-wide" />
+					<SortHeader Label="CPU" Direction="@(_sort.DirectionOf("cpu"))" OnSort="@(() => _sort.Toggle("cpu", startDescending: true))" />
+					<SortHeader Label="Mem" Direction="@(_sort.DirectionOf("mem"))" OnSort="@(() => _sort.Toggle("mem", startDescending: true))" />
+					<SortHeader Label="NI" Direction="@(_sort.DirectionOf("nice"))" OnSort="@(() => _sort.Toggle("nice", startDescending: false))" Class="mta-wide" />
+					<SortHeader Label="RSS" Direction="@(_sort.DirectionOf("rss"))" OnSort="@(() => _sort.Toggle("rss", startDescending: true))" Class="mta-wide" />
+					<SortHeader Label="Command" Direction="@(_sort.DirectionOf("command"))" OnSort="@(() => _sort.Toggle("command", startDescending: false))" />
 					<span></span>
 				</div>
 				@foreach ((ProcessInfo process, int depth) in shown)

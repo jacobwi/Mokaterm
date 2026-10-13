@@ -88,11 +88,11 @@
 				case "usage":
 					<div class="mta-table" style="--mta-cols: minmax(0, 1.2fr) minmax(0, 1fr) 60px 120px 70px; --mta-cols-narrow: minmax(0, 1fr) 96px 60px">
 						<div class="mta-row mta-row--head">
-							<AdminSortHeader Text="Mounted on" Key="mount" Sort="_sort" OnChanged="StateHasChanged" />
+							<SortHeader Label="Mounted on" Direction="@(_sort.DirectionOf("mount"))" OnSort="@(() => _sort.Toggle("mount", startDescending: false))" />
 							<span class="mta-wide">Source</span>
 							<span class="mta-wide">Type</span>
-							<AdminSortHeader Text="Used" Key="used" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
-							<AdminSortHeader Text="Size" Key="size" Sort="_sort" StartDescending OnChanged="StateHasChanged" />
+							<SortHeader Label="Used" Direction="@(_sort.DirectionOf("used"))" OnSort="@(() => _sort.Toggle("used", startDescending: true))" />
+							<SortHeader Label="Size" Direction="@(_sort.DirectionOf("size"))" OnSort="@(() => _sort.Toggle("size", startDescending: true))" />
 						</div>
 						@foreach (FileSystemUsage item in SortedUsage(snapshot.Usage.Where(item => (_everything || DiskCommands.IsStorage(item)) && (Matches(item.MountPoint) || Matches(item.Source)))))
 						{

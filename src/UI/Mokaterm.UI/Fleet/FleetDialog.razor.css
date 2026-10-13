@@ -125,7 +125,9 @@
 	color: var(--moka-color-on-surface);
 }
 
+/* Visible overflow lets a SortHeader's focus ring show; its label cuts itself off instead. */
 .mt-fleet-table ::deep .mt-fleet-row--head .mt-fleet-cell {
+	overflow: visible;
 	font-size: 10px;
 	color: var(--moka-color-on-surface-tertiary);
 }
@@ -139,6 +141,11 @@
 	display: grid;
 	grid-template-columns: 34px 1fr;
 	gap: var(--moka-spacing-xs);
+}
+
+/* The figure and bar grid would hold the header to the figure's 34px. */
+.mt-fleet-table ::deep .mt-fleet-row--head .mt-fleet-cell--usage {
+	display: flex;
 }
 
 .mt-fleet-table ::deep .mt-fleet-cell--count,

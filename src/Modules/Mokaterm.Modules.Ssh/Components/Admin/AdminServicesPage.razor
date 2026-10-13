@@ -37,9 +37,9 @@
 			<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) 128px 84px 28px; --mta-cols-narrow: 14px minmax(0, 1fr) 84px 28px">
 				<div class="mta-row mta-row--head">
 					<span></span>
-					<AdminSortHeader Text="Service" Key="name" Sort="_sort" OnChanged="ApplyFilter" />
-					<AdminSortHeader Text="State" Key="state" Sort="_sort" OnChanged="ApplyFilter" Class="mta-wide" />
-					<AdminSortHeader Text="At boot" Key="boot" Sort="_sort" OnChanged="ApplyFilter" />
+					<SortHeader Label="Service" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => SortBy("name"))" />
+					<SortHeader Label="State" Direction="@(_sort.DirectionOf("state"))" OnSort="@(() => SortBy("state"))" Class="mta-wide" />
+					<SortHeader Label="At boot" Direction="@(_sort.DirectionOf("boot"))" OnSort="@(() => SortBy("boot"))" />
 					<span></span>
 				</div>
 				@foreach (ServiceUnit unit in Shown.Take(MaxRows))
@@ -291,6 +291,12 @@
 	private void OnStateChanged(string value)
 	{
 		_state = value;
+		ApplyFilter();
+	}
+
+	private void SortBy(string key)
+	{
+		_sort.Toggle(key, startDescending: false);
 		ApplyFilter();
 	}
 

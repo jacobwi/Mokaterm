@@ -30,15 +30,12 @@
 				<tr>
 					@foreach ((StatsColumn column, string text) in Columns)
 					{
-						<th class="@ColumnClass(column)" aria-sort="@AriaSort(column)" @key="column">
-							<button type="button" class="@(column == _sort ? "mt-dks-sort mt-dks-sort--active" : "mt-dks-sort")" @onclick="@(() => SortBy(column))">
-								@text
-								@if (column == _sort)
-								{
-									<MokaIcon Icon="@(_descending ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronUp)" Size="MokaSize.Xs" />
-								}
-							</button>
-						</th>
+						<SortHeader TableCell
+									Label="@text"
+									Class="@ColumnClass(column)"
+									Direction="@DirectionOf(column)"
+									OnSort="@(() => SortBy(column))"
+									@key="column" />
 					}
 				</tr>
 			</thead>

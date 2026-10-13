@@ -143,10 +143,10 @@
 						}
 						<div class="mta-table" style="--mta-cols: 56px minmax(0, 1.2fr) 64px minmax(0, 1fr); --mta-cols-narrow: 48px minmax(0, 1fr) 56px">
 							<div class="mta-row mta-row--head">
-								<AdminSortHeader Text="Proto" Key="proto" Sort="_portSort" OnChanged="StateHasChanged" />
-								<AdminSortHeader Text="Address" Key="address" Sort="_portSort" OnChanged="StateHasChanged" />
-								<AdminSortHeader Text="Port" Key="port" Sort="_portSort" OnChanged="StateHasChanged" />
-								<AdminSortHeader Text="Process" Key="process" Sort="_portSort" OnChanged="StateHasChanged" Class="mta-wide" />
+								<SortHeader Label="Proto" Direction="@(_portSort.DirectionOf("proto"))" OnSort="@(() => _portSort.Toggle("proto", startDescending: false))" />
+								<SortHeader Label="Address" Direction="@(_portSort.DirectionOf("address"))" OnSort="@(() => _portSort.Toggle("address", startDescending: false))" />
+								<SortHeader Label="Port" Direction="@(_portSort.DirectionOf("port"))" OnSort="@(() => _portSort.Toggle("port", startDescending: false))" />
+								<SortHeader Label="Process" Direction="@(_portSort.DirectionOf("process"))" OnSort="@(() => _portSort.Toggle("process", startDescending: false))" Class="mta-wide" />
 							</div>
 							@foreach (ListeningSocket socket in SortedPorts(snapshot.Listening.Where(socket => Matches(socket.Process) || Matches(socket.Address) || Matches(socket.Port.ToString(CultureInfo.InvariantCulture)))))
 							{

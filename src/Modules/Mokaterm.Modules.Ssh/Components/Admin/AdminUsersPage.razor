@@ -34,15 +34,17 @@
 			{
 				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr) 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr) 28px">
 					<div class="mta-row mta-row--head">
-						<AdminSortHeader Text="Group" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
-						<AdminSortHeader Text="GID" Key="id" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+						<SortHeader Label="Group" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
+						<SortHeader Label="GID" Direction="@(_sort.DirectionOf("id"))" OnSort="@(() => _sort.Toggle("id", startDescending: false))" Class="mta-wide" />
 						<span>Members</span>
 						<span></span>
 					</div>
 					@foreach (GroupAccount group in SortedGroups(snapshot.Groups.Where(Matches)))
 					{
+						@* A name can repeat (a local entry and a directory one), and a repeated key ends the page on the
+						   first re-sort, so rows are keyed by name and number. *@
 						<div class="@(group.Name == _selectedGroup && !_addingGroup ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-							 @key="group.Name"
+							 @key="@($"{group.Name}|{group.Gid}")"
 							 role="button"
 							 tabindex="0"
 							 @onclick="@(() => SelectGroup(group.Name))"
@@ -80,8 +82,8 @@
 				{
 					<div class="mta-table" style="@UserColumns">
 						<div class="mta-row mta-row--head">
-							<AdminSortHeader Text="User" Key="name" Sort="_sort" OnChanged="StateHasChanged" />
-							<AdminSortHeader Text="UID" Key="id" Sort="_sort" OnChanged="StateHasChanged" Class="mta-wide" />
+							<SortHeader Label="User" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
+							<SortHeader Label="UID" Direction="@(_sort.DirectionOf("id"))" OnSort="@(() => _sort.Toggle("id", startDescending: false))" Class="mta-wide" />
 							<span class="mta-wide">Shell</span>
 							@if (KnowsPasswords)
 							{
@@ -91,8 +93,9 @@
 						</div>
 						@foreach (UserAccount user in users)
 						{
+							@* Keyed by name and number for the same reason as the groups above. *@
 							<div class="@(user.Name == _selected && !_adding ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-								 @key="user.Name"
+								 @key="@($"{user.Name}|{user.Uid}")"
 								 role="button"
 								 tabindex="0"
 								 @onclick="@(() => Select(user.Name))"

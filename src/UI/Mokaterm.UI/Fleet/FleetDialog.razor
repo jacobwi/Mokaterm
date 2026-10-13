@@ -69,20 +69,67 @@
 							</MokaCallout>
 						}
 
-						<div class="mt-fleet-table" role="grid" aria-label="Saved logins and their machines" aria-rowcount="@(Visible.Count + 1)" @ref="_table">
+						@* While the pointer is on the table the rows hold their places (FleetSort.Hold), so a host that
+						   finishes its read moves to its sorted place once the pointer leaves, not under a click. *@
+						<div class="mt-fleet-table"
+							 role="grid"
+							 aria-label="Saved logins and their machines"
+							 aria-rowcount="@(Visible.Count + 1)"
+							 @onpointerenter="HoldOrder"
+							 @onpointerleave="ReleaseOrder"
+							 @ref="_table">
 							<div class="mt-fleet-row mt-fleet-row--head" role="row">
 								<span class="mt-fleet-cell mt-fleet-cell--pick" role="columnheader"><span class="mt-fleet-sr">Picked</span></span>
-								<span class="mt-fleet-cell mt-fleet-cell--state" role="columnheader">State</span>
-								<span class="mt-fleet-cell mt-fleet-cell--login" role="columnheader">Login</span>
-								<span class="mt-fleet-cell mt-fleet-cell--os" role="columnheader">System</span>
-								<span class="mt-fleet-cell mt-fleet-cell--uptime" role="columnheader">Up</span>
-								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--load" role="columnheader" title="Load average over one minute">Load</span>
-								<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory" role="columnheader">Memory</span>
-								<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk" role="columnheader" title="The fullest real file system">Disk</span>
-								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates" role="columnheader" title="Pending updates the package manager already knows about">Updates</span>
-								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--reboot" role="columnheader">Reboot</span>
-								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed" role="columnheader" title="Failed services">Failed</span>
-								<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker" role="columnheader" title="Running containers of all, when Docker answers this login">Docker</span>
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--state"
+											Label="State"
+											Direction="@DirectionOf(FleetColumn.State)"
+											OnSort="() => SortBy(FleetColumn.State)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--login"
+											Label="Login"
+											Direction="@DirectionOf(FleetColumn.Login)"
+											OnSort="() => SortBy(FleetColumn.Login)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--os"
+											Label="System"
+											Direction="@DirectionOf(FleetColumn.System)"
+											OnSort="() => SortBy(FleetColumn.System)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--uptime"
+											Label="Up"
+											Description="Time since the last boot"
+											Direction="@DirectionOf(FleetColumn.Uptime)"
+											OnSort="() => SortBy(FleetColumn.Uptime)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--load"
+											Label="Load"
+											Description="Load average over one minute"
+											Direction="@DirectionOf(FleetColumn.Load)"
+											OnSort="() => SortBy(FleetColumn.Load)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory"
+											Label="Memory"
+											Direction="@DirectionOf(FleetColumn.Memory)"
+											OnSort="() => SortBy(FleetColumn.Memory)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk"
+											Label="Disk"
+											Description="The fullest real file system"
+											Direction="@DirectionOf(FleetColumn.Disk)"
+											OnSort="() => SortBy(FleetColumn.Disk)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates"
+											Label="Updates"
+											Description="Pending updates the package manager already knows about"
+											Direction="@DirectionOf(FleetColumn.Updates)"
+											OnSort="() => SortBy(FleetColumn.Updates)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--reboot"
+											Label="Reboot"
+											Direction="@DirectionOf(FleetColumn.Reboot)"
+											OnSort="() => SortBy(FleetColumn.Reboot)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed"
+											Label="Failed"
+											Description="Failed services"
+											Direction="@DirectionOf(FleetColumn.Failed)"
+											OnSort="() => SortBy(FleetColumn.Failed)" />
+								<SortHeader Class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker"
+											Label="Docker"
+											Description="Running containers of all, when Docker answers this login"
+											Direction="@DirectionOf(FleetColumn.Docker)"
+											OnSort="() => SortBy(FleetColumn.Docker)" />
 								<span class="mt-fleet-cell mt-fleet-cell--actions" role="columnheader"><span class="mt-fleet-sr">Actions</span></span>
 							</div>
 

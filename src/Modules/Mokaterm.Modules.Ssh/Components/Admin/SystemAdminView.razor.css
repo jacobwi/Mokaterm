@@ -338,26 +338,6 @@
 	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
 }
 
-.mt-admin ::deep .mta-sort {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	min-width: 0;
-	padding: 0;
-	border: 0;
-	background: none;
-	color: inherit;
-	font: inherit;
-	letter-spacing: inherit;
-	text-transform: inherit;
-	cursor: pointer;
-}
-
-.mt-admin ::deep .mta-sort--active,
-.mt-admin ::deep .mta-sort:hover {
-	color: var(--moka-color-on-surface);
-}
-
 .mt-admin ::deep .mta-cell {
 	min-width: 0;
 	overflow: hidden;
