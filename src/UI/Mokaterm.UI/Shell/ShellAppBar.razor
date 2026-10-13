@@ -4,7 +4,7 @@
 					Title="Connections panel"
 					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.ToggleConnections)"
 					Active="@(!Shell.ConnectionsPanelCollapsed)"
-					TooltipPosition="MokaTooltipPosition.Right"
+					TooltipPosition="MokaTooltipPosition.BottomStart"
 					OnClick="Shell.ToggleConnectionsPanel" />
 		<MokaText Element="span" Mono Weight="MokaFontWeight.Semibold" Size="MokaSize.Md" Style="white-space:nowrap">
 			<MokaText Element="span" Mono Color="MokaColor.Primary">&gt;_</MokaText> mokaterm
@@ -40,7 +40,7 @@
 					Title="Settings"
 					Shortcut="@ShellShortcuts.LabelFor(ShellCommandIds.Settings)"
 					Active="Shell.SettingsOpen"
-					TooltipPosition="MokaTooltipPosition.Left"
+					TooltipPosition="MokaTooltipPosition.BottomEnd"
 					OnClick="ToggleSettings" />
 	</EndContent>
 </MokaAppBar>
