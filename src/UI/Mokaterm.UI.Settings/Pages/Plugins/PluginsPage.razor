@@ -37,54 +37,76 @@
 		</MokaCallout>
 	}
 
-	<SettingsSection Title="Installed" Description="@InstalledDescription">
-		<Actions>
-			@if (CanInstall)
-			{
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Sm"
-							StartIcon="MokaIcons.Action.Upload"
-							Loading="_picking"
-							Disabled="Busy"
-							OnClick="PickPackageAsync">
-					Install from file
-				</MokaButton>
-			}
-		</Actions>
-		<ChildContent>
-			@if (plugins.Count == 0)
-			{
-				<MokaEmptyState Icon="MokatermIcons.Plugin" Title="No plugins installed" Description="@EmptyDescription" />
-			}
-			@foreach (PluginRecord plugin in plugins)
-			{
-				<PluginRow @key="plugin.Id"
-						   Plugin="plugin"
-						   CanManage="Plugins.CanInstall"
-						   Busy="Busy"
-						   OnTurnOn="TurnOnAsync"
-						   OnTurnOff="TurnOffAsync"
-						   OnTrust="TrustChangedFilesAsync"
-						   OnRemove="RemoveAsync"
-						   SettingsPageId="@SettingsPageOf(plugin)"
-						   OnOpenSettings="OpenSettings" />
-			}
-		</ChildContent>
-	</SettingsSection>
+	<div class="plugins-views">
+		@if (ShowsBrowse)
+		{
+			<ViewTabs Tabs="Tabs" Active="@_tab" ActiveChanged="ShowTab" Label="Plugin views" IdPrefix="plugins-tab" />
+		}
 
-	<SettingsSection Title="Folder">
-		<SettingsRow Label="Plugins folder" Description="@FolderDescription">
-			<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
-				<MokaText Element="span"
-						  Size="MokaSize.Xs"
-						  Mono
-						  Truncate
-						  Style="@TextStyles.TruncateBox"
-						  title="@Plugins.Directory">@Plugins.Directory</MokaText>
-				<CopyButton Text="@Plugins.Directory" Label="Copy folder path" />
-			</MokaFlexbox>
-		</SettingsRow>
-	</SettingsSection>
+		@if (_tab == InstalledTab)
+		{
+			<div class="plugins-views__panel" role="@(ShowsBrowse ? "tabpanel" : null)" aria-labelledby="@(ShowsBrowse ? "plugins-tab-" + InstalledTab : null)">
+				<SettingsSection Title="Installed" Description="@InstalledDescription">
+					<Actions>
+						@if (CanInstall)
+						{
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Sm"
+										StartIcon="MokaIcons.Action.Upload"
+										Loading="_picking"
+										Disabled="Busy"
+										OnClick="PickPackageAsync">
+								Install from file
+							</MokaButton>
+						}
+					</Actions>
+					<ChildContent>
+						@if (plugins.Count == 0)
+						{
+							<MokaEmptyState Icon="MokatermIcons.Plugin" Title="No plugins installed" Description="@EmptyDescription" />
+						}
+						@foreach (PluginRecord plugin in plugins)
+						{
+							<PluginRow @key="plugin.Id"
+									   Plugin="plugin"
+									   CanManage="Plugins.CanInstall"
+									   Busy="Busy"
+									   OnTurnOn="TurnOnAsync"
+									   OnTurnOff="TurnOffAsync"
+									   OnTrust="TrustChangedFilesAsync"
+									   OnRemove="RemoveAsync"
+									   SettingsPageId="@SettingsPageOf(plugin)"
+									   OnOpenSettings="OpenSettings"
+									   Update="UpdateOf(plugin)"
+									   Withdrawn="WithdrawnOf(plugin)" />
+						}
+					</ChildContent>
+				</SettingsSection>
+
+				<SettingsSection Title="Folder">
+					<SettingsRow Label="Plugins folder" Description="@FolderDescription">
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
+							<MokaText Element="span"
+									  Size="MokaSize.Xs"
+									  Mono
+									  Truncate
+									  Style="@TextStyles.TruncateBox"
+									  title="@Plugins.Directory">@Plugins.Directory</MokaText>
+							<CopyButton Text="@Plugins.Directory" Label="Copy folder path" />
+						</MokaFlexbox>
+					</SettingsRow>
+				</SettingsSection>
+			</div>
+		}
+
+		@* Kept once opened, hidden behind the other tab, so the search and the category survive a look at the list. *@
+		@if (_browseOpened && ShowsBrowse)
+		{
+			<div role="tabpanel" aria-labelledby="@("plugins-tab-" + BrowseTab)" hidden="@(_tab != BrowseTab)">
+				<PluginGalleryView Installed="plugins" Busy="Busy" Downloading="@_downloading" OnInstall="InstallFromGalleryAsync" />
+			</div>
+		}
+	</div>
 </SettingsPage>
 
 <PluginInstallDialog Open="_installOpen" OpenChanged="OnInstallOpenChanged" Package="_package" />

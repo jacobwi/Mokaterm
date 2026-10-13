@@ -23,8 +23,11 @@ public interface IPluginManager
 	event EventHandler? Changed;
 
 	/// <summary>Reads and checks a package without installing it.</summary>
+	/// <param name="package">The <c>.mokaplugin</c> file's bytes.</param>
+	/// <param name="origin">Where the bytes came from, for the install dialog; null for a file the user picked.</param>
+	/// <param name="cancellationToken">Cancels the read.</param>
 	/// <exception cref="InvalidDataException">The file is not a usable plugin package; the message says why.</exception>
-	Task<IPluginPackage> ReadPackageAsync(Stream package, CancellationToken cancellationToken);
+	Task<IPluginPackage> ReadPackageAsync(Stream package, PluginPackageOrigin? origin, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Installs <paramref name="package"/> for the next start. <paramref name="enable"/> turns it on, which for a code

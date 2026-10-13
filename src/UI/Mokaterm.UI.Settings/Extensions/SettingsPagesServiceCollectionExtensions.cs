@@ -108,7 +108,8 @@ public static class SettingsPagesServiceCollectionExtensions
 			Group = SettingsPageGroup.Application,
 			Order = 45,
 			Keywords = "plugins plugin extensions add-ons addons mokaplugin package install from file update enable disable turn on off "
-				+ "remove uninstall trust publisher code data theme pack sha-256 hash checksum safe start restart folder",
+				+ "remove uninstall trust publisher code data theme pack sha-256 hash checksum safe start restart folder "
+				+ "gallery browse community download verified signed signature withdrawn update available source",
 		});
 
 		services.AddSettingsPage(new SettingsPageDescriptor

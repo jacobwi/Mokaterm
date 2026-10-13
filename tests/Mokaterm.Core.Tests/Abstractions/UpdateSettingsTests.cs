@@ -29,12 +29,31 @@ public sealed class UpdateSettingsTests
 		Assert.Equal("", UpdateSettings.NormalizeFeed(feed));
 
 	[Fact]
-	public void Defaults_HaveNoFeedAndCheckAtStartup()
+	public void Defaults_UseTheGitHubReleases_AndCheckAtStartup()
 	{
 		UpdateSettings defaults = new();
 
-		Assert.Equal("", defaults.Feed);
+		Assert.Equal(UpdateSettings.GitHubReleases, defaults.Feed);
+		Assert.Equal(UpdateSettings.GitHubReleases, UpdateSettings.NormalizeFeed(defaults.Feed));
+		Assert.True(UpdateSettings.IsGitHubRepository(defaults.Feed));
 		Assert.True(defaults.CheckAtStartup);
 		Assert.Equal("updates", UpdateSettings.SectionKey);
 	}
+
+	[Theory]
+	[InlineData("https://github.com/jacobwi/Mokaterm", true)]
+	[InlineData("https://github.com/jacobwi/Mokaterm/", true)]
+	[InlineData("  https://GitHub.com/acme/fork  ", true)]
+	[InlineData("https://github.com/jacobwi", false)]
+	[InlineData("https://github.com/jacobwi/Mokaterm/releases", false)]
+	[InlineData("https://github.com/jacobwi/Mokaterm/releases/latest/download", false)]
+	[InlineData("http://github.com/jacobwi/Mokaterm", false)]
+	[InlineData("https://github.com.example.com/jacobwi/Mokaterm", false)]
+	[InlineData("https://github.com/jacobwi/Mokaterm?tab=releases", false)]
+	[InlineData("https://updates.example.com/mokaterm/", false)]
+	[InlineData(@"C:\releases\mokaterm", false)]
+	[InlineData("", false)]
+	[InlineData(null, false)]
+	public void IsGitHubRepository_OnlyARepositoryAddress(string? feed, bool expected) =>
+		Assert.Equal(expected, UpdateSettings.IsGitHubRepository(feed));
 }

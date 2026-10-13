@@ -32,4 +32,7 @@ public interface IPluginPackage : IDisposable
 
 	/// <summary>Why this package cannot be used on this host or this version, or null when it can.</summary>
 	string? Problem { get; }
+
+	/// <summary>Where the package came from, or null for a file the user picked.</summary>
+	PluginPackageOrigin? Origin { get; }
 }

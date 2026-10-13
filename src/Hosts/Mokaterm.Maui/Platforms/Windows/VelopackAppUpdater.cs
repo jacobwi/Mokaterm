@@ -5,13 +5,15 @@ using Mokaterm.Abstractions.Settings;
 using Mokaterm.Maui.Services;
 using Velopack;
 using Velopack.Locators;
+using Velopack.Sources;
 
 namespace Mokaterm.Maui.Platforms.Windows;
 
 /// <summary>
-/// In-app updates through Velopack, against the feed in <see cref="UpdateSettings"/>: an https address or a folder,
-/// which <see cref="UpdateManager"/> tells apart itself. One instance for the whole app, because a downloaded package
-/// belongs to the install and not to a window.
+/// In-app updates through Velopack, against the feed in <see cref="UpdateSettings"/>: a GitHub repository (by default
+/// this project's releases), another https address or a folder, which <see cref="UpdateManager"/> tells apart itself.
+/// One instance for the whole app, because a downloaded package belongs to the install and not to a window. A check
+/// asks the feed for its release list and nothing else; it sends nothing about this machine.
 /// <para>
 /// Velopack only works inside an install: <c>VelopackApp.Build().Run()</c> in the entry point leaves the locator that
 /// finds it behind, and every call throws where there is none. A build run out of <c>bin</c>, and a copied install
@@ -224,7 +226,11 @@ internal sealed class VelopackAppUpdater : IAppUpdater
 			return null;
 		}
 
-		UpdateManager manager = new(feed);
+		// A GitHub repository is read through its release list (the GitHub API): each release carries only its own files,
+		// and the list is how Velopack finds the full package a smaller delta update is built against.
+		UpdateManager manager = UpdateSettings.IsGitHubRepository(feed)
+			? new UpdateManager(new GithubSource(feed, accessToken: null, prerelease: false))
+			: new UpdateManager(feed);
 		return manager.IsInstalled ? manager : null;
 	}
 

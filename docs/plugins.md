@@ -10,7 +10,8 @@ planned.
 - **What they add**: protocols, server tools, utility tools, Docker manager pages, System view pages, themes.
 - **Code runs in-process**, behind a trust step. A separate process would not protect the vault (same user, same
   files), so it is not worth what it costs in UI.
-- **Installed from a file the user picks.** A gallery comes later, and the package format is ready for it.
+- **Installed from a file the user picks, or from the gallery** (the Plugins page's Browse tab, desktop only), which
+  hands the same install dialog the same package.
 - **Hosts**: the desktop app installs from Settings. The web host loads only what the operator put in its plugins folder
   and lists it read-only, because there the code runs on the server. A plugin names the hosts it supports, the way serial
   and the local shell are desktop only.
@@ -185,7 +186,8 @@ dotnet new mokaterm-plugin -n Acme.Proxmox --kind system-page --publisher "Acme"
 "Plugins" in the Application group: each plugin with its name, version, publisher, a CODE or DATA chip, the hosts it
 supports, its themes and its state (on, off, failed, files changed, not compatible, skipped) with the reason, plus what
 the next start changes. Actions: install from file, turn on or off, trust new files, remove, and "Restart now" on the
-desktop. On the web host the list is read-only and names the operator's folder.
+desktop. Where a gallery is registered (the desktop) the list is the Installed tab and the gallery is the Browse tab.
+On the web host the list is read-only, names the operator's folder and has no tabs.
 
 ## Store
 
@@ -194,8 +196,9 @@ MSIX build, and the Store build restarts through the platform.
 
 ## Community plugins: the gallery
 
-Planned. Everything lives on GitHub, with no server of ours: a gallery repository, GitHub Actions to build and check,
-Releases for the packages and Pages for the index. Homebrew and Scoop run the same way.
+Everything lives on GitHub, with no server of ours: a gallery repository, GitHub Actions to build and check, Releases
+for the packages and Pages for the index. Homebrew and Scoop run the same way. The app's side (the Browse tab, the
+signature check and the update chips) is built; the index format is `docs/index-format.md` in the gallery repository.
 
 **Submitting.** An author adds a plugin, or a new version, with a pull request to the gallery repository
 (`jacobwi/mokaterm-plugins`) holding one small file per plugin:
@@ -226,15 +229,40 @@ categories, the source commit, and any version withdrawn) to GitHub Pages and si
 half is built into the app. A compromised repository, account or CDN cannot swap a package without the signature
 failing. Our own plugins are signed the same way and show as verified.
 
-**In the app.** A Browse tab on the Plugins page (desktop only; the web host lists, since its operator copies files by
-hand):
+**In the app.** A Browse tab on the Plugins page, beside Installed. Only the desktop host registers the gallery
+(`AddPluginGallery`), so the web host, whose operator copies files by hand, has no tab and asks nothing of GitHub.
 
-- The index is fetched only when the tab is opened, never in the background, so nothing leaves the machine unasked.
-- Plugins by category and search, with the verified badge and a link to the source.
-- Install downloads the package, checks its SHA-256 and the index signature, and then opens the same install dialog as
-  a file does, adding "built from acme/mokaterm-proxmox at 9f2c4e1". The trust step does not change.
-- An installed plugin shows "Update available" when the index has a newer version built for this Mokaterm, and a
-  warning when its version was withdrawn.
+- The index is fetched only when the tab is opened, never in the background, so nothing leaves the machine unasked. The
+  tab says which host it asks. A window keeps what it read until Refresh; nothing is kept across starts.
+- Plugins by category and search, each on a card with its publisher, license, the verified badge, CODE or DATA, the
+  hosts, a link to the source and Install, Update or Installed.
+- Install downloads the package, checks it against the signed index and then opens the same install dialog as a file
+  does, adding "From the Mokaterm gallery, built from https://github.com/acme/mokaterm-proxmox at 9f2c4e1". The trust
+  step does not change.
+- Once the tab read the index, an installed plugin shows "Update available" when the index has a newer version built
+  for this Mokaterm, and a warning with the gallery's reason when its version was withdrawn.
+
+**Checks.** Requests carry a `Mokaterm/<version>` user agent and nothing else (no cookies, no referrer).
+
+1. `index.json` (at most 4 MiB) and `index.json.sig` (at most 1 KiB) are read over https, each wait limited to 30
+   seconds.
+2. The signature (88 characters of base64, a final newline allowed) is checked with Ed25519 over the exact bytes
+   against every key in `PluginGalleryKeys` before any field is read. A missing or wrong signature refuses the whole
+   list. The app carries a list of keys so a new one can ship a release before the gallery signs with it.
+3. The list is read with the format's limits (2000 plugins, 100 versions each, 1000 characters a text field, ids by
+   the plugin id rule, https addresses, lower-case hashes and commits). A field that breaks a rule refuses the whole
+   list, since the gallery's own workflow signed it. `format` above 1 asks for an update of Mokaterm.
+4. A version is offered only when this build loads its `sdk` (data loads on any), the plugin names this host (or none)
+   and it is not withdrawn. A card with nothing offered says why.
+5. A download is https only, stops past the size the index lists (and 64 MiB), must be exactly that size and match its
+   SHA-256, then goes through `IPluginManager.ReadPackageAsync` like a picked file. The package's id, version and code
+   or data must match the entry.
+
+`MOKATERM_GALLERY_INDEX` points the desktop app at another copy of the index (a preview, a mirror), which still has to
+carry a production signature. The DevHost serves a demo gallery from memory, signed at start with a key made for that
+run (the only place a key beside the production ones is trusted), listing the sample plugin's package when it is
+built, a theme pack in two versions with the older withdrawn, and two plugins that do not fit the host;
+`Mokaterm:Gallery:Index` points it at a real gallery instead.
 
 **Order of work.**
 
@@ -242,7 +270,7 @@ hand):
    tag publishes them).
 2. PublicApiAnalyzers on Abstractions and UI.Common, so the surface plugins build against only changes on purpose.
 3. The gallery repository: submission format, build and check workflow, the signing key kept as a GitHub secret.
-4. The Browse tab, signature check and update chips in the app.
+4. The Browse tab, signature check and update chips in the app (built).
 
 GitHub topic search (every repository tagged `mokaterm-plugin`) is not the source of truth: it has no hashes, no
 review and a low rate limit. It could later list unreviewed plugins behind a clear warning.
@@ -263,7 +291,7 @@ review and a low rate limit. It could later list unreviewed plugins behind a cle
 - Script tools: a System or Docker page described by a manifest (scripts, how to read their output into a list, actions
   on a row) and drawn by one built-in component. Nothing runs on the user's machine, which is what makes them the right
   format for community plugins.
-- The gallery (see Community plugins above).
+- The gallery repository and its workflow (see Community plugins above; the app's side is built).
 - A credential source extension point (1Password and Bitwarden CLIs, KeePass).
 - PublicApiAnalyzers on Abstractions and UI.Common.
 
@@ -277,6 +305,11 @@ review and a low rate limit. It could later list unreviewed plugins behind a cle
   in the System view; plugin pages rely on that without a declared contract.
 - A plugin page that throws trips the whole tool's error boundary, so "Try again" restarts the tool, not the page.
 - The file picker offers every file type, not only `.mokaplugin`.
+- The gallery has not read a real index yet: the production one does not exist, so the client is covered by tests with
+  indexes signed by test keys and was tried in the DevHost against its demo gallery and against the production address
+  (a 404). Downloads follow GitHub's redirect to its storage host, which no test has done for real. Switching away from
+  the Plugins page cancels a download that is still running, and an update that waits for the next start shows as
+  "Waits for restart" with no version, because the pending folder's version is not on the record.
 - Installing a real package through the page's file picker has not been run in an app yet. The manager's install is
   covered by tests with the sample package, the dialog was tried against a fake manager, and the DevHost's picker hands
   back canned files; the DevHost shows installed plugins when their folder and `plugins.json` are put in place.

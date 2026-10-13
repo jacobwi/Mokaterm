@@ -25,7 +25,7 @@ internal sealed class FakePluginManager : IPluginManager
 	/// <summary>Every change asked for, as <c>install id on</c>, <c>enable id off</c> or <c>remove id</c>.</summary>
 	public IReadOnlyList<string> Calls => _calls;
 
-	public Task<IPluginPackage> ReadPackageAsync(Stream package, CancellationToken cancellationToken) =>
+	public Task<IPluginPackage> ReadPackageAsync(Stream package, PluginPackageOrigin? origin, CancellationToken cancellationToken) =>
 		throw new NotSupportedException();
 
 	public Task InstallAsync(IPluginPackage package, bool enable, CancellationToken cancellationToken)

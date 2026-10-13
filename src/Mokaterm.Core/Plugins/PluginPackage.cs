@@ -21,9 +21,16 @@ internal sealed class PluginPackage : IPluginPackage
 	private readonly Dictionary<string, byte[]> _contents;
 	private bool _disposed;
 
-	private PluginPackage(PluginManifest manifest, Dictionary<string, byte[]> contents, List<PluginPackageFile> files, string? installedVersion, string? problem)
+	private PluginPackage(
+		PluginManifest manifest,
+		Dictionary<string, byte[]> contents,
+		List<PluginPackageFile> files,
+		string? installedVersion,
+		string? problem,
+		PluginPackageOrigin? origin)
 	{
 		Manifest = manifest;
+		Origin = origin;
 		_contents = contents;
 		Files = files;
 		Hash = PluginHash.Combine(files);
@@ -58,11 +65,14 @@ internal sealed class PluginPackage : IPluginPackage
 
 	public string? Problem { get; }
 
+	public PluginPackageOrigin? Origin { get; }
+
 	/// <summary>Reads and checks a package.</summary>
 	/// <param name="installedVersion">The version installed under an id, or null when none is.</param>
 	/// <param name="hostName">This host's name in <see cref="PluginHosts"/>.</param>
+	/// <param name="origin">Where the data came from, or null for a file the user picked.</param>
 	/// <exception cref="InvalidDataException">The data is not a usable package; the message is for the user.</exception>
-	public static PluginPackage Read(byte[] data, Func<string, string?> installedVersion, string hostName)
+	public static PluginPackage Read(byte[] data, Func<string, string?> installedVersion, string hostName, PluginPackageOrigin? origin = null)
 	{
 		ArgumentNullException.ThrowIfNull(data);
 		ArgumentNullException.ThrowIfNull(installedVersion);
@@ -118,7 +128,7 @@ internal sealed class PluginPackage : IPluginPackage
 		}
 
 		files.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
-		return new PluginPackage(manifest, contents, files, installedVersion(manifest.Id), PluginCompatibility.Problem(manifest, hostName));
+		return new PluginPackage(manifest, contents, files, installedVersion(manifest.Id), PluginCompatibility.Problem(manifest, hostName), origin);
 	}
 
 	/// <summary>Writes every file under <paramref name="folder"/>, which must not exist yet.</summary>

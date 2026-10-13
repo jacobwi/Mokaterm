@@ -1,0 +1,65 @@
+.plugin-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	padding: var(--moka-spacing-md) var(--moka-spacing-lg);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+	transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.plugin-card:hover {
+	border-color: var(--moka-color-primary-border);
+	background: var(--moka-color-surface-hover);
+}
+
+.plugin-card__head,
+.plugin-card__by {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* Long descriptions stop after three lines; the card is a summary, the source is the full story. */
+::deep .plugin-card__description {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+}
+
+.plugin-card__facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xxs);
+}
+
+::deep .plugin-card__unavailable {
+	color: var(--moka-color-warning);
+}
+
+.plugin-card__foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-xs);
+	margin-top: auto;
+	padding-top: var(--moka-spacing-xs);
+}
+
+.plugin-card__state {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	color: var(--moka-color-on-surface-variant);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}

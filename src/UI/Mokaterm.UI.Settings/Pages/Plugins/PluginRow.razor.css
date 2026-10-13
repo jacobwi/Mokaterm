@@ -56,6 +56,30 @@
 	color: var(--moka-color-on-surface);
 }
 
+/* The gallery has something newer: an accent chip with the glow a status carries, not a button, since Browse installs. */
+.plugin-row__update {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px var(--moka-spacing-xs);
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-primary-glow-faint);
+	color: var(--moka-color-primary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	box-shadow: 0 0 8px var(--moka-color-primary-glow);
+}
+
+.plugin-row__withdrawn {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--moka-spacing-xs);
+	color: var(--moka-color-warning);
+}
+
 /* Beside the text on a wide row, under it on a narrow one, and then lined up with the text rather than the edge. */
 .plugin-row__actions {
 	display: flex;

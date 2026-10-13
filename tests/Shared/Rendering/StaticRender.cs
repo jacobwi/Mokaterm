@@ -32,6 +32,25 @@ internal static class StaticRender
 	}
 
 	/// <summary>
+	/// What a component shows before its asynchronous work settles, such as a loading state, without waiting for that work:
+	/// the components are disposed as the renderer goes, which cancels whatever they were waiting on.
+	/// </summary>
+	public static async Task<string> RenderUnsettledAsync<TComponent>(Action<IServiceCollection> configure, Dictionary<string, object?> parameters)
+		where TComponent : IComponent
+	{
+		ServiceCollection services = new();
+		services.AddLogging();
+		services.AddScoped<IJSRuntime, IdleJsRuntime>();
+		configure(services);
+		await using ServiceProvider provider = services.BuildServiceProvider();
+		await using AsyncServiceScope scope = provider.CreateAsyncScope();
+		await using HtmlRenderer renderer = new(scope.ServiceProvider, provider.GetRequiredService<ILoggerFactory>());
+
+		return await renderer.Dispatcher.InvokeAsync(() =>
+			renderer.BeginRenderingComponent<TComponent>(ParameterView.FromDictionary(parameters)).ToHtmlString());
+	}
+
+	/// <summary>
 	/// Static rendering never reaches a browser. Like the runtime Blazor itself uses there, every call throws
 	/// <see cref="InvalidOperationException"/>, which components (Moka.Red's dialog among them) read as "no JavaScript yet".
 	/// </summary>

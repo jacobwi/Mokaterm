@@ -29,6 +29,8 @@ internal sealed class FakePluginPackage : IPluginPackage
 
 	public string? Problem { get; init; }
 
+	public PluginPackageOrigin? Origin { get; init; }
+
 	public bool IsDisposed { get; private set; }
 
 	public void Dispose() => IsDisposed = true;

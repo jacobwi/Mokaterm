@@ -17,6 +17,9 @@ internal static class PluginDisplay
 		"A plugin that runs code has the same access as Mokaterm, including the vault while it is unlocked and every open "
 		+ "session. Only turn one on if you trust whoever made it.";
 
+	/// <summary>What the gallery's verified badge means.</summary>
+	public const string VerifiedTitle = "Built from source in the gallery's own repository and reviewed by the Mokaterm team.";
+
 	public static string Kind(bool hasCode) => hasCode ? "CODE" : "DATA";
 
 	/// <summary>Code gets the accent because it is what the trust step is about; data runs nothing.</summary>
@@ -118,9 +121,47 @@ internal static class PluginDisplay
 			return $"Version {version} is already installed. Installing replaces its files.";
 		}
 
-		return IsOlder(version, installed)
+		return PluginVersions.Compare(version, installed) < 0
 			? $"Goes back from {installed} to {version}."
 			: $"Updates {installed} to {version}.";
+	}
+
+	/// <summary>The line the install dialog shows for a package from the gallery.</summary>
+	public static string Origin(PluginPackageOrigin origin)
+	{
+		ArgumentNullException.ThrowIfNull(origin);
+		return $"From the Mokaterm gallery, built from {origin.Source} at {ShortCommit(origin.Commit)}";
+	}
+
+	/// <summary>A commit as git shortens it, for text; the full one goes in a title.</summary>
+	public static string ShortCommit(string commit) => commit.Length > 7 ? commit[..7] : commit;
+
+	/// <summary>A gallery category in words. One the gallery added after this build reads as its own name.</summary>
+	public static string Category(string id) => id switch
+	{
+		"protocols" => "Protocols",
+		"server-tools" => "Server tools",
+		"docker" => "Docker",
+		"utilities" => "Utilities",
+		"security" => "Security",
+		"themes" => "Themes",
+		_ => id.Length == 0 ? id : char.ToUpperInvariant(id[0]) + id[1..].Replace('-', ' '),
+	};
+
+	/// <summary>The categories an index uses, the known ones in a fixed order and any newer ones after them.</summary>
+	public static IReadOnlyList<string> Categories(IEnumerable<PluginGalleryEntry> plugins)
+	{
+		ArgumentNullException.ThrowIfNull(plugins);
+		HashSet<string> used = new(plugins.SelectMany(plugin => plugin.Categories), StringComparer.Ordinal);
+		string[] known = ["protocols", "server-tools", "docker", "utilities", "security", "themes"];
+		return [.. known.Where(used.Contains), .. used.Except(known, StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+	}
+
+	/// <summary>The warning an installed version the gallery withdrew carries, with the gallery's reason.</summary>
+	public static string Withdrawn(PluginGalleryVersion version)
+	{
+		ArgumentNullException.ThrowIfNull(version);
+		return $"Version {version.Version} was withdrawn from the gallery. {version.Withdrawn}";
 	}
 
 	/// <summary>
@@ -149,14 +190,4 @@ internal static class PluginDisplay
 		string.Equals(host, PluginHosts.Desktop, StringComparison.OrdinalIgnoreCase) ? "Desktop"
 		: string.Equals(host, PluginHosts.Web, StringComparison.OrdinalIgnoreCase) ? "Web"
 		: host.Trim();
-
-	// Only a plain dotted version is compared; anything else reads as an update rather than a wrong "goes back".
-	private static bool IsOlder(string candidate, string than) =>
-		Version.TryParse(Core(candidate), out Version? a) && Version.TryParse(Core(than), out Version? b) && a < b;
-
-	private static string Core(string version)
-	{
-		int end = version.IndexOfAny(['-', '+']);
-		return (end < 0 ? version : version[..end]).Trim();
-	}
 }

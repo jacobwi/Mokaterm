@@ -40,5 +40,13 @@ public sealed partial class PluginRow : ComponentBase
 	[Parameter]
 	public EventCallback<string> OnOpenSettings { get; set; }
 
+	/// <summary>A newer version the gallery offers, once this window read the gallery's list; otherwise null.</summary>
+	[Parameter]
+	public PluginGalleryVersion? Update { get; set; }
+
+	/// <summary>The installed version as the gallery lists it when the gallery withdrew it; otherwise null.</summary>
+	[Parameter]
+	public PluginGalleryVersion? Withdrawn { get; set; }
+
 	private bool Manages => CanManage && Plugin.Pending != PluginPendingChange.Remove;
 }

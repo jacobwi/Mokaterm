@@ -1,0 +1,48 @@
+.plugin-gallery {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.plugin-gallery__notice {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+/* Takes the line, so Refresh sits at its far end. */
+.plugin-gallery__notice-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.plugin-gallery__filters {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.plugin-gallery__categories {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xs);
+}
+
+.plugin-gallery__cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+.plugin-gallery__loading {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-xl) 0;
+}

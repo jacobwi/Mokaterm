@@ -19,6 +19,13 @@
 							   Color="PluginDisplay.StatusColor(plugin.Status)"
 							   Glow="PluginDisplay.StatusGlows(plugin.Status)" />
 			</span>
+			@if (Update is { } update)
+			{
+				<span class="plugin-row__update" title="@($"The gallery offers {plugin.Name} {update.Version}. Update it from the Browse tab.")">
+					<MokaIcon Icon="MokatermIcons.Download" SizeValue="11px" />
+					Update available: @update.Version
+				</span>
+			}
 		</div>
 
 		<div class="plugin-row__by">
@@ -45,6 +52,14 @@
 		@if (!string.IsNullOrWhiteSpace(plugin.Problem))
 		{
 			<MokaText Element="div" Size="MokaSize.Xs" Style="@($"color:{PluginDisplay.ProblemColor(plugin.Status)}")">@plugin.Problem</MokaText>
+		}
+
+		@if (Withdrawn is { } withdrawn)
+		{
+			<div class="plugin-row__withdrawn" role="note">
+				<MokaIcon Icon="MokaIcons.Status.Warning" SizeValue="12px" />
+				<MokaText Element="span" Size="MokaSize.Xs" Style="color: var(--moka-color-warning)">@PluginDisplay.Withdrawn(withdrawn)</MokaText>
+			</div>
 		}
 
 		@if (PluginDisplay.PendingText(plugin) is { } pending)

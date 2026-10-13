@@ -291,6 +291,6 @@ public sealed class PluginCatalogTests
 	private static async Task<IPluginPackage> ReadAsync(PluginManager manager, IReadOnlyDictionary<string, string> files)
 	{
 		using MemoryStream stream = new(TestPlugins.Zip(files));
-		return await manager.ReadPackageAsync(stream, Ct);
+		return await manager.ReadPackageAsync(stream, origin: null, Ct);
 	}
 }

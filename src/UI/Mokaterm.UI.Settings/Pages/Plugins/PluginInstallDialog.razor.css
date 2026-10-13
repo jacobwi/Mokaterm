@@ -32,6 +32,17 @@
 	background: var(--moka-color-primary-glow-faint);
 }
 
+/* Where a gallery package was built from: what the gallery vouches for, read before the files below. */
+.plugin-install__origin {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--moka-color-on-surface-variant);
+}
+
 .plugin-install__facts {
 	display: grid;
 	grid-template-columns: max-content minmax(0, 1fr);

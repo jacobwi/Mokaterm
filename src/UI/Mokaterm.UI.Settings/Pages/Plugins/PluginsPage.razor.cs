@@ -11,9 +11,10 @@ using Mokaterm.UI.Common.Platform;
 namespace Mokaterm.UI.Settings.Pages.Plugins;
 
 /// <summary>
-/// Installed plugins and what the next start does with them: installing from a file, turning on and off, trusting
-/// changed files and removing. Every change waits for a restart, so the page says what is pending rather than pretending
-/// it already happened. On a host that cannot install (the web host, where code would run on the server) it only lists.
+/// Installed plugins and what the next start does with them: installing from a file or from the gallery, turning on and
+/// off, trusting changed files and removing. Every change waits for a restart, so the page says what is pending rather
+/// than pretending it already happened. On a host that cannot install (the web host, where code would run on the server)
+/// it only lists, and there is no Browse tab.
 /// </summary>
 public sealed partial class PluginsPage : ComponentBase, IDisposable
 {
@@ -21,8 +22,17 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	// so a wrong pick (a disk image renamed by mistake) is refused rather than read.
 	private const long MaxPackageBytes = 64L * 1024 * 1024;
 
+	private const string InstalledTab = "installed";
+	private const string BrowseTab = "browse";
+
+	private static readonly IReadOnlyList<(string Id, string Text)> Tabs = [(InstalledTab, "Installed"), (BrowseTab, "Browse")];
+
 	private readonly CancellationTokenSource _lifetime = new();
+	private IPluginGallery? _gallery;
 	private IPluginPackage? _package;
+	private string _tab = InstalledTab;
+	private bool _browseOpened;
+	private string? _downloading;
 	private bool _installOpen;
 	private bool _picking;
 	private bool _changing;
@@ -52,7 +62,10 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 
 	private bool CanInstall => Plugins.CanInstall && Files is not null;
 
-	private bool Busy => _picking || _changing;
+	private bool Busy => _picking || _changing || _downloading is not null;
+
+	// The gallery installs, so a host whose plugins are the operator's has no Browse tab even when one is registered.
+	private bool ShowsBrowse => _gallery is not null && Plugins.CanInstall;
 
 	private IReadOnlyList<PluginRecord> Listed =>
 	[
@@ -82,11 +95,26 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 
 		_disposed = true;
 		Plugins.Changed -= OnPluginsChanged;
+		if (_gallery is not null)
+		{
+			_gallery.Changed -= OnPluginsChanged;
+		}
+
 		_lifetime.Cancel();
 		_lifetime.Dispose();
 	}
 
-	protected override void OnInitialized() => Plugins.Changed += OnPluginsChanged;
+	protected override void OnInitialized()
+	{
+		Plugins.Changed += OnPluginsChanged;
+
+		// Rows mark updates from the list once the Browse tab read it, so a read there redraws them here.
+		_gallery = Services.GetService<IPluginGallery>();
+		if (_gallery is not null)
+		{
+			_gallery.Changed += OnPluginsChanged;
+		}
+	}
 
 	private void OnPluginsChanged(object? sender, EventArgs e) => _ = InvokeAsync(StateHasChanged);
 
@@ -102,6 +130,63 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 
 	private void OpenSettings(string pageId) => Services.GetService<ISettingsNavigator>()?.Open(pageId);
 
+	private void ShowTab(string tab)
+	{
+		_tab = tab;
+		_browseOpened |= tab == BrowseTab;
+	}
+
+	/// <summary>A newer version the gallery offers for an installed plugin, once this window read the gallery's list.</summary>
+	private PluginGalleryVersion? UpdateOf(PluginRecord plugin) =>
+		_gallery?.Current?.Find(plugin.Id) is { } entry && PluginGalleryOffer.For(entry, plugin) is { Kind: PluginGalleryOfferKind.Update } offer
+			? offer.Version
+			: null;
+
+	/// <summary>The installed version as the gallery lists it when the gallery withdrew it.</summary>
+	private PluginGalleryVersion? WithdrawnOf(PluginRecord plugin) =>
+		plugin.Pending != PluginPendingChange.Remove && _gallery?.Current?.Find(plugin.Id) is { } entry ? entry.WithdrawnFor(plugin.Version) : null;
+
+	private async Task InstallFromGalleryAsync(PluginGalleryEntry plugin)
+	{
+		if (Busy || _disposed || _gallery is not { } gallery || plugin.Newest is not { } version)
+		{
+			return;
+		}
+
+		_downloading = plugin.Id;
+		try
+		{
+			IPluginPackage package = await gallery.DownloadAsync(plugin, version, _lifetime.Token);
+			if (_disposed)
+			{
+				package.Dispose();
+				return;
+			}
+
+			// The same dialog a picked file opens, which owns the package from here and disposes it when it closes.
+			_package = package;
+			_installOpen = true;
+		}
+		catch (OperationCanceledException) when (_disposed)
+		{
+			// The page went away while the package was downloading.
+		}
+		catch (PluginGalleryException ex)
+		{
+			Logger.LogWarning("Downloading a plugin from the gallery failed: {Failure}", LogSafe.Describe(ex));
+			Interaction.Notify(NoticeSeverity.Error, ex.Message, $"{plugin.Name} could not be downloaded");
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogError(ex, "Downloading a plugin from the gallery failed");
+			Interaction.Notify(NoticeSeverity.Error, "Try again in a moment.", $"{plugin.Name} could not be downloaded");
+		}
+		finally
+		{
+			_downloading = null;
+		}
+	}
+
 	private async Task PickPackageAsync()
 	{
 		if (Busy || !Plugins.CanInstall || Files is not { } files)
@@ -116,7 +201,7 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 				files,
 				MaxPackageBytes,
 				"a plugin package",
-				(stream, token) => Plugins.ReadPackageAsync(stream, token),
+				(stream, token) => Plugins.ReadPackageAsync(stream, origin: null, token),
 				_lifetime.Token);
 
 			if (picked.Error is { } refusal)

@@ -1,24 +1,15 @@
-@namespace Mokaterm.Modules.Ssh.Components.Docker
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Mokaterm.UI.Common.Interop;
 
-@* Micro-label tabs: text and a glowing underline for the open one, no boxes. Arrow keys move between them. *@
-<div class="mt-dk-tabs" role="tablist" aria-label="@Label">
-	@foreach ((string id, string text) in Tabs)
-	{
-		<button type="button"
-				@key="id"
-				@ref="_buttons[id]"
-				role="tab"
-				class="@(id == Active ? "mt-dk-tab mt-dk-tab--active" : "mt-dk-tab")"
-				aria-selected="@(id == Active ? "true" : "false")"
-				tabindex="@(id == Active ? 0 : -1)"
-				@onclick="@(() => SelectAsync(id))"
-				@onkeydown="@(args => OnKeyDownAsync(args, id))">
-			@text
-		</button>
-	}
-</div>
+namespace Mokaterm.UI.Common.Components;
 
-@code {
+/// <summary>
+/// A row of tabs that switch the view below them: the Docker manager's container and project panels, the Plugins page.
+/// The parent draws the view for <see cref="Active"/>; a panel can name its tab through <see cref="TabId"/>.
+/// </summary>
+public sealed partial class ViewTabs : ComponentBase
+{
 	private readonly Dictionary<string, ElementReference> _buttons = new(StringComparer.Ordinal);
 	private string? _focus;
 
@@ -35,6 +26,16 @@
 	[Parameter]
 	public string Label { get; set; } = "Views";
 
+	/// <summary>
+	/// Prefixes the tab buttons' element ids, so a panel can point at its tab with <c>aria-labelledby</c>. Without it the
+	/// buttons carry no id.
+	/// </summary>
+	[Parameter]
+	public string? IdPrefix { get; set; }
+
+	/// <summary>The element id of a tab's button, or null when no <see cref="IdPrefix"/> was given.</summary>
+	public string? TabId(string id) => IdPrefix is null ? null : $"{IdPrefix}-{id}";
+
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
 		if (_focus is { } id && _buttons.TryGetValue(id, out ElementReference button))
@@ -44,7 +45,7 @@
 			{
 				await button.FocusAsync();
 			}
-			catch (Exception ex) when (Mokaterm.UI.Common.Interop.JsModule.IsExpected(ex))
+			catch (Exception ex) when (JsModule.IsExpected(ex))
 			{
 				// The tab went away with the page; there is nothing to focus.
 			}

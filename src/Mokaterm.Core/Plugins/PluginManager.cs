@@ -37,7 +37,7 @@ internal sealed class PluginManager : IPluginManager, IDisposable
 
 	public void Dispose() => _gate.Dispose();
 
-	public async Task<IPluginPackage> ReadPackageAsync(Stream package, CancellationToken cancellationToken)
+	public async Task<IPluginPackage> ReadPackageAsync(Stream package, PluginPackageOrigin? origin, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(package);
 		using MemoryStream copy = new();
@@ -54,7 +54,7 @@ internal sealed class PluginManager : IPluginManager, IDisposable
 		}
 
 		string hostName = PluginHosts.For(_catalog.Options.Host);
-		return PluginPackage.Read(copy.ToArray(), InstalledVersion, hostName);
+		return PluginPackage.Read(copy.ToArray(), InstalledVersion, hostName, origin);
 	}
 
 	public async Task InstallAsync(IPluginPackage package, bool enable, CancellationToken cancellationToken)

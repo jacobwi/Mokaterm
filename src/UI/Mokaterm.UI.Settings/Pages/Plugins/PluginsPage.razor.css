@@ -1,0 +1,14 @@
+.plugins-views {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-lg);
+	min-width: 0;
+}
+
+/* The sections keep the gap the settings page puts between its own sections. */
+.plugins-views__panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxl);
+	min-width: 0;
+}

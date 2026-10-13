@@ -4,6 +4,7 @@ using Microsoft.Maui.Platform;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
 using Mokaterm.Core.Plugins;
+using Mokaterm.Core.Plugins.Gallery;
 using Mokaterm.Maui.Services;
 using Mokaterm.Maui.ToolWindows;
 using Mokaterm.Modules.Ftp;
@@ -55,6 +56,10 @@ public static class MauiProgram
 			SkipAll = PluginCatalogOptions.SkipAllRequested(),
 		});
 		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddPlugins(plugins));
+
+		// The Plugins page's Browse tab. Nothing is fetched until it opens. MOKATERM_GALLERY_INDEX can point it at another
+		// copy of the list, which still needs a production signature.
+		builder.Services.AddPluginGallery(PluginGalleryOptions.FromEnvironment());
 		builder.Services.AddMokatermSessions();
 		builder.Services.AddMokatermUI();
 

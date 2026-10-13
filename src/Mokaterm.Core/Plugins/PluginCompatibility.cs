@@ -13,22 +13,41 @@ public static class PluginCompatibility
 	/// <summary>This build's plugin version, from the contracts assembly plugins compile against.</summary>
 	public static Version HostSdk { get; } = ReadHostSdk();
 
+	/// <summary>This build's plugin version in words: "0.2" while on 0.x, "1.x" from 1.0.</summary>
+	internal static string HostSdkText => Describe(HostSdk);
+
 	/// <summary>Why a plugin cannot run here, in a sentence for the user, or null when it can.</summary>
 	internal static string? Problem(PluginManifest manifest, string hostName)
 	{
-		if (manifest.Hosts.Count > 0 && !manifest.Hosts.Contains(hostName))
+		if (HostProblem(manifest.Hosts, hostName) is { } host)
 		{
-			return hostName == PluginHosts.Web ? "This plugin is for the desktop app only." : "This plugin is for the web app only.";
+			return host;
 		}
 
-		// Data needs no particular version: a theme reads the same in every build.
-		if (manifest.HasCode && TryParseSdk(manifest.Sdk, out Version? sdk) && !Matches(sdk))
+		if (!Loads(manifest.HasCode, manifest.Sdk) && TryParseSdk(manifest.Sdk, out Version? sdk))
 		{
 			return $"This plugin was built for Mokaterm {Describe(sdk)}, and this is Mokaterm {Describe(HostSdk)}. It needs a version built for this one.";
 		}
 
 		return null;
 	}
+
+	/// <summary>Why a plugin that names <paramref name="hosts"/> is not for this host, or null when it is.</summary>
+	internal static string? HostProblem(IReadOnlyList<string> hosts, string hostName)
+	{
+		if (hosts.Count == 0 || hosts.Contains(hostName))
+		{
+			return null;
+		}
+
+		return hostName == PluginHosts.Web ? "This plugin is for the desktop app only." : "This plugin is for the web app only.";
+	}
+
+	/// <summary>
+	/// True when this build loads a plugin built against <paramref name="sdk"/>. Data needs no particular version: a theme
+	/// reads the same in every build.
+	/// </summary>
+	internal static bool Loads(bool hasCode, string? sdk) => !hasCode || TryParseSdk(sdk, out Version? version) && Matches(version);
 
 	internal static bool TryParseSdk(string? text, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Version? version)
 	{

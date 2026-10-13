@@ -68,7 +68,7 @@
 
 	<SettingsSection Title="Feed">
 		<SettingsRow Label="Feed location"
-					 Description="An https address or a full path to a folder with the release files. Leave it empty to turn updates off."
+					 Description="Mokaterm's GitHub releases by default. Also takes another https address or a full path to a folder with the release files. Leave it empty to turn updates off; Reset to defaults brings GitHub back."
 					 ControlWidth="340px">
 			<TextSetting Value="@settings.Feed"
 						 ValueChanged="SetFeedAsync"
@@ -77,7 +77,7 @@
 						 Placeholder="Updates are off"
 						 AriaLabel="Update feed location" />
 		</SettingsRow>
-		<SettingsRow Label="Check at startup" Description="Look for a new version shortly after the app starts and show a notice when there is one.">
+		<SettingsRow Label="Check at startup" Description="Look for a new version shortly after the app starts and show a notice when there is one. The check asks the feed for its list of releases and sends nothing about you or this machine.">
 			<MokaSwitch Value="settings.CheckAtStartup"
 						ValueChanged="value => UpdateAsync(s => s with { CheckAtStartup = value })"
 						aria-label="Check for updates at startup" />

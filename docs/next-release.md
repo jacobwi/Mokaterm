@@ -14,10 +14,9 @@ What we plan to put in the release after 0.1.9. Nothing here is started unless i
    X11 forwarding, security keys, tool windows) has met only fixtures, Git Bash and the DevHost. One container with
    OpenSSH and Docker, run through Docker Desktop on the dev machine, lets the live tests (`MOKATERM_TEST_SSH`) run
    against a real server. Expect it to find bugs.
-2. **Updates that work without setup.** The update feed is empty by default, so installs from Setup.exe never update.
-   Point the default at the GitHub releases. The existing "check at startup" (on by default) then makes one request to
-   GitHub each start, which the app's privacy wording has to say plainly. The Store build has no updater and is not
-   affected.
+2. **Updates that work without setup.** Done: the feed defaults to the GitHub releases, read through Velopack's GitHub
+   source, and the Updates page says a check only asks for the release list. "Check at startup" (on by default) makes
+   that one request each start. The Store build has no updater and is not affected.
 3. **Flaky tests.** Sweep for timing-sensitive tests (the RDP hang-up test and an MQTT loopback port clash have both
    flaked), fix them, and add retries to the release workflow so one flake cannot stop a release again. 0.1.6 never
    published because of this.

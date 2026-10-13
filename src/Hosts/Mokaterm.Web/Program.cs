@@ -56,7 +56,8 @@ builder.Services.AddSingleton<IAppEnvironment, WebAppEnvironment>();
 builder.Services.AddSingleton<DownloadTicketStore>();
 builder.Services.AddScoped<ILocalFileAccess, BrowserLocalFileAccess>();
 
-// Plugins load before the container is built: a plugin registers services like any module.
+// Plugins load before the container is built: a plugin registers services like any module. There is no gallery here:
+// the operator copies plugins into the folder by hand, so the Plugins page only lists and has no Browse tab.
 PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
 {
 	Directory = WebAppEnvironment.ResolvePluginsDirectory(builder.Configuration, builder.Environment),

@@ -1,0 +1,14 @@
+.plugin-verified {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px var(--moka-spacing-xs);
+	border: 1px solid color-mix(in srgb, var(--moka-color-success) 35%, transparent);
+	border-radius: var(--moka-radius-sm);
+	color: var(--moka-color-success);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	box-shadow: 0 0 8px color-mix(in srgb, var(--moka-color-success) 30%, transparent);
+}

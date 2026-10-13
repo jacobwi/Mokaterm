@@ -1,0 +1,110 @@
+@using Moka.Red.Feedback.Loading
+@using Mokaterm.Abstractions.Plugins
+
+<div class="plugin-gallery">
+	<div class="plugin-gallery__notice">
+		<MokaIcon Icon="MokatermIcons.Globe" SizeValue="12px" />
+		<span class="plugin-gallery__notice-text">@Notice</span>
+		@if (_index is not null)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Refresh"
+						Loading="_loading"
+						Disabled="Busy"
+						OnClick="RefreshAsync"
+						aria-label="Read the plugin list again">
+				Refresh
+			</MokaButton>
+		}
+	</div>
+
+	@if (_index is { } index)
+	{
+		@if (_error is not null)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_error</MokaAlert>
+		}
+
+		@if (index.Plugins.Count == 0)
+		{
+			<MokaEmptyState Icon="MokatermIcons.Plugin"
+							Title="The gallery is empty"
+							Description="It lists no plugins yet. Install one from a file, or look again later." />
+		}
+		else
+		{
+			@if (index.Plugins.All(plugin => plugin.Newest is null))
+			{
+				<MokaCallout Type="MokaCalloutType.Note" Title="Nothing here fits this Mokaterm">
+					No plugin in the gallery has a version for this version of Mokaterm or this kind of host. Each card says what it needs.
+				</MokaCallout>
+			}
+
+			<div class="plugin-gallery__filters">
+				<MokaSearchInput Value="@_query"
+								 ValueChanged="OnQueryChanged"
+								 Placeholder="Search by name, publisher or description"
+								 Debounce="100"
+								 aria-label="Search plugins" />
+				<div class="plugin-gallery__categories" role="group" aria-label="Categories">
+					<MokaChip Text="All"
+							  Size="MokaSize.Sm"
+							  Selected="@(_category is null)"
+							  OnClick="() => ShowCategory(null)"
+							  aria-pressed="@(_category is null ? "true" : "false")" />
+					@foreach (string category in PluginDisplay.Categories(index.Plugins))
+					{
+						<MokaChip @key="category"
+								  Text="@PluginDisplay.Category(category)"
+								  Size="MokaSize.Sm"
+								  Selected="@(_category == category)"
+								  OnClick="() => ShowCategory(category)"
+								  aria-pressed="@(_category == category ? "true" : "false")" />
+					}
+				</div>
+			</div>
+
+			IReadOnlyList<PluginGalleryEntry> shown = Shown(index);
+			@if (shown.Count == 0)
+			{
+				<MokaEmptyState Icon="MokaIcons.Action.Search"
+								Title="No plugin matches"
+								Description="Try other words, or another category." />
+			}
+			else
+			{
+				<div class="plugin-gallery__cards">
+					@foreach (PluginGalleryEntry plugin in shown)
+					{
+						<PluginGalleryCard @key="plugin.Id"
+										   Plugin="plugin"
+										   Installed="InstalledOf(plugin)"
+										   Busy="Busy"
+										   Downloading="@(Downloading == plugin.Id)"
+										   OnInstall="OnInstall"
+										   OnOpenSource="OpenSourceAsync" />
+					}
+				</div>
+			}
+		}
+	}
+	else if (_error is not null)
+	{
+		<MokaEmptyState Icon="MokaIcons.Status.Warning" Title="The plugin list could not be read" Description="@_error">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Refresh"
+						Loading="_loading"
+						OnClick="RefreshAsync">
+				Try again
+			</MokaButton>
+		</MokaEmptyState>
+	}
+	else
+	{
+		<div class="plugin-gallery__loading">
+			<MokaSpinner Label="@($"Reading the plugin list from {Host}")" />
+		</div>
+	}
+</div>

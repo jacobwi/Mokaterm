@@ -45,7 +45,7 @@
 
 @if (_details is { } details)
 {
-	<DockerTabs Tabs="Tabs" Active="@Tab" ActiveChanged="OnTabChangedAsync" Label="Container views" />
+	<ViewTabs Tabs="Tabs" Active="@Tab" ActiveChanged="OnTabChangedAsync" Label="Container views" />
 
 	@* The log scrolls inside its own box, so following stays at its end; the other views scroll as a whole. *@
 	@switch (Tab)

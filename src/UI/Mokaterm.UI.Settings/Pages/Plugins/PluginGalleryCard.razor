@@ -1,0 +1,98 @@
+@using Mokaterm.Abstractions.Plugins
+
+@{
+	PluginGalleryEntry plugin = Plugin;
+}
+
+<article class="plugin-card" data-plugin="@plugin.Id" aria-label="@plugin.Name">
+	<div class="plugin-card__head">
+		<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@plugin.Name</MokaText>
+		@if (ShownVersion is { } version)
+		{
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@version</MokaText>
+		}
+		<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
+				 Size="MokaSize.Xs"
+				 Color="PluginDisplay.KindColor(plugin.HasCode)"
+				 title="@PluginDisplay.KindTitle(plugin.HasCode)" />
+		@if (plugin.Verified)
+		{
+			<PluginVerifiedBadge />
+		}
+	</div>
+
+	<div class="plugin-card__by">
+		<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@PluginDisplay.Publisher(plugin.Publisher)</MokaText>
+		<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@plugin.License</MokaText>
+	</div>
+
+	@if (!string.IsNullOrWhiteSpace(plugin.Description))
+	{
+		<MokaText Element="div" Size="MokaSize.Xs" Class="plugin-card__description">@plugin.Description</MokaText>
+	}
+
+	<div class="plugin-card__facts">
+		@foreach (string category in plugin.Categories)
+		{
+			<MokaTag Text="@PluginDisplay.Category(category)" Size="MokaSize.Xs" Variant="MokaVariant.Outlined" />
+		}
+		@foreach (string host in PluginDisplay.HostNames(plugin.Hosts))
+		{
+			<MokaTag Text="@host" Icon="PluginDisplay.HostIcon(host)" Size="MokaSize.Xs" />
+		}
+	</div>
+
+	@if (Offer.Kind == PluginGalleryOfferKind.Unavailable && plugin.Unavailable is { } unavailable)
+	{
+		<MokaText Element="div" Size="MokaSize.Xs" Class="plugin-card__unavailable">@unavailable</MokaText>
+	}
+
+	<div class="plugin-card__foot">
+		<MokaButton Variant="MokaVariant.Text"
+					Size="MokaSize.Sm"
+					Color="MokaColor.Surface"
+					StartIcon="MokaIcons.Content.ExternalLink"
+					OnClick="() => OnOpenSource.InvokeAsync(plugin)"
+					title="@plugin.Source.ToString()"
+					aria-label="@($"Source of {plugin.Name}")">
+			Source
+		</MokaButton>
+		@switch (Offer.Kind)
+		{
+			case PluginGalleryOfferKind.Install:
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Download"
+							Loading="Downloading"
+							Disabled="Busy"
+							OnClick="() => OnInstall.InvokeAsync(plugin)"
+							aria-label="@($"Install {plugin.Name}")">
+					Install
+				</MokaButton>
+				break;
+			case PluginGalleryOfferKind.Update:
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Reconnect"
+							Loading="Downloading"
+							Disabled="Busy"
+							OnClick="() => OnInstall.InvokeAsync(plugin)"
+							aria-label="@($"Update {plugin.Name} to {Offer.Version?.Version}")">
+					Update to @Offer.Version?.Version
+				</MokaButton>
+				break;
+			case PluginGalleryOfferKind.Installed:
+				<span class="plugin-card__state">
+					<MokaIcon Icon="MokaIcons.Status.Check" SizeValue="12px" />
+					Installed
+				</span>
+				break;
+			case PluginGalleryOfferKind.Waiting:
+				<span class="plugin-card__state" title="Installed. It loads at the next start.">
+					<MokaIcon Icon="MokaIcons.Status.Clock" SizeValue="12px" />
+					Waits for restart
+				</span>
+				break;
+		}
+	</div>
+</article>

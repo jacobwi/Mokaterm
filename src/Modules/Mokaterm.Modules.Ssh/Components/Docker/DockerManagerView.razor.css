@@ -318,45 +318,6 @@
 	}
 }
 
-.mt-dk ::deep .mt-dk-tabs {
-	display: flex;
-	flex-shrink: 0;
-	flex-wrap: wrap;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-	border-bottom: 1px solid var(--moka-color-outline-variant);
-}
-
-.mt-dk ::deep .mt-dk-tab {
-	padding: 4px 2px;
-	border: none;
-	border-bottom: 2px solid transparent;
-	background: none;
-	color: var(--moka-color-on-surface-tertiary);
-	font-family: inherit;
-	font-size: 10px;
-	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	cursor: pointer;
-	transition: color var(--moka-transition-fast);
-}
-
-.mt-dk ::deep .mt-dk-tab:hover {
-	color: var(--moka-color-on-surface);
-}
-
-.mt-dk ::deep .mt-dk-tab--active {
-	border-bottom-color: var(--moka-color-primary);
-	color: var(--moka-color-on-surface);
-	box-shadow: 0 6px 12px -8px var(--moka-color-primary-glow-strong);
-}
-
-.mt-dk ::deep .mt-dk-tab:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
-}
-
 .mt-dk ::deep .mt-dk-section {
 	display: flex;
 	flex-direction: column;

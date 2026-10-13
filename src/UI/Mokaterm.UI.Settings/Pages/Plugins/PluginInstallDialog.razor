@@ -31,6 +31,18 @@
 					<MokaText Element="div" Size="MokaSize.Sm">@package.Description</MokaText>
 				}
 
+				@if (package.Origin is { } origin)
+				{
+					<div class="plugin-install__origin" title="@($"Commit {origin.Commit}")">
+						<MokaIcon Icon="MokatermIcons.Globe" SizeValue="12px" />
+						<MokaText Element="span" Size="MokaSize.Xs">@PluginDisplay.Origin(origin)</MokaText>
+						@if (origin.Verified)
+						{
+							<PluginVerifiedBadge />
+						}
+					</div>
+				}
+
 				@if (PluginDisplay.VersionChange(package.InstalledVersion, package.Version) is { } change)
 				{
 					<div class="plugin-install__update">

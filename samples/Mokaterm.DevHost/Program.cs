@@ -1,8 +1,10 @@
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
 using Mokaterm.Core.Plugins;
+using Mokaterm.Core.Plugins.Gallery;
 using Mokaterm.DevHost.Components;
 using Mokaterm.DevHost.Demo;
+using Mokaterm.DevHost.Demo.Gallery;
 using Mokaterm.DevHost.Demo.Mqtt;
 using Mokaterm.DevHost.Demo.Telnet;
 using Mokaterm.DevHost.Demo.Vnc;
@@ -60,7 +62,31 @@ builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRd
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
 
+// The Browse tab reads a demo gallery that never leaves this machine: signed at start with a key made for this run and
+// served from memory (Mokaterm:Gallery:Packages names a folder of .mokaplugin files to list; the default is the sample
+// plugin's build output). This host is the only one that trusts a key beside the production ones, and only that
+// per-run key, which exists nowhere but in this process. Mokaterm:Gallery:Index points it at a real gallery instead,
+// which then has to carry a production signature like everywhere else.
+string? galleryIndex = builder.Configuration["Mokaterm:Gallery:Index"];
+DemoPluginGallery? demoGallery = null;
+if (!string.IsNullOrWhiteSpace(galleryIndex))
+{
+	builder.Services.AddPluginGallery(new PluginGalleryOptions { Index = new Uri(galleryIndex) });
+}
+else
+{
+	demoGallery = DemoPluginGallery.Create(builder.Configuration["Mokaterm:Gallery:Packages"], builder.Environment.ContentRootPath);
+	builder.Services.AddPluginGallery(
+		new PluginGalleryOptions { Index = demoGallery.Index, TrustedKeys = [.. PluginGalleryKeys.Production, demoGallery.PublicKey] },
+		demoGallery.CreateHandler);
+}
+
 WebApplication app = builder.Build();
+
+if (demoGallery is { PackagesFromDisk: 0 })
+{
+	app.Logger.LogInformation("The demo plugin gallery found no .mokaplugin to list; build samples/Mokaterm.Plugins.Sample to list the sample plugin");
+}
 
 // The demo servers first: the seeded logins need the loopback ports they picked.
 DemoVncServer vnc = app.Services.GetRequiredService<DemoVncServer>();

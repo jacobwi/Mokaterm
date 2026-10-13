@@ -31,7 +31,7 @@ public sealed class PluginLoadingTests : IDisposable
 		{
 			IPluginManager manager = services.GetRequiredService<IPluginManager>();
 			await using FileStream file = File.OpenRead(SamplePluginPackage.FilePath);
-			using IPluginPackage package = await manager.ReadPackageAsync(file, Ct);
+			using IPluginPackage package = await manager.ReadPackageAsync(file, origin: null, Ct);
 
 			Assert.Equal(SamplePluginPackage.Id, package.Id);
 			Assert.True(package.HasCode);
@@ -190,7 +190,7 @@ public sealed class PluginLoadingTests : IDisposable
 		using ServiceProvider services = Services(catalog);
 		IPluginManager manager = services.GetRequiredService<IPluginManager>();
 		await using FileStream file = File.OpenRead(SamplePluginPackage.FilePath);
-		using IPluginPackage package = await manager.ReadPackageAsync(file, Ct);
+		using IPluginPackage package = await manager.ReadPackageAsync(file, origin: null, Ct);
 		await manager.InstallAsync(package, enable: true, Ct);
 	}
 }
