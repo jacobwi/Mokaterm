@@ -92,10 +92,13 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 		string text = await WaitForLogAsync(LogName, "total 0");
 		Assert.StartsWith("[mokaterm] session log: abc@10.0.0.5:22, started 2026-09-26 14:25:30 +00:00", text, StringComparison.Ordinal);
 		Assert.Contains("Nothing typed is recorded.", text, StringComparison.Ordinal);
+
+		// The writer counts the bytes once the write has returned, so the file can hold the text a moment before the
+		// status says so; on a slow runner that moment was long enough to fail the release of 0.2.0.
+		await Eventually.TrueAsync(() => Recorder.StatusFor(handle.Id).Bytes == "total 0\r\n".Length, "the status counts what was written");
 		SessionLogStatus status = Recorder.StatusFor(handle.Id);
 		Assert.Equal(SessionLogState.Recording, status.State);
 		Assert.Equal(LogName, status.FileName);
-		Assert.Equal("total 0\r\n".Length, status.Bytes);
 	}
 
 	[Fact]
