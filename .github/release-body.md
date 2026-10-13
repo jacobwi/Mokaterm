@@ -1,3 +1,40 @@
+## What's new in 0.2.1
+
+**Tool windows**
+
+- On the desktop every tool can open in a window of its own, the Tools menu's tools included, with the same dark title
+  bar as the main window.
+- A tool window can stay on top, go back to the main window as a dialog, or bring the main window forward, and it comes
+  back where you left it after a restart or an unlock.
+- Settings, Appearance has a Tool windows section: open tools in their own window, reopen them at start, remember where
+  they were, and show a tool's description in its header (off by default).
+
+**Tooltips**
+
+- Every icon button names itself in Mokaterm's own tooltip, placed below the button so it never covers the icon beside
+  it: the top bar, the toolbars, the panels' collapse buttons, a tab's close button and the status bar included.
+  Buttons that had no tooltip at all now have one, and greyed buttons and pages say why they cannot be used.
+- Tooltips are dark instead of a white box, no longer stay up after a click, and are no longer cut off by the panel
+  they sit in.
+- Notifications open below the title bar instead of over the window's own buttons.
+
+**Fixes**
+
+- A password copied in a tool window is cleared from the clipboard on time even when that window was closed first.
+- Downloads, previews and zips of files read as root go in pieces, so a slow download can no longer pull a whole file
+  into memory. A file that changes on the server while it is read stops with a message instead of arriving mixed.
+- An SSH connection that stops answering is noticed within about two minutes, and the session can reconnect, instead
+  of waiting for the network to give up. Settings, SSH, "Missed keepalive replies" sets how many go unanswered first.
+  A server that never answers keepalives is left alone.
+- The fleet overview sorts by any column. The System view and the Docker stats page use the same sort headers.
+- Sorting the System view's Users page no longer closes the view when two accounts share a name.
+
+**Plugins**
+
+- Three new plugins in the gallery: **Network Toolkit** (DNS, ping, port check, traceroute, whois, Wake-on-LAN, subnets),
+  **Developer Utilities** (JWT, encoders, hashes, IDs, time, JSON and YAML, regex) and **Password Generator**
+  (passwords, passphrases and PINs). Install them from Settings, Plugins, Browse.
+
 ## What's new in 0.2.0
 
 **Plugins**

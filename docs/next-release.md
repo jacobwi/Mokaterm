@@ -28,10 +28,17 @@ SDK packages and template, and automatic updates (items 2 and 15); the rest move
 ## Fixes from the known gaps
 
 5. Root downloads, zips and previews stream `sudo cat` through a channel SSH.NET buffers without limit, so a slow browser
-   download can hold a whole file in memory. Bound it.
-6. SSH keepalives expect no reply, so a half-open connection is only noticed when TCP gives up. A keepalive that waits
-   for an answer would catch it in seconds.
-7. The fleet overview table cannot be sorted.
+   download can hold a whole file in memory. Bound it. Done: root reads are `ReadRange` pieces through sudo, the stream
+   container files already used (`PieceReadStream`), so a reader holds at most two pieces (8 MiB) whatever its pace,
+   with the next piece read ahead once past the first two; a file that changes between pieces fails the read.
+   `RemoteCommand.RunAsync` keeps 1 MiB of stderr and drains the rest.
+6. SSH keepalives expect no reply, so a half-open connection is only noticed when TCP gives up. Done: every keepalive
+   interval also sends `keepalive@openssh.com` wanting a reply, and once the server has answered one, "Missed keepalive
+   replies" (3) unanswered intervals drop the session and reconnect, as OpenSSH's `ServerAliveInterval` and
+   `ServerAliveCountMax` do. A server that never answers is never dropped and stops being asked. Not yet run against a
+   real server.
+7. The fleet overview table cannot be sorted. Done: every column sorts by value, and the System view and Docker stats
+   lists share the same `SortHeader`.
 
 ## Features
 
