@@ -1,0 +1,20 @@
+@* An app tool in the shared frame. Its one-line description goes after the title only when the settings ask for it;
+   otherwise pointing at the title shows it. *@
+<ToolFrame Presentation="Presentation"
+		   Target="AppToolActions.Target(Tool)"
+		   Icon="Tool.Icon"
+		   Title="@Tool.Title"
+		   Size="Tool.Size"
+		   Detail="Description"
+		   Hint="@(_showDescription ? null : Tool.Description)"
+		   OnPopOut="PopOutAsync"
+		   OnReturn="ReturnToDialog"
+		   OnClose="CloseDialog">
+	<DynamicComponent Type="Tool.Component" />
+</ToolFrame>
+
+@code {
+	private RenderFragment? Description => _showDescription && Tool.Description is { Length: > 0 } text
+		? @<span class="mt-tool-description" title="@text">@text</span>
+		: null;
+}

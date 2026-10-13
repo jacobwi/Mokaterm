@@ -1,0 +1,13 @@
+@* The bar at the top of a window without a system title bar: the shell's top bar in the main window, a tool's header in
+   a tool window. It keeps the window's buttons clear and reports where it can be dragged. Where the host has no
+   IWindowChrome the content renders as it is, with nothing around it. *@
+@if (_chrome is null)
+{
+	@ChildContent
+}
+else
+{
+	<div class="@Class" style="@_style" @ref="_bar">
+		@ChildContent
+	</div>
+}

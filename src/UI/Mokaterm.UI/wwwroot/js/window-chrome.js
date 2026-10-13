@@ -1,6 +1,6 @@
-// Window chrome for a desktop window without a system title bar: the shell's top bar stands in for it. The host needs to
-// know which parts of the bar move the window, so this reports the bar's empty stretches whenever its layout changes, in
-// CSS pixels from the top left of the page. Every control keeps its whole column, above and below it included, so a
+// Window chrome for a desktop window without a system title bar: the shell's top bar stands in for it in the main window,
+// a tool's header in a tool window. The host needs to know which parts of the bar move the window, so this reports the
+// bar's empty stretches whenever its layout changes, in CSS pixels from the top left of the page. Every control keeps its whole column, above and below it included, so a
 // click that misses a button by a pixel does nothing instead of moving the window.
 
 // Everything that takes a click. A form field counts as its whole box, so its icon and padding still focus it.

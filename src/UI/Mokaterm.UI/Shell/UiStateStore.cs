@@ -81,6 +81,20 @@ internal sealed class UiStateStore : IAsyncDisposable
 		}
 	}
 
+	/// <summary>
+	/// Writes what waits for the delay at once. The desktop's process ends right after its window closes, which is also
+	/// when tool windows report where they were, so the delay would never run out.
+	/// </summary>
+	public Task FlushAsync()
+	{
+		lock (_gate)
+		{
+			_ = _saveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+		}
+
+		return SaveAsync();
+	}
+
 	public async ValueTask DisposeAsync()
 	{
 		ITimer? timer;

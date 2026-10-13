@@ -45,6 +45,29 @@ public sealed class SettingsBackupTests
 		Assert.Equal("", second.Settings.Get<SessionLogSettings>().Folder);
 	}
 
+	// None of the tool window switches names anything of this machine, so all four travel with the rest.
+	[Fact]
+	public async Task TheToolWindowSwitches_RoundTrip()
+	{
+		byte[] file;
+		await using (Machine first = new())
+		{
+			await first.Settings.UpdateAsync<AppearanceSettings>(
+				s => s with { ToolsInOwnWindow = false, ReopenToolWindows = false, RememberToolWindowPlaces = false, ShowToolDescriptions = true },
+				Ct);
+			file = (await first.Backup.ExportAsync(Ct)).Content;
+		}
+
+		await using Machine second = new();
+		await second.Backup.ImportAsync("settings.json", file, Ct);
+
+		AppearanceSettings imported = second.Settings.Get<AppearanceSettings>();
+		Assert.False(imported.ToolsInOwnWindow);
+		Assert.False(imported.ReopenToolWindows);
+		Assert.False(imported.RememberToolWindowPlaces);
+		Assert.True(imported.ShowToolDescriptions);
+	}
+
 	[Fact]
 	public async Task Export_LeavesOutTheValuesThatOnlyFitThisMachine()
 	{
@@ -175,6 +198,7 @@ public sealed class SettingsBackupTests
 				services.AddSingleton(SettingsSectionType.Of<FileTransferSettings>());
 				services.AddSingleton(SettingsSectionType.Of<SessionLogSettings>());
 				services.AddSingleton(SettingsSectionType.Of<UpdateSettings>());
+				services.AddSingleton(SettingsSectionType.Of<AppearanceSettings>());
 
 				// Registered twice, the way a page and a module could both register one section.
 				services.AddSingleton(SettingsSectionType.Of<TerminalSettings>());

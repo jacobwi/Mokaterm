@@ -30,6 +30,10 @@ public sealed partial class HeadedDialog : ComponentBase
 	[Parameter]
 	public RenderFragment? HeaderDetail { get; set; }
 
+	/// <summary>Shown when the title is pointed at.</summary>
+	[Parameter]
+	public string? TitleHint { get; set; }
+
 	/// <summary>Buttons in the header before Close.</summary>
 	[Parameter]
 	public RenderFragment? HeaderActions { get; set; }

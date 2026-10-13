@@ -74,28 +74,6 @@ public sealed class ToolCommandsTests
 		Assert.Single(commands, command => command.Id == "mokaterm.app-tool.jwt");
 	}
 
-	[Fact]
-	public void AnAppTool_OpensInTheShell_AndGoesWithTheTransientUi()
-	{
-		ShellState shell = new(new UiStateStore(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance));
-		AppToolDescriptor tool = AppTool("subnet-calculator", "Subnet calculator");
-		int changes = 0;
-		shell.Changed += () => changes++;
-
-		shell.OpenAppTool(tool);
-		shell.OpenAppTool(tool);
-		Assert.Same(tool, shell.AppTool);
-		Assert.Equal(1, changes);
-
-		// The vault locked: nothing a tool shows may stay on screen.
-		shell.ResetTransientUi();
-		Assert.Null(shell.AppTool);
-
-		shell.OpenAppTool(tool);
-		shell.CloseAppTool();
-		Assert.Null(shell.AppTool);
-	}
-
 	private static SessionToolDescriptor Tool(string protocol, string? id, string title) => new()
 	{
 		ProtocolId = protocol,
@@ -134,6 +112,7 @@ public sealed class ToolCommandsTests
 			null!,
 			new UiContributions([], [], tools, appTools: appTools),
 			interaction,
+			null!,
 			null!,
 			null!,
 			new SessionViewRequests());

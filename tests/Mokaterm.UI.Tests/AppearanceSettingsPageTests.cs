@@ -66,16 +66,50 @@ public sealed class AppearanceSettingsPageTests
 	{
 		string html = await RenderAsync(new AppearanceSettings(), HostKind.Desktop);
 
+		Assert.Contains("Tool windows", html, StringComparison.Ordinal);
 		Assert.Contains("Open tools in their own window", html, StringComparison.Ordinal);
+		Assert.Contains("Reopen tool windows at start", html, StringComparison.Ordinal);
+		Assert.Contains("Remember tool window places", html, StringComparison.Ordinal);
+		Assert.Contains("Show tool descriptions", html, StringComparison.Ordinal);
 	}
 
-	// A browser keeps tools in dialogs, so the switch would do nothing there.
+	// A browser keeps tools in dialogs, so the window switches would do nothing there; a dialog's header still has a title.
 	[Fact]
-	public async Task Render_Web_DoesNotOfferToolWindows()
+	public async Task Render_Web_OffersOnlyWhatADialogUses()
 	{
 		string html = await RenderAsync(new AppearanceSettings(), HostKind.Web);
 
 		Assert.DoesNotContain("Open tools in their own window", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Reopen tool windows at start", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Remember tool window places", html, StringComparison.Ordinal);
+		Assert.Contains("Show tool descriptions", html, StringComparison.Ordinal);
+	}
+
+	// The windows open, come back and keep their places; the header holds no description until asked.
+	[Fact]
+	public void ToolWindowDefaults_AreOn_ExceptDescriptions()
+	{
+		AppearanceSettings defaults = new();
+
+		Assert.True(defaults.ToolsInOwnWindow);
+		Assert.True(defaults.ReopenToolWindows);
+		Assert.True(defaults.RememberToolWindowPlaces);
+		Assert.False(defaults.ShowToolDescriptions);
+		Assert.Equal(defaults, defaults.Clamped());
+	}
+
+	// A settings file from before these switches existed reads as their defaults, not as everything off.
+	[Fact]
+	public void AnOlderFile_WithoutTheToolWindowSwitches_ReadsAsTheirDefaults()
+	{
+		AppearanceSettings read = System.Text.Json.JsonSerializer.Deserialize<AppearanceSettings>(
+			"{\"toolsInOwnWindow\":false}",
+			System.Text.Json.JsonSerializerOptions.Web)!;
+
+		Assert.False(read.ToolsInOwnWindow);
+		Assert.True(read.ReopenToolWindows);
+		Assert.True(read.RememberToolWindowPlaces);
+		Assert.False(read.ShowToolDescriptions);
 	}
 
 	private static Task<string> RenderAsync(AppearanceSettings settings, HostKind host = HostKind.Web) =>

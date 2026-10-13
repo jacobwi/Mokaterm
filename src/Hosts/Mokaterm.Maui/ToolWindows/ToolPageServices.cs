@@ -57,20 +57,33 @@ internal sealed class ToolPageServices
 	/// The services of one tool window over <paramref name="owner"/>, the opening window's scope. Never dispose the
 	/// result; dispose the scopes made from it.
 	/// </summary>
-	public IServiceProvider Borrow(IServiceProvider owner)
+	/// <param name="owner">The opening window's scope.</param>
+	/// <param name="own">
+	/// Services that belong to the tool window itself and replace whatever the app registered for them, such as the
+	/// chrome bound to its own native window: borrowing the main window's would move the main window's drag regions.
+	/// </param>
+	public IServiceProvider Borrow(IServiceProvider owner, IReadOnlyDictionary<Type, object>? own = null)
 	{
 		ArgumentNullException.ThrowIfNull(owner);
-		Dictionary<(Type, object?), int> counts = _descriptors
+		own ??= new Dictionary<Type, object>();
+		ServiceDescriptor[] descriptors = [.. _descriptors.Where(descriptor => descriptor.IsKeyedService || !own.ContainsKey(descriptor.ServiceType))];
+		Dictionary<(Type, object?), int> counts = descriptors
 			.GroupBy(descriptor => (descriptor.ServiceType, descriptor.ServiceKey))
 			.ToDictionary(group => group.Key, group => group.Count());
 		Dictionary<(Type, object?), int> seen = [];
 		IServiceCollection services = new ServiceCollection();
-		foreach (ServiceDescriptor descriptor in _descriptors)
+		foreach (ServiceDescriptor descriptor in descriptors)
 		{
 			(Type, object?) slot = (descriptor.ServiceType, descriptor.ServiceKey);
 			int index = seen.GetValueOrDefault(slot);
 			seen[slot] = index + 1;
 			services.Add(Rewrite(descriptor, owner, index, counts[slot]));
+		}
+
+		// Instances the container did not create are never disposed by it; the window that made them owns them.
+		foreach ((Type type, object instance) in own)
+		{
+			services.AddSingleton(type, instance);
 		}
 
 		return services.BuildServiceProvider();

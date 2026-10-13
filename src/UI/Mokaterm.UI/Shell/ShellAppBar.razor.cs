@@ -5,6 +5,7 @@ using Moka.Red.Feedback.CommandPalette;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Tools;
 
 namespace Mokaterm.UI.Shell;
 
@@ -34,10 +35,14 @@ public sealed partial class ShellAppBar : ComponentBase, IDisposable
 	[Inject]
 	private IMokaContextMenuService Menu { get; set; } = default!;
 
+	[Inject]
+	private AppToolActions AppTools { get; set; } = default!;
+
 	public void Dispose()
 	{
 		Shell.Changed -= OnShellChanged;
 		Transfers.Changed -= OnTransfersChanged;
+		AppTools.Changed -= OnShellChanged;
 	}
 
 	protected override void OnInitialized()
@@ -45,6 +50,7 @@ public sealed partial class ShellAppBar : ComponentBase, IDisposable
 		_activeTransfers = Transfers.ActiveCount;
 		Shell.Changed += OnShellChanged;
 		Transfers.Changed += OnTransfersChanged;
+		AppTools.Changed += OnShellChanged;
 	}
 
 	private void LockVault() => Vault.Lock(LockReason.User);
@@ -59,9 +65,9 @@ public sealed partial class ShellAppBar : ComponentBase, IDisposable
 			{
 				Text = tool.Title,
 				Icon = tool.Icon,
-				Checked = ReferenceEquals(Shell.AppTool, tool),
+				Checked = AppTools.IsOpen(tool),
 				Shortcut = ShellShortcuts.LabelFor(ShellCommandIds.ForAppTool(tool)),
-				OnClickSync = () => Shell.OpenAppTool(captured),
+				OnClick = () => AppTools.OpenAsync(captured),
 			});
 		}
 

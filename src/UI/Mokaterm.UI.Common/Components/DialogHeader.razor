@@ -1,15 +1,21 @@
 @namespace Mokaterm.UI.Common.Components
 
-@* A header bar for a page that is not a dialog, such as a session tool's own window, drawn the way Moka draws a dialog's
-   header so a tool looks the same in its window and in its dialog. *@
+@* A header bar for a page that is not a dialog, such as a tool's own window, drawn the way Moka draws a dialog's header
+   so a tool looks the same in its window and in its dialog. *@
 <div class="mt-dialog-head @Class">
 	@if (Icon is { } icon)
 	{
 		<MokaIcon Icon="icon" SizeValue="18px" Class="mt-dialog-head-icon" />
 	}
 	<h2 class="mt-dialog-head-title">
-		<DialogTitle Title="@Title" Detail="Detail" />
+		<DialogTitle Title="@Title" Detail="Detail" Hint="@TitleHint" />
 	</h2>
+	@if (Actions is not null)
+	{
+		<div class="mt-dialog-head-actions">
+			@Actions
+		</div>
+	}
 </div>
 
 @code {
@@ -22,6 +28,14 @@
 	/// <summary>What the page is about, after the title: a session's label for a tool.</summary>
 	[Parameter]
 	public RenderFragment? Detail { get; set; }
+
+	/// <summary>Shown when the title is pointed at.</summary>
+	[Parameter]
+	public string? TitleHint { get; set; }
+
+	/// <summary>Buttons at the end of the header, where a dialog has its header actions.</summary>
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
 
 	[Parameter]
 	public string? Class { get; set; }

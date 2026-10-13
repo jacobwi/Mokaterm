@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Mokaterm.UI.Shell;
+using Mokaterm.UI.Tools;
 
 namespace Mokaterm.UI.Workspace;
 
@@ -20,6 +21,9 @@ public sealed partial class WorkspaceView : ComponentBase, IDisposable
 	private SessionRestore Restore { get; set; } = default!;
 
 	[Inject]
+	private ToolWindowRestore ToolWindows { get; set; } = default!;
+
+	[Inject]
 	private ShellState Shell { get; set; } = default!;
 
 	public void Dispose()
@@ -34,8 +38,11 @@ public sealed partial class WorkspaceView : ComponentBase, IDisposable
 		Workspace.Changed += OnWorkspaceChanged;
 		Shell.Changed += OnShellChanged;
 
-		// The shell renders only while the vault is unlocked, so this is the first moment a session can be opened.
+		// The shell renders only while the vault is unlocked, so this is the first moment a session can be opened. The
+		// tool windows start following the session restore first, since a session tool's window comes back with its session.
+		Task toolWindows = ToolWindows.StartAsync();
 		await Restore.StartAsync();
+		await toolWindows;
 	}
 
 	/// <summary>Takes the layout and the focused pane from the workspace. False when neither changed.</summary>

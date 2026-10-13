@@ -9,7 +9,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale, status bar and session toolbar back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, font scale, status bar, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms.">
 			<EnumSegmentedControl TEnum="ThemeMode"
@@ -85,15 +85,37 @@
 				}
 			</div>
 		</SettingsRow>
+	</SettingsSection>
+
+	@* The window rows are the desktop's: a browser keeps every tool in a dialog, so there they would change nothing. *@
+	<SettingsSection Title="Tool windows" Description="Docker, System and the tools in the top bar's Tools menu: where they open and what their header shows.">
 		@if (AppEnvironment.Kind == HostKind.Desktop)
 		{
 			<SettingsRow Label="Open tools in their own window"
-						 Description="Session tools such as Docker and System open as windows you can move beside the terminal or to another screen. Off, they open over the session.">
+						 Description="Tools open as windows you can move beside the terminal or to another screen. Off, they open over the session or the app, and a tool's own button still moves it to a window.">
 				<MokaSwitch Value="settings.ToolsInOwnWindow"
 							ValueChanged="value => UpdateAsync(s => s with { ToolsInOwnWindow = value })"
 							aria-label="Open tools in their own window" />
 			</SettingsRow>
+			<SettingsRow Label="Reopen tool windows at start"
+						 Description="Tool windows open when Mokaterm closed come back: the Tools menu's once the vault is unlocked, a session's once that session is reopened and connected. A window you closed yourself stays closed.">
+				<MokaSwitch Value="settings.ReopenToolWindows"
+							ValueChanged="value => UpdateAsync(s => s with { ReopenToolWindows = value })"
+							aria-label="Reopen tool windows at start" />
+			</SettingsRow>
+			<SettingsRow Label="Remember tool window places"
+						 Description="Each tool's window opens where it was last, at the same size, and stays on top if it did. Off, windows open at the tool's usual size and nothing about them is kept.">
+				<MokaSwitch Value="settings.RememberToolWindowPlaces"
+							ValueChanged="value => UpdateAsync(s => s with { RememberToolWindowPlaces = value })"
+							aria-label="Remember tool window places" />
+			</SettingsRow>
 		}
+		<SettingsRow Label="Show tool descriptions"
+					 Description="Puts a tool's one-line description after its title, in its dialog and in its window. Off, the description shows when you point at the title.">
+			<MokaSwitch Value="settings.ShowToolDescriptions"
+						ValueChanged="value => UpdateAsync(s => s with { ShowToolDescriptions = value })"
+						aria-label="Show tool descriptions" />
+		</SettingsRow>
 	</SettingsSection>
 
 	<SettingsSection Title="Preview" Description="Follows the settings above as you change them.">

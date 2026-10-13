@@ -24,3 +24,11 @@
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
+
+/* Moka's header actions: never shrinking, after the title. */
+.mt-dialog-head-actions {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}

@@ -18,6 +18,7 @@ using Mokaterm.UI.Extensions;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Tests.Fakes;
+using Mokaterm.UI.Tools;
 using Mokaterm.UI.Workspace;
 
 namespace Mokaterm.UI.Tests;
@@ -59,6 +60,10 @@ public sealed class ToolPageServicesTests
 	[InlineData(typeof(SessionWorkspace))]
 	[InlineData(typeof(ISessionTabs))]
 	[InlineData(typeof(SessionToolActions))]
+	[InlineData(typeof(ShellToolWindows))]
+	[InlineData(typeof(AppToolActions))]
+	[InlineData(typeof(ToolWindowRestore))]
+	[InlineData(typeof(SessionRestore))]
 	[InlineData(typeof(UiStateStore))]
 	[InlineData(typeof(ShellState))]
 	[InlineData(typeof(InputBroadcast))]
@@ -127,6 +132,31 @@ public sealed class ToolPageServicesTests
 		Assert.False(vault.Disposed);
 	}
 
+	// The main window's chrome is an app-wide singleton like any other, so without this a tool window's header would hand
+	// its drag regions to the main window.
+	[Fact]
+	public async Task AWindowsOwnChrome_ReplacesTheMainWindows_InThatWindowOnly()
+	{
+		ServiceCollection services = Registrations();
+		MainChrome main = new();
+		services.AddSingleton<MainChrome>(main);
+		services.AddSingleton<IWindowChrome>(provider => provider.GetRequiredService<MainChrome>());
+		await using ServiceProvider root = services.BuildServiceProvider();
+		await using AsyncServiceScope owner = root.CreateAsyncScope();
+		ToolPageServices pages = new(services, MokatermUiServiceCollectionExtensions.PageServices);
+		MainChrome own = new();
+
+		IServiceProvider borrowed = pages.Borrow(owner.ServiceProvider, new Dictionary<Type, object> { [typeof(IWindowChrome)] = own });
+		IServiceProvider plain = pages.Borrow(owner.ServiceProvider);
+		await using AsyncServiceScope page = borrowed.CreateAsyncScope();
+
+		Assert.Same(own, page.ServiceProvider.GetRequiredService<IWindowChrome>());
+		Assert.Same(own, Assert.Single(page.ServiceProvider.GetServices<IWindowChrome>()));
+		Assert.Same(main, owner.ServiceProvider.GetRequiredService<IWindowChrome>());
+		Assert.Same(main, plain.GetRequiredService<IWindowChrome>());
+		Assert.Same(owner.ServiceProvider.GetRequiredService<IVault>(), page.ServiceProvider.GetRequiredService<IVault>());
+	}
+
 	[Fact]
 	public async Task ServicesRegisteredSeveralTimes_KeepEveryInstanceInOrder()
 	{
@@ -175,6 +205,26 @@ public sealed class ToolPageServicesTests
 	}
 
 	private sealed class IdleNavigation : NavigationManager;
+
+	/// <summary>A window's chrome that does nothing but be told apart from another.</summary>
+	private sealed class MainChrome : IWindowChrome
+	{
+		public event Action? InsetsChanged
+		{
+			add { }
+			remove { }
+		}
+
+		public WindowChromeInsets Insets => default;
+
+		public void SetDragRegions(IReadOnlyList<WindowDragRegion> regions)
+		{
+		}
+
+		public void ResetDragRegions()
+		{
+		}
+	}
 
 	/// <summary>A session manager that asks for passwords, as the real one does.</summary>
 	private sealed class PromptingSessionManager(IUserInteraction interaction) : ManualSessionManager

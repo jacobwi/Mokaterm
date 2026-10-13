@@ -26,6 +26,7 @@ internal sealed class SessionRestore : IDisposable
 	private SavedTabs _persisted = SavedTabs.Empty;
 	private PaneNode? _layout;
 	private bool _started;
+	private bool _settled;
 	private bool _disposed;
 
 	public SessionRestore(
@@ -46,6 +47,18 @@ internal sealed class SessionRestore : IDisposable
 
 	/// <summary>Raised when the offer appears or goes away. Any thread.</summary>
 	public event Action? Changed;
+
+	/// <summary>A login from the saved set is open again, as this session. Raised while restoring, on its thread.</summary>
+	public event Action<ISessionHandle>? Reopened;
+
+	/// <summary>
+	/// The saved set has been dealt with: reopened, turned down, gone stale because the user opened something else, or
+	/// there was nothing to offer. Raised once; a login of the saved set that was not reopened by then never will be.
+	/// </summary>
+	public event Action? Settled;
+
+	/// <summary>The user closed this session's tab, so nothing of it comes back at the next start. Any thread.</summary>
+	public event Action<Guid>? Forgotten;
 
 	/// <summary>Logins saved by the previous run that have not been reopened or turned down yet.</summary>
 	public IReadOnlyList<Guid> Pending
@@ -90,20 +103,33 @@ internal sealed class SessionRestore : IDisposable
 		{
 			Changed?.Invoke();
 		}
+
+		// Always settled by the restore itself; an offer settles when it is answered or goes stale.
+		if (Pending.Count == 0)
+		{
+			Settle();
+		}
 	}
 
 	/// <summary>Drops a session the user closed, so the next start does not bring it back.</summary>
 	public void Forget(Guid sessionId)
 	{
+		bool removed;
 		lock (_gate)
 		{
-			if (_disposed || _entries.RemoveAll(entry => entry.SessionId == sessionId) == 0)
+			if (_disposed)
 			{
 				return;
 			}
+
+			removed = _entries.RemoveAll(entry => entry.SessionId == sessionId) > 0;
 		}
 
-		Persist();
+		Forgotten?.Invoke(sessionId);
+		if (removed)
+		{
+			Persist();
+		}
 	}
 
 	/// <summary>Opens every login in the saved set, in the order their tabs had, each in the pane it was in.</summary>
@@ -123,7 +149,8 @@ internal sealed class SessionRestore : IDisposable
 			{
 				try
 				{
-					await _manager.OpenAsync(connectionId);
+					ISessionHandle session = await _manager.OpenAsync(connectionId);
+					Reopened?.Invoke(session);
 				}
 				catch (Exception ex) when (ex is not OperationCanceledException)
 				{
@@ -136,6 +163,7 @@ internal sealed class SessionRestore : IDisposable
 		finally
 		{
 			_workspace.EndRestore();
+			Settle();
 		}
 
 		if (failed > 0)
@@ -157,6 +185,7 @@ internal sealed class SessionRestore : IDisposable
 		}
 
 		Persist();
+		Settle();
 	}
 
 	public void Dispose()
@@ -176,6 +205,21 @@ internal sealed class SessionRestore : IDisposable
 
 	private static bool Covers(PaneNode layout, List<RestoreEntry> entries) =>
 		entries.TrueForAll(entry => PaneLayout.Contains(layout, entry.PaneId));
+
+	private void Settle()
+	{
+		lock (_gate)
+		{
+			if (_settled || _disposed)
+			{
+				return;
+			}
+
+			_settled = true;
+		}
+
+		Settled?.Invoke();
+	}
 
 	private SavedTabs TakePending()
 	{
@@ -256,6 +300,7 @@ internal sealed class SessionRestore : IDisposable
 		if (offerGone)
 		{
 			Changed?.Invoke();
+			Settle();
 		}
 
 		Persist();

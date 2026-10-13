@@ -87,7 +87,7 @@ public sealed class ShellInputBridgeTests
 			SessionWorkspace workspace = new(Sessions);
 			UserInteractionService interaction = new();
 			SessionActions actions = new(Sessions, workspace, null!, null!, interaction, null!, shell, NullLogger<SessionActions>.Instance);
-			ShellCommandRegistry commands = new(new MokaCommandPaletteService(), shell, workspace, actions, null!, null!, null!, null!, null!, new UiContributions([], [], []), interaction, null!, null!, new SessionViewRequests());
+			ShellCommandRegistry commands = new(new MokaCommandPaletteService(), shell, workspace, actions, null!, null!, null!, null!, null!, new UiContributions([], [], []), interaction, null!, null!, null!, new SessionViewRequests());
 			Bridge = new ShellInputBridge(new ShellInterop(Js), commands, null!, new FixedSettings(), new WebEnvironment(), Sessions, NullLogger<ShellInputBridge>.Instance);
 			SubscribersBeforeAttach = Sessions.SubscriberCount;
 		}

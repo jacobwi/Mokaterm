@@ -1,14 +1,18 @@
 @namespace Mokaterm.UI.Common.Components
+@using Moka.Red.Feedback.Tooltip
 
-@* A quiet icon button for a dialog header, drawn like Moka's own close button so the two sit side by side. *@
-<button type="button"
-		class="mt-dialog-head-button"
-		aria-label="@Title"
-		title="@Title"
-		disabled="@Disabled"
-		@onclick="OnClick">
-	<MokaIcon Icon="Icon" SizeValue="@SizeValue" />
-</button>
+@* A quiet icon button for a dialog header, drawn like Moka's own close button so the two sit side by side. Its name
+   shows in Moka's tooltip, below it by default since a header sits at the top of its dialog or window. *@
+<MokaTooltip Text="@TooltipText" Position="TooltipPosition">
+	<button type="button"
+			class="mt-dialog-head-button @(Active ? "mt-dialog-head-button--on" : null)"
+			aria-label="@Title"
+			aria-pressed="@(Toggle ? (Active ? "true" : "false") : null)"
+			disabled="@Disabled"
+			@onclick="OnClick">
+		<MokaIcon Icon="Icon" SizeValue="@SizeValue" />
+	</button>
+</MokaTooltip>
 
 @code {
 	[Parameter, EditorRequired]
@@ -18,12 +22,30 @@
 	[Parameter, EditorRequired]
 	public string Title { get; set; } = "";
 
+	/// <summary>Shown after the title in the tooltip, for example <c>Ctrl+Shift+L</c>.</summary>
+	[Parameter]
+	public string? Shortcut { get; set; }
+
+	/// <summary>Where the tooltip opens. BottomEnd suits the rightmost button, whose tooltip would reach past the edge.</summary>
+	[Parameter]
+	public MokaTooltipPosition TooltipPosition { get; set; } = MokaTooltipPosition.Bottom;
+
 	[Parameter]
 	public EventCallback<MouseEventArgs> OnClick { get; set; }
 
 	[Parameter]
 	public bool Disabled { get; set; }
 
+	/// <summary>The button switches something on and off, which <see cref="Active"/> says, rather than doing it once.</summary>
+	[Parameter]
+	public bool Toggle { get; set; }
+
+	/// <summary>For a <see cref="Toggle"/>: the thing is on, and the button is lit.</summary>
+	[Parameter]
+	public bool Active { get; set; }
+
 	[Parameter]
 	public string SizeValue { get; set; } = "16px";
+
+	private string TooltipText => Shortcut is null ? Title : $"{Title} ({Shortcut})";
 }

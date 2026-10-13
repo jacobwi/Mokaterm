@@ -1,17 +1,18 @@
 namespace Mokaterm.UI.Common.Platform;
 
 /// <summary>
-/// Session tools in native windows of their own. Only the desktop host registers it: in a browser a second window
-/// would be a second circuit with a vault of its own, so the web host keeps tools in dialogs. The shell decides when
-/// a window opens and when it has to go (its session closed, the vault locked); the host only manages windows.
+/// Tools in native windows of their own: session tools and app tools alike. Only the desktop host registers it: in a
+/// browser a second window would be a second circuit with a vault of its own, so the web host keeps tools in dialogs.
+/// The shell decides when a window opens and when it has to go (its session closed, the vault locked); the host only
+/// manages windows.
 /// </summary>
 public interface IToolWindows
 {
-	/// <summary>Raised when a window opens or closes. May fire on any thread.</summary>
+	/// <summary>Raised when a window opens or closes, or stops or starts staying on top. May fire on any thread.</summary>
 	event Action? Changed;
 
-	/// <summary>Whether a window shows <paramref name="toolKey"/> for <paramref name="sessionId"/>.</summary>
-	bool IsOpen(Guid sessionId, string toolKey);
+	/// <summary>Whether a window shows <paramref name="target"/>.</summary>
+	bool IsOpen(ToolWindowTarget target);
 
 	/// <summary>
 	/// Opens the tool in a window, or brings the window already showing it to the front. False when no window could be
@@ -19,8 +20,11 @@ public interface IToolWindows
 	/// </summary>
 	Task<bool> OpenAsync(ToolWindowRequest request);
 
-	/// <summary>Closes the windows of one session, or only the one showing <paramref name="toolKey"/>.</summary>
-	void Close(Guid sessionId, string? toolKey = null);
+	/// <summary>Closes the window showing <paramref name="target"/>, if there is one.</summary>
+	void Close(ToolWindowTarget target);
+
+	/// <summary>Closes every window of one session's tools.</summary>
+	void CloseSession(Guid sessionId);
 
 	/// <summary>Closes every window that borrows <paramref name="services"/>, such as when its vault locks.</summary>
 	void CloseAll(IServiceProvider services);
@@ -31,4 +35,13 @@ public interface IToolWindows
 	/// window has no tool window open.
 	/// </summary>
 	void ShowOwner(IServiceProvider services);
+
+	/// <summary>Whether the window showing <paramref name="target"/> stays above other windows.</summary>
+	bool IsKeptOnTop(ToolWindowTarget target);
+
+	/// <summary>
+	/// Keeps the window showing <paramref name="target"/> above other windows, or lets it go behind them again. The
+	/// request's <see cref="ToolWindowRequest.BoundsChanged"/> hears of it, so the next window of that tool does the same.
+	/// </summary>
+	void SetKeepOnTop(ToolWindowTarget target, bool keepOnTop);
 }

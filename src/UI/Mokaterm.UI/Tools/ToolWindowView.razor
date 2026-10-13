@@ -1,0 +1,41 @@
+@* The whole page of a tool's own window on the desktop: the tool in the shared frame, and the overlays a tool can raise.
+   It runs on the services of the window that opened it, so the sessions, the vault and the settings are that window's;
+   only what belongs to a page (scripts, menus, dialogs, its prompts and toasts) is its own. *@
+<MokaThemeProvider Theme="_theme">
+	<PluginStyles />
+	@if (_session is { } session && _sessionTool is { } tool)
+	{
+		<SessionToolFrame Presentation="ToolPresentation.Window" Session="session" Tool="tool" />
+	}
+	else if (_appTool is { } appTool)
+	{
+		<AppToolFrame Presentation="ToolPresentation.Window" Tool="appTool" />
+	}
+	else
+	{
+		@* Still a frame: its header is the window's title bar, which is what moves and closes the window. *@
+		<ToolFrame Presentation="ToolPresentation.Window" Target="Target" Icon="MokatermIcons.Tools" Title="Mokaterm">
+			@if (Target.IsAppTool)
+			{
+				<MokaEmptyState Icon="MokatermIcons.Plugin"
+								Title="This tool is gone"
+								Description="The plugin that added it is not loaded any more. Close this window." />
+			}
+			else
+			{
+				<MokaEmptyState Icon="MokatermIcons.Disconnect"
+								Title="This session is closed"
+								Description="The tool went with it. This window closes on its own." />
+			}
+		</ToolFrame>
+	}
+
+	<MokaToastHost />
+	<ViewBoundary Name="A dialog" NotifyOnly OnFailed="CloseServiceDialogs">
+		<MokaDialogHost />
+	</ViewBoundary>
+	<ViewBoundary Name="A menu command" NotifyOnly>
+		<MokaContextMenuHost />
+	</ViewBoundary>
+	<InteractionHost />
+</MokaThemeProvider>

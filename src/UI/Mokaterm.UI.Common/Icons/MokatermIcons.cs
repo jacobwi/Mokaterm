@@ -160,6 +160,17 @@ public static class MokatermIcons
 	/// <summary>Moves a tool out of its dialog into a window of its own.</summary>
 	public static readonly MokaIconDefinition PopOut = MokaIcons.Content.ExternalLink;
 
+	/// <summary>Moves a tool out of its own window, back into a dialog in the main window.</summary>
+	public static readonly MokaIconDefinition PopIn = MokaIcons.Navigation.Dock;
+
+	/// <summary>Keeps a window above every other window.</summary>
+	public static readonly MokaIconDefinition Pin = new("mt-pin",
+		"M12 17v5 M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2v.8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z");
+
+	/// <summary>The main window, brought in front of a tool's own window.</summary>
+	public static readonly MokaIconDefinition MainWindow = new("mt-main-window",
+		"M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M2 9h20 M6 6.5h.01 M9 6.5h.01");
+
 	/// <summary>The fleet overview: every saved machine in one table.</summary>
 	public static readonly MokaIconDefinition Fleet = new("mt-fleet",
 		"M3 3h7v9H3z M14 3h7v5h-7z M14 12h7v9h-7z M3 16h7v5H3z");

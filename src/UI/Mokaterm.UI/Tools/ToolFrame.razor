@@ -1,0 +1,56 @@
+@using Moka.Red.Feedback.Dialog
+
+@* A tool's header and body, for session tools and app tools, in a dialog and in a window of its own. The header is fed
+   the same icon, title, detail and actions either way: Moka draws it in a dialog, DialogHeader in a window, where it
+   is also the window's title bar. *@
+@if (Presentation == ToolPresentation.Dialog)
+{
+	<HeadedDialog Open="true"
+				  OpenChanged="OnOpenChanged"
+				  Icon="Icon"
+				  Title="@Title"
+				  DialogSize="@(Wide ? MokaDialogSize.ExtraLarge : MokaDialogSize.Large)"
+				  Fill="Wide"
+				  HeaderDetail="Detail"
+				  TitleHint="@Hint"
+				  HeaderActions="Actions">
+		<ViewBoundary @key="Target" Name="@Title" Fill="Wide">
+			@ChildContent
+		</ViewBoundary>
+	</HeadedDialog>
+}
+else
+{
+	<div class="mt-toolwin">
+		<WindowChromeBar Class="mt-toolwin-top">
+			<DialogHeader Icon="Icon" Title="@Title" Detail="Detail" TitleHint="@Hint" Actions="Actions" />
+		</WindowChromeBar>
+		<div class="mt-toolwin-body @(Wide ? "mt-toolwin-body--fill" : null)">
+			<ViewBoundary @key="Target" Name="@Title" Fill>
+				@ChildContent
+			</ViewBoundary>
+		</div>
+	</div>
+}
+
+@code {
+	// Null when there is nothing to show: an empty slot would still take its gap in the header.
+	private RenderFragment? Actions => Presentation switch
+	{
+		ToolPresentation.Dialog when OnPopOut.HasDelegate && Windows.CanOpenWindows =>
+			@<DialogHeaderButton Icon="MokatermIcons.PopOut" Title="Open in its own window" OnClick="OnPopOut" />,
+		ToolPresentation.Window =>
+			@<text>
+				@if (OnReturn.HasDelegate)
+				{
+					<DialogHeaderButton Icon="MokatermIcons.PopIn" Title="Back to the main window" OnClick="OnReturn" />
+				}
+				<DialogHeaderButton Icon="MokatermIcons.Pin" Title="Keep on top" Toggle Active="_keptOnTop" OnClick="ToggleKeepOnTop" />
+				<DialogHeaderButton Icon="MokatermIcons.MainWindow"
+									Title="Show the main window"
+									TooltipPosition="MokaTooltipPosition.BottomEnd"
+									OnClick="ShowMainWindow" />
+			</text>,
+		_ => null,
+	};
+}

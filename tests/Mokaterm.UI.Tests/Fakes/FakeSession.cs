@@ -5,7 +5,10 @@ using Mokaterm.Abstractions.Terminal;
 
 namespace Mokaterm.UI.Tests.Fakes;
 
-/// <summary>A connected SSH session that never changes, for components that only read a session.</summary>
+/// <summary>
+/// A connected SSH session, for components that only read a session. A test that needs it to drop or reconnect sets
+/// its state through <see cref="Become"/>, which tells whoever listens, as a real session does.
+/// </summary>
 internal sealed class FakeSession : ISessionHandle
 {
 	public FakeSession(Guid? connectionId = null, HostEnvironment environment = HostEnvironment.None)
@@ -20,11 +23,7 @@ internal sealed class FakeSession : ISessionHandle
 		};
 	}
 
-	public event Action? Changed
-	{
-		add { }
-		remove { }
-	}
+	public event Action? Changed;
 
 	public Guid Id { get; } = Guid.NewGuid();
 
@@ -45,9 +44,9 @@ internal sealed class FakeSession : ISessionHandle
 	/// <summary>A quick-connect session when set, with no saved login behind it.</summary>
 	public bool IsTransient { get; init; }
 
-	public SessionState State => SessionState.Connected;
+	public SessionState State { get; private set; } = SessionState.Connected;
 
-	public string? StatusMessage => null;
+	public string? StatusMessage { get; private set; }
 
 	public ConnectFailure? Failure => null;
 
@@ -59,4 +58,13 @@ internal sealed class FakeSession : ISessionHandle
 
 	/// <summary>The live session, for a test that needs its features; none by default.</summary>
 	public IProtocolSession? Session { get; init; }
+
+	/// <summary>Moves the session to <paramref name="state"/> and says so, with the line a real one shows meanwhile.</summary>
+	public FakeSession Become(SessionState state, string? statusMessage = null)
+	{
+		State = state;
+		StatusMessage = statusMessage;
+		Changed?.Invoke();
+		return this;
+	}
 }

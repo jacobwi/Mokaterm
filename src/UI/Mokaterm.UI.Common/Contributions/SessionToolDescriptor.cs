@@ -37,7 +37,7 @@ public sealed record SessionToolDescriptor
 	/// <summary>False hides the button until the session is connected, which suits tools that talk to the server.</summary>
 	public bool ShowWhileDisconnected { get; init; }
 
-	/// <summary>The dialog the tool opens in.</summary>
+	/// <summary>The size of the dialog the tool opens in, and the first size of its window.</summary>
 	public SessionToolSize Size { get; init; }
 
 	/// <summary><see cref="Id"/>, or the title when there is none, lower case with dashes for spaces.</summary>

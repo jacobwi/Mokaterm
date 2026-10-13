@@ -533,18 +533,6 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		}
 	}
 
-	private EventCallback PopOutCallback(SessionToolDescriptor tool) => Tools.CanOpenWindows
-		? EventCallback.Factory.Create(this, () => Tools.PopOutAsync(Session, tool))
-		: default;
-
-	private void OnToolDialogOpenChanged(bool open)
-	{
-		if (!open)
-		{
-			Tools.CloseDialog(Session.Id);
-		}
-	}
-
 	private void OnToolsChanged() => _ = InvokeAsync(StateHasChanged);
 
 	private void ShowToolsMenu(MouseEventArgs args, IReadOnlyList<SessionToolDescriptor> tools)

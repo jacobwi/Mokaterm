@@ -1,11 +1,13 @@
 @* The session a tool works on, after the tool's title in its dialog and in its own window: drawn the way its tab draws it,
-   so two windows of the same tool on two machines cannot be mistaken. *@
+   so two windows of the same tool on two machines cannot be mistaken, with the session's state in the words and colours
+   the rest of the app uses. While it reconnects, hovering the dot says when the next attempt is. *@
 <span class="mt-tool-session">
 	<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
 	<SessionLabel Session="Session" ShowPort Tooltip="@EndpointFormat.Format(Session)" />
+	<MokaStatusDot Size="MokaSize.Xs"
+				   Color="@SessionStateDisplay.Color(Session.State)"
+				   Pulse="@(Session.State == SessionState.Connecting)"
+				   Label="@SessionStateDisplay.Label(Session.State)"
+				   title="@StateTitle"
+				   Class="mt-tool-session-state" />
 </span>
-
-@code {
-	[Parameter, EditorRequired]
-	public ISessionHandle Session { get; set; } = default!;
-}

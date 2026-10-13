@@ -6,15 +6,15 @@
 }
 
 /*
-	A desktop window without a system title bar: the window's own buttons are drawn over one end of the top bar. The
-	shell puts their size in these properties; the bar keeps that stretch empty and grows to their height, so its
-	controls line up with them.
+	A desktop window without a system title bar: the window's own buttons are drawn over one end of the top bar.
+	WindowChromeBar puts their size in these properties; the bar keeps that stretch empty and grows to their height, so
+	its controls line up with them. The element is WindowChromeBar's, so it is reached through ::deep.
 */
-.mt-shell-top {
+.mt-shell ::deep .mt-shell-top {
 	flex-shrink: 0;
 }
 
-.mt-shell-top ::deep .moka-appbar {
+.mt-shell ::deep .mt-shell-top .moka-appbar {
 	min-height: var(--mt-chrome-height, 0px);
 	padding-left: calc(var(--moka-spacing-lg) + var(--mt-chrome-left, 0px));
 	padding-right: calc(var(--moka-spacing-sm) + var(--mt-chrome-right, 0px));

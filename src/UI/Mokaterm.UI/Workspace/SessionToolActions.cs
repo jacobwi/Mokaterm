@@ -1,78 +1,58 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
-using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Presentation;
-using Mokaterm.UI.Shell;
+using Mokaterm.UI.Tools;
 
 namespace Mokaterm.UI.Workspace;
 
 /// <summary>
-/// Opens and closes the tools modules add to the session toolbar. A tool opens in a dialog over its session, or, where
-/// the host has windows and the setting asks for them, in a window of its own. The rules for when a window has to go
-/// are here rather than in the host: the session closed, or the vault locked, or this window's services went away.
+/// Opens and closes the tools modules add to the session toolbar. A tool opens in a dialog over its session, or in a
+/// window of its own by the rule <see cref="ShellToolWindows"/> holds for every tool. The rules for when a session
+/// tool has to go are here rather than in the host: its session closed, or the vault locked.
 /// </summary>
 internal sealed class SessionToolActions : IDisposable
 {
 	private readonly IUiContributions _contributions;
 	private readonly ISessionManager _sessions;
 	private readonly IVault _vault;
-	private readonly ISettingsService _settings;
-	private readonly UiStateStore _uiState;
+	private readonly ShellToolWindows _windows;
+	private readonly ISessionTabs _tabs;
 	private readonly UserInteractionService _prompts;
-	private readonly IServiceProvider _services;
-	private readonly IToolWindows? _windows;
-	private readonly ILogger<SessionToolActions> _logger;
 	private readonly Lock _gate = new();
 	private readonly Dictionary<Guid, SessionToolDescriptor> _dialogs = [];
 	private HashSet<Guid> _sessionIds;
-	private InteractionRequest? _shownPrompt;
 	private bool _disposed;
 
 	public SessionToolActions(
 		IUiContributions contributions,
 		ISessionManager sessions,
 		IVault vault,
-		ISettingsService settings,
-		UiStateStore uiState,
-		UserInteractionService prompts,
-		IServiceProvider services,
-		ILogger<SessionToolActions> logger)
+		ShellToolWindows windows,
+		ISessionTabs tabs,
+		UserInteractionService prompts)
 	{
 		_contributions = contributions;
 		_sessions = sessions;
 		_vault = vault;
-		_settings = settings;
-		_uiState = uiState;
+		_windows = windows;
+		_tabs = tabs;
 		_prompts = prompts;
-		_services = services;
-		_windows = services.GetService<IToolWindows>();
-		_logger = logger;
 		_sessionIds = [.. sessions.Sessions.Select(session => session.Id)];
 
 		_sessions.SessionsChanged += OnSessionsChanged;
 		_vault.StatusChanged += OnVaultStatusChanged;
-		if (_windows is not null)
-		{
-			_windows.Changed += OnWindowsChanged;
-			_prompts.Changed += OnPromptsChanged;
-		}
+		_windows.Changed += OnWindowsChanged;
 	}
 
 	/// <summary>Raised when a tool opens or closes, in a dialog or a window. May fire on any thread.</summary>
 	public event Action? Changed;
 
 	/// <summary>Whether this host can put a tool in a window of its own at all.</summary>
-	public bool CanOpenWindows => _windows is not null;
-
-	/// <summary>Whether a tool opened now goes to a window rather than a dialog.</summary>
-	public bool OpensWindows => _windows is not null && _settings.Get<AppearanceSettings>().ToolsInOwnWindow;
+	public bool CanOpenWindows => _windows.CanOpenWindows;
 
 	/// <summary>
 	/// The title of a tool's window, such as "Docker · user@host": the plain middle dot, because a dash in a title reads
@@ -85,12 +65,24 @@ internal sealed class SessionToolActions : IDisposable
 		return $"{tool.Title} · {SessionTitle.Endpoint(session)}";
 	}
 
+	/// <summary>What a window showing <paramref name="tool"/> on <paramref name="session"/> is known by.</summary>
+	public static ToolWindowTarget Target(ISessionHandle session, SessionToolDescriptor tool)
+	{
+		ArgumentNullException.ThrowIfNull(session);
+		ArgumentNullException.ThrowIfNull(tool);
+		return ToolWindowTarget.SessionTool(session.Id, tool.Key);
+	}
+
 	/// <summary>The tools the session's protocol has, whatever state the session is in.</summary>
 	public IReadOnlyList<SessionToolDescriptor> For(ISessionHandle session)
 	{
 		ArgumentNullException.ThrowIfNull(session);
 		return _contributions.FindSessionTools(session.Protocol.Id);
 	}
+
+	/// <summary>The session's tool with <paramref name="key"/>, or null when its protocol has none.</summary>
+	public SessionToolDescriptor? Find(ISessionHandle session, string key) =>
+		For(session).FirstOrDefault(tool => string.Equals(tool.Key, key, StringComparison.Ordinal));
 
 	/// <summary>The tools the toolbar offers now: the ones that need the server wait until the session is connected.</summary>
 	public IReadOnlyList<SessionToolDescriptor> Available(ISessionHandle session)
@@ -114,12 +106,7 @@ internal sealed class SessionToolActions : IDisposable
 		return tool is not null && Available(session).Contains(tool) ? tool : null;
 	}
 
-	public bool IsInWindow(ISessionHandle session, SessionToolDescriptor tool)
-	{
-		ArgumentNullException.ThrowIfNull(session);
-		ArgumentNullException.ThrowIfNull(tool);
-		return _windows?.IsOpen(session.Id, tool.Key) == true;
-	}
+	public bool IsInWindow(ISessionHandle session, SessionToolDescriptor tool) => _windows.IsOpen(Target(session, tool));
 
 	/// <summary>Whether the tool shows anywhere, in a dialog or in a window.</summary>
 	public bool IsOpen(ISessionHandle session, SessionToolDescriptor tool) =>
@@ -141,7 +128,7 @@ internal sealed class SessionToolActions : IDisposable
 		return OpenAsync(session, tool);
 	}
 
-	/// <summary>Shows the tool, in a window when the setting asks for one and the host has them, else in a dialog.</summary>
+	/// <summary>Shows the tool, in a window when the rule says so, else in a dialog.</summary>
 	public async Task OpenAsync(ISessionHandle session, SessionToolDescriptor tool)
 	{
 		ArgumentNullException.ThrowIfNull(session);
@@ -152,7 +139,7 @@ internal sealed class SessionToolActions : IDisposable
 			return;
 		}
 
-		if ((OpensWindows || IsInWindow(session, tool)) && await OpenWindowAsync(session, tool))
+		if (await _windows.ShowAsync(Target(session, tool), WindowTitle(tool, session), tool.Size))
 		{
 			return;
 		}
@@ -163,12 +150,38 @@ internal sealed class SessionToolActions : IDisposable
 	/// <summary>Moves a tool from its dialog to a window of its own. The dialog stays when no window could open.</summary>
 	public async Task PopOutAsync(ISessionHandle session, SessionToolDescriptor tool)
 	{
-		ArgumentNullException.ThrowIfNull(session);
-		ArgumentNullException.ThrowIfNull(tool);
 		if (await OpenWindowAsync(session, tool))
 		{
 			CloseDialog(session.Id);
 		}
+	}
+
+	/// <summary>
+	/// Opens the tool's window without a dialog to fall back to, for a window coming back at start once its session
+	/// has connected again. False when the tool is not there or the window would not open.
+	/// </summary>
+	public Task<bool> OpenWindowAsync(ISessionHandle session, SessionToolDescriptor tool)
+	{
+		ArgumentNullException.ThrowIfNull(session);
+		ArgumentNullException.ThrowIfNull(tool);
+		return Available(session).Contains(tool)
+			? _windows.OpenAsync(Target(session, tool), WindowTitle(tool, session), tool.Size)
+			: Task.FromResult(false);
+	}
+
+	/// <summary>
+	/// "Back to the main window": the tool leaves its window for the dialog over its session's tab, which comes to the
+	/// front in the window that opened it. The user closed that window, so it does not come back at the next start.
+	/// </summary>
+	public void ReturnToDialog(ISessionHandle session, SessionToolDescriptor tool)
+	{
+		ArgumentNullException.ThrowIfNull(session);
+		ArgumentNullException.ThrowIfNull(tool);
+		ShowDialog(session.Id, tool);
+
+		// Before the close: the owner only comes forward while it still has a tool window open.
+		_tabs.Show(session.Id);
+		_windows.Close(Target(session, tool), byUser: true);
 	}
 
 	public void CloseDialog(Guid sessionId)
@@ -200,14 +213,7 @@ internal sealed class SessionToolActions : IDisposable
 
 		_sessions.SessionsChanged -= OnSessionsChanged;
 		_vault.StatusChanged -= OnVaultStatusChanged;
-		if (_windows is not null)
-		{
-			_windows.Changed -= OnWindowsChanged;
-			_prompts.Changed -= OnPromptsChanged;
-
-			// The windows borrow this scope, which is going away with the window that owns it.
-			_windows.CloseAll(_services);
-		}
+		_windows.Changed -= OnWindowsChanged;
 	}
 
 	private void ShowDialog(Guid sessionId, SessionToolDescriptor tool)
@@ -224,41 +230,6 @@ internal sealed class SessionToolActions : IDisposable
 
 		Changed?.Invoke();
 	}
-
-	private async Task<bool> OpenWindowAsync(ISessionHandle session, SessionToolDescriptor tool)
-	{
-		if (_windows is null)
-		{
-			return false;
-		}
-
-		string key = tool.Key;
-		ToolWindowBounds? bounds = _uiState.Current.ToolWindows.GetValueOrDefault(key);
-		ToolWindowRequest request = new(
-			session.Id,
-			key,
-			WindowTitle(tool, session),
-			_services,
-			tool.Size,
-			bounds is { IsUsable: true } ? bounds : null,
-			moved => _uiState.Update(state => state with { ToolWindows = WithBounds(state.ToolWindows, key, moved) }));
-		try
-		{
-			return await _windows.OpenAsync(request);
-		}
-		catch (Exception ex)
-		{
-			// The dialog still works, so a window that would not open costs nothing but the window.
-			_logger.LogWarning("A session tool's window could not be opened: {Failure}", LogSafe.Describe(ex));
-			return false;
-		}
-	}
-
-	private static Dictionary<string, ToolWindowBounds> WithBounds(
-		IReadOnlyDictionary<string, ToolWindowBounds> current,
-		string key,
-		ToolWindowBounds bounds) =>
-		new(current, StringComparer.Ordinal) { [key] = bounds };
 
 	private void OnSessionsChanged()
 	{
@@ -277,7 +248,7 @@ internal sealed class SessionToolActions : IDisposable
 
 		foreach (Guid id in gone)
 		{
-			_windows?.Close(id);
+			_windows.CloseSession(id);
 		}
 
 		if (dialogsChanged)
@@ -293,31 +264,15 @@ internal sealed class SessionToolActions : IDisposable
 			return;
 		}
 
-		// Tools show hostnames, containers and files, none of which may stay on screen once the vault locks.
+		// Tools show hostnames, containers and files, none of which may stay on screen once the vault locks. Their
+		// windows go through ShellToolWindows.
 		lock (_gate)
 		{
 			_dialogs.Clear();
 		}
 
-		_windows?.CloseAll(_services);
 		Changed?.Invoke();
 	}
 
 	private void OnWindowsChanged() => Changed?.Invoke();
-
-	/// <summary>
-	/// A question this window asks (a sudo password a tool's action needed, a host key on reconnect) shows here, not in
-	/// a tool window, so this window comes forward once for each new one. Questions the tools ask themselves have their
-	/// own queue in the tool's window and never reach this one.
-	/// </summary>
-	private void OnPromptsChanged()
-	{
-		InteractionRequest? current = _prompts.Current;
-		if (current is null || ReferenceEquals(Interlocked.Exchange(ref _shownPrompt, current), current))
-		{
-			return;
-		}
-
-		_windows?.ShowOwner(_services);
-	}
 }

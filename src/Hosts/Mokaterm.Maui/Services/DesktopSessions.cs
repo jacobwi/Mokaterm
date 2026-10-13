@@ -25,9 +25,12 @@ public sealed class DesktopSessions
 	public DesktopSessions(ISettingsService settings) => _settings = settings;
 
 	/// <summary>Called by the page's root component; disposing the result forgets the page again.</summary>
-	public IDisposable Track(ISessionManager sessions, ITransferQueue transfers)
+	/// <param name="sessions">The page's sessions, closed at shutdown.</param>
+	/// <param name="transfers">The page's transfers, cancelled at shutdown.</param>
+	/// <param name="flushPage">Writes the page's own state, such as where its tool windows were, at shutdown.</param>
+	public IDisposable Track(ISessionManager sessions, ITransferQueue transfers, Func<Task>? flushPage = null)
 	{
-		Registration registration = new(this, sessions, transfers);
+		Registration registration = new(this, sessions, transfers, flushPage);
 		lock (_lock)
 		{
 			_registrations.Add(registration);
@@ -48,7 +51,8 @@ public sealed class DesktopSessions
 		// Both at once: a session close that runs its whole deadline must not be what loses the settings.
 		Task stop = Report(StopAllAsync);
 		Task flush = Report(() => _settings.FlushAsync());
-		_ = await Task.WhenAny(Task.WhenAll(stop, flush), Task.Delay(ShutdownTimeout));
+		Task pages = Report(FlushPagesAsync);
+		_ = await Task.WhenAny(Task.WhenAll(stop, flush, pages), Task.Delay(ShutdownTimeout));
 	});
 
 	/// <summary>
@@ -83,6 +87,17 @@ public sealed class DesktopSessions
 		}
 	}
 
+	private Task FlushPagesAsync()
+	{
+		Registration[] registrations;
+		lock (_lock)
+		{
+			registrations = [.. _registrations];
+		}
+
+		return Task.WhenAll(registrations.Select(registration => registration.FlushPage?.Invoke() ?? Task.CompletedTask));
+	}
+
 	private static async Task Report(Func<Task> work)
 	{
 		try
@@ -108,16 +123,19 @@ public sealed class DesktopSessions
 	{
 		private readonly DesktopSessions _owner;
 
-		public Registration(DesktopSessions owner, ISessionManager sessions, ITransferQueue transfers)
+		public Registration(DesktopSessions owner, ISessionManager sessions, ITransferQueue transfers, Func<Task>? flushPage)
 		{
 			_owner = owner;
 			Sessions = sessions;
 			Transfers = transfers;
+			FlushPage = flushPage;
 		}
 
 		public ISessionManager Sessions { get; }
 
 		public ITransferQueue Transfers { get; }
+
+		public Func<Task>? FlushPage { get; }
 
 		public void Dispose() => _owner.Forget(this);
 	}

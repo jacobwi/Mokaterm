@@ -38,9 +38,9 @@ public static class MauiProgram
 		builder.Services.AddSingleton<DesktopSessions>();
 		builder.Services.AddScoped<ILocalFileAccess, MauiLocalFileAccess>();
 
-		// Session tools in windows of their own. Each window's page borrows the services of the window that opened it,
-		// which the manager works out from the finished registrations below, and its BlazorWebView needs the handler
-		// that hands Blazor that borrowed scope.
+		// Tools in windows of their own. Each window's page borrows the services of the window that opened it, which the
+		// manager works out from the finished registrations below, and its BlazorWebView needs the handler that hands
+		// Blazor that borrowed scope.
 		DesktopToolWindows toolWindows = new();
 		builder.Services.AddSingleton(toolWindows);
 		builder.Services.AddSingleton<IToolWindows>(toolWindows);
@@ -74,8 +74,20 @@ public static class MauiProgram
 		toolWindows.Prepare(
 			builder.Services,
 			MokatermUiServiceCollectionExtensions.PageServices,
-			app.Services.GetRequiredService<ILogger<DesktopToolWindows>>());
+			app.Services.GetRequiredService<ILogger<DesktopToolWindows>>(),
+			ToolWindowChrome());
 		return app;
+	}
+
+	// Every tool window draws its own title bar like the main window, through a chrome of its own: the main window's
+	// is bound to the main window and would move that one's drag regions.
+	private static Func<IServiceProvider, IWindowChrome>? ToolWindowChrome()
+	{
+#if WINDOWS
+		return services => new Platforms.Windows.WindowChrome(services.GetRequiredService<Abstractions.Settings.ISettingsService>());
+#else
+		return null;
+#endif
 	}
 
 	private static void AddPlatformServices(MauiAppBuilder builder)
@@ -115,17 +127,20 @@ public static class MauiProgram
 		// Plugin changes apply at the next start, which the Plugins page can start from here.
 		builder.Services.AddSingleton<IAppRestarter, Platforms.Windows.DesktopRestarter>();
 
-		// One window, so one chrome: the shell's top bar becomes that window's title bar.
+		// The main window's chrome: the shell's top bar becomes its title bar. Tool windows each make their own
+		// (ToolWindowChrome above), which their pages find in place of this one.
 		builder.Services.AddSingleton<Platforms.Windows.WindowChrome>();
 		builder.Services.AddSingleton<IWindowChrome>(services => services.GetRequiredService<Platforms.Windows.WindowChrome>());
 
 		// Both of these need the window itself, and its handler is connected by the time this runs.
 		builder.ConfigureLifecycleEvents(events => events.AddWindows(windows => windows.OnWindowCreated(window =>
 		{
-			// A tool window keeps the system's title bar and takes no file drops: both singletons serve the main window,
-			// and attaching either to a tool window would take it from the main one.
-			if (window.GetWindow() is ToolWindow)
+			// A tool window has a chrome of its own and takes no file drops: both singletons serve the main window, and
+			// attaching either to a tool window would take it from the main one.
+			if (window.GetWindow() is ToolWindow tool)
 			{
+				(tool.Chrome as Platforms.Windows.WindowChrome)?.Attach(window);
+				DesktopToolWindows.ApplyKeepOnTop(tool);
 				return;
 			}
 

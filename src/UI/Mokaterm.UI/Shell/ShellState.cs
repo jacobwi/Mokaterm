@@ -1,5 +1,3 @@
-using Mokaterm.UI.Common.Contributions;
-
 namespace Mokaterm.UI.Shell;
 
 /// <summary>
@@ -30,9 +28,6 @@ internal sealed class ShellState
 
 	/// <summary>The editor dialog on screen, or null.</summary>
 	public ShellEditorRequest? Editor { get; private set; }
-
-	/// <summary>The app tool on screen, or null.</summary>
-	public AppToolDescriptor? AppTool { get; private set; }
 
 	public void SetConnectionsPanelCollapsed(bool collapsed)
 	{
@@ -132,41 +127,19 @@ internal sealed class ShellState
 		Changed?.Invoke();
 	}
 
-	/// <summary>Shows an app tool, in place of the one on screen.</summary>
-	public void OpenAppTool(AppToolDescriptor tool)
-	{
-		ArgumentNullException.ThrowIfNull(tool);
-		if (ReferenceEquals(AppTool, tool))
-		{
-			return;
-		}
-
-		AppTool = tool;
-		Changed?.Invoke();
-	}
-
-	public void CloseAppTool()
-	{
-		if (AppTool is null)
-		{
-			return;
-		}
-
-		AppTool = null;
-		Changed?.Invoke();
-	}
-
-	/// <summary>Drops any open editor and app tool, for example when the vault locks and the shell unmounts.</summary>
+	/// <summary>
+	/// Drops any open editor and the shortcut sheet, for example when the vault locks and the shell unmounts. App tools
+	/// go by <c>AppToolActions</c>, which follows the vault itself.
+	/// </summary>
 	public void ResetTransientUi()
 	{
-		if (Editor is null && !ShortcutsOpen && AppTool is null)
+		if (Editor is null && !ShortcutsOpen)
 		{
 			return;
 		}
 
 		Editor = null;
 		ShortcutsOpen = false;
-		AppTool = null;
 		Changed?.Invoke();
 	}
 

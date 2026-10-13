@@ -1,16 +1,8 @@
 <div class="mt-shell">
-	@if (_chrome is null)
-	{
+	@* Where the window has no title bar of its own, the top bar is it. *@
+	<WindowChromeBar Class="mt-shell-top">
 		<ShellAppBar />
-	}
-	else
-	{
-		@* The window has no title bar of its own: the bar keeps the window's buttons clear and reports where it can be
-		   dragged. *@
-		<div class="mt-shell-top" style="@_chromeStyle" @ref="_topBar">
-			<ShellAppBar />
-		</div>
-	}
+	</WindowChromeBar>
 
 	<MokaDockLayout Class="mt-shell-body">
 		<MokaDockPanel Dock="MokaDockPosition.Left"

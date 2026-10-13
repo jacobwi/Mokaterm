@@ -1,0 +1,8 @@
+/* One line, cut with an ellipsis: the detail gives way first when the header is narrow. */
+.mt-tool-description {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

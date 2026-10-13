@@ -37,9 +37,13 @@ internal sealed record UiStateDocument
 	public string? RestoreLayout { get; init; }
 
 	/// <summary>
-	/// Where each session tool's own window was last, by the tool's key (<c>docker</c>), so the next one opens there.
-	/// One entry per tool rather than per session: the key names a module's view, never a machine.
+	/// Where each tool's own window was last and whether it stayed on top, by <see cref="ToolWindowTarget.PlaceKey"/>
+	/// (<c>docker</c>, <c>app:subnet-calculator</c>), so the next one opens the same way. One entry per tool rather than
+	/// per session: the key names a module's view, never a machine.
 	/// </summary>
 	public IReadOnlyDictionary<string, ToolWindowBounds> ToolWindows { get; init; } =
 		new Dictionary<string, ToolWindowBounds>(StringComparer.Ordinal);
+
+	/// <summary>The tool windows that were open, in the order they opened, for the next start to bring back.</summary>
+	public IReadOnlyList<ToolWindowMemo> RestoreToolWindows { get; init; } = [];
 }

@@ -12,6 +12,7 @@ using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Connections;
 using Mokaterm.UI.Presentation;
+using Mokaterm.UI.Tools;
 using Mokaterm.UI.Workspace;
 
 namespace Mokaterm.UI.Shell;
@@ -37,6 +38,7 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 	private readonly IUserInteraction _interaction;
 	private readonly IVault _vault;
 	private readonly SessionToolActions _tools;
+	private readonly AppToolActions _appTools;
 	private readonly SessionViewRequests _requests;
 	private readonly Lock _gate = new();
 	private readonly IReadOnlyList<CommandDefinition> _definitions;
@@ -60,6 +62,7 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 		IUserInteraction interaction,
 		IVault vault,
 		SessionToolActions tools,
+		AppToolActions appTools,
 		SessionViewRequests requests)
 	{
 		_palette = palette;
@@ -75,6 +78,7 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 		_interaction = interaction;
 		_vault = vault;
 		_tools = tools;
+		_appTools = appTools;
 		_requests = requests;
 		_definitions = BuildDefinitions();
 		foreach (CommandDefinition definition in _definitions)
@@ -260,7 +264,7 @@ internal sealed partial class ShellCommandRegistry : IDisposable
 			$"Open {tool.Title}",
 			"Tools",
 			tool.Icon,
-			Sync(() => _shell.OpenAppTool(tool)),
+			() => _appTools.OpenAsync(tool),
 			tool.Description,
 			$"app tool {tool.Title}")),
 	];

@@ -12,9 +12,9 @@ using Mokaterm.UI.Common.Platform;
 namespace Mokaterm.Maui.ToolWindows;
 
 /// <summary>
-/// The desktop's session tool windows. It only manages windows: the shell decides when one opens and when one has to
-/// go. Created before the app is built and given the app's registrations once it is, because a tool window's services
-/// are worked out from them (<see cref="ToolPageServices"/>).
+/// The desktop's tool windows, for session tools and app tools. It only manages windows: the shell decides when one
+/// opens and when one has to go. Created before the app is built and given the app's registrations once it is,
+/// because a tool window's services are worked out from them (<see cref="ToolPageServices"/>).
 /// </summary>
 public sealed class DesktopToolWindows : IToolWindows
 {
@@ -33,6 +33,7 @@ public sealed class DesktopToolWindows : IToolWindows
 	private readonly Lock _gate = new();
 	private readonly List<ToolWindow> _windows = [];
 	private ToolPageServices? _pages;
+	private Func<IServiceProvider, IWindowChrome>? _chromeFor;
 	private ILogger _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
 
 	public event Action? Changed;
@@ -42,14 +43,26 @@ public sealed class DesktopToolWindows : IToolWindows
 	/// registrations would not let a window borrow the vault and the sessions, every open answers false and the shell
 	/// shows the tool in a dialog.
 	/// </summary>
-	public void Prepare(IEnumerable<ServiceDescriptor> registrations, IEnumerable<Type> pageServices, ILogger<DesktopToolWindows> logger)
+	/// <param name="registrations">Every registration of the app.</param>
+	/// <param name="pageServices">The shell's page services, which each window gets its own of.</param>
+	/// <param name="logger">Where a window that would not open is reported.</param>
+	/// <param name="chromeFor">
+	/// Makes the chrome a new window's page draws its title bar with, from the opening window's services; null where
+	/// windows keep the system title bar.
+	/// </param>
+	public void Prepare(
+		IEnumerable<ServiceDescriptor> registrations,
+		IEnumerable<Type> pageServices,
+		ILogger<DesktopToolWindows> logger,
+		Func<IServiceProvider, IWindowChrome>? chromeFor = null)
 	{
 		_logger = logger;
+		_chromeFor = chromeFor;
 		ToolPageServices pages = new(registrations, pageServices);
 		if (pages.FirstNotShared(MustBorrow) is { } wrong)
 		{
 			_logger.LogError(
-				"Session tools stay in dialogs: a tool window would get its own {Service} instead of borrowing the main window's.",
+				"Tools stay in dialogs: a tool window would get its own {Service} instead of borrowing the main window's.",
 				wrong.Name);
 			return;
 		}
@@ -57,13 +70,7 @@ public sealed class DesktopToolWindows : IToolWindows
 		_pages = pages;
 	}
 
-	public bool IsOpen(Guid sessionId, string toolKey)
-	{
-		lock (_gate)
-		{
-			return _windows.Exists(window => window.Shows(sessionId, toolKey));
-		}
-	}
+	public bool IsOpen(ToolWindowTarget target) => Find(target) is not null;
 
 	public Task<bool> OpenAsync(ToolWindowRequest request)
 	{
@@ -71,7 +78,9 @@ public sealed class DesktopToolWindows : IToolWindows
 		return MainThread.InvokeOnMainThreadAsync(() => Open(request));
 	}
 
-	public void Close(Guid sessionId, string? toolKey = null) => CloseWhere(window => window.Shows(sessionId, toolKey));
+	public void Close(ToolWindowTarget target) => CloseWhere(window => window.Shows(target));
+
+	public void CloseSession(Guid sessionId) => CloseWhere(window => window.Request.Target.SessionId == sessionId);
 
 	public void CloseAll(IServiceProvider services) => CloseWhere(window => ReferenceEquals(window.Request.Services, services));
 
@@ -92,6 +101,35 @@ public sealed class DesktopToolWindows : IToolWindows
 			Bring(owner);
 		}
 	});
+
+	public bool IsKeptOnTop(ToolWindowTarget target) => Find(target)?.KeepOnTop == true;
+
+	public void SetKeepOnTop(ToolWindowTarget target, bool keepOnTop) => OnMainThread(() =>
+	{
+		if (Find(target) is not { } window || window.KeepOnTop == keepOnTop)
+		{
+			return;
+		}
+
+		window.KeepOnTop = keepOnTop;
+		ApplyKeepOnTop(window);
+
+		// Remembered at once rather than when the window closes, so a crash does not lose it.
+		if (window.CurrentBounds is { IsUsable: true } bounds && !IsMinimized(window))
+		{
+			window.Request.BoundsChanged?.Invoke(bounds);
+		}
+
+		Changed?.Invoke();
+	});
+
+	/// <summary>Stays above other windows if it should, once the native window exists.</summary>
+	internal static void ApplyKeepOnTop(ToolWindow window)
+	{
+#if WINDOWS
+		Platforms.Windows.ToolWindowPlacement.SetKeepOnTop(window, window.KeepOnTop);
+#endif
+	}
 
 	private static void Bring(Window window)
 	{
@@ -127,6 +165,28 @@ public sealed class DesktopToolWindows : IToolWindows
 #endif
 	}
 
+	// At once on the UI thread: the main window's close handler calls this and the process must not wait for a queue.
+	private static void OnMainThread(Action action)
+	{
+		if (MainThread.IsMainThread)
+		{
+			action();
+		}
+		else
+		{
+			MainThread.BeginInvokeOnMainThread(action);
+		}
+	}
+
+	private ToolWindow? Find(ToolWindowTarget target)
+	{
+		ArgumentNullException.ThrowIfNull(target);
+		lock (_gate)
+		{
+			return _windows.Find(window => window.Shows(target));
+		}
+	}
+
 	private bool Open(ToolWindowRequest request)
 	{
 		if (_pages is not { } pages || Application.Current is not { } app)
@@ -134,13 +194,7 @@ public sealed class DesktopToolWindows : IToolWindows
 			return false;
 		}
 
-		ToolWindow? existing;
-		lock (_gate)
-		{
-			existing = _windows.Find(window => window.Shows(request.SessionId, request.ToolKey));
-		}
-
-		if (existing is not null)
+		if (Find(request.Target) is { } existing)
 		{
 			Bring(existing);
 			return true;
@@ -149,7 +203,12 @@ public sealed class DesktopToolWindows : IToolWindows
 		ToolWindow created;
 		try
 		{
-			created = new ToolWindow(request, pages.Borrow(request.Services), Placement(request.Bounds));
+			// The page's title bar is bound to this window, so the page gets that chrome and not the main window's.
+			IWindowChrome? chrome = _chromeFor?.Invoke(request.Services);
+			IServiceProvider borrowed = pages.Borrow(
+				request.Services,
+				chrome is null ? null : new Dictionary<Type, object> { [typeof(IWindowChrome)] = chrome });
+			created = new ToolWindow(request, borrowed, Placement(request.Bounds), chrome);
 		}
 		catch (Exception ex)
 		{
@@ -182,6 +241,7 @@ public sealed class DesktopToolWindows : IToolWindows
 	private void Abandon(Application app, ToolWindow window)
 	{
 		window.Destroying -= OnWindowDestroying;
+		window.ClosedByApp = true;
 		lock (_gate)
 		{
 			_windows.Remove(window);
@@ -197,19 +257,6 @@ public sealed class DesktopToolWindows : IToolWindows
 		}
 	}
 
-	// At once on the UI thread: the main window's close handler calls this and the process must not wait for a queue.
-	private static void OnMainThread(Action action)
-	{
-		if (MainThread.IsMainThread)
-		{
-			action();
-		}
-		else
-		{
-			MainThread.BeginInvokeOnMainThread(action);
-		}
-	}
-
 	private void CloseWhere(Predicate<ToolWindow> match) => OnMainThread(() =>
 	{
 		ToolWindow[] closing;
@@ -220,6 +267,7 @@ public sealed class DesktopToolWindows : IToolWindows
 
 		foreach (ToolWindow window in closing)
 		{
+			window.ClosedByApp = true;
 			Application.Current?.CloseWindow(window);
 		}
 	});
@@ -241,6 +289,12 @@ public sealed class DesktopToolWindows : IToolWindows
 		if (window.CurrentBounds is { IsUsable: true } bounds && !IsMinimized(window))
 		{
 			window.Request.BoundsChanged?.Invoke(bounds);
+		}
+
+		// Nothing of the app's closed it, so its own close button did: it is not to come back at the next start.
+		if (removed && !window.ClosedByApp)
+		{
+			window.Request.ClosedByUser?.Invoke();
 		}
 
 		if (removed)

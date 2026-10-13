@@ -6,7 +6,10 @@ using WinUIWindow = Microsoft.UI.Xaml.Window;
 
 namespace Mokaterm.Maui.Platforms.Windows;
 
-/// <summary>Whether a tool window's remembered place is still on a screen, which a screen unplugged since may not be.</summary>
+/// <summary>
+/// Where a tool window is and how it stacks: whether its remembered place is still on a screen, which a screen unplugged
+/// since may not be, whether it is minimized, and keeping it on top.
+/// </summary>
 internal static class ToolWindowPlacement
 {
 	// The title bar is what the window is dragged by, so its middle has to be reachable.
@@ -37,5 +40,18 @@ internal static class ToolWindowPlacement
 		ArgumentNullException.ThrowIfNull(window);
 		return window.Handler?.PlatformView is WinUIWindow native
 			&& native.AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+	}
+
+	/// <summary>
+	/// Keeps the window above every window that is not itself kept on top, the main window included, or lets it go
+	/// behind them again. Does nothing before the native window exists.
+	/// </summary>
+	public static void SetKeepOnTop(MauiWindow window, bool keepOnTop)
+	{
+		ArgumentNullException.ThrowIfNull(window);
+		if (window.Handler?.PlatformView is WinUIWindow native && native.AppWindow.Presenter is OverlappedPresenter presenter)
+		{
+			presenter.IsAlwaysOnTop = keepOnTop;
+		}
 	}
 }

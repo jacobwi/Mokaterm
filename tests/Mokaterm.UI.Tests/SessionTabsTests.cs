@@ -160,11 +160,15 @@ public sealed class SessionTabsTests
 
 		public List<IServiceProvider> Owners { get; } = [];
 
-		public bool IsOpen(Guid sessionId, string toolKey) => false;
+		public bool IsOpen(ToolWindowTarget target) => false;
 
 		public Task<bool> OpenAsync(ToolWindowRequest request) => Task.FromResult(false);
 
-		public void Close(Guid sessionId, string? toolKey = null)
+		public void Close(ToolWindowTarget target)
+		{
+		}
+
+		public void CloseSession(Guid sessionId)
 		{
 		}
 
@@ -173,5 +177,11 @@ public sealed class SessionTabsTests
 		}
 
 		public void ShowOwner(IServiceProvider services) => Owners.Add(services);
+
+		public bool IsKeptOnTop(ToolWindowTarget target) => false;
+
+		public void SetKeepOnTop(ToolWindowTarget target, bool keepOnTop)
+		{
+		}
 	}
 }

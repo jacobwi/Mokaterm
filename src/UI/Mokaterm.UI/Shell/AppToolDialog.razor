@@ -1,17 +1,5 @@
-@using Moka.Red.Feedback.Dialog
-
-@* The app tool on screen, in a dialog sized like a session tool's. The boundary keeps a tool's failure inside it. *@
-@if (Shell.AppTool is { } tool)
+@* The app tool in the dialog, in the frame every tool shares. The frame's boundary keeps a tool's failure inside it. *@
+@if (Tools.Dialog is { } tool)
 {
-	bool wide = tool.Size == SessionToolSize.Wide;
-	<HeadedDialog Open="true"
-				  OpenChanged="OnOpenChanged"
-				  Icon="tool.Icon"
-				  Title="@tool.Title"
-				  DialogSize="@(wide ? MokaDialogSize.ExtraLarge : MokaDialogSize.Large)"
-				  Fill="wide">
-		<ViewBoundary @key="tool" Name="@tool.Title" Fill="wide">
-			<DynamicComponent Type="tool.Component" />
-		</ViewBoundary>
-	</HeadedDialog>
+	<AppToolFrame Presentation="ToolPresentation.Dialog" Tool="tool" />
 }

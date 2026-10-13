@@ -53,12 +53,12 @@ none names a machine.
 | Extension point | Registration | Plugin use |
 | --- | --- | --- |
 | Protocol | `IProtocolProvider` and `AddProtocolUi` | A new protocol with its options editor and, if it needs one, its own session view. |
-| Session tool | `AddSessionTool` | A toolbar tool like Docker or System, with its palette command. |
+| Session tool | `AddSessionTool` | A toolbar tool like Docker or System, with its palette command, in a dialog or (desktop) a window of its own. |
 | Settings page | `AddSettingsPage` | The plugin's own settings, built from the shared fields, in the settings list's Plugins group (the sample's refresh and subnet settings). |
 | Importer | `IConnectionImportSource` | Logins from another client. |
 | System page | `AddSystemPage` | A page in the System view's side menu (the sample's fail2ban page). |
 | Docker page | `AddDockerPage` | A page in the Docker manager's side menu. |
-| App tool | `AddAppTool` | A tool that needs no session (the sample's subnet calculator), in the top bar's Tools menu and the palette. |
+| App tool | `AddAppTool` | A tool that needs no session (the sample's subnet calculator), in the top bar's Tools menu and the palette, in a dialog or (desktop) a window of its own. |
 | Themes | `themes/` in the package | Terminal themes, listed after the built-in ones. |
 
 ### Settings

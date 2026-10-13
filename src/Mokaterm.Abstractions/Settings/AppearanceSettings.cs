@@ -58,10 +58,27 @@ public sealed record AppearanceSettings : ISettingsSection
 	public IReadOnlyList<string> HiddenToolbarButtons { get; init; } = [];
 
 	/// <summary>
-	/// Opens session tools in windows of their own where the host has windows, which is the desktop app. A browser
-	/// keeps them in dialogs whatever this says.
+	/// Opens tools, session tools and the top bar's app tools alike, in windows of their own where the host has windows,
+	/// which is the desktop app. A browser keeps them in dialogs whatever this says.
 	/// </summary>
 	public bool ToolsInOwnWindow { get; init; } = true;
+
+	/// <summary>
+	/// Brings back at start the tool windows that were open when Mokaterm closed. Desktop only, like the windows.
+	/// </summary>
+	public bool ReopenToolWindows { get; init; } = true;
+
+	/// <summary>
+	/// Opens each tool's window where that tool's window was last, at its size, and on top if it stayed on top. Off,
+	/// every window opens at the tool's default size where the system puts it, and nothing about it is kept.
+	/// </summary>
+	public bool RememberToolWindowPlaces { get; init; } = true;
+
+	/// <summary>
+	/// Puts an app tool's one-line description after its title in its dialog or window header. Off, the header holds
+	/// the icon and the title (and a session tool's session) and the description shows when the title is pointed at.
+	/// </summary>
+	public bool ShowToolDescriptions { get; init; }
 
 	/// <summary>A copy with the accent color and the font scale inside the range the settings page offers.</summary>
 	public AppearanceSettings Clamped() => this with

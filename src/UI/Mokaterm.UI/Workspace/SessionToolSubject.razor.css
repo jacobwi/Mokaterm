@@ -4,3 +4,9 @@
 	gap: var(--moka-spacing-xs);
 	min-width: 0;
 }
+
+/* The state stays whole when the label has to give way. */
+.mt-tool-session ::deep .mt-tool-session-state {
+	flex-shrink: 0;
+	margin-inline-start: var(--moka-spacing-xs);
+}

@@ -1,8 +1,9 @@
 namespace Mokaterm.UI.Common.Platform;
 
 /// <summary>
-/// A host window without a system title bar: the shell's top bar is drawn where the title bar would be and takes over
-/// its jobs. The desktop host implements it. A host that registers nothing keeps the top bar an ordinary bar.
+/// A host window without a system title bar: the shell's top bar, or a tool's header in a tool window, is drawn where
+/// the title bar would be and takes over its jobs. The desktop host implements it, one per window: a page finds the
+/// chrome of the window it is in. A host that registers nothing keeps the bar an ordinary bar.
 /// </summary>
 public interface IWindowChrome
 {

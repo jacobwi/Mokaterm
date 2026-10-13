@@ -36,7 +36,9 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 
 	public void Dispose() => _registration?.Dispose();
 
-	protected override void OnInitialized() => _registration = Registry.Track(Sessions, Transfers);
+	// The page's own state too: the tool windows that close with the main window report where they were just before.
+	protected override void OnInitialized() =>
+		_registration = Registry.Track(Sessions, Transfers, () => UI.Shell.ShellPersistence.FlushAsync(Services));
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{

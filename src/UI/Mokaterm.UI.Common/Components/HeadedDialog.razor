@@ -24,7 +24,7 @@
 
 @code {
 	// Inside Moka's heading, so the dialog is named by both: "System root@web-1".
-	private RenderFragment? TitleContent => HeaderDetail is null
+	private RenderFragment? TitleContent => HeaderDetail is null && TitleHint is null
 		? null
-		: @<DialogTitle Title="@Title" Detail="HeaderDetail" />;
+		: @<DialogTitle Title="@Title" Detail="HeaderDetail" Hint="@TitleHint" />;
 }

@@ -4,15 +4,15 @@ using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Platform;
-using Mokaterm.UI.Workspace;
+using Mokaterm.UI.Tools;
 
 namespace Mokaterm.Maui.ToolWindows;
 
 /// <summary>
-/// A session tool in a native window of its own: one BlazorWebView whose page is <see cref="ToolWindowView"/>, running
-/// on services borrowed from the window that opened it. It keeps the system's title bar rather than the main window's
-/// custom one: that one is the shell's top bar reporting its empty stretches as drag regions, and a tool's page has no
-/// such bar, while the system's shows the title "Docker · user@host" that the taskbar and Alt+Tab list it by.
+/// A tool in a native window of its own: one BlazorWebView whose page is <see cref="ToolWindowView"/>, running on
+/// services borrowed from the window that opened it. Like the main window it has no system title bar: the tool's header
+/// is the title bar, through a chrome of its own (<see cref="Chrome"/>), with the window's buttons drawn over its end.
+/// The title "Docker · user@host" stays the window's, for the taskbar and Alt+Tab.
 /// </summary>
 internal sealed class ToolWindow : Window
 {
@@ -21,15 +21,17 @@ internal sealed class ToolWindow : Window
 	private const double StandardWidth = 760;
 	private const double StandardHeight = 560;
 
+	/// <param name="request">What to show, and where its place is remembered.</param>
+	/// <param name="borrowed">The window's services (<see cref="ToolPageServices.Borrow"/>), which it holds for its whole life.</param>
 	/// <param name="bounds">Where to open, or null for the tool's default size; a position that is not a number is left to the system.</param>
-	public ToolWindow(ToolWindowRequest request, IServiceProvider borrowed, ToolWindowBounds? bounds)
+	/// <param name="chrome">The chrome bound to this window, which its page also finds as its <see cref="IWindowChrome"/>.</param>
+	public ToolWindow(ToolWindowRequest request, IServiceProvider borrowed, ToolWindowBounds? bounds, IWindowChrome? chrome)
 	{
 		ArgumentNullException.ThrowIfNull(request);
 		ArgumentNullException.ThrowIfNull(borrowed);
 		Request = request;
-
-		// The window holds the borrowed container for as long as it lives; nothing else does.
 		Borrowed = borrowed;
+		Chrome = chrome;
 		Title = request.Title;
 		MinimumWidth = ToolWindowBounds.MinWidth;
 		MinimumHeight = ToolWindowBounds.MinHeight;
@@ -37,6 +39,7 @@ internal sealed class ToolWindow : Window
 		{
 			Width = bounds.Width;
 			Height = bounds.Height;
+			KeepOnTop = bounds.KeepOnTop;
 			if (double.IsFinite(bounds.X) && double.IsFinite(bounds.Y))
 			{
 				X = bounds.X;
@@ -59,11 +62,7 @@ internal sealed class ToolWindow : Window
 		{
 			Selector = "#app",
 			ComponentType = typeof(ToolWindowView),
-			Parameters = new Dictionary<string, object?>
-			{
-				[nameof(ToolWindowView.SessionId)] = request.SessionId,
-				[nameof(ToolWindowView.ToolKey)] = request.ToolKey,
-			},
+			Parameters = new Dictionary<string, object?> { [nameof(ToolWindowView.Target)] = request.Target },
 		});
 		view.BlazorWebViewInitialized += OnWebViewInitialized;
 		view.UrlLoading += OnUrlLoading;
@@ -79,11 +78,21 @@ internal sealed class ToolWindow : Window
 
 	public IServiceProvider Borrowed { get; }
 
-	/// <summary>Where the window is now, in the units the next one is opened with.</summary>
-	public ToolWindowBounds CurrentBounds => new(X, Y, Width, Height);
+	/// <summary>The title bar this window's page draws, or null on a platform without one.</summary>
+	public IWindowChrome? Chrome { get; }
 
-	public bool Shows(Guid sessionId, string? toolKey) =>
-		Request.SessionId == sessionId && (toolKey is null || string.Equals(Request.ToolKey, toolKey, StringComparison.Ordinal));
+	/// <summary>Whether the window stays above other windows. The host applies it to the native window.</summary>
+	public bool KeepOnTop { get; set; }
+
+	/// <summary>
+	/// Set before the app closes the window itself, so a close without it is the user's own: the window's close button.
+	/// </summary>
+	public bool ClosedByApp { get; set; }
+
+	/// <summary>Where the window is now and whether it stays on top, in the units the next one is opened with.</summary>
+	public ToolWindowBounds CurrentBounds => new(X, Y, Width, Height) { KeepOnTop = KeepOnTop };
+
+	public bool Shows(ToolWindowTarget target) => Request.Target == target;
 
 	private static void OnUrlLoading(object? sender, UrlLoadingEventArgs e) => UrlLoadingPolicy.Apply(e);
 

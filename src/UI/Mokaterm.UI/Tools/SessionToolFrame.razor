@@ -1,0 +1,26 @@
+@* A session tool in the shared frame, with the session it works on and that session's state after the title. *@
+<ToolFrame Presentation="Presentation"
+		   Target="SessionToolActions.Target(Session, Tool)"
+		   Icon="Tool.Icon"
+		   Title="@Tool.Title"
+		   Size="Tool.Size"
+		   OnPopOut="PopOutAsync"
+		   OnReturn="ReturnCallback"
+		   OnClose="CloseDialog">
+	<Detail>
+		<SessionToolSubject Session="Session" />
+	</Detail>
+	<ChildContent>
+		@if (Tools.Available(Session).Contains(Tool))
+		{
+			<DynamicComponent Type="Tool.Component" Parameters="Parameters" />
+		}
+		else
+		{
+			@* Only a window gets here: a dialog closes when its tool needs a connection the session lost. *@
+			<MokaEmptyState Icon="MokatermIcons.Disconnect"
+							Title="@($"{Tool.Title} needs the session")"
+							Description="@SessionIdleText.For(Session.State, $"Reconnect the session to use {Tool.Title} again.")" />
+		}
+	</ChildContent>
+</ToolFrame>

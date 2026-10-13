@@ -16,6 +16,7 @@ using Mokaterm.UI.QuickConnect;
 using Mokaterm.UI.Settings.Extensions;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Terminal.Extensions;
+using Mokaterm.UI.Tools;
 using Mokaterm.UI.Vault;
 using Mokaterm.UI.Workspace;
 
@@ -25,8 +26,8 @@ public static class MokatermUiServiceCollectionExtensions
 {
 	/// <summary>
 	/// The scoped services of the shell that belong to one page rather than to the window's state. A second page that
-	/// borrows a window's services, such as a session tool's own window on the desktop, gets its own of these and the
-	/// window's of everything else. The prompt queue is one: a question a tool asks shows in the window the tool is in.
+	/// borrows a window's services, such as a tool's own window on the desktop, gets its own of these and the window's
+	/// of everything else. The prompt queue is one: a question a tool asks shows in the window the tool is in.
 	/// Services that call into the page, Blazor's and Moka.Red's are recognized without being listed here.
 	/// </summary>
 	public static IReadOnlyList<Type> PageServices { get; } = [typeof(IUserInteraction), typeof(UserInteractionService)];
@@ -61,7 +62,11 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<SessionActions>();
 		services.AddScoped<ISessionTabs, SessionTabs>();
 
+		// Tools in dialogs and in windows of their own. All three are the window's state, which a tool window borrows.
+		services.AddScoped<ShellToolWindows>();
 		services.AddScoped<SessionToolActions>();
+		services.AddScoped<AppToolActions>();
+		services.AddScoped<ToolWindowRestore>();
 
 		services.AddScoped<SessionViewRequests>();
 		services.AddScoped<CatalogState>();
