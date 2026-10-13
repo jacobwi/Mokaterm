@@ -31,17 +31,21 @@
 					{
 						<span class="mt-qc-recent" aria-hidden="true"><MokaIcon Icon="MokatermIcons.History" Size="MokaSize.Xs" /></span>
 						@* The mouse's way to forget an entry; the keyboard's is Shift+Delete on the active row, which is why the
-						   button stays out of the accessibility tree instead of nesting a control inside an option. *@
-						<button type="button"
-								class="mt-qc-remove"
-								tabindex="-1"
-								aria-hidden="true"
-								title="Remove from history (Shift+Delete)"
-								@onmousedown:preventDefault
-								@onclick:stopPropagation
-								@onclick="() => OnRemove.InvokeAsync(row)">
-							<MokaIcon Icon="MokaIcons.Navigation.Close" Size="MokaSize.Xs" />
-						</button>
+						   button stays out of the accessibility tree instead of nesting a control inside an option. It is a
+						   plain button rather than an IconButton because it must not take the focus from the box. The empty
+						   title keeps the row's own title from showing over the tooltip. *@
+						<Hint Text="Remove from history" Shortcut="Shift+Delete" Position="MokaTooltipPosition.BottomEnd" Class="mt-qc-remove-hint">
+							<button type="button"
+									class="mt-qc-remove"
+									tabindex="-1"
+									aria-hidden="true"
+									title=""
+									@onmousedown:preventDefault
+									@onclick:stopPropagation
+									@onclick="() => OnRemove.InvokeAsync(row)">
+								<MokaIcon Icon="MokaIcons.Navigation.Close" Size="MokaSize.Xs" />
+							</button>
+						</Hint>
 					}
 					break;
 

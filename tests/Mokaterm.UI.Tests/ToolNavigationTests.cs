@@ -41,7 +41,7 @@ public sealed partial class ToolNavigationTests
 
 		Assert.Contains("Fail2ban", Labels(html));
 		Assert.Contains("mt-toolnav-item--off", Tooltips.ControlFor(html, "Fail2ban: fail2ban is not installed here."), StringComparison.Ordinal);
-		Assert.Contains("moka-tooltip-popup--right\"", Tooltips.PopupFor(html, "Fail2ban: fail2ban is not installed here."), StringComparison.Ordinal);
+		Assert.Equal("right", Tooltips.PositionOf(html, "Fail2ban: fail2ban is not installed here."));
 	}
 
 	private static List<string> Labels(string html) => [.. Label().Matches(html).Select(match => match.Groups[1].Value)];

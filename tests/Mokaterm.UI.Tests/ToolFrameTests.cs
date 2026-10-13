@@ -95,7 +95,11 @@ public sealed partial class ToolFrameTests
 			new FakeToolWindows(),
 			session => session.Become(SessionState.Failed, countdown));
 
-		Assert.Contains($"title=\"{countdown}\"", StatusDot().Match(html).Value, StringComparison.Ordinal);
+		Assert.Contains(StatusDot().Match(html).Value, Tooltips.ControlFor(html, countdown), StringComparison.Ordinal);
+		Assert.Equal("bottom", Tooltips.PositionOf(html, countdown));
+
+		// The header is the window's title bar, where only what keeps the pointer in the page ever shows a tooltip.
+		Assert.Contains("data-mt-no-drag", Tooltips.TriggerFor(html, countdown), StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -121,10 +125,9 @@ public sealed partial class ToolFrameTests
 	{
 		string html = await RenderAppToolAsync(presentation, new FakeToolWindows());
 
-		Assert.Contains(
-			"<span class=\"mt-dialog-title-text\" title=\"Network, broadcast and host range of a prefix\"",
-			TitleScope().Replace(html, ""),
-			StringComparison.Ordinal);
+		Assert.Contains(">Subnet calculator</span>", Tooltips.ControlFor(html, Subnets.Description!), StringComparison.Ordinal);
+		Assert.Equal("bottom-start", Tooltips.PositionOf(html, Subnets.Description!));
+		Assert.Matches(TitleHint(), html);
 		Assert.DoesNotContain("mt-dialog-detail", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("mt-tool-description", html, StringComparison.Ordinal);
 		Assert.Contains("the subnet tool", html, StringComparison.Ordinal);
@@ -145,7 +148,8 @@ public sealed partial class ToolFrameTests
 		Assert.Contains(">Subnet calculator</span>", html, StringComparison.Ordinal);
 		Assert.Contains("mt-dialog-detail", html, StringComparison.Ordinal);
 		Assert.Contains(">Network, broadcast and host range of a prefix</span>", html, StringComparison.Ordinal);
-		Assert.DoesNotContain("mt-dialog-title-text\" title=", TitleScope().Replace(html, ""), StringComparison.Ordinal);
+		Assert.DoesNotContain(Subnets.Description!, Tooltips.Texts(html));
+		Assert.DoesNotMatch(TitleHint(), html);
 	}
 
 	// A session tool has no description: its header carries the session either way.
@@ -159,7 +163,7 @@ public sealed partial class ToolFrameTests
 
 		Assert.Contains("mt-tool-session", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("mt-tool-description", html, StringComparison.Ordinal);
-		Assert.DoesNotContain("mt-dialog-title-text\" title=", TitleScope().Replace(html, ""), StringComparison.Ordinal);
+		Assert.DoesNotMatch(TitleHint(), html);
 	}
 
 	// The desktop: a dialog offers its own window, and only that.
@@ -314,9 +318,9 @@ public sealed partial class ToolFrameTests
 	[GeneratedRegex("<button[^>]*class=\"mt-dialog-head-button[^>]*>")]
 	private static partial Regex HeaderButtonTag();
 
-	// Blazor's scoped CSS attribute, which sits between an element's name and its attributes.
-	[GeneratedRegex(" b-[a-z0-9]{10}")]
-	private static partial Regex TitleScope();
+	// The title's hint element while it holds a hint, which keeps the pointer in the page so a window's title bar shows it.
+	[GeneratedRegex("<span class=\"moka-tooltip-trigger mt-dialog-title-text\"[^>]*\\sdata-mt-no-drag")]
+	private static partial Regex TitleHint();
 
 	[GeneratedRegex("<span[^>]*class=\"moka-status-dot[^\"]*\"[^>]*>.*?</span>\\s*</span>", RegexOptions.Singleline)]
 	private static partial Regex StatusDot();

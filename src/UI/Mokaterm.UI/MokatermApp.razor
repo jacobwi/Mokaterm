@@ -38,7 +38,8 @@
 		</ViewBoundary>
 	}
 
-	<MokaToastHost />
+	@* Below the top bar, which on the desktop is also where the window's own buttons are, so a toast covers neither. *@
+	<MokaToastHost OffsetTop="var(--mt-top-bar-height)" />
 
 	@* Each overlay runs actions other parts of the app hand it (menu items, palette commands, the file browser's
 	   dialogs); one that throws is reported as a notice instead of ending the circuit. A dialog host that is recreated

@@ -3,10 +3,11 @@ using System.Text.RegularExpressions;
 namespace Mokaterm.UI.Tests;
 
 /// <summary>
-/// An icon with no visible label is named by IconButton's tooltip. A <c>title</c> on one brings the browser's own tooltip
-/// back beside it: a second late, unstyled box over the Moka one. This reads every .razor file under src the way Razor
-/// does (attribute values may hold C# with quotes and brackets of their own) and fails on an icon-only MokaButton or an
-/// IconButton that carries a title.
+/// An icon with no visible label is named by IconButton's tooltip, or by a Hint around a plain button that cannot be one.
+/// A <c>title</c> on one brings the browser's own tooltip back beside it: a second late, unstyled box over the Moka one.
+/// This reads every .razor file under src the way Razor does (attribute values may hold C# with quotes and brackets of
+/// their own) and fails on an icon-only MokaButton, an icon-only plain button or an IconButton that carries a title. An
+/// empty title is allowed, since that is how a button keeps a row's title from showing over its own tooltip.
 /// </summary>
 public sealed partial class IconTooltipMarkupTests
 {
@@ -27,9 +28,8 @@ public sealed partial class IconTooltipMarkupTests
 			string text = File.ReadAllText(file);
 			foreach (Match tag in ButtonStart().Matches(text))
 			{
-				(HashSet<string> attributes, bool iconOnly) = ReadButton(text, tag.Index + tag.Length, tag.Groups[1].Value);
 				read++;
-				if (attributes.Contains("title") && (iconOnly || tag.Groups[1].Value == "IconButton"))
+				if (Flags(text, tag))
 				{
 					found.Add($"{relative}:{LineOf(text, tag.Index)}");
 				}
@@ -50,17 +50,43 @@ public sealed partial class IconTooltipMarkupTests
 	[InlineData("""<IconButton Icon="X" Label="Refresh" title="Refresh" />""", true)]
 	[InlineData("""<MokaButton Label="@(on ? "Hide (Alt+H)" : "Show")" StartIcon="X" aria-label="@($"Edit {(a ? "x" : "y")} title=")" />""", false)]
 	[InlineData("""<MokaButton Text="@count.ToString("N0", culture)" StartIcon="X" title="@Hint(a, "b")" />""", true)]
-	public void TheReader_FindsTitlesOnIconOnlyButtons_AndNowhereElse(string markup, bool flagged)
-	{
-		Match tag = ButtonStart().Match(markup);
-		(HashSet<string> attributes, bool iconOnly) = ReadButton(markup, tag.Index + tag.Length, tag.Groups[1].Value);
+	[InlineData("""<button type="button" title="Remove" @onclick="() => Remove(row)"><MokaIcon Icon="X" /></button>""", true)]
+	[InlineData("""<button title="@(on ? "Hide" : "Show")">  <MokaIcon Icon="@(on ? A : B)" Size="MokaSize.Xs" />  </button>""", true)]
+	[InlineData("""<button type="button" title="" tabindex="-1"><MokaIcon Icon="X" /></button>""", false)]
+	[InlineData("""<button type="button" title="@Status"><MokaStatusDot /><span>web</span></button>""", false)]
+	[InlineData("""<button type="button" title="Open"><MokaIcon Icon="X" />Open</button>""", false)]
+	[InlineData("""<button type="button"><MokaIcon Icon="X" /></button>""", false)]
+	public void TheReader_FindsTitlesOnIconOnlyButtons_AndNowhereElse(string markup, bool flagged) =>
+		Assert.Equal(flagged, Flags(markup, ButtonStart().Match(markup)));
 
-		Assert.Equal(flagged, attributes.Contains("title") && (iconOnly || tag.Groups[1].Value == "IconButton"));
+	// A title the browser would show, on a button that shows nothing but an icon, or on an IconButton whatever it shows.
+	private static bool Flags(string text, Match tag)
+	{
+		string name = tag.Groups[1].Value;
+		(Dictionary<string, string> attributes, bool selfClosing, int end) = ReadTag(text, tag.Index + tag.Length);
+		if (!attributes.TryGetValue("title", out string? title) || title.Length == 0)
+		{
+			return false;
+		}
+
+		if (name == "IconButton")
+		{
+			return true;
+		}
+
+		if (name == "button")
+		{
+			return !selfClosing && OnlyIconsUntilClose(text, end);
+		}
+
+		bool hasIcon = attributes.ContainsKey("StartIcon") || attributes.ContainsKey("EndIcon") || attributes.ContainsKey("Icon");
+		return hasIcon && (selfClosing || EmptyUntilClose(text, end, name));
 	}
 
-	private static (HashSet<string> Attributes, bool IconOnly) ReadButton(string text, int at, string name)
+	// The attributes of the tag whose name ends just before at, each with its value as written, and where the tag ends.
+	private static (Dictionary<string, string> Attributes, bool SelfClosing, int End) ReadTag(string text, int at)
 	{
-		HashSet<string> attributes = new(StringComparer.Ordinal);
+		Dictionary<string, string> attributes = new(StringComparer.Ordinal);
 		bool selfClosing = false;
 		int i = at;
 		while (i < text.Length)
@@ -89,28 +115,82 @@ public sealed partial class IconTooltipMarkupTests
 				i++;
 			}
 
-			attributes.Add(text[start..i]);
-			if (i < text.Length && text[i] == '=')
-			{
-				i++;
-				i = text[i] == '"' ? SkipValue(text, i + 1) : SkipUnquoted(text, i);
-			}
-			else if (i == start)
+			if (i == start)
 			{
 				// A stray character; step over it rather than loop on it.
 				i++;
+				continue;
 			}
+
+			string name = text[start..i];
+			string value = "";
+			if (i < text.Length && text[i] == '=')
+			{
+				i++;
+				if (text[i] == '"')
+				{
+					int valueEnd = SkipValue(text, i + 1);
+					value = text[(i + 1)..Math.Max(i + 1, valueEnd - 1)];
+					i = valueEnd;
+				}
+				else
+				{
+					int valueStart = i;
+					i = SkipUnquoted(text, i);
+					value = text[valueStart..i];
+				}
+			}
+
+			attributes[name] = value;
 		}
 
-		bool hasIcon = attributes.Contains("StartIcon") || attributes.Contains("EndIcon") || attributes.Contains("Icon");
-		bool noContent = selfClosing || EmptyUntilClose(text, i, name);
-		return (attributes, hasIcon && noContent);
+		return (attributes, selfClosing, i);
 	}
 
 	private static bool EmptyUntilClose(string text, int i, string name)
 	{
 		int close = text.IndexOf($"</{name}>", i, StringComparison.Ordinal);
 		return close >= 0 && string.IsNullOrWhiteSpace(text[i..close]);
+	}
+
+	// A plain button's content up to its close: one or more MokaIcon tags and nothing else but white space.
+	private static bool OnlyIconsUntilClose(string text, int i)
+	{
+		const string close = "</button>";
+		const string icon = "<MokaIcon";
+		bool sawIcon = false;
+		while (i < text.Length)
+		{
+			while (i < text.Length && char.IsWhiteSpace(text[i]))
+			{
+				i++;
+			}
+
+			if (string.CompareOrdinal(text, i, close, 0, close.Length) == 0)
+			{
+				return sawIcon;
+			}
+
+			int after = i + icon.Length;
+			bool isIcon = string.CompareOrdinal(text, i, icon, 0, icon.Length) == 0
+				&& after < text.Length
+				&& (char.IsWhiteSpace(text[after]) || text[after] == '/');
+			if (!isIcon)
+			{
+				return false;
+			}
+
+			(_, bool selfClosing, int end) = ReadTag(text, after);
+			if (!selfClosing)
+			{
+				return false;
+			}
+
+			sawIcon = true;
+			i = end;
+		}
+
+		return false;
 	}
 
 	private static int SkipUnquoted(string text, int i)
@@ -254,6 +334,6 @@ public sealed partial class IconTooltipMarkupTests
 		return "";
 	}
 
-	[GeneratedRegex("<(MokaButton|IconButton)\\b")]
+	[GeneratedRegex("<(MokaButton|IconButton|button)\\b")]
 	private static partial Regex ButtonStart();
 }

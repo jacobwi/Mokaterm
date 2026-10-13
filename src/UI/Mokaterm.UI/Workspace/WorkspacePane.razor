@@ -47,6 +47,6 @@
 		@<span class="mt-tab-icon">
 			<MokaStatusDot Size="MokaSize.Xs" Color="@SessionStateDisplay.Color(session.State)" Pulse="@(session.State == SessionState.Connecting)" />
 			<ProtocolIcon ProtocolId="@session.Protocol.Id" Size="MokaSize.Xs" />
-			<SessionLabel Session="session" Tooltip="" />
+			<SessionLabel Session="session" />
 		</span>;
 }

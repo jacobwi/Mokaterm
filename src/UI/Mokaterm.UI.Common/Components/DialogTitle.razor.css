@@ -5,9 +5,15 @@
 	min-width: 0;
 }
 
-.mt-dialog-title-text {
+/* The hint's element around the title is what the row lays out, and the text inside it is what gets cut. */
+.mt-dialog-title ::deep .mt-dialog-title-text {
 	flex-shrink: 0;
 	max-width: 60%;
+	min-width: 0;
+}
+
+.mt-dialog-title-name {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

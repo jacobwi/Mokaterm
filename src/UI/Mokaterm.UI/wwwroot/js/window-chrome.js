@@ -4,10 +4,13 @@
 // click that misses a button by a pixel does nothing instead of moving the window.
 
 // Everything that takes a click. A form field counts as its whole box, so its icon and padding still focus it.
+// data-mt-no-drag marks what takes no click but has to see the pointer, such as a hint's trigger (Hint.razor): over a
+// stretch that moves the window, Windows keeps the pointer to itself and the page never hears of the hover.
 const interactive = [
 	'button', 'a[href]', 'input', 'select', 'textarea', 'label',
 	'[tabindex]:not([tabindex="-1"])', '[contenteditable]:not([contenteditable="false"])',
 	'[role="button"]', '[role="combobox"]', '[role="listbox"]', '[role="menu"]', '[role="option"]', '[role="tab"]',
+	'[data-mt-no-drag]',
 ].join(',');
 
 // A narrower gap between two controls stays with the page.

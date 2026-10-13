@@ -71,9 +71,9 @@ public sealed partial class IconButtonTests
 	}
 
 	[Theory]
-	[InlineData(null, "moka-tooltip-popup--bottom")]
-	[InlineData(MokaTooltipPosition.BottomEnd, "moka-tooltip-popup--bottom-end")]
-	[InlineData(MokaTooltipPosition.Top, "moka-tooltip-popup--top")]
+	[InlineData(null, "bottom")]
+	[InlineData(MokaTooltipPosition.BottomEnd, "bottom-end")]
+	[InlineData(MokaTooltipPosition.Top, "top")]
 	public async Task ThePosition_DefaultsToBelow(MokaTooltipPosition? position, string expected)
 	{
 		Dictionary<string, object?> parameters = new() { [nameof(IconButton.Label)] = "Close" };
@@ -84,7 +84,7 @@ public sealed partial class IconButtonTests
 
 		string html = await RenderButtonAsync(parameters);
 
-		Assert.Contains($"{expected}\"", Tooltips.PopupFor(html, "Close"), StringComparison.Ordinal);
+		Assert.Equal(expected, Tooltips.PositionOf(html, "Close"));
 	}
 
 	[Theory]
@@ -133,6 +133,7 @@ public sealed partial class IconButtonTests
 
 		Assert.Empty(Tooltips.Texts(html));
 		Assert.DoesNotContain("role=\"tooltip\"", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("data-mt-no-drag", html, StringComparison.Ordinal);
 		Assert.Contains(">inside<", html, StringComparison.Ordinal);
 	}
 
@@ -143,6 +144,20 @@ public sealed partial class IconButtonTests
 
 		Assert.Equal(["Save (Ctrl+S)"], Tooltips.Texts(html));
 		Assert.Contains(">inside<", Tooltips.ControlFor(html, "Save (Ctrl+S)"), StringComparison.Ordinal);
+	}
+
+	// A sentence wraps rather than running past the window's edge, and a hint in a desktop window's title bar still sees
+	// the pointer: window-chrome.js leaves anything marked data-mt-no-drag to the page.
+	[Fact]
+	public async Task AHint_WrapsItsText_AndKeepsThePointerInThePage()
+	{
+		const string text = "The server cannot compute checksums, so this copy was not checked";
+		string html = await RenderHintAsync(text, null);
+
+		string popup = Tooltips.PopupFor(html, text);
+		Assert.Contains("moka-tooltip-popup--wrap", popup, StringComparison.Ordinal);
+		Assert.Contains("--moka-tooltip-max-width: 20rem", popup, StringComparison.Ordinal);
+		Assert.Contains("data-mt-no-drag", Tooltips.TriggerFor(html, text), StringComparison.Ordinal);
 	}
 
 	[Theory]

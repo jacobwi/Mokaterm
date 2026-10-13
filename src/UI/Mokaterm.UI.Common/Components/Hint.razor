@@ -1,11 +1,20 @@
 @namespace Mokaterm.UI.Common.Components
 
-@* Moka.Red's tooltip with the app's defaults, around whatever it explains. IconButton draws its tooltip through this. *@
-<MokaTooltip Content="@(Format(Text, Shortcut) is { } text ? Body(text) : null)" Position="Position" Class="@Class" Style="@Style">
+@* Moka.Red's tooltip with the app's defaults, around whatever it explains. IconButton draws its tooltip through this.
+   A tooltip only shows once the pointer rests on it, and in a desktop window's title bar Windows takes the pointer
+   wherever nothing takes a click, so a hint there would never show: data-mt-no-drag leaves its box to the page
+   (window-chrome.js). *@
+<MokaTooltip Text="@Format(Text, Shortcut)"
+			 Position="Position"
+			 MaxWidth="@WrapWidth"
+			 Class="@Class"
+			 Style="@Style"
+			 data-mt-no-drag="@(!string.IsNullOrEmpty(Text))">
 	@ChildContent
 </MokaTooltip>
 
 @code {
-	// Moka's popup keeps its text on one line, which suits a name but runs a sentence past the window's edge.
-	private static RenderFragment Body(string text) => @<span class="mt-hint">@text</span>;
+	// Moka keeps a popup's text on one line unless it is given a width, which suits a name but runs a sentence past the
+	// window's edge.
+	private const string WrapWidth = "20rem";
 }

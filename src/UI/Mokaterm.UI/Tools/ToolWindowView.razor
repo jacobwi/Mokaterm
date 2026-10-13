@@ -30,7 +30,8 @@
 		</ToolFrame>
 	}
 
-	<MokaToastHost />
+	@* Below the header, which is the window's title bar and holds its buttons. *@
+	<MokaToastHost OffsetTop="var(--mt-top-bar-height)" />
 	<ViewBoundary Name="A dialog" NotifyOnly OnFailed="CloseServiceDialogs">
 		<MokaDialogHost />
 	</ViewBoundary>

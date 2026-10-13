@@ -127,7 +127,6 @@
 }
 
 .mt-qc-remove {
-	display: none;
 	padding: 0;
 	border: 1px solid transparent;
 	border-radius: var(--moka-radius-sm);
@@ -141,9 +140,16 @@
 	display: none;
 }
 
-.mt-qc-row:hover .mt-qc-remove,
-.mt-qc-row--active .mt-qc-remove {
-	display: flex;
+/* The tooltip's element around the button is what the row lays out, so it is the one that hides: an empty one would
+   still take a gap beside the clock. */
+.mt-qc-list ::deep .mt-qc-remove-hint {
+	display: none;
+	flex-shrink: 0;
+}
+
+.mt-qc-row:hover ::deep .mt-qc-remove-hint,
+.mt-qc-row--active ::deep .mt-qc-remove-hint {
+	display: inline-flex;
 }
 
 .mt-qc-remove:hover {

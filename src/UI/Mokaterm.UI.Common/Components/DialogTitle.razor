@@ -3,7 +3,9 @@
 @* A title with what it is about after it (a session's label for a tool), inside a heading: Moka's dialog heading through
    HeadedDialog, and a tool window's own header, so the two read the same. *@
 <span class="mt-dialog-title">
-	<span class="mt-dialog-title-text" title="@Hint">@Title</span>
+	<Hint Text="@Hint" Position="MokaTooltipPosition.BottomStart" Class="mt-dialog-title-text">
+		<span class="mt-dialog-title-name">@Title</span>
+	</Hint>
 	@if (Detail is not null)
 	{
 		<span class="mt-dialog-detail">@Detail</span>

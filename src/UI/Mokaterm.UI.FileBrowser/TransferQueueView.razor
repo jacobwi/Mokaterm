@@ -49,11 +49,11 @@
 		</text>;
 
 	RenderFragment CompactRow(ITransferItem item) =>
-		@<div @key="item.Id" class="tq-row tq-row--compact" title="@Tooltip(item)">
+		@<div @key="item.Id" class="tq-row tq-row--compact">
 			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
-			<span class="tq-name">@item.Name</span>
+			<span class="tq-name" title="@item.Name">@item.Name</span>
 			@Badges(item)
-			<span class="tq-route">@Route(item)</span>
+			<span class="tq-route" title="@Tooltip(item)">@Route(item)</span>
 			<div class="tq-progress">
 				<MokaProgress Value="@ProgressValue(item)" />
 			</div>
@@ -64,16 +64,16 @@
 		</div>;
 
 	RenderFragment FullRow(ITransferItem item) =>
-		@<div @key="item.Id" class="tq-row" title="@Tooltip(item)">
+		@<div @key="item.Id" class="tq-row">
 			<div class="tq-line">
 				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)" />
-				<span class="tq-name">@item.Name</span>
+				<span class="tq-name" title="@item.Name">@item.Name</span>
 				@Badges(item)
 				<span class="tq-grow"></span>
 				<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
 				@Actions(item)
 			</div>
-			<div class="tq-route">@Route(item)</div>
+			<div class="tq-route" title="@Tooltip(item)">@Route(item)</div>
 			<div class="tq-line">
 				<div class="tq-progress">
 					<MokaProgress Value="@ProgressValue(item)" />

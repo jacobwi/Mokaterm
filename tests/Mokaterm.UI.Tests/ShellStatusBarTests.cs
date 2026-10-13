@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -144,7 +145,8 @@ public sealed partial class ShellStatusBarTests
 		Assert.Contains("mt-status-chip mt-status-chip--on", html, StringComparison.Ordinal);
 		Assert.Contains("mt-status-chip mt-status-chip--problem", html, StringComparison.Ordinal);
 		Assert.Contains(">AGENT", html, StringComparison.Ordinal);
-		Assert.Contains("title=\"X11 forwarding is not working.\"", html, StringComparison.Ordinal);
+		Assert.Contains("aria-description=\"X11 forwarding is not working.\"", html, StringComparison.Ordinal);
+		Assert.Equal("top", Tooltips.PositionOf(html, "X11 forwarding is not working."));
 	}
 
 	[Fact]
@@ -173,7 +175,8 @@ public sealed partial class ShellStatusBarTests
 		Assert.Contains("after 15 minutes without activity", html, StringComparison.Ordinal);
 	}
 
-	// Only the items that do something are buttons, and every item says what it is, whether it acts or not.
+	// Only the items that do something are buttons, and every item says what it is, whether it acts or not: in Moka's
+	// tooltip, above it since the bar is at the bottom of the window, and as its description for a screen reader.
 	[Fact]
 	public async Task Render_OnlyItemsThatActAreButtons_AndEveryItemHasATooltip()
 	{
@@ -183,8 +186,11 @@ public sealed partial class ShellStatusBarTests
 		Assert.NotEmpty(items);
 		foreach (string item in items)
 		{
-			Match title = TitleAttribute().Match(item);
-			Assert.True(title.Success && title.Groups[1].Value.Length > 0, item);
+			Match description = DescriptionAttribute().Match(item);
+			Assert.True(description.Success && description.Groups[1].Value.Length > 0, item);
+			string tooltip = WebUtility.HtmlDecode(description.Groups[1].Value);
+			Assert.StartsWith(item, Tooltips.ControlFor(html, tooltip).TrimStart(), StringComparison.Ordinal);
+			Assert.Equal("top", Tooltips.PositionOf(html, tooltip));
 			Assert.Equal(item.Contains("role=\"button\"", StringComparison.Ordinal), item.Contains("tabindex=\"0\"", StringComparison.Ordinal));
 		}
 
@@ -256,8 +262,8 @@ public sealed partial class ShellStatusBarTests
 	[GeneratedRegex("<div class=\"moka-statusbar-item[^>]*>")]
 	private static partial Regex StatusBarItem();
 
-	[GeneratedRegex("title=\"([^\"]*)\"")]
-	private static partial Regex TitleAttribute();
+	[GeneratedRegex("aria-description=\"([^\"]*)\"")]
+	private static partial Regex DescriptionAttribute();
 
 	/// <summary>A live session whose only feature is the indicators it was given.</summary>
 	private sealed class IndicatingSession(params SessionIndicator[] indicators) : IProtocolSession, ISessionIndicators

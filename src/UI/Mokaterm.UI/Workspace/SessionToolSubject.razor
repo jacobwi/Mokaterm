@@ -4,10 +4,10 @@
 <span class="mt-tool-session">
 	<ProtocolIcon ProtocolId="@Session.Protocol.Id" Size="MokaSize.Xs" />
 	<SessionLabel Session="Session" ShowPort Tooltip="@EndpointFormat.Format(Session)" />
-	<MokaStatusDot Size="MokaSize.Xs"
-				   Color="@SessionStateDisplay.Color(Session.State)"
-				   Pulse="@(Session.State == SessionState.Connecting)"
-				   Label="@SessionStateDisplay.Label(Session.State)"
-				   title="@StateTitle"
-				   Class="mt-tool-session-state" />
+	<Hint Text="@StateTitle" Position="MokaTooltipPosition.Bottom" Class="mt-tool-session-state">
+		<MokaStatusDot Size="MokaSize.Xs"
+					   Color="@SessionStateDisplay.Color(Session.State)"
+					   Pulse="@(Session.State == SessionState.Connecting)"
+					   Label="@SessionStateDisplay.Label(Session.State)" />
+	</Hint>
 </span>

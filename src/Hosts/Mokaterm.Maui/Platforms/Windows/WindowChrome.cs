@@ -142,7 +142,8 @@ internal sealed class WindowChrome : IWindowChrome
 
 		// MAUI extends the content already; this keeps the page under the system's buttons if that default changes.
 		// Tall buttons (48) are what Windows asks for when the title bar holds controls, and they match Moka's dense bar;
-		// at the standard 32 their glyphs would sit off centre from the bar's icons.
+		// at the standard 32 their glyphs would sit off centre from the bar's icons. wwwroot/index.html gives the page's
+		// top bar the same height (--mt-top-bar-height), which is also where toasts start.
 		_appWindow.TitleBar.ExtendsContentIntoTitleBar = true;
 		_appWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
 

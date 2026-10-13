@@ -58,17 +58,21 @@ public sealed partial class QuickConnectListTests
 			Options(html));
 	}
 
-	// The box keeps the focus: no row is a tab stop, and the mouse-only remove button is hidden from the tree.
+	// The box keeps the focus: no row is a tab stop, and the mouse-only remove button is hidden from the tree. Its name
+	// and key are in Moka's tooltip, and its empty title keeps the row's own title from showing over that.
 	[Fact]
 	public async Task Render_NothingInTheListTakesTheFocus()
 	{
+		const string tooltip = "Remove from history (Shift+Delete)";
 		string html = await RenderAsync(activeIndex: -1);
 
 		Assert.DoesNotMatch("tabindex=\"0\"", html);
 		Match remove = Assert.Single(RemoveButton().Matches(html));
 		Assert.Contains("aria-hidden=\"true\"", remove.Value, StringComparison.Ordinal);
 		Assert.Contains("tabindex=\"-1\"", remove.Value, StringComparison.Ordinal);
-		Assert.Contains("Shift+Delete", WebUtility.HtmlDecode(remove.Value), StringComparison.Ordinal);
+		Assert.Contains("title=\"\"", remove.Value, StringComparison.Ordinal);
+		Assert.Contains(remove.Value, Tooltips.ControlFor(html, tooltip), StringComparison.Ordinal);
+		Assert.Equal("bottom-end", Tooltips.PositionOf(html, tooltip));
 	}
 
 	[Fact]

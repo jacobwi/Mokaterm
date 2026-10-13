@@ -10,14 +10,15 @@
 /*
 	The header is the window's title bar. Its buttons are drawn over the header's right end, so WindowChromeBar puts
 	their size in these properties: the header keeps that stretch empty and takes their height, so its own buttons line
-	up with them. Both elements belong to other components, so they are reached through ::deep.
+	up with them. It is also the top bar toasts open below (mokaterm.css), so it is at least that tall. Both elements
+	belong to other components, so they are reached through ::deep.
 */
 .mt-toolwin ::deep .mt-toolwin-top {
 	flex-shrink: 0;
 }
 
 .mt-toolwin ::deep .mt-toolwin-top .mt-dialog-head {
-	min-height: var(--mt-chrome-height, 0px);
+	min-height: max(var(--mt-top-bar-height), var(--mt-chrome-height, 0px));
 	padding-left: calc(var(--moka-spacing-lg) + var(--mt-chrome-left, 0px));
 	padding-right: calc(var(--moka-spacing-sm) + var(--mt-chrome-right, 0px));
 }

@@ -19,6 +19,15 @@ body,
 	overflow: clip;
 }
 
+/*
+	The strip across the top of the window: the shell's top bar, or a tool window's header. The bar takes this height and
+	toasts open below it. A desktop window without a title bar of its own sets it to the height of its caption buttons in
+	its host page, since those sit over the top of the page whatever the page shows.
+*/
+:root {
+	--mt-top-bar-height: 40px;
+}
+
 /* The theme tokens live on .moka-root; body only resolves them when a host also emits them on :root. */
 body,
 .moka-root {

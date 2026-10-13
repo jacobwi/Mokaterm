@@ -124,8 +124,10 @@
 				bool open = _expanded.Contains(service.Name);
 				<div class="mt-dk-row" role="listitem" @key="service.Name">
 					<button type="button" class="mt-dk-row-main" @onclick="@(() => ToggleService(service))"
-							aria-expanded="@(service.IsScaled ? (open ? "true" : "false") : null)" title="@ServiceTitle(service)">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@ServiceColor(service)" Pulse="@(service.Health == DockerHealth.Starting)" />
+							aria-expanded="@(service.IsScaled ? (open ? "true" : "false") : null)" aria-description="@ServiceTitle(service)">
+						<Hint Text="@ServiceTitle(service)" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
+							<MokaStatusDot Size="MokaSize.Xs" Color="@ServiceColor(service)" Pulse="@(service.Health == DockerHealth.Starting)" />
+						</Hint>
 						<span class="mt-dk-cell-name mt-dk-cell--w20">@service.Name</span>
 						@if (service.Problem.Length > 0)
 						{

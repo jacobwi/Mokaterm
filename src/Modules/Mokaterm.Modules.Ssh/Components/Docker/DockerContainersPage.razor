@@ -67,10 +67,12 @@ else
 					@foreach (DockerContainer container in group.Containers)
 					{
 						<div class="@(container.Id == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="container.Id">
-							<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(container, "logs"))" title="@container.Status">
-								<MokaStatusDot Size="MokaSize.Xs"
-											   Color="@DockerStateDisplay.Color(container.State, container.Health)"
-											   Pulse="@DockerStateDisplay.IsMoving(container.State, container.Health)" />
+							<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(container, "logs"))" aria-description="@container.Status">
+								<Hint Text="@container.Status" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
+									<MokaStatusDot Size="MokaSize.Xs"
+												   Color="@DockerStateDisplay.Color(container.State, container.Health)"
+												   Pulse="@DockerStateDisplay.IsMoving(container.State, container.Health)" />
+								</Hint>
 								<span class="mt-dk-cell-name mt-dk-cell--w30">@ShortName(container)</span>
 								<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-label mt-dk-cell--w12 mt-dk-cell--error" : "mt-dk-label mt-dk-cell--w12")">@DockerStateDisplay.HealthLabel(container.Health)</span>
 								<span class="mt-dk-cell mt-dk-cell--grow" title="@container.Image">@container.Image</span>

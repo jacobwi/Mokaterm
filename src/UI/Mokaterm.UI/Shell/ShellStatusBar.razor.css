@@ -2,6 +2,10 @@
 	The bar reads as one row of related facts rather than scattered text: the items sit edge to edge and a hairline
 	separates them. Moka's own items carry no separator, so the line is drawn as a background on every item but the
 	first of a group; the hover background sets background-color only, so the line survives it.
+
+	An item with a tooltip sits inside the tooltip's element, which is then what the group lays out, so whether an item
+	follows another is asked of either. The line still goes on the item itself: on the element around it, the item's
+	hover background would cover it.
 */
 .mt-status-group {
 	display: flex;
@@ -18,7 +22,8 @@
 	flex-shrink: 0;
 }
 
-.mt-status-group ::deep .moka-statusbar-item + .moka-statusbar-item {
+.mt-status-group ::deep :is(.moka-statusbar-item, .moka-statusbar-item-tooltip) + .moka-statusbar-item,
+.mt-status-group ::deep :is(.moka-statusbar-item, .moka-statusbar-item-tooltip) + .moka-statusbar-item-tooltip > .moka-statusbar-item {
 	background-image: linear-gradient(var(--moka-color-outline), var(--moka-color-outline));
 	background-position: left center;
 	background-repeat: no-repeat;
@@ -27,13 +32,17 @@
 
 /*
 	An item only gives way at all once it may shrink past its content. The remote title is weighted to lose most of the
-	room, because which machine you are typing at matters more than what its shell calls itself.
+	room, because which machine you are typing at matters more than what its shell calls itself. The tooltip's element
+	around an item is the one the group shrinks, so it carries the same rules, and the item inside still has to give way
+	to it.
 */
-.mt-status-group ::deep .mt-status-session {
+.mt-status-group ::deep .mt-status-session,
+.mt-status-group ::deep .moka-statusbar-item-tooltip:has(> .mt-status-session) {
 	min-width: 0;
 }
 
-.mt-status-group ::deep .mt-status-remote-item {
+.mt-status-group ::deep .mt-status-remote-item,
+.mt-status-group ::deep .moka-statusbar-item-tooltip:has(> .mt-status-remote-item) {
 	flex-shrink: 4;
 	min-width: 0;
 }

@@ -46,8 +46,10 @@ else
 				@foreach (ComposeProject project in Shown)
 				{
 					<div class="mt-dk-row" role="listitem" @key="project.Name">
-						<button type="button" class="mt-dk-row-main" @onclick="@(() => Open(project))" title="@project.Status">
-							<MokaStatusDot Size="MokaSize.Xs" Color="@ProjectColor(project)" />
+						<button type="button" class="mt-dk-row-main" @onclick="@(() => Open(project))" aria-description="@project.Status">
+							<Hint Text="@project.Status" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
+								<MokaStatusDot Size="MokaSize.Xs" Color="@ProjectColor(project)" />
+							</Hint>
 							<span class="mt-dk-cell-name mt-dk-cell--w30">@project.Name</span>
 							<span class="mt-dk-cell mt-dk-cell--count" title="Containers running, of all of them">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
 							<span class="mt-dk-cell mt-dk-cell--grow" title="@project.WorkingDirectory">@project.WorkingDirectory</span>

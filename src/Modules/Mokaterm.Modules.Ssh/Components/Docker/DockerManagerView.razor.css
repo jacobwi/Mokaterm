@@ -224,6 +224,13 @@
 	cursor: pointer;
 }
 
+/* A row's state dot says what the state is in its hint. The dot is 6px across, so the hint's element reaches a few
+   pixels past it to be found by the pointer, without taking any more room in the row. */
+.mt-dk ::deep .mt-dk-state {
+	margin: -4px;
+	padding: 4px;
+}
+
 .mt-dk ::deep .mt-dk-row-main:focus-visible {
 	outline: none;
 	border-radius: var(--moka-radius-sm);
