@@ -76,6 +76,48 @@
 }
 
 /*
+	The hovered link's address, drawn like Moka.Red's tooltip: its colours, size, corners and fade, shown after its
+	delay and hidden at once. terminal.js shows it as a popover, in the top layer, and places it in window coordinates;
+	without popovers it stays a fixed element, which the view's overflow does not clip either. The pointer goes through,
+	so a right-click or a selection under it still reaches the terminal.
+*/
+.mt-terminal-link-hint {
+	position: fixed;
+	inset: auto;
+	z-index: var(--moka-z-tooltip);
+	display: none;
+	box-sizing: border-box;
+	max-width: min(20rem, var(--mt-link-hint-room, 20rem));
+	margin: 0;
+	padding: var(--moka-spacing-xxs) var(--moka-spacing-sm);
+	border: 0;
+	border-radius: var(--moka-radius-sm);
+	overflow: visible;
+	background: var(--moka-color-on-surface);
+	color: var(--moka-color-surface);
+	font-family: var(--moka-font-family);
+	font-size: var(--moka-font-size-xs);
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.15s, display 0.15s allow-discrete, overlay 0.15s allow-discrete;
+}
+
+/* Only showing waits, and display flips at once so terminal.js can measure the hint before placing it. */
+.mt-terminal-link-hint--open {
+	display: block;
+	opacity: 1;
+	transition: opacity 0.15s 0.3s;
+}
+
+@starting-style {
+	.mt-terminal-link-hint--open {
+		opacity: 0;
+	}
+}
+
+/*
 	Save buttons over the hovered row. The strip itself lets clicks through so selecting text still works; only the
 	buttons take the pointer, and they stay clear of the scrollbar width set in terminal.js.
 */

@@ -4,92 +4,76 @@
 <div class="mt-vnc" @ref="_root">
 	<div class="mt-vnc-toolbar">
 		<MokaSegmentedControl AriaLabel="Scaling" Value="@_scaling" ValueChanged="OnScalingChangedAsync" Size="MokaSize.Sm">
-			<MokaSegment Value="fit" Text="FIT" title="Scale the whole screen into the view" />
-			<MokaSegment Value="actual" Text="1:1" title="One remote pixel per pixel, with scrollbars" />
-			<MokaSegment Value="remote" Text="SERVER" title="Ask the server to resize its screen to this view" />
+			<Hint Text="Scale the whole screen into the view" Position="MokaTooltipPosition.BottomStart">
+				<MokaSegment Value="fit" Text="FIT" />
+			</Hint>
+			<Hint Text="One remote pixel per pixel, with scrollbars">
+				<MokaSegment Value="actual" Text="1:1" />
+			</Hint>
+			<Hint Text="Ask the server to resize its screen to this view">
+				<MokaSegment Value="remote" Text="SERVER" />
+			</Hint>
 		</MokaSegmentedControl>
 
-		<MokaButton Variant="@ToggleVariant(_viewOnly)"
+		<IconButton Variant="@ToggleVariant(_viewOnly)"
 					Color="@ToggleColor(_viewOnly)"
-					Size="MokaSize.Sm"
-					StartIcon="@(_viewOnly ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
+					Icon="@(_viewOnly ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
 					Disabled="@(!IsRunning)"
 					OnClick="ToggleViewOnlyAsync"
-					title="@(_viewOnly ? "View only: keys and mouse stay here" : "Keys and mouse go to the session")"
-					aria-label="View only"
-					aria-pressed="@Pressed(_viewOnly)" />
+					Label="@(_viewOnly ? "View only: keys and mouse stay here" : "Keys and mouse go to the session")"
+					AriaLabel="View only"
+					Pressed="_viewOnly" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-wide"
-					StartIcon="MokatermIcons.Keyboard"
+		<IconButton Class="mt-vnc-wide"
+					Icon="MokatermIcons.Keyboard"
 					Disabled="@(!IsRunning || _viewOnly)"
 					OnClick="ShowKeysMenu"
-					title="Send a key combination this machine would swallow"
-					aria-label="Send keys" />
+					Label="Send a key combination this machine would swallow"
+					AriaLabel="Send keys" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-wide"
-					StartIcon="MokaIcons.Content.Paste"
+		<IconButton Class="mt-vnc-wide"
+					Icon="MokaIcons.Content.Paste"
 					Disabled="@(!IsRunning || _viewOnly)"
 					OnClick="SendClipboardAsync"
-					title="Send the clipboard of this machine to the session"
-					aria-label="Send clipboard" />
+					Label="Send the clipboard of this machine to the session"
+					AriaLabel="Send clipboard" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-wide"
-					StartIcon="MokaIcons.Content.Copy"
+		<IconButton Class="mt-vnc-wide"
+					Icon="MokaIcons.Content.Copy"
 					Disabled="@(!IsRunning || _clipboardLength == 0)"
 					OnClick="ReceiveClipboardAsync"
-					title="@ReceiveClipboardTitle"
-					aria-label="Copy the clipboard of the session" />
+					Label="@ReceiveClipboardTitle"
+					AriaLabel="Copy the clipboard of the session" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-wide"
-					StartIcon="MokatermIcons.Sliders"
+		<IconButton Class="mt-vnc-wide"
+					Icon="MokatermIcons.Sliders"
 					Disabled="@(!IsRunning)"
 					OnClick="ShowQualityMenu"
-					title="@QualityTitle"
-					aria-label="Quality and compression" />
+					Label="@QualityTitle"
+					AriaLabel="Quality and compression" />
 		<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-vnc-meta mt-vnc-quality" title="@QualityTitle">@QualityText</MokaText>
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-wide"
-					StartIcon="MokaIcons.Action.Download"
+		<IconButton Class="mt-vnc-wide"
+					Icon="MokaIcons.Action.Download"
 					Disabled="@(!IsRunning)"
 					OnClick="SaveScreenshotAsync"
-					title="Save a picture of the screen"
-					aria-label="Save a picture of the screen" />
+					Label="Save a picture of the screen" />
 
-		<MokaButton Variant="@ToggleVariant(_fullscreen)"
+		<IconButton Variant="@ToggleVariant(_fullscreen)"
 					Color="@ToggleColor(_fullscreen)"
-					Size="MokaSize.Sm"
 					Class="mt-vnc-wide"
-					StartIcon="MokatermIcons.Maximize"
+					Icon="MokatermIcons.Maximize"
 					Disabled="@(!IsRunning)"
 					OnClick="ToggleFullscreenAsync"
-					title="Full screen"
-					aria-label="Full screen"
-					aria-pressed="@Pressed(_fullscreen)" />
+					Label="Full screen"
+					Pressed="_fullscreen" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					Class="mt-vnc-compact"
-					StartIcon="MokaIcons.Navigation.MoreHorizontal"
+		<IconButton Class="mt-vnc-compact"
+					Icon="MokaIcons.Navigation.MoreHorizontal"
 					Disabled="@(!IsRunning)"
 					OnClick="ShowActionsMenu"
-					title="Keys, clipboard, quality, screenshot and full screen"
-					aria-label="More actions"
+					Label="Keys, clipboard, quality, screenshot and full screen"
+					AriaLabel="More actions"
 					aria-haspopup="menu" />
 
 		<span class="mt-vnc-spacer"></span>
@@ -104,15 +88,18 @@
 
 			@if (IsEncrypted)
 			{
-				<MokaTag Text="TLS" Icon="MokatermIcons.Lock" Color="MokaColor.Success" Size="MokaSize.Xs" title="@SecurityText" />
+				<Hint Text="@SecurityText" Position="MokaTooltipPosition.BottomEnd">
+					<MokaTag Text="TLS" Icon="MokatermIcons.Lock" Color="MokaColor.Success" Size="MokaSize.Xs" />
+				</Hint>
 			}
 			else
 			{
-				<MokaTag Text="NOT ENCRYPTED"
-						 Icon="MokatermIcons.Unlock"
-						 Color="MokaColor.Warning"
-						 Size="MokaSize.Xs"
-						 title="@($"{SecurityText}. Anyone on the path can read this screen and every key you type.")" />
+				<Hint Text="@($"{SecurityText}. Anyone on the path can read this screen and every key you type.")" Position="MokaTooltipPosition.BottomEnd">
+					<MokaTag Text="NOT ENCRYPTED"
+							 Icon="MokatermIcons.Unlock"
+							 Color="MokaColor.Warning"
+							 Size="MokaSize.Xs" />
+				</Hint>
 			}
 		}
 	</div>

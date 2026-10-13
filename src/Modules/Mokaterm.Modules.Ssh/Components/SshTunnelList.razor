@@ -23,20 +23,17 @@
 				{
 					<MokaTag Text="MANUAL" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 				}
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Surface"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Edit"
+				<IconButton Size="MokaSize.Xs"
+							Icon="MokaIcons.Action.Edit"
 							Disabled="Disabled"
 							OnClick="@(() => Toggle(tunnel.Id))"
-							aria-label="Edit tunnel" />
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Error"
+							Label="Edit tunnel" />
+				<IconButton Color="MokaColor.Error"
 							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Delete"
+							Icon="MokaIcons.Action.Delete"
 							Disabled="Disabled"
 							OnClick="@(() => RemoveAsync(tunnel.Id))"
-							aria-label="Remove tunnel" />
+							Label="Remove tunnel" />
 			</div>
 
 			@if (_editing == tunnel.Id)

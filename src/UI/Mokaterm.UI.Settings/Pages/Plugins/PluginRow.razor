@@ -9,22 +9,25 @@
 		<div class="plugin-row__head">
 			<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Medium">@plugin.Name</MokaText>
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@plugin.Version</MokaText>
-			<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
-					 Size="MokaSize.Xs"
-					 Color="PluginDisplay.KindColor(plugin.HasCode)"
-					 title="@PluginDisplay.KindTitle(plugin.HasCode)" />
-			<span class="plugin-row__status" title="@PluginDisplay.StatusTitle(plugin.Status)">
+			<Hint Text="@PluginDisplay.KindTitle(plugin.HasCode)">
+				<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
+						 Size="MokaSize.Xs"
+						 Color="PluginDisplay.KindColor(plugin.HasCode)" />
+			</Hint>
+			<Hint Text="@PluginDisplay.StatusTitle(plugin.Status)">
 				<MokaStatusDot Size="MokaSize.Xs"
 							   Label="@PluginDisplay.StatusLabel(plugin.Status)"
 							   Color="PluginDisplay.StatusColor(plugin.Status)"
 							   Glow="PluginDisplay.StatusGlows(plugin.Status)" />
-			</span>
+			</Hint>
 			@if (Update is { } update)
 			{
-				<span class="plugin-row__update" title="@($"The gallery offers {plugin.Name} {update.Version}. Update it from the Browse tab.")">
-					<MokaIcon Icon="MokatermIcons.Download" SizeValue="11px" />
-					Update available: @update.Version
-				</span>
+				<Hint Text="@($"The gallery offers {plugin.Name} {update.Version}. Update it from the Browse tab.")">
+					<span class="plugin-row__update">
+						<MokaIcon Icon="MokatermIcons.Download" SizeValue="11px" />
+						Update available: @update.Version
+					</span>
+				</Hint>
 			}
 		</div>
 
@@ -109,24 +112,24 @@
 				}
 				else
 				{
-					<MokaButton Variant="MokaVariant.Outlined"
-								Size="MokaSize.Sm"
-								StartIcon="MokatermIcons.Power"
-								Disabled="@(Busy || plugin.Status == PluginStatus.Incompatible)"
-								OnClick="() => OnTurnOn.InvokeAsync(plugin)"
-								title="@(plugin.Status == PluginStatus.Incompatible ? plugin.Problem : null)"
-								aria-label="@($"Turn on {plugin.Name}")">
-						Turn on
-					</MokaButton>
+					<Hint Text="@(plugin.Status == PluginStatus.Incompatible ? plugin.Problem : null)">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Size="MokaSize.Sm"
+									StartIcon="MokatermIcons.Power"
+									Disabled="@(Busy || plugin.Status == PluginStatus.Incompatible)"
+									OnClick="() => OnTurnOn.InvokeAsync(plugin)"
+									aria-label="@($"Turn on {plugin.Name}")">
+							Turn on
+						</MokaButton>
+					</Hint>
 				}
-				<MokaButton Variant="MokaVariant.Text"
-							Size="MokaSize.Sm"
-							Color="MokaColor.Error"
-							StartIcon="MokaIcons.Action.Delete"
+				<IconButton Color="MokaColor.Error"
+							Icon="MokaIcons.Action.Delete"
 							Disabled="Busy"
 							OnClick="() => OnRemove.InvokeAsync(plugin)"
-							title="Remove"
-							aria-label="@($"Remove {plugin.Name}")" />
+							Label="Remove"
+							AriaLabel="@($"Remove {plugin.Name}")"
+							Position="MokaTooltipPosition.BottomEnd" />
 			}
 		</div>
 	}

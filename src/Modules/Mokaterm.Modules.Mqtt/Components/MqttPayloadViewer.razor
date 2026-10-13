@@ -27,16 +27,16 @@
 			}
 			@if (Message.IsTruncated)
 			{
-				<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" title="@TruncatedTitle" />
+				<Hint Text="@TruncatedTitle">
+					<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				</Hint>
 			}
 
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Content.Copy"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Content.Copy"
 						OnClick="CopyAsync"
-						title="Copy what this panel shows"
-						aria-label="Copy the payload" />
+						Label="Copy what this panel shows"
+						AriaLabel="Copy the payload" />
 		</div>
 
 		@if (Message.PayloadLength == 0)

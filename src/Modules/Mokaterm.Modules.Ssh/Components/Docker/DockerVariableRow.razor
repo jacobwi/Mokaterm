@@ -8,19 +8,17 @@
 	<span class="mt-dk-variable-value">@Shown</span>
 	@if (Value is { Length: > 0 })
 	{
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="@(_revealed ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
+		<IconButton Size="MokaSize.Xs"
+					Icon="@(_revealed ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
 					OnClick="Toggle"
-					aria-pressed="@(_revealed ? "true" : "false")"
-					aria-label="@(_revealed ? $"Hide {Name}" : $"Show {Name}")" />
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="MokaIcons.Content.Copy"
+					Pressed="_revealed"
+					Label="@(_revealed ? "Hide the value" : "Show the value")"
+					AriaLabel="@(_revealed ? $"Hide {Name}" : $"Show {Name}")" />
+		<IconButton Size="MokaSize.Xs"
+					Icon="MokaIcons.Content.Copy"
 					OnClick="CopyAsync"
-					aria-label="@($"Copy the value of {Name}")" />
+					Label="Copy the value"
+					AriaLabel="@($"Copy the value of {Name}")" />
 	}
 </div>
 

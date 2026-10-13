@@ -24,25 +24,29 @@
 			}
 			@if (_feature.Compose is { } compose)
 			{
-				<MokaTag Text="@ComposeLabel(compose)" Size="MokaSize.Xs" Color="MokaColor.Surface" title="@($"Compose commands run as {compose.Display}")" />
+				<Hint Text="@($"Compose commands run as {compose.Display}")">
+					<MokaTag Text="@ComposeLabel(compose)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				</Hint>
 			}
 			@if (_status.Info is { Rootless: true })
 			{
-				<MokaTag Text="ROOTLESS" Size="MokaSize.Xs" Color="MokaColor.Info" title="The daemon runs as an ordinary user" />
+				<Hint Text="The daemon runs as an ordinary user">
+					<MokaTag Text="ROOTLESS" Size="MokaSize.Xs" Color="MokaColor.Info" />
+				</Hint>
 			}
 			@if (_status.IsElevated)
 			{
-				<MokaTag Text="SUDO" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Every docker command runs through sudo" />
+				<Hint Text="Every docker command runs through sudo">
+					<MokaTag Text="SUDO" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				</Hint>
 			}
 			<span class="mt-dk-spacer"></span>
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Refresh"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Refresh"
 						Disabled="_detecting"
 						OnClick="DetectAsync"
-						title="Look for Docker again"
-						aria-label="Look for Docker again" />
+						Label="Look for Docker again"
+						Position="MokaTooltipPosition.BottomEnd" />
 		</div>
 
 		@switch (_status.Availability)

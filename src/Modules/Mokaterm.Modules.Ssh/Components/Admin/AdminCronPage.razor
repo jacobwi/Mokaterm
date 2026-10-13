@@ -84,12 +84,11 @@
 									</span>
 									<span class="mta-cell mta-mono mta-wide" title="@entry.Command">@entry.Command</span>
 									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-										<MokaButton Variant="MokaVariant.Text"
-													Color="MokaColor.Surface"
-													Size="MokaSize.Xs"
-													StartIcon="MokaIcons.Navigation.MoreHorizontal"
+										<IconButton Size="MokaSize.Xs"
+													Icon="MokaIcons.Navigation.MoreHorizontal"
 													OnClick="@(args => ShowRowMenu(args, MenuFor(index, entry)))"
-													aria-label="Actions for the entry" />
+													Label="Actions for the entry"
+													Position="MokaTooltipPosition.BottomEnd" />
 									</span>
 								</div>
 							}
@@ -310,15 +309,16 @@
 		<ToolDetailPanel Title="@entry.Schedule.Describe()" Subtitle="@entry.Schedule.Text" Mono="false" OnClose="@(() => _selected = null)">
 			<Actions>
 				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Edit" Disabled="Busy" OnClick="@(() => StartEdit(index, entry))">Edit</MokaButton>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Color="MokaColor.Error"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Delete"
-							Disabled="@(Busy || WriteBlocked is not null)"
-							title="@WriteBlocked"
-							OnClick="@(() => DeleteAsync(index, entry))">
-					Delete
-				</MokaButton>
+				<Hint Text="@WriteBlocked">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(Busy || WriteBlocked is not null)"
+								OnClick="@(() => DeleteAsync(index, entry))">
+						Delete
+					</MokaButton>
+				</Hint>
 			</Actions>
 			<ChildContent>
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command</MokaText>

@@ -34,13 +34,14 @@
 							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" OnClick="() => Actions.NewHost()">
 								New host
 							</MokaButton>
-							<MokaButton Variant="MokaVariant.Text"
-										Size="MokaSize.Sm"
-										StartIcon="MokatermIcons.FileUpload"
-										title="From OpenSSH, PuTTY or WinSCP"
-										OnClick="() => Actions.ImportConnections()">
-								Import hosts
-							</MokaButton>
+							<Hint Text="From OpenSSH, PuTTY or WinSCP">
+								<MokaButton Variant="MokaVariant.Text"
+											Size="MokaSize.Sm"
+											StartIcon="MokatermIcons.FileUpload"
+											OnClick="() => Actions.ImportConnections()">
+									Import hosts
+								</MokaButton>
+							</Hint>
 						</MokaFlexbox>
 					</MokaEmptyState>
 				}

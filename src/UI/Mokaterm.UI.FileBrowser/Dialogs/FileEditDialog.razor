@@ -17,10 +17,11 @@
 				}
 				@if (_dirty)
 				{
-					<MokaTag Text="UNSAVED"
-							 Size="MokaSize.Xs"
-							 Color="MokaColor.Warning"
-							 title="These edits have not reached the server yet" />
+					<Hint Text="These edits have not reached the server yet">
+						<MokaTag Text="UNSAVED"
+								 Size="MokaSize.Xs"
+								 Color="MokaColor.Warning" />
+					</Hint>
 				}
 			</div>
 		</div>
@@ -73,15 +74,16 @@
 							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted" title="@TooLargeTitle">Too large to highlight</MokaText>
 						}
 						<MokaContextMenuTrigger Trigger="MokaContextMenuTriggerType.LeftClick" Items="_languageMenu">
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										EndIcon="MokaIcons.Navigation.ChevronUp"
-										title="Highlighting"
-										aria-label="@LanguageLabel"
-										aria-haspopup="menu">
-								@_language.Name
-							</MokaButton>
+							<Hint Text="Highlighting">
+								<MokaButton Variant="MokaVariant.Text"
+											Color="MokaColor.Surface"
+											Size="MokaSize.Xs"
+											EndIcon="MokaIcons.Navigation.ChevronUp"
+											aria-label="@LanguageLabel"
+											aria-haspopup="menu">
+									@_language.Name
+								</MokaButton>
+							</Hint>
 						</MokaContextMenuTrigger>
 					</div>
 				</div>
@@ -164,18 +166,21 @@
 	<Actions>
 		@if (_conflict is not null)
 		{
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Sm"
-						Disabled="_saving"
-						OnClick="BackToEditing"
-						title="Keep editing on top of the server's copy"
-						data-dialog-default="true">
-				Back to editing
-			</MokaButton>
-			<MokaButton Size="MokaSize.Sm" Color="MokaColor.Error" Disabled="_saving" OnClick="OverwriteAsync" title="Write your edits over the server's copy">
-				@(_saving ? "Saving..." : "Overwrite")
-			</MokaButton>
+			<Hint Text="Keep editing on top of the server's copy" Position="MokaTooltipPosition.Top">
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Sm"
+							Disabled="_saving"
+							OnClick="BackToEditing"
+							data-dialog-default="true">
+					Back to editing
+				</MokaButton>
+			</Hint>
+			<Hint Text="Write your edits over the server's copy" Position="MokaTooltipPosition.TopEnd">
+				<MokaButton Size="MokaSize.Sm" Color="MokaColor.Error" Disabled="_saving" OnClick="OverwriteAsync">
+					@(_saving ? "Saving..." : "Overwrite")
+				</MokaButton>
+			</Hint>
 		}
 		else
 		{
@@ -185,23 +190,25 @@
 			}
 			else
 			{
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Surface"
-							Size="MokaSize.Sm"
-							Disabled="@(!_dirty || _saving)"
-							OnClick="ReviewAsync"
-							title="Compare the edits with the file as it was read">
-					Review changes
-				</MokaButton>
+				<Hint Text="Compare the edits with the file as it was read" Position="MokaTooltipPosition.Top">
+					<MokaButton Variant="MokaVariant.Text"
+								Color="MokaColor.Surface"
+								Size="MokaSize.Sm"
+								Disabled="@(!_dirty || _saving)"
+								OnClick="ReviewAsync">
+						Review changes
+					</MokaButton>
+				</Hint>
 			}
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="_saving" OnClick="CancelAsync">Cancel</MokaButton>
-			<MokaButton Size="MokaSize.Sm"
-						Disabled="@(!_dirty || _saving)"
-						OnClick="SaveAsync"
-						title="Save (Ctrl+S)"
-						data-dialog-default="true">
-				@(_saving ? "Saving..." : "Save")
-			</MokaButton>
+			<Hint Text="Save" Shortcut="Ctrl+S" Position="MokaTooltipPosition.TopEnd">
+				<MokaButton Size="MokaSize.Sm"
+							Disabled="@(!_dirty || _saving)"
+							OnClick="SaveAsync"
+							data-dialog-default="true">
+					@(_saving ? "Saving..." : "Save")
+				</MokaButton>
+			</Hint>
 		}
 	</Actions>
 </DialogFrame>

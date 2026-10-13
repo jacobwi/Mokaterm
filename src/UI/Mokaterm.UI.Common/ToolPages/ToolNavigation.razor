@@ -8,15 +8,19 @@
 	<nav class="mt-toolnav-list" aria-label="@Label">
 		@foreach (ToolNavEntry entry in Entries)
 		{
-			<button type="button"
-					class="@ItemClass(entry)"
-					aria-current="@(IsCurrent(entry) ? "page" : null)"
-					title="@(entry.Unavailable is { } reason ? $"{entry.Label}: {reason}" : entry.Label)"
-					@key="entry.Id"
-					@onclick="@(() => CurrentChanged.InvokeAsync(entry.Id))">
-				<MokaIcon Icon="entry.Icon" Size="MokaSize.Xs" />
-				<span class="mt-toolnav-label">@entry.Label</span>
-			</button>
+			@* The hint names the page where only icons show, and says why a greyed one cannot be used. *@
+			<Hint Text="@(entry.Unavailable is { } reason ? $"{entry.Label}: {reason}" : entry.Label)"
+				  Position="MokaTooltipPosition.Right"
+				  Class="mt-toolnav-hint"
+				  @key="entry.Id">
+				<button type="button"
+						class="@ItemClass(entry)"
+						aria-current="@(IsCurrent(entry) ? "page" : null)"
+						@onclick="@(() => CurrentChanged.InvokeAsync(entry.Id))">
+					<MokaIcon Icon="entry.Icon" Size="MokaSize.Xs" />
+					<span class="mt-toolnav-label">@entry.Label</span>
+				</button>
+			</Hint>
 		}
 	</nav>
 

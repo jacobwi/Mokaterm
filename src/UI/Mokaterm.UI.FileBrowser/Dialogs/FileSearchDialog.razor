@@ -94,8 +94,10 @@
 	</ChildContent>
 	<Actions>
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Close">Close</MokaButton>
-		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="@(_selected is null)"
-					OnClick="ChooseSelected" title="Go to the selected result (Enter)">Go to</MokaButton>
+		<Hint Text="Go to the selected result" Shortcut="Enter" Position="MokaTooltipPosition.Top">
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" Disabled="@(_selected is null)"
+						OnClick="ChooseSelected">Go to</MokaButton>
+		</Hint>
 		@if (_running)
 		{
 			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Stop">Stop</MokaButton>

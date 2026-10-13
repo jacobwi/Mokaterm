@@ -10,14 +10,16 @@
 	<ChipsEnd>
 		@if (_snapshot is not null)
 		{
-			<span class="mta-live" title="@(SampleError ?? "CPU, memory, load, network and disk figures are read again every two seconds while this page is shown.")">
-				<MokaStatusDot Size="MokaSize.Xs" Color="@(SampleError is null ? MokaColor.Success : MokaColor.Warning)" Glow="@(SampleError is null)" />
-				<span class="mta-label">@(SampleError is null ? "Live" : "Live figures paused")</span>
-				@if (SampleError is { } error)
-				{
-					<span class="mta-dim mta-live-error">@error</span>
-				}
-			</span>
+			<Hint Text="@(SampleError ?? "CPU, memory, load, network and disk figures are read again every two seconds while this page is shown.")" Style="min-width: 0">
+				<span class="mta-live">
+					<MokaStatusDot Size="MokaSize.Xs" Color="@(SampleError is null ? MokaColor.Success : MokaColor.Warning)" Glow="@(SampleError is null)" />
+					<span class="mta-label">@(SampleError is null ? "Live" : "Live figures paused")</span>
+					@if (SampleError is { } error)
+					{
+						<span class="mta-dim mta-live-error">@error</span>
+					}
+				</span>
+			</Hint>
 		}
 	</ChipsEnd>
 	<ChildContent>

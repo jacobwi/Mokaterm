@@ -6,7 +6,7 @@
 
 <div class="mt-dk-page">
 	<div class="mt-dk-panel-head">
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowLeft" OnClick="OnBack" aria-label="Back to the projects" />
+		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.ArrowLeft" OnClick="OnBack" Label="Back to the projects" />
 		<MokaStatusDot Size="MokaSize.Xs" Color="@HealthColor(Health)" Pulse="IsBusy" />
 		<span class="mt-dk-cell-name">@ProjectName</span>
 		<span class="mt-dk-label">@HealthLabel(Health)</span>
@@ -14,10 +14,12 @@
 		<span class="mt-dk-spacer"></span>
 		@if (Tool is { } tool)
 		{
-			<MokaTag Text="@tool.Display.ToUpperInvariant()" Size="MokaSize.Xs" Color="MokaColor.Surface" title="Every command here runs with this compose" />
+			<Hint Text="Every command here runs with this compose">
+				<MokaTag Text="@tool.Display.ToUpperInvariant()" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+			</Hint>
 		}
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-					Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh (the project also refreshes every five seconds)" aria-label="Refresh" />
+		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+					Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh (the project also refreshes every five seconds)" AriaLabel="Refresh" />
 	</div>
 
 	@if (_project?.WorkingDirectory is { } folder)
@@ -41,15 +43,19 @@
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Stop" Disabled="IsBusy" OnClick="@(() => RunAsync("stop"))">Stop</MokaButton>
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play" Disabled="IsBusy" OnClick="@(() => RunAsync("start"))">Start</MokaButton>
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Primary" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp" Disabled="@(IsBusy || !_target.HasFiles)" OnClick="@(() => RunAsync("up"))">Up</MokaButton>
-					<MokaChip Text="rebuild" Size="MokaSize.Xs" Selected="_build" OnClick="ToggleBuild" title="Up builds images first (--build)" />
-					<MokaChip Text="pull first" Size="MokaSize.Xs" Selected="_pullFirst" OnClick="TogglePullFirst" title="Up pulls images first" />
+					<Hint Text="Up builds images first (--build)">
+						<MokaChip Text="rebuild" Size="MokaSize.Xs" Selected="_build" OnClick="ToggleBuild" />
+					</Hint>
+					<Hint Text="Up pulls images first">
+						<MokaChip Text="pull first" Size="MokaSize.Xs" Selected="_pullFirst" OnClick="TogglePullFirst" />
+					</Hint>
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete" Disabled="IsBusy" OnClick="@(() => RunAsync("down"))">Down</MokaButton>
 				</span>
 				<span class="mt-dk-spacer"></span>
 				<DockerUpdateCheck Session="Session" References="ServiceImages" OnChecked="StateHasChanged" />
 				<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 					<ChildContent>
-						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.MoreHorizontal" Disabled="IsBusy" aria-label="More project actions" />
+						<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal" Disabled="IsBusy" Label="More project actions" Position="MokaTooltipPosition.BottomEnd" />
 					</ChildContent>
 					<Items>
 						<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" Class="mt-dk-narrow-only" OnClick="@(() => RunAsync("restart"))" />
@@ -138,21 +144,21 @@
 					@if (_target is not null)
 					{
 						<span class="mt-dk-hover">
-							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.File.FileText"
-										OnClick="@(() => ShowLogs(service.Name))" title="Logs" aria-label="@($"Logs of {service.Name}")" />
+							<IconButton Size="MokaSize.Xs" Icon="MokaIcons.File.FileText"
+										OnClick="@(() => ShowLogs(service.Name))" Label="Logs" AriaLabel="@($"Logs of {service.Name}")" />
 							@if (RunningContainer(service) is { } running)
 							{
 								<DockerPortLinks Session="Session" Ports="RunningPorts(service)" Name="@($"{ProjectName} {service.Name}")" />
-								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
+								<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Terminal"
 											Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="@(() => ShellAsync(running.Name))"
-											title="Open a shell in a new tab" aria-label="@($"Open a shell in {service.Name}")" />
+											Label="Open a shell in a new tab" AriaLabel="@($"Open a shell in {service.Name}")" />
 							}
-							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect"
-										Disabled="IsBusy" OnClick="@(() => RunAsync("restart", service.Name))" title="Restart" aria-label="@($"Restart {service.Name}")" />
+							<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Reconnect"
+										Disabled="IsBusy" OnClick="@(() => RunAsync("restart", service.Name))" Label="Restart" AriaLabel="@($"Restart {service.Name}")" />
 							<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 								<ChildContent>
-									<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.MoreHorizontal"
-												Disabled="IsBusy" aria-label="@($"Actions for {service.Name}")" />
+									<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+												Disabled="IsBusy" Label="More actions" AriaLabel="@($"Actions for {service.Name}")" Position="MokaTooltipPosition.BottomEnd" />
 								</ChildContent>
 								<Items>
 									<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" OnClick="@(() => RunAsync("restart", service.Name))" />

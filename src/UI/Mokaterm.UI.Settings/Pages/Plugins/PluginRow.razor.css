@@ -33,10 +33,6 @@
 	min-width: 0;
 }
 
-.plugin-row__status {
-	display: inline-flex;
-}
-
 .plugin-row__facts {
 	display: flex;
 	flex-wrap: wrap;

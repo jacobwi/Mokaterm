@@ -31,12 +31,13 @@
 				<dd>
 					@if (Capabilities.Clock.CanSwitchNtp && clock.CanSwitchNtp != false)
 					{
-						<MokaSwitch Value="ntp"
-									ValueChanged="SetNtpAsync"
-									Label="@(ntp ? "On" : "Off")"
-									Disabled="@(Busy || Context.RootChangeBlocked is not null)"
-									title="@Context.RootChangeBlocked"
-									aria-label="Time synchronisation" />
+						<Hint Text="@Context.RootChangeBlocked">
+							<MokaSwitch Value="ntp"
+										ValueChanged="SetNtpAsync"
+										Label="@(ntp ? "On" : "Off")"
+										Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+										aria-label="Time synchronisation" />
+						</Hint>
 					}
 					else
 					{
@@ -67,13 +68,14 @@
 								Disabled="@(Context.RootChangeBlocked is not null)"
 								aria-label="Time zone" />
 				</div>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Sm"
-							Disabled="@(Busy || string.IsNullOrEmpty(_zone) || _zone == clock.TimeZone || Context.RootChangeBlocked is not null)"
-							title="@Context.RootChangeBlocked"
-							OnClick="SetZoneAsync">
-					Set time zone
-				</MokaButton>
+				<Hint Text="@Context.RootChangeBlocked">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								Disabled="@(Busy || string.IsNullOrEmpty(_zone) || _zone == clock.TimeZone || Context.RootChangeBlocked is not null)"
+								OnClick="SetZoneAsync">
+						Set time zone
+					</MokaButton>
+				</Hint>
 			</div>
 			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
 				@(Capabilities.Clock.UsesTimedatectl

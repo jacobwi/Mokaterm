@@ -58,25 +58,27 @@
 	private protected RenderFragment EditButtons(string path, bool asRoot, bool createNew = false) => @<span class="mt-dk-toolbar">
 		@if (asRoot || !CanUseRoot)
 		{
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
-						StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
-						OnClick="@(() => EditProjectFileAsync(path, asRoot, createNew))"
-						title="@(createNew ? $"Create {DockerHostPaths.NameOf(path)} in the editor" : $"Open {DockerHostPaths.NameOf(path)} in the editor")">
-				@(createNew ? "Create" : "Edit")
-			</MokaButton>
+			<Hint Text="@(createNew ? $"Create {DockerHostPaths.NameOf(path)} in the editor" : $"Open {DockerHostPaths.NameOf(path)} in the editor")">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
+							StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
+							OnClick="@(() => EditProjectFileAsync(path, asRoot, createNew))">
+					@(createNew ? "Create" : "Edit")
+				</MokaButton>
+			</Hint>
 		}
 		else
 		{
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
-						StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
-						OnClick="@(() => EditProjectFileAsync(path, asRoot: false, createNew))"
-						title="@(createNew ? "Create it as the login" : "Open it in the editor as the login")">
-				@(createNew ? "Create" : "Edit")
-			</MokaButton>
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root" Disabled="IsEditing"
+			<Hint Text="@(createNew ? "Create it as the login" : "Open it in the editor as the login")">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
+							StartIcon="@(createNew ? MokatermIcons.FilePlus : MokaIcons.Action.Edit)" Disabled="IsEditing"
+							OnClick="@(() => EditProjectFileAsync(path, asRoot: false, createNew))">
+					@(createNew ? "Create" : "Edit")
+				</MokaButton>
+			</Hint>
+			<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Root" Disabled="IsEditing"
 						OnClick="@(() => EditProjectFileAsync(path, asRoot: true, createNew))"
-						title="@(createNew ? "Create it as root, through sudo" : "Open it in the editor as root, through sudo")"
-						aria-label="@($"{(createNew ? "Create" : "Edit")} {DockerHostPaths.NameOf(path)} as root")" />
+						Label="@(createNew ? "Create it as root, through sudo" : "Open it in the editor as root, through sudo")"
+						AriaLabel="@($"{(createNew ? "Create" : "Edit")} {DockerHostPaths.NameOf(path)} as root")" />
 		}
 	</span>;
 

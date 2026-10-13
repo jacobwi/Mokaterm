@@ -125,12 +125,13 @@
 		}
 		@if (SkippedCount > 0)
 		{
-			<MokaButton Variant="MokaVariant.Text"
-						Loading="_retrying"
-						title="Reads the skipped logins again and asks what each one needs, one prompt at a time."
-						OnClick="RunSkippedAskingAsync">
-				@($"Run skipped, asking ({SkippedCount})")
-			</MokaButton>
+			<Hint Text="Reads the skipped logins again and asks what each one needs, one prompt at a time." Position="MokaTooltipPosition.Top">
+				<MokaButton Variant="MokaVariant.Text"
+							Loading="_retrying"
+							OnClick="RunSkippedAskingAsync">
+					@($"Run skipped, asking ({SkippedCount})")
+				</MokaButton>
+			</Hint>
 		}
 		@if (RetryableCount > 0 && !Fleet.IsRunning)
 		{

@@ -49,7 +49,9 @@
 							<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate>@row.Segment</MokaText>
 							@if (row.HasRetained)
 							{
-								<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" title="A retained message arrived on this topic" />
+								<Hint Text="A retained message arrived on this topic">
+									<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" />
+								</Hint>
 							}
 						</div>
 						@if (row.Preview is { Length: > 0 } preview)

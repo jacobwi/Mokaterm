@@ -23,14 +23,15 @@
 		<div class="f2b-root">
 			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>fail2ban only answers root on this server. Turn root mode on to read its jails.</MokaAlert>
 			<div>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Xs"
-							StartIcon="MokatermIcons.Root"
-							Disabled="@(Context.RootChangeBlocked is not null)"
-							title="@Context.RootChangeBlocked"
-							OnClick="EnableRootAsync">
-					Root mode
-				</MokaButton>
+				<Hint Text="@Context.RootChangeBlocked">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Xs"
+								StartIcon="MokatermIcons.Root"
+								Disabled="@(Context.RootChangeBlocked is not null)"
+								OnClick="EnableRootAsync">
+						Root mode
+					</MokaButton>
+				</Hint>
 			</div>
 		</div>
 	}
@@ -108,13 +109,14 @@
 							<div class="mta-row" @key="address">
 								<span class="mta-cell mta-mono" title="@address">@address</span>
 								<span class="mta-cell mta-cell--end">
-									<MokaButton Variant="MokaVariant.Outlined"
-												Size="MokaSize.Xs"
-												Disabled="@(Busy || refused is not null)"
-												title="@(refused ?? $"Let {address} in again")"
-												OnClick="@(() => UnbanAsync(jail, address))">
-										Unban
-									</MokaButton>
+									<Hint Text="@(refused ?? $"Let {address} in again")">
+										<MokaButton Variant="MokaVariant.Outlined"
+													Size="MokaSize.Xs"
+													Disabled="@(Busy || refused is not null)"
+													OnClick="@(() => UnbanAsync(jail, address))">
+											Unban
+										</MokaButton>
+									</Hint>
 								</span>
 							</div>
 						}

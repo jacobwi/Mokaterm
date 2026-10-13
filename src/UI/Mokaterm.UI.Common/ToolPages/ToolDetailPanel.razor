@@ -19,13 +19,11 @@
 		</div>
 		@if (OnClose.HasDelegate)
 		{
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Navigation.Close"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Navigation.Close"
 						OnClick="OnClose"
-						title="Close the details"
-						aria-label="Close the details" />
+						Label="Close the details"
+						Position="MokaTooltipPosition.BottomEnd" />
 		}
 	</header>
 	@if (Actions is not null)

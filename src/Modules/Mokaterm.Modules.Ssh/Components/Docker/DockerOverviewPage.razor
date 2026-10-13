@@ -4,14 +4,11 @@
 <div class="mt-dk-toolbar">
 	<span class="mt-dk-label">Engine</span>
 	<span class="mt-dk-spacer"></span>
-	<MokaButton Variant="MokaVariant.Text"
-				Color="MokaColor.Surface"
-				Size="MokaSize.Xs"
-				StartIcon="MokaIcons.Action.Refresh"
+	<IconButton Size="MokaSize.Xs"
+				Icon="MokaIcons.Action.Refresh"
 				Disabled="IsLoading"
 				OnClick="RefreshAsync"
-				title="Look again"
-				aria-label="Look again" />
+				Label="Look again" />
 </div>
 
 @LoadErrorPanel(RefreshAsync)

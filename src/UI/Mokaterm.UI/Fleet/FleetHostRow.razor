@@ -112,23 +112,20 @@
 			<span class="mt-fleet-dim">@Unknown</span>
 		}
 	</span>
-	<span class="mt-fleet-cell mt-fleet-cell--actions" role="gridcell" @onclick:stopPropagation>
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="MokatermIcons.Reconnect"
+	@* An empty title keeps the row's own from showing over the buttons' tooltips. *@
+	<span class="mt-fleet-cell mt-fleet-cell--actions" role="gridcell" title="" @onclick:stopPropagation>
+		<IconButton Size="MokaSize.Xs"
+					Icon="MokatermIcons.Reconnect"
 					Disabled="@Row.IsPending"
 					tabindex="-1"
-					title="Read again (R)"
-					aria-label="Read again"
+					Label="Read again"
+					Shortcut="R"
 					OnClick="OnRefresh" />
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="MokatermIcons.Connect"
+		<IconButton Size="MokaSize.Xs"
+					Icon="MokatermIcons.Connect"
 					tabindex="-1"
-					title="Open in a tab (O)"
-					aria-label="Open in a tab"
+					Label="Open in a tab"
+					Shortcut="O"
 					OnClick="OnOpen" />
 	</span>
 

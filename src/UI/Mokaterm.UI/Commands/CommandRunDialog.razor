@@ -207,7 +207,9 @@
 		@if (_run is null)
 		{
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_starting" OnClick="Close">Cancel</MokaButton>
-			<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" title="@SaveHint" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			<Hint Text="@SaveHint" Position="MokaTooltipPosition.Top">
+				<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			</Hint>
 			<MokaButton data-primary="true" StartIcon="MokatermIcons.Command" Loading="_starting" Disabled="@(!CanRun)" OnClick="RunAsync">
 				@RunLabel
 			</MokaButton>
@@ -230,16 +232,19 @@
 				}
 				@if (SkippedCount > 0)
 				{
-					<MokaButton Variant="MokaVariant.Text"
-								Loading="_retrying"
-								title="Runs the skipped hosts again and asks what each one needs, one prompt at a time."
-								OnClick="RetrySkippedAsync">
-						@($"Run skipped, asking ({SkippedCount})")
-					</MokaButton>
+					<Hint Text="Runs the skipped hosts again and asks what each one needs, one prompt at a time." Position="MokaTooltipPosition.Top">
+						<MokaButton Variant="MokaVariant.Text"
+									Loading="_retrying"
+									OnClick="RetrySkippedAsync">
+							@($"Run skipped, asking ({SkippedCount})")
+						</MokaButton>
+					</Hint>
 				}
 				<MokaButton Variant="MokaVariant.Text" OnClick="EditAgain">Change and run again</MokaButton>
 			}
-			<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" title="@SaveHint" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			<Hint Text="@SaveHint" Position="MokaTooltipPosition.Top">
+				<MokaButton Variant="MokaVariant.Text" Disabled="@(!CanSaveCommand)" OnClick="SaveCommandAsync">Save as command</MokaButton>
+			</Hint>
 			<MokaButton data-primary="true" Disabled="IsBusy" OnClick="Close">Close</MokaButton>
 		}
 	</Actions>

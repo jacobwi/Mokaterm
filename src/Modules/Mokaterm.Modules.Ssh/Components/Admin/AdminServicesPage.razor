@@ -64,12 +64,12 @@
 						<span class="mta-cell mta-mono mta-dim mta-wide">@unit.StateText</span>
 						<span class="mta-cell mta-mono @(unit.Enabled == true ? "" : "mta-dim")">@BootText(unit)</span>
 						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										StartIcon="MokaIcons.Navigation.MoreHorizontal"
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokaIcons.Navigation.MoreHorizontal"
 										OnClick="@(args => ShowRowMenu(args, MenuFor(unit)))"
-										aria-label="@($"Actions for {unit.Name}")" />
+										Label="More actions"
+										AriaLabel="@($"Actions for {unit.Name}")"
+										Position="MokaTooltipPosition.BottomEnd" />
 						</span>
 					</div>
 				}
@@ -161,24 +161,26 @@
 			<Actions>
 				@foreach (ServiceAction action in Actions(unit))
 				{
-					<MokaButton Variant="MokaVariant.Outlined"
-								Color="@(action is ServiceAction.Stop or ServiceAction.Disable ? MokaColor.Error : MokaColor.Primary)"
-								Size="MokaSize.Xs"
-								Disabled="@(Busy || Context.RootChangeBlocked is not null)"
-								title="@Context.RootChangeBlocked"
-								OnClick="@(() => ActAsync(action, unit))">
-						@action
-					</MokaButton>
+					<Hint Text="@Context.RootChangeBlocked">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Color="@(action is ServiceAction.Stop or ServiceAction.Disable ? MokaColor.Error : MokaColor.Primary)"
+									Size="MokaSize.Xs"
+									Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+									OnClick="@(() => ActAsync(action, unit))">
+							@action
+						</MokaButton>
+					</Hint>
 				}
 				@if (Capabilities.Services?.HasUnitFiles == true)
 				{
-					<MokaButton Variant="MokaVariant.Outlined"
-								Size="MokaSize.Xs"
-								Disabled="@(Busy || _editingOverride || Context.RootChangeBlocked is not null)"
-								title="@(Context.RootChangeBlocked ?? $"Edit {ServiceCommands.OverridePath(unit.Name)} as root")"
-								OnClick="@(() => EditOverrideAsync(unit))">
-						Edit override
-					</MokaButton>
+					<Hint Text="@(Context.RootChangeBlocked ?? $"Edit {ServiceCommands.OverridePath(unit.Name)} as root")">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Size="MokaSize.Xs"
+									Disabled="@(Busy || _editingOverride || Context.RootChangeBlocked is not null)"
+									OnClick="@(() => EditOverrideAsync(unit))">
+							Edit override
+						</MokaButton>
+					</Hint>
 				}
 			</Actions>
 			<ChildContent>

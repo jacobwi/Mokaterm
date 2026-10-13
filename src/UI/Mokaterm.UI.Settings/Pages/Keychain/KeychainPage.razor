@@ -76,35 +76,35 @@
 		<RowActions Context="credential">
 			@if (credential.Kind == CredentialKind.Password)
 			{
-				<MokaButton Variant="MokaVariant.Text"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Content.Copy"
+				<IconButton Size="MokaSize.Xs"
+							Icon="MokaIcons.Content.Copy"
+							Color="MokaColor.Primary"
 							OnClick="() => CopyPasswordAsync(credential)"
-							title="Copy password"
-							aria-label="@($"Copy the password of {credential.Name}")" />
+							Label="Copy password"
+							AriaLabel="@($"Copy the password of {credential.Name}")" />
 			}
 			else
 			{
-				<MokaButton Variant="MokaVariant.Text"
-							Size="MokaSize.Xs"
-							StartIcon="MokatermIcons.ShieldCheck"
+				<IconButton Size="MokaSize.Xs"
+							Icon="MokatermIcons.ShieldCheck"
+							Color="MokaColor.Primary"
 							OnClick="() => CopyPublicKeyAsync(credential)"
-							title="Copy public key"
-							aria-label="@($"Copy the public key of {credential.Name}")" />
+							Label="Copy public key"
+							AriaLabel="@($"Copy the public key of {credential.Name}")" />
 			}
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Edit"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Edit"
+						Color="MokaColor.Primary"
 						OnClick="() => EditCredential(credential)"
-						title="Edit"
-						aria-label="@($"Edit {credential.Name}")" />
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Xs"
+						Label="Edit"
+						AriaLabel="@($"Edit {credential.Name}")" />
+			<IconButton Size="MokaSize.Xs"
 						Color="MokaColor.Error"
-						StartIcon="MokaIcons.Action.Delete"
+						Icon="MokaIcons.Action.Delete"
 						OnClick="() => DeleteAsync(credential)"
-						title="Delete"
-						aria-label="@($"Delete {credential.Name}")" />
+						Label="Delete"
+						AriaLabel="@($"Delete {credential.Name}")"
+						Position="MokaTooltipPosition.BottomEnd" />
 		</RowActions>
 		<EmptyContent>
 			@if (IsLoaded)

@@ -7,26 +7,22 @@
    the user, and for one that cannot be opened from here, which the menu says why. *@
 @if (_routes is [{ CanOpen: true, Schemes: [var scheme] } only])
 {
-	<MokaButton Variant="MokaVariant.Text"
-				Color="MokaColor.Surface"
-				Size="MokaSize.Xs"
-				StartIcon="MokatermIcons.Globe"
+	<IconButton Size="MokaSize.Xs"
+				Icon="MokatermIcons.Globe"
 				Disabled="_opening"
 				OnClick="@(() => OpenAsync(only, scheme))"
-				title="@Hint(only, scheme)"
-				aria-label="@($"Open {only.Port.Display} of {Name} in the browser")" />
+				Label="@Hint(only, scheme)"
+				AriaLabel="@($"Open {only.Port.Display} of {Name} in the browser")" />
 }
 else if (_routes.Count > 0)
 {
 	<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 		<ChildContent>
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokatermIcons.Globe"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokatermIcons.Globe"
 						Disabled="_opening"
-						title="Open in the browser"
-						aria-label="@($"Open a port of {Name} in the browser")" />
+						Label="Open in the browser"
+						AriaLabel="@($"Open a port of {Name} in the browser")" />
 		</ChildContent>
 		<Items>
 			@foreach (DockerPortRoute route in _routes)

@@ -1,0 +1,19 @@
+@namespace Mokaterm.UI.Common.Components
+
+<Hint Text="@Label" Shortcut="@Shortcut" Position="Position" Class="@Class">
+	<MokaButton Variant="Variant"
+				Color="@(Active ? MokaColor.Primary : Color)"
+				Size="Size"
+				StartIcon="Icon"
+				Disabled="Disabled"
+				Loading="Loading"
+				Class="@ButtonClass"
+				OnClick="OnClick"
+				aria-label="@(AriaLabel ?? Label)"
+				aria-pressed="@PressedText"
+				@attributes="AdditionalAttributes" />
+	@if (Dot is { Length: > 0 } dot)
+	{
+		<span class="mt-icon-dot" style="--mt-icon-dot:@dot" aria-hidden="true"></span>
+	}
+</Hint>

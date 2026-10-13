@@ -93,21 +93,22 @@
 					</MokaColumn>
 				</ChildContent>
 				<RowActions Context="file">
-					<MokaButton Variant="MokaVariant.Text"
-								Size="MokaSize.Xs"
-								StartIcon="MokatermIcons.Play"
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokatermIcons.Play"
+								Color="MokaColor.Primary"
 								OnClick="() => Play(file)"
-								title="Play"
-								aria-label="@($"Play {file.Name}")" />
+								Label="Play"
+								AriaLabel="@($"Play {file.Name}")" />
 					@if (CanSaveFiles)
 					{
-						<MokaButton Variant="MokaVariant.Text"
-									Size="MokaSize.Xs"
-									StartIcon="MokatermIcons.Download"
+						<IconButton Size="MokaSize.Xs"
+									Icon="MokatermIcons.Download"
+									Color="MokaColor.Primary"
 									Disabled="_busy"
 									OnClick="() => SaveAsync(file)"
-									title="Save a copy"
-									aria-label="@($"Save a copy of {file.Name}")" />
+									Label="Save a copy"
+									AriaLabel="@($"Save a copy of {file.Name}")"
+									Position="MokaTooltipPosition.BottomEnd" />
 					}
 				</RowActions>
 				<EmptyContent>

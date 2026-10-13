@@ -274,9 +274,12 @@
 	color: var(--moka-color-primary);
 }
 
+/* The pointer goes through to the hint around a greyed link, which says why it cannot be used, the way it does for a
+   disabled Moka button. */
 .mt-admin ::deep .mta-link:disabled {
 	cursor: default;
 	opacity: 0.5;
+	pointer-events: none;
 }
 
 .mt-admin ::deep .mta-table {

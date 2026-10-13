@@ -18,17 +18,17 @@
 		@if (actions.Status == "running")
 		{
 			<DockerPortLinks Session="Session" Ports="actions.Ports" Name="@Name" />
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
-						Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="ShellAsync" title="Open a shell in a new tab" aria-label="Open a shell" />
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen"
-						OnClick="BrowseAsync" title="Browse its files" aria-label="Browse files" />
+			<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Terminal"
+						Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="ShellAsync" Label="Open a shell in a new tab" AriaLabel="Open a shell" />
+			<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.FolderOpen"
+						OnClick="BrowseAsync" Label="Browse its files" AriaLabel="Browse files" />
 		}
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(IsAlive(actions) ? MokatermIcons.Reconnect : MokatermIcons.Play)"
+		<IconButton Size="MokaSize.Xs" Icon="@(IsAlive(actions) ? MokatermIcons.Reconnect : MokatermIcons.Play)"
 					Disabled="IsBusy" OnClick="@(() => OnMenuAsync(IsAlive(actions) ? "restart" : "start"))"
-					title="@(IsAlive(actions) ? "Restart" : "Start")" aria-label="@(IsAlive(actions) ? "Restart" : "Start")" />
+					Label="@(IsAlive(actions) ? "Restart" : "Start")" />
 		<DockerContainerMenu Name="@Name" Id="@actions.Id" State="@actions.Status" Disabled="IsBusy" HasTerminal="CanOpenShellTab" OnAction="OnMenuAsync" />
 	}
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="OnClose" aria-label="Close the panel" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="OnClose" Label="Close the panel" Position="MokaTooltipPosition.BottomEnd" />
 </div>
 
 @if (_details is { } meta)

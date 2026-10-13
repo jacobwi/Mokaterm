@@ -5,13 +5,12 @@
 @* Every action on one container, in one menu: the row and the panel show only the two or three used most. *@
 <MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 	<ChildContent>
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="MokaIcons.Navigation.MoreHorizontal"
+		<IconButton Size="MokaSize.Xs"
+					Icon="MokaIcons.Navigation.MoreHorizontal"
 					Disabled="Disabled"
-					title="More actions"
-					aria-label="@($"Actions for {Name}")" />
+					Label="More actions"
+					AriaLabel="@($"Actions for {Name}")"
+					Position="MokaTooltipPosition.BottomEnd" />
 	</ChildContent>
 	<Items>
 		@if (IsAlive)

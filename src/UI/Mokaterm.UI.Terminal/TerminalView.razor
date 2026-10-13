@@ -7,26 +7,32 @@
 	@* terminal.js sets the text and toggles visibility; Blazor renders it once and leaves it alone. *@
 	<div class="mt-terminal-badge" aria-hidden="true"></div>
 
+	@* The hovered link's address. terminal.js fills, places and shows it; Blazor renders it once and leaves it alone. *@
+	<div class="mt-terminal-link-hint" popover="manual" role="tooltip"></div>
+
 	@if (_hoverCommand is not null)
 	{
 		<div class="mt-terminal-row-actions" style="@_hoverStyle">
 			@if (OnCommandSaved.HasDelegate)
 			{
-				<MokaButton Variant="MokaVariant.Soft"
+				<IconButton Variant="MokaVariant.Soft"
 							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Save"
+							Icon="MokaIcons.Action.Save"
+							Color="MokaColor.Primary"
 							OnClick="() => SaveHoveredCommandAsync(false)"
-							title="@($"Save \"{_hoverCommand}\" for this connection")"
-							aria-label="@($"Save the command {_hoverCommand} for this connection")" />
+							Label="@($"Save \"{_hoverCommand}\" for this connection")"
+							AriaLabel="@($"Save the command {_hoverCommand} for this connection")" />
 			}
 			@if (OnCommandSavedWithDetails.HasDelegate)
 			{
-				<MokaButton Variant="MokaVariant.Soft"
+				<IconButton Variant="MokaVariant.Soft"
 							Size="MokaSize.Xs"
-							StartIcon="MokatermIcons.Tag"
+							Icon="MokatermIcons.Tag"
+							Color="MokaColor.Primary"
 							OnClick="() => SaveHoveredCommandAsync(true)"
-							title="Save with a name, tags and a scope"
-							aria-label="@($"Save the command {_hoverCommand} with a name, tags and a scope")" />
+							Label="Save with a name, tags and a scope"
+							AriaLabel="@($"Save the command {_hoverCommand} with a name, tags and a scope")"
+							Position="MokaTooltipPosition.BottomEnd" />
 			}
 		</div>
 	}
@@ -34,12 +40,13 @@
 	@if (_scrolledUp && _startError is null)
 	{
 		<div class="mt-terminal-jump">
-			<MokaButton Variant="MokaVariant.Soft"
-						Size="MokaSize.Sm"
-						StartIcon="MokaIcons.Navigation.ArrowDown"
+			<IconButton Variant="MokaVariant.Soft"
+						Icon="MokaIcons.Navigation.ArrowDown"
+						Color="MokaColor.Primary"
 						OnClick="ScrollToBottomAsync"
-						title="Scroll to the end (Ctrl+Shift+End)"
-						aria-label="Scroll to the end" />
+						Label="Scroll to the end"
+						Shortcut="Ctrl+Shift+End"
+						Position="MokaTooltipPosition.TopEnd" />
 		</div>
 	}
 
@@ -74,34 +81,37 @@
 							   @onkeydown="OnFindKeyDownAsync"
 							   aria-label="Find in terminal"
 							   data-terminal-find="" />
-				<MokaButton Variant="@OptionVariant(_findCaseSensitive)"
-							Color="@OptionColor(_findCaseSensitive)"
-							Size="MokaSize.Sm"
-							Class="mt-find-option"
-							OnClick="ToggleCaseSensitiveAsync"
-							title="Match case (Alt+C)"
-							aria-label="Match case"
-							aria-pressed="@AriaPressed(_findCaseSensitive)">Aa</MokaButton>
-				<MokaButton Variant="@OptionVariant(_findWholeWord)"
-							Color="@OptionColor(_findWholeWord)"
-							Size="MokaSize.Sm"
-							Class="mt-find-option"
-							OnClick="ToggleWholeWordAsync"
-							title="Match whole word (Alt+W)"
-							aria-label="Match whole word"
-							aria-pressed="@AriaPressed(_findWholeWord)">ab</MokaButton>
-				<MokaButton Variant="@OptionVariant(_findRegex)"
-							Color="@OptionColor(_findRegex)"
-							Size="MokaSize.Sm"
-							Class="mt-find-option"
-							OnClick="ToggleRegexAsync"
-							title="Use regular expression (Alt+R)"
-							aria-label="Use regular expression"
-							aria-pressed="@AriaPressed(_findRegex)">.*</MokaButton>
+				<Hint Text="Match case" Shortcut="Alt+C">
+					<MokaButton Variant="@OptionVariant(_findCaseSensitive)"
+								Color="@OptionColor(_findCaseSensitive)"
+								Size="MokaSize.Sm"
+								Class="mt-find-option"
+								OnClick="ToggleCaseSensitiveAsync"
+								aria-label="Match case"
+								aria-pressed="@AriaPressed(_findCaseSensitive)">Aa</MokaButton>
+				</Hint>
+				<Hint Text="Match whole word" Shortcut="Alt+W">
+					<MokaButton Variant="@OptionVariant(_findWholeWord)"
+								Color="@OptionColor(_findWholeWord)"
+								Size="MokaSize.Sm"
+								Class="mt-find-option"
+								OnClick="ToggleWholeWordAsync"
+								aria-label="Match whole word"
+								aria-pressed="@AriaPressed(_findWholeWord)">ab</MokaButton>
+				</Hint>
+				<Hint Text="Use regular expression" Shortcut="Alt+R">
+					<MokaButton Variant="@OptionVariant(_findRegex)"
+								Color="@OptionColor(_findRegex)"
+								Size="MokaSize.Sm"
+								Class="mt-find-option"
+								OnClick="ToggleRegexAsync"
+								aria-label="Use regular expression"
+								aria-pressed="@AriaPressed(_findRegex)">.*</MokaButton>
+				</Hint>
 				<MokaText Element="span" Size="MokaSize.Xs" Mono Style="min-width:4.5rem;color:var(--moka-color-on-surface-variant)">@_findStatus</MokaText>
-				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ChevronUp" OnClick="FindPreviousAsync" title="Previous match (Shift+Enter)" aria-label="Previous match" />
-				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.ChevronDown" OnClick="FindNextAsync" title="Next match (Enter)" aria-label="Next match" />
-				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" StartIcon="MokaIcons.Navigation.Close" OnClick="CloseFindAsync" title="Close (Escape)" aria-label="Close find" />
+				<IconButton Icon="MokaIcons.Navigation.ChevronUp" Color="MokaColor.Primary" OnClick="FindPreviousAsync" Label="Previous match" Shortcut="Shift+Enter" />
+				<IconButton Icon="MokaIcons.Navigation.ChevronDown" Color="MokaColor.Primary" OnClick="FindNextAsync" Label="Next match" Shortcut="Enter" />
+				<IconButton Icon="MokaIcons.Navigation.Close" Color="MokaColor.Primary" OnClick="CloseFindAsync" Label="Close" Shortcut="Escape" AriaLabel="Close find" Position="MokaTooltipPosition.BottomEnd" />
 			</MokaToolbar>
 		</div>
 	}

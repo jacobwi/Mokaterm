@@ -29,29 +29,31 @@
 	<ChipsEnd>
 		@if (_reboot is { Required: true } reboot)
 		{
-			<span title="@($"Reboot {AdminUpdateReads.RebootText(reboot)}")">
+			<Hint Text="@($"Reboot {AdminUpdateReads.RebootText(reboot)}")">
 				<MokaTag Text="REBOOT REQUIRED" Size="MokaSize.Xs" Color="MokaColor.Warning" />
-			</span>
+			</Hint>
 		}
 		@if (RebootCommands.CanReboot(Profile))
 		{
-			<button type="button"
-					class="mta-link"
-					disabled="@(Busy || Context.RootChangeBlocked is not null)"
-					title="@(Context.RootChangeBlocked ?? $"Reboot the machine; the session reconnects once it is back. Reboot {(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "status not read yet")}.")"
-					@onclick="Context.Reboot">
-				reboot
-			</button>
+			<Hint Text="@(Context.RootChangeBlocked ?? $"Reboot the machine; the session reconnects once it is back. Reboot {(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "status not read yet")}.")">
+				<button type="button"
+						class="mta-link"
+						disabled="@(Busy || Context.RootChangeBlocked is not null)"
+						@onclick="Context.Reboot">
+					reboot
+				</button>
+			</Hint>
 		}
 		@if (_view != "installed" && Capabilities.Packages?.RefreshIndex() is not null)
 		{
-			<button type="button"
-					class="mta-link"
-					disabled="@(Busy || Context.RootChangeBlocked is not null)"
-					title="Fetch the current package lists from every repository, then check again"
-					@onclick="RefreshIndexAsync">
-				refresh package lists
-			</button>
+			<Hint Text="Fetch the current package lists from every repository, then check again">
+				<button type="button"
+						class="mta-link"
+						disabled="@(Busy || Context.RootChangeBlocked is not null)"
+						@onclick="RefreshIndexAsync">
+					refresh package lists
+				</button>
+			</Hint>
 		}
 	</ChipsEnd>
 	<ChildContent>
@@ -159,12 +161,12 @@
 							<span class="mta-cell mta-mono mta-dim" title="@package.Version">@package.Version</span>
 							<span class="mta-cell mta-mono mta-dim mta-wide">@package.Architecture</span>
 							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-								<MokaButton Variant="MokaVariant.Text"
-											Color="MokaColor.Surface"
-											Size="MokaSize.Xs"
-											StartIcon="MokaIcons.Navigation.MoreHorizontal"
+								<IconButton Size="MokaSize.Xs"
+											Icon="MokaIcons.Navigation.MoreHorizontal"
 											OnClick="@(args => ShowRowMenu(args, MenuFor(package)))"
-											aria-label="@($"Actions for {package.Name}")" />
+											Label="More actions"
+											AriaLabel="@($"Actions for {package.Name}")"
+											Position="MokaTooltipPosition.BottomEnd" />
 							</span>
 						</div>
 					}
@@ -271,15 +273,16 @@
 		PackageUpdate? update = _updates?.FirstOrDefault(candidate => candidate.Name == package.Name);
 		<ToolDetailPanel Title="@package.Name" OnClose="@(() => _selected = null)">
 			<Actions>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Color="MokaColor.Error"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Delete"
-							Disabled="@(Busy || Context.RootChangeBlocked is not null)"
-							title="@Context.RootChangeBlocked"
-							OnClick="@(() => RemoveAsync(package.Name))">
-					Remove
-				</MokaButton>
+				<Hint Text="@Context.RootChangeBlocked">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+								OnClick="@(() => RemoveAsync(package.Name))">
+						Remove
+					</MokaButton>
+				</Hint>
 			</Actions>
 			<ChildContent>
 				<dl class="mta-kv">

@@ -3,7 +3,7 @@
 
 @* A quiet icon button for a dialog header, drawn like Moka's own close button so the two sit side by side. Its name
    shows in Moka's tooltip, below it by default since a header sits at the top of its dialog or window. *@
-<MokaTooltip Text="@TooltipText" Position="TooltipPosition">
+<Hint Text="@Title" Shortcut="@Shortcut" Position="TooltipPosition">
 	<button type="button"
 			class="mt-dialog-head-button @(Active ? "mt-dialog-head-button--on" : null)"
 			aria-label="@Title"
@@ -12,7 +12,7 @@
 			@onclick="OnClick">
 		<MokaIcon Icon="Icon" SizeValue="@SizeValue" />
 	</button>
-</MokaTooltip>
+</Hint>
 
 @code {
 	[Parameter, EditorRequired]
@@ -46,6 +46,4 @@
 
 	[Parameter]
 	public string SizeValue { get; set; } = "16px";
-
-	private string TooltipText => Shortcut is null ? Title : $"{Title} ({Shortcut})";
 }

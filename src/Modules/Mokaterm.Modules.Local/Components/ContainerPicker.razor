@@ -18,15 +18,16 @@
 			}
 			else
 			{
-				<MokaButton Variant="MokaVariant.Outlined"
-							Color="MokaColor.Surface"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Search"
-							Disabled="Disabled"
-							OnClick="LoadAsync"
-							title="@ChooseTitle">
-					Choose
-				</MokaButton>
+				<Hint Text="@ChooseTitle">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Surface"
+								Size="MokaSize.Xs"
+								StartIcon="MokaIcons.Action.Search"
+								Disabled="Disabled"
+								OnClick="LoadAsync">
+						Choose
+					</MokaButton>
+				</Hint>
 			}
 		</div>
 	</div>

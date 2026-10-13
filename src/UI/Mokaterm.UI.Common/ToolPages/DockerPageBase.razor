@@ -36,21 +36,19 @@
 					<span class="mt-dk-spacer"></span>
 					@if (change.Text.Length > 0)
 					{
-						<MokaButton Variant="MokaVariant.Text"
-									Color="MokaColor.Surface"
-									Size="MokaSize.Xs"
-									StartIcon="@(ChangeOutputShown ? MokaIcons.Navigation.ChevronUp : MokaIcons.Navigation.ChevronDown)"
+						<IconButton Size="MokaSize.Xs"
+									Icon="@(ChangeOutputShown ? MokaIcons.Navigation.ChevronUp : MokaIcons.Navigation.ChevronDown)"
 									OnClick="ToggleChangeOutput"
 									aria-expanded="@(ChangeOutputShown ? "true" : "false")"
-									aria-label="Output" />
+									Label="@(ChangeOutputShown ? "Hide the output" : "Show the output")"
+									AriaLabel="Output" />
 					}
 					<CopyButton Text="@change.Command" Label="Copy the command" />
-					<MokaButton Variant="MokaVariant.Text"
-								Color="MokaColor.Surface"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Navigation.Close"
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.Close"
 								OnClick="DismissChange"
-								aria-label="Dismiss" />
+								Label="Dismiss"
+								Position="MokaTooltipPosition.BottomEnd" />
 				</div>
 				<span class="mt-dk-change-command mt-dk-mono" title="@change.Command">$ @change.Command</span>
 				@if (ChangeOutputShown && change.Text.Length > 0)

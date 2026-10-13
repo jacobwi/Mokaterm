@@ -15,13 +15,12 @@
 			<MokaTag Text="@status.Line.Frame" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 			<MokaTag Text="@FlowControlLabel(status.Line.FlowControl)" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 			<span class="mt-serial-spacer"></span>
-			<MokaButton Variant="MokaVariant.Outlined"
-						Color="MokaColor.Surface"
+			<IconButton Variant="MokaVariant.Outlined"
 						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Refresh"
+						Icon="MokaIcons.Action.Refresh"
 						Disabled="@(_busy || !status.IsOpen)"
 						OnClick="RefreshAsync"
-						aria-label="Read the pins again" />
+						Label="Read the pins again" />
 		</div>
 
 		<div class="mt-serial-label">Input</div>

@@ -18,9 +18,15 @@
 							  Disabled="Disabled"
 							  Size="MokaSize.Sm"
 							  FullWidth>
-			<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="Disabled" title="At most once" />
-			<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="Disabled" title="At least once" />
-			<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="Disabled" title="Exactly once" />
+			<Hint Text="At most once" Style="flex: 1">
+				<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="Disabled" />
+			</Hint>
+			<Hint Text="At least once" Style="flex: 1">
+				<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="Disabled" />
+			</Hint>
+			<Hint Text="Exactly once" Style="flex: 1">
+				<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="Disabled" />
+			</Hint>
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

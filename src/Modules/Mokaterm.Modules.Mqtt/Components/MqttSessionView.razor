@@ -3,33 +3,24 @@
 
 <div class="mt-mqtt">
 	<div class="mt-mqtt-toolbar">
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					StartIcon="MqttIcons.Publish"
+		<IconButton Icon="MqttIcons.Publish"
 					Disabled="@(_connection is null)"
 					OnClick="OpenPublish"
-					title="Publish a message"
-					aria-label="Publish a message" />
+					Label="Publish a message"
+					Position="MokaTooltipPosition.BottomStart" />
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					StartIcon="MqttIcons.Topic"
+		<IconButton Icon="MqttIcons.Topic"
 					Disabled="@(_connection is null)"
 					OnClick="OpenSubscriptions"
-					title="@SubscriptionsTitle"
-					aria-label="Subscriptions" />
+					Label="@SubscriptionsTitle"
+					AriaLabel="Subscriptions" />
 		<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-meta mt-mqtt-subs-count" title="@SubscriptionsTitle">@SubscriptionsText</MokaText>
 
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Sm"
-					StartIcon="MokatermIcons.Eraser"
+		<IconButton Icon="MokatermIcons.Eraser"
 					Disabled="@(_connection is null)"
 					OnClick="ClearKept"
-					title="Forget every topic and message kept here"
-					aria-label="Clear what is kept" />
+					Label="Forget every topic and message kept here"
+					AriaLabel="Clear what is kept" />
 
 		<span class="mt-mqtt-spacer"></span>
 
@@ -48,15 +39,18 @@
 
 			@if (connection.Info.IsEncrypted)
 			{
-				<MokaTag Text="TLS" Icon="MokatermIcons.Lock" Color="MokaColor.Success" Size="MokaSize.Xs" title="@TransportTitle" />
+				<Hint Text="@TransportTitle" Position="MokaTooltipPosition.BottomEnd">
+					<MokaTag Text="TLS" Icon="MokatermIcons.Lock" Color="MokaColor.Success" Size="MokaSize.Xs" />
+				</Hint>
 			}
 			else
 			{
-				<MokaTag Text="NOT ENCRYPTED"
-						 Icon="MokatermIcons.Unlock"
-						 Color="MokaColor.Warning"
-						 Size="MokaSize.Xs"
-						 title="@($"{TransportTitle}. Anyone on the path can read the login and every payload.")" />
+				<Hint Text="@($"{TransportTitle}. Anyone on the path can read the login and every payload.")" Position="MokaTooltipPosition.BottomEnd">
+					<MokaTag Text="NOT ENCRYPTED"
+							 Icon="MokatermIcons.Unlock"
+							 Color="MokaColor.Warning"
+							 Size="MokaSize.Xs" />
+				</Hint>
 			}
 		}
 	</div>

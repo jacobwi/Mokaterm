@@ -14,14 +14,12 @@
 				Disabled="@(IsBusy || _newImage is not null)" OnClick="@(() => NewContainer(""))">
 		New container
 	</MokaButton>
-	<MokaButton Variant="MokaVariant.Text"
-				Color="MokaColor.Surface"
-				Size="MokaSize.Xs"
-				StartIcon="MokaIcons.Action.Refresh"
+	<IconButton Size="MokaSize.Xs"
+				Icon="MokaIcons.Action.Refresh"
 				Disabled="IsLoading"
 				OnClick="RefreshAsync"
-				title="Refresh (the list also refreshes every five seconds)"
-				aria-label="Refresh" />
+				Label="Refresh (the list also refreshes every five seconds)"
+				AriaLabel="Refresh" />
 </div>
 
 @LoadErrorPanel(RefreshAsync)
@@ -80,19 +78,19 @@ else
 								<span class="mt-dk-cell mt-dk-cell--optional" title="@Ports(container)">@Ports(container)</span>
 							</button>
 							<span class="mt-dk-hover">
-								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.File.FileText"
-											OnClick="@(() => Select(container, "logs"))" title="Logs" aria-label="@($"Logs of {container.Name}")" />
+								<IconButton Size="MokaSize.Xs" Icon="MokaIcons.File.FileText"
+											OnClick="@(() => Select(container, "logs"))" Label="Logs" AriaLabel="@($"Logs of {container.Name}")" />
 								@if (container.IsRunning)
 								{
 									<DockerPortLinks Session="Session" Ports="container.Ports" Name="@container.Name" />
-									<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Terminal"
+									<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Terminal"
 												Disabled="@(IsBusy || !CanOpenShellTab)"
-												OnClick="@(() => ShellAsync(container))" title="Open a shell in a new tab" aria-label="@($"Open a shell in {container.Name}")" />
+												OnClick="@(() => ShellAsync(container))" Label="Open a shell in a new tab" AriaLabel="@($"Open a shell in {container.Name}")" />
 								}
-								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="@(container.IsAlive ? MokatermIcons.Reconnect : MokatermIcons.Play)"
+								<IconButton Size="MokaSize.Xs" Icon="@(container.IsAlive ? MokatermIcons.Reconnect : MokatermIcons.Play)"
 											Disabled="IsBusy"
 											OnClick="@(() => container.IsAlive ? RestartAsync(container) : StartAsync(container))"
-											title="@(container.IsAlive ? "Restart" : "Start")" aria-label="@($"{(container.IsAlive ? "Restart" : "Start")} {container.Name}")" />
+											Label="@(container.IsAlive ? "Restart" : "Start")" AriaLabel="@($"{(container.IsAlive ? "Restart" : "Start")} {container.Name}")" />
 								<DockerContainerMenu Name="@container.Name"
 													 Id="@container.Id"
 													 State="@container.State"

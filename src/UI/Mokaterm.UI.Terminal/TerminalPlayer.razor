@@ -29,20 +29,20 @@
 	@if (Recording.IsTimed)
 	{
 		<div class="mt-player-controls">
-			<MokaButton Variant="MokaVariant.Soft"
-						Size="MokaSize.Sm"
-						StartIcon="@(IsPlaying ? MokatermIcons.Pause : MokatermIcons.Play)"
+			<IconButton Variant="MokaVariant.Soft"
+						Icon="@(IsPlaying ? MokatermIcons.Pause : MokatermIcons.Play)"
+						Color="MokaColor.Primary"
 						Disabled="!_ready"
 						OnClick="TogglePlayAsync"
-						title="@PlayLabel"
-						aria-label="@PlayLabel" />
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Sm"
-						StartIcon="MokaIcons.Action.Refresh"
+						Label="@PlayLabel"
+						Position="MokaTooltipPosition.TopStart" />
+			<IconButton Icon="MokaIcons.Action.Refresh"
+						Color="MokaColor.Primary"
 						Disabled="!_ready"
 						OnClick="RestartAsync"
-						title="Restart"
-						aria-label="Play from the beginning" />
+						Label="Restart"
+						AriaLabel="Play from the beginning"
+						Position="MokaTooltipPosition.Top" />
 			<div class="mt-player-seek">
 				<MokaSlider Value="PositionSeconds"
 							ValueChanged="SeekAsync"

@@ -7,8 +7,8 @@
 		<div class="mt-dk-section-head">
 			<span class="mt-dk-label">Project folder</span>
 			<span class="mt-dk-spacer"></span>
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-						Disabled="IsLoading" OnClick="CheckAsync" title="Check the files again" aria-label="Check the files again" />
+			<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+						Disabled="IsLoading" OnClick="CheckAsync" Label="Check the files again" />
 		</div>
 		@if (context.Project.WorkingDirectory is { } folder)
 		{
@@ -96,7 +96,7 @@
 
 	private RenderFragment StateDot(string path) => _exists.TryGetValue(path, out bool exists)
 		? exists
-			? @<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow="false" title="On disk" />
+			? @<Hint Text="On disk"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow="false" /></Hint>
 			: @<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="MokaColor.Error" />
-		: @<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Surface" Glow="false" title="Not checked yet" />;
+		: @<Hint Text="Not checked yet"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Surface" Glow="false" /></Hint>;
 }

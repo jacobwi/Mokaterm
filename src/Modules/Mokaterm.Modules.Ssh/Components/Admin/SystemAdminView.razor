@@ -65,48 +65,52 @@
 
 			@if (_feature.LoginIsRoot)
 			{
-				<MokaTag Text="ROOT LOGIN" Size="MokaSize.Xs" Color="MokaColor.Error" title="This session logged in as root, so changes run without sudo." />
+				<Hint Text="This session logged in as root, so changes run without sudo.">
+					<MokaTag Text="ROOT LOGIN" Size="MokaSize.Xs" Color="MokaColor.Error" />
+				</Hint>
 			}
 			else if (_feature.RootBlockedReason is { } blocked)
 			{
-				<MokaTag Text="READ ONLY" Size="MokaSize.Xs" Color="MokaColor.Surface" title="@blocked" />
+				<Hint Text="@blocked">
+					<MokaTag Text="READ ONLY" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+				</Hint>
 			}
 			else if (_feature.RootModeOn)
 			{
-				<MokaButton Variant="MokaVariant.Outlined"
-							Color="MokaColor.Error"
-							Size="MokaSize.Xs"
-							StartIcon="MokatermIcons.Root"
-							Class="mta-root-on"
-							Disabled="@(_feature.Running is not null)"
-							OnClick="DisableRoot"
-							title="Root mode is on: sudo is ready for this view. Click to turn it off.">
-					Root
-				</MokaButton>
+				<Hint Text="Root mode is on: sudo is ready for this view. Click to turn it off.">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								StartIcon="MokatermIcons.Root"
+								Class="mta-root-on"
+								Disabled="@(_feature.Running is not null)"
+								OnClick="DisableRoot">
+						Root
+					</MokaButton>
+				</Hint>
 			}
 			else
 			{
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Surface"
-							Size="MokaSize.Xs"
-							StartIcon="MokatermIcons.Lock"
-							Loading="_rootBusy"
-							Disabled="_rootBusy"
-							OnClick="EnableRootAsync"
-							title="Read and change what needs root, through sudo. It lasts until this window closes.">
-					Root mode
-				</MokaButton>
+				<Hint Text="Read and change what needs root, through sudo. It lasts until this window closes.">
+					<MokaButton Variant="MokaVariant.Text"
+								Color="MokaColor.Surface"
+								Size="MokaSize.Xs"
+								StartIcon="MokatermIcons.Lock"
+								Loading="_rootBusy"
+								Disabled="_rootBusy"
+								OnClick="EnableRootAsync">
+						Root mode
+					</MokaButton>
+				</Hint>
 			}
 
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Refresh"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Refresh"
 						Loading="_detecting"
 						Disabled="_detecting"
 						OnClick="RefreshDetectionAsync"
-						title="Detect the system again"
-						aria-label="Detect the system again" />
+						Label="Detect the system again"
+						Position="MokaTooltipPosition.BottomEnd" />
 		</div>
 
 		@if (_rootError is { } rootError)
@@ -182,14 +186,12 @@
 					}
 					else
 					{
-						<CopyButton Text="@ResultText(result)" Label="Copy the output" />
-						<MokaButton Variant="MokaVariant.Text"
-									Color="MokaColor.Surface"
-									Size="MokaSize.Xs"
-									StartIcon="@(OutputOpen(result) ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronUp)"
+						<CopyButton Text="@ResultText(result)" Label="Copy the output" Position="MokaTooltipPosition.Top" />
+						<IconButton Size="MokaSize.Xs"
+									Icon="@(OutputOpen(result) ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronUp)"
 									OnClick="ToggleOutput"
-									title="@(OutputOpen(result) ? "Hide the output" : "Show the output")"
-									aria-label="@(OutputOpen(result) ? "Hide the output" : "Show the output")" />
+									Label="@(OutputOpen(result) ? "Hide the output" : "Show the output")"
+									Position="MokaTooltipPosition.TopEnd" />
 					}
 				</div>
 				@if (!result.IsRunning && OutputOpen(result))

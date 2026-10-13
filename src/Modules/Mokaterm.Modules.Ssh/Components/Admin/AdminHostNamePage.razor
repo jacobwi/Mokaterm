@@ -12,7 +12,7 @@
 				<MokaText Element="span" Size="MokaSize.Sm" Mono>@(info.Static.Length > 0 ? info.Static : "not set")</MokaText>
 				@if (info.Static.Length > 0 && info.Static != info.Current)
 				{
-					<span class="mta-after" title="The name changes at the next boot."><MokaTag Text="DIFFERS" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+					<Hint Text="The name changes at the next boot." Class="mta-after"><MokaTag Text="DIFFERS" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
 				}
 			</dd>
 			@if (info.Pretty.Length > 0)
@@ -39,13 +39,14 @@
 								 Disabled="@(Context.RootChangeBlocked is not null)"
 								 @key="_formVersion" />
 				</div>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Sm"
-							Disabled="@(Busy || _name.Length == 0 || _name == info.Current || Context.RootChangeBlocked is not null)"
-							title="@Context.RootChangeBlocked"
-							OnClick="RenameAsync">
-					Rename
-				</MokaButton>
+				<Hint Text="@Context.RootChangeBlocked">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Sm"
+								Disabled="@(Busy || _name.Length == 0 || _name == info.Current || Context.RootChangeBlocked is not null)"
+								OnClick="RenameAsync">
+						Rename
+					</MokaButton>
+				</Hint>
 			</div>
 			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
 				@(Capabilities.HostName.UsesHostnamectl

@@ -63,13 +63,13 @@
 			</MokaColumn>
 		</ChildContent>
 		<RowActions Context="host">
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Xs"
+			<IconButton Size="MokaSize.Xs"
 						Color="MokaColor.Error"
-						StartIcon="MokaIcons.Action.Delete"
+						Icon="MokaIcons.Action.Delete"
 						OnClick="() => RemoveAsync(host)"
-						title="Remove"
-						aria-label="@($"Stop trusting {Endpoint(host)}")" />
+						Label="Remove"
+						AriaLabel="@($"Stop trusting {Endpoint(host)}")"
+						Position="MokaTooltipPosition.BottomEnd" />
 		</RowActions>
 		<EmptyContent>
 			@if (IsLoaded)

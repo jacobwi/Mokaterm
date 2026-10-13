@@ -11,10 +11,11 @@
 		{
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">@version</MokaText>
 		}
-		<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
-				 Size="MokaSize.Xs"
-				 Color="PluginDisplay.KindColor(plugin.HasCode)"
-				 title="@PluginDisplay.KindTitle(plugin.HasCode)" />
+		<Hint Text="@PluginDisplay.KindTitle(plugin.HasCode)">
+			<MokaTag Text="@PluginDisplay.Kind(plugin.HasCode)"
+					 Size="MokaSize.Xs"
+					 Color="PluginDisplay.KindColor(plugin.HasCode)" />
+		</Hint>
 		@if (plugin.Verified)
 		{
 			<PluginVerifiedBadge />
@@ -48,15 +49,16 @@
 	}
 
 	<div class="plugin-card__foot">
-		<MokaButton Variant="MokaVariant.Text"
-					Size="MokaSize.Sm"
-					Color="MokaColor.Surface"
-					StartIcon="MokaIcons.Content.ExternalLink"
-					OnClick="() => OnOpenSource.InvokeAsync(plugin)"
-					title="@plugin.Source.ToString()"
-					aria-label="@($"Source of {plugin.Name}")">
-			Source
-		</MokaButton>
+		<Hint Text="@plugin.Source.ToString()">
+			<MokaButton Variant="MokaVariant.Text"
+						Size="MokaSize.Sm"
+						Color="MokaColor.Surface"
+						StartIcon="MokaIcons.Content.ExternalLink"
+						OnClick="() => OnOpenSource.InvokeAsync(plugin)"
+						aria-label="@($"Source of {plugin.Name}")">
+				Source
+			</MokaButton>
+		</Hint>
 		@switch (Offer.Kind)
 		{
 			case PluginGalleryOfferKind.Install:
@@ -88,10 +90,12 @@
 				</span>
 				break;
 			case PluginGalleryOfferKind.Waiting:
-				<span class="plugin-card__state" title="Installed. It loads at the next start.">
-					<MokaIcon Icon="MokaIcons.Status.Clock" SizeValue="12px" />
-					Waits for restart
-				</span>
+				<Hint Text="Installed. It loads at the next start.">
+					<span class="plugin-card__state">
+						<MokaIcon Icon="MokaIcons.Status.Clock" SizeValue="12px" />
+						Waits for restart
+					</span>
+				</Hint>
 				break;
 		}
 	</div>

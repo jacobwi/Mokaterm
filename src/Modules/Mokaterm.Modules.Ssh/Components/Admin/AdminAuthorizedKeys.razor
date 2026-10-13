@@ -67,15 +67,16 @@ else
 					<MokaText Element="div" Size="MokaSize.Xs" Mono Truncate Class="mta-dim" title="@key.Options">@key.Options</MokaText>
 				}
 			</div>
-			<MokaButton Variant="MokaVariant.Outlined"
-						Color="MokaColor.Error"
-						Size="MokaSize.Xs"
-						Disabled="@(!CanChange(file))"
-						title="@ChangeBlocked(file)"
-						OnClick="@(() => RemoveAsync(key))"
-						aria-label="@($"Remove {AuthorizedKeyCommands.DisplayName(key)}")">
-				Remove
-			</MokaButton>
+			<Hint Text="@ChangeBlocked(file)">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Color="MokaColor.Error"
+							Size="MokaSize.Xs"
+							Disabled="@(!CanChange(file))"
+							OnClick="@(() => RemoveAsync(key))"
+							aria-label="@($"Remove {AuthorizedKeyCommands.DisplayName(key)}")">
+					Remove
+				</MokaButton>
+			</Hint>
 		</div>
 	}
 
@@ -105,13 +106,14 @@ else
 								Size="MokaSize.Sm"
 								aria-label="Key from the keychain" />
 				</div>
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Xs"
-							Disabled="@(_picked is null || !CanChange(file) || file.Find(_picked.KeyFingerprint) is not null)"
-							title="@ChangeBlocked(file)"
-							OnClick="AddAsync">
-					Add
-				</MokaButton>
+				<Hint Text="@ChangeBlocked(file)">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Size="MokaSize.Xs"
+								Disabled="@(_picked is null || !CanChange(file) || file.Find(_picked.KeyFingerprint) is not null)"
+								OnClick="AddAsync">
+						Add
+					</MokaButton>
+				</Hint>
 			</div>
 		}
 		@if (_addProblem is { } addProblem)

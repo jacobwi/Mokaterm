@@ -63,27 +63,22 @@
 		<div class="mt-ssh-hop" @key="hop.Id">
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-ssh-hop-index">@(index + 1)</MokaText>
 			<MokaText Element="span" Size="MokaSize.Sm" Truncate Style="flex:1;min-width:0">@hop.Label</MokaText>
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Navigation.ArrowUp"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Navigation.ArrowUp"
 						Disabled="@(Disabled || index == 0)"
 						OnClick="@(() => MoveJumpHostAsync(index, -1))"
-						aria-label="Move up" />
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Navigation.ArrowDown"
+						Label="Move up" />
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Navigation.ArrowDown"
 						Disabled="@(Disabled || index == SelectedJumpHosts.Count - 1)"
 						OnClick="@(() => MoveJumpHostAsync(index, 1))"
-						aria-label="Move down" />
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Error"
+						Label="Move down" />
+			<IconButton Color="MokaColor.Error"
 						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Delete"
+						Icon="MokaIcons.Action.Delete"
 						Disabled="Disabled"
 						OnClick="@(() => RemoveJumpHostAsync(hop.Id))"
-						aria-label="Remove jump host" />
+						Label="Remove jump host" />
 		</div>
 	}
 

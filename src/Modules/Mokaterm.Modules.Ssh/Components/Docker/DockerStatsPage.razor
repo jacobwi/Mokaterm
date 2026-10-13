@@ -6,8 +6,8 @@
 		<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name" Debounce="100" aria-label="Filter containers" />
 	</div>
 	<span class="mt-dk-mono mt-dk-muted" title="Running containers, sampled every three seconds while this page shows">@CountText</span>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" title="Sample now" aria-label="Sample now" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" Label="Sample now" />
 </div>
 
 @LoadErrorPanel(RefreshAsync)

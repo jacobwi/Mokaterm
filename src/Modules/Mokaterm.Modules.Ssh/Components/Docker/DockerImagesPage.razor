@@ -14,13 +14,15 @@
 	<DockerUpdateCheck Session="Session" References="TaggedReferences" OnChecked="StateHasChanged" />
 	@if (Navigation is { } navigation)
 	{
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
-					OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))" title="Dangling and unused images, with what each frees">
-			@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
-		</MokaButton>
+		<Hint Text="Dangling and unused images, with what each frees">
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+						OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
+				@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
+			</MokaButton>
+		</Hint>
 	}
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
 </div>
 
 @if (_pulling)
@@ -83,16 +85,16 @@
 					<CopyButton Text="@image.Reference" Label="Copy the reference" />
 					@if (Navigation is { } rowNavigation)
 					{
-						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play"
+						<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Play"
 									Disabled="IsBusy" OnClick="@(() => rowNavigation.NewContainer(image.Reference))"
-									title="New container from this image" aria-label="@($"New container from {image.Reference}")" />
+									Label="New container from this image" AriaLabel="@($"New container from {image.Reference}")" />
 					}
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
-								Disabled="IsBusy" OnClick="@(() => RemoveAsync(image, force: false))" title="Remove" aria-label="@($"Remove {image.Reference}")" />
+					<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
+								Disabled="IsBusy" OnClick="@(() => RemoveAsync(image, force: false))" Label="Remove" AriaLabel="@($"Remove {image.Reference}")" />
 					<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
 						<ChildContent>
-							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.MoreHorizontal"
-										Disabled="IsBusy" aria-label="@($"Actions for {image.Reference}")" />
+							<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+										Disabled="IsBusy" Label="More actions" AriaLabel="@($"Actions for {image.Reference}")" Position="MokaTooltipPosition.BottomEnd" />
 						</ChildContent>
 						<Items>
 							@if (update is { HasUpdate: true })

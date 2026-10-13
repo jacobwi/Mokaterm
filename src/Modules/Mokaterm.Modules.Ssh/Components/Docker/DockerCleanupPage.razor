@@ -5,8 +5,8 @@
 	<span class="mt-dk-label">Disk usage</span>
 	<span class="mt-dk-cell">docker system df</span>
 	<span class="mt-dk-spacer"></span>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" title="Measure again" aria-label="Measure again" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" Label="Measure again" />
 </div>
 
 @LoadErrorPanel(RefreshAsync)

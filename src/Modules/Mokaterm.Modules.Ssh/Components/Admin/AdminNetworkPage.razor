@@ -55,7 +55,7 @@
 										<span class="mta-mono">@networkInterface.Name</span>
 										@if (CarriesSession(networkInterface))
 										{
-											<span class="mta-after" title="This SSH session arrives on this interface"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+											<Hint Text="This SSH session arrives on this interface" Class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
 										}
 									</span>
 									<span class="mta-cell mta-mono mta-dim mta-wide" title="@string.Join("\n", networkInterface.Addresses.Select(address => address.Cidr))">
@@ -63,12 +63,12 @@
 									</span>
 									<span class="mta-cell mta-mono mta-dim mta-wide">@networkInterface.Mtu</span>
 									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-										<MokaButton Variant="MokaVariant.Text"
-													Color="MokaColor.Surface"
-													Size="MokaSize.Xs"
-													StartIcon="MokaIcons.Navigation.MoreHorizontal"
+										<IconButton Size="MokaSize.Xs"
+													Icon="MokaIcons.Navigation.MoreHorizontal"
 													OnClick="@(args => ShowRowMenu(args, MenuFor(networkInterface)))"
-													aria-label="@($"Actions for {networkInterface.Name}")" />
+													Label="More actions"
+													AriaLabel="@($"Actions for {networkInterface.Name}")"
+													Position="MokaTooltipPosition.BottomEnd" />
 									</span>
 								</div>
 							}
@@ -157,7 +157,7 @@
 										@socket.Port
 										@if (socket.Port == Profile.Facts.SshServerPort && !socket.IsUdp)
 										{
-											<span class="mta-after" title="This session arrived on this port"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Warning" Glow /></span>
+											<Hint Text="This session arrived on this port" Class="mta-after"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Warning" Glow /></Hint>
 										}
 									</span>
 									<span class="mta-cell mta-mono mta-dim mta-wide">@(socket.Process.Length > 0 ? $"{socket.Process} ({socket.Pid})" : "")</span>
@@ -215,14 +215,15 @@
 			<Actions>
 				@if (!networkInterface.IsLoopback)
 				{
-					<MokaButton Variant="MokaVariant.Outlined"
-								Color="@(networkInterface.IsUp ? MokaColor.Error : MokaColor.Primary)"
-								Size="MokaSize.Xs"
-								Disabled="@(Busy || Context.RootChangeBlocked is not null || AdminNames.CheckInterface(networkInterface.Name) is not null)"
-								title="@Context.RootChangeBlocked"
-								OnClick="@(() => SetLinkAsync(networkInterface, !networkInterface.IsUp))">
-						@(networkInterface.IsUp ? "Bring down" : "Bring up")
-					</MokaButton>
+					<Hint Text="@Context.RootChangeBlocked">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Color="@(networkInterface.IsUp ? MokaColor.Error : MokaColor.Primary)"
+									Size="MokaSize.Xs"
+									Disabled="@(Busy || Context.RootChangeBlocked is not null || AdminNames.CheckInterface(networkInterface.Name) is not null)"
+									OnClick="@(() => SetLinkAsync(networkInterface, !networkInterface.IsUp))">
+							@(networkInterface.IsUp ? "Bring down" : "Bring up")
+						</MokaButton>
+					</Hint>
 				}
 			</Actions>
 			<ChildContent>

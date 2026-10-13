@@ -63,21 +63,18 @@
 					</MokaText>
 					@if (status.State is MqttSubscriptionState.Idle or MqttSubscriptionState.Failed)
 					{
-						<MokaButton Variant="MokaVariant.Text"
-									Color="MokaColor.Surface"
-									Size="MokaSize.Xs"
-									StartIcon="MokatermIcons.Connect"
+						<IconButton Size="MokaSize.Xs"
+									Icon="MokatermIcons.Connect"
 									Disabled="@_busy"
 									OnClick="@(() => SubscribeAsync(status.Subscription))"
-									aria-label="Subscribe" />
+									Label="Subscribe" />
 					}
-					<MokaButton Variant="MokaVariant.Text"
-								Color="MokaColor.Error"
+					<IconButton Color="MokaColor.Error"
 								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Action.Delete"
+								Icon="MokaIcons.Action.Delete"
 								Disabled="@_busy"
 								OnClick="@(() => RemoveAsync(status.Subscription.Id))"
-								aria-label="@RemoveLabel(status)" />
+								Label="@RemoveLabel(status)" />
 				</div>
 			}
 		</div>

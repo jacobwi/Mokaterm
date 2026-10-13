@@ -211,7 +211,7 @@ public sealed partial class ToolFrameTests
 	public async Task HeaderButtons_AreNamedByMokasTooltip_NotTheBrowsers(ToolPresentation presentation)
 	{
 		string html = await RenderAppToolAsync(presentation, new FakeToolWindows());
-		List<string> tooltips = [.. Tooltip().Matches(html).Select(match => match.Groups["text"].Value)];
+		List<string> tooltips = Tooltips.Texts(html);
 
 		Assert.NotEmpty(Actions(html));
 		foreach (string action in Actions(html))
@@ -313,9 +313,6 @@ public sealed partial class ToolFrameTests
 
 	[GeneratedRegex("<button[^>]*class=\"mt-dialog-head-button[^>]*>")]
 	private static partial Regex HeaderButtonTag();
-
-	[GeneratedRegex("role=\"tooltip\"[^>]*>\\s*(?<text>[^<]*?)\\s*</span>")]
-	private static partial Regex Tooltip();
 
 	// Blazor's scoped CSS attribute, which sits between an element's name and its attributes.
 	[GeneratedRegex(" b-[a-z0-9]{10}")]

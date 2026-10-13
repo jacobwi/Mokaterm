@@ -70,6 +70,11 @@ const MaxTriggerNoticeLength = 300;
 const IsMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgentData?.platform ?? navigator.platform ?? '');
 const LinkHint = IsMac ? 'Cmd+click to open' : 'Ctrl+click to open';
 const MaxLinkLabelLength = 300;
+// The link hint keeps this far from the terminal's and the window's edges, the gap MokaTooltip keeps from its trigger,
+// and starts this far below the pointer so the cursor does not cover its first line.
+const LinkHintGap = 4;
+const LinkHintPointerOffset = 18;
+const LinkHintOpenClass = 'mt-terminal-link-hint--open';
 
 const instances = createInstances();
 const players = createInstances();
@@ -85,9 +90,10 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 	const WebglAddon = options.useWebGl ? await loadWebglAddon() : null;
 
 	// The address goes in the hint: an OSC 8 link shows whatever text the server chose, which need not be where it leads.
+	const linkHint = host.querySelector('.mt-terminal-link-hint');
 	const linkHover = {
-		hover: (event, uri) => { screen.title = `${linkLabel(uri)}\n${LinkHint}`; },
-		leave: () => { screen.removeAttribute('title'); },
+		hover: (event, uri) => showLinkHint(host, linkHint, event, uri),
+		leave: () => hideLinkHint(linkHint),
 	};
 	const terminalOptions = {
 		allowProposedApi: true,
@@ -135,6 +141,7 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 		atBottom: true,
 		badge: host.querySelector('.mt-terminal-badge'),
 		badgeTimer: 0,
+		linkHint,
 		decorations: searchDecorations(options.theme),
 		inputQueue: [],
 		inputBusy: false,
@@ -213,6 +220,10 @@ export async function create(host, screen, dotNet, options, cols, rows) {
 			listen(screen, 'paste', event => handlePasteEvent(state, event), true),
 			listen(screen, 'contextmenu', event => handleContextMenu(state, event)),
 			listen(screen, 'mousedown', event => handleMouseDown(state, event)),
+			// A click opens the link or starts a selection, and a wheel moves the text away from the pointer: either way the
+			// hint has said what it had to, as a button's tooltip does once it is clicked.
+			listen(screen, 'mousedown', () => hideLinkHint(linkHint), true),
+			listen(screen, 'wheel', () => hideLinkHint(linkHint), { capture: true, passive: true }),
 			// The host, not the screen: moving onto the buttons Blazor draws over a row must not count as leaving it.
 			listen(host, 'mousemove', event => updateHover(state, event)),
 			listen(host, 'mouseleave', () => clearHover(state)),
@@ -485,7 +496,7 @@ export function dispose(id) {
 	state.selectionSnapshot = null;
 	state.hoverRow = null;
 	state.host.classList.remove(BellClass);
-	state.screen.removeAttribute('title');
+	hideLinkHint(state.linkHint);
 	// xterm.js never calls back for writes it has not parsed when disposed, and .NET is awaiting them.
 	for (const done of [...state.pendingWrites]) {
 		done();
@@ -1140,6 +1151,66 @@ function openLink(event, uri) {
 function linkLabel(uri) {
 	const text = typeof uri === 'string' ? uri : '';
 	return text.length > MaxLinkLabelLength ? text.slice(0, safeEnd(text, MaxLinkLabelLength)) + '...' : text;
+}
+
+// The hint is drawn like MokaTooltip's popups and shown as a manual popover, in the top layer, where the terminal's own
+// overflow and the panels beside it cannot cut it off. What is left here is placing it: under the pointer, or over it
+// where there is no room below, and inside both the terminal and the window.
+function showLinkHint(host, hint, event, uri) {
+	if (!hint?.isConnected) {
+		return;
+	}
+
+	hint.textContent = `${linkLabel(uri)}\n${LinkHint}`;
+	hint.classList.add(LinkHintOpenClass);
+	if (typeof hint.showPopover === 'function' && !hint.matches(':popover-open')) {
+		try {
+			hint.showPopover();
+		}
+		catch {
+			// Shown as a fixed element instead, which is all a browser without popovers gets.
+		}
+	}
+
+	placeLinkHint(host, hint, event?.clientX ?? 0, event?.clientY ?? 0);
+}
+
+function hideLinkHint(hint) {
+	if (!hint) {
+		return;
+	}
+
+	hint.classList.remove(LinkHintOpenClass);
+	if (typeof hint.hidePopover === 'function' && hint.matches(':popover-open')) {
+		try {
+			hint.hidePopover();
+		}
+		catch {
+			// Already closed by the browser.
+		}
+	}
+}
+
+function placeLinkHint(host, hint, x, y) {
+	const bounds = host.getBoundingClientRect();
+	const left = Math.max(bounds.left, 0) + LinkHintGap;
+	const right = Math.min(bounds.right, window.innerWidth) - LinkHintGap;
+	const top = Math.max(bounds.top, 0) + LinkHintGap;
+	const bottom = Math.min(bounds.bottom, window.innerHeight) - LinkHintGap;
+	hint.style.setProperty('--mt-link-hint-room', `${Math.max(right - left, 0)}px`);
+
+	// Measured from the window's corner: the width a positioned box takes depends on the room right of where it stands,
+	// so measuring it where the last link left it would wrap the text for that place instead of this one.
+	hint.style.left = '0px';
+	hint.style.top = '0px';
+	const size = hint.getBoundingClientRect();
+	let hintTop = y + LinkHintPointerOffset;
+	if (hintTop + size.height > bottom) {
+		hintTop = y - LinkHintGap - size.height;
+	}
+
+	hint.style.left = `${Math.max(left, Math.min(x - size.width / 2, right - size.width))}px`;
+	hint.style.top = `${Math.max(top, Math.min(hintTop, bottom - size.height))}px`;
 }
 
 function searchOptions(state, incremental, flags) {

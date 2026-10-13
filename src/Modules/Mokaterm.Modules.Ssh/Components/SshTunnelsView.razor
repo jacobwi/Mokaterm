@@ -71,33 +71,28 @@
 						}
 						@if (status.State == SshTunnelState.Open)
 						{
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										StartIcon="MokatermIcons.Disconnect"
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokatermIcons.Disconnect"
 										Disabled="_busy"
 										OnClick="@(() => CloseAsync(status.Tunnel.Id))"
-										aria-label="Close tunnel" />
+										Label="Close tunnel" />
 						}
 						else
 						{
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										StartIcon="MokatermIcons.Connect"
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokatermIcons.Connect"
 										Disabled="@(_busy || status.State == SshTunnelState.Opening)"
 										OnClick="@(() => OpenAsync(status.Tunnel.Id))"
-										aria-label="Open tunnel" />
+										Label="Open tunnel" />
 						}
 						@if (status.IsSessionOnly)
 						{
-							<MokaButton Variant="MokaVariant.Text"
-										Color="MokaColor.Error"
+							<IconButton Color="MokaColor.Error"
 										Size="MokaSize.Xs"
-										StartIcon="MokaIcons.Action.Delete"
+										Icon="MokaIcons.Action.Delete"
 										Disabled="_busy"
 										OnClick="@(() => RemoveAsync(status.Tunnel.Id))"
-										aria-label="Remove tunnel" />
+										Label="Remove tunnel" />
 						}
 					</div>
 				}

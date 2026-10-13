@@ -11,17 +11,18 @@
 	</MokaButton>
 	@if (Navigation is { } navigation)
 	{
-		<MokaButton Variant="MokaVariant.Text"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="DockerIcons.Prune"
-					OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))"
-					title="Unused volumes with their sizes, removed together">
-			@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
-		</MokaButton>
+		<Hint Text="Unused volumes with their sizes, removed together">
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="DockerIcons.Prune"
+						OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
+				@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
+			</MokaButton>
+		</Hint>
 	}
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
 </div>
 
 @if (_creating)
@@ -67,9 +68,9 @@
 					<span class="mt-dk-cell mt-dk-cell--grow">@(volume.InUse ? "" : "unused")</span>
 				</button>
 				<span class="mt-dk-hover">
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+					<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
 								Disabled="@(IsBusy || !CanRemove(volume))" OnClick="@(() => RemoveAsync(volume))"
-								title="@(volume.InUse ? "A container still uses it" : $"Remove {volume.Name}")" aria-label="@($"Remove {volume.Name}")" />
+								Label="@(volume.InUse ? "A container still uses it" : $"Remove {volume.Name}")" AriaLabel="@($"Remove {volume.Name}")" />
 				</span>
 			</div>
 		}
@@ -81,7 +82,7 @@
 			<div class="mt-dk-panel-head">
 				<span class="mt-dk-cell-name">@selected</span>
 				<span class="mt-dk-spacer"></span>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="ClosePanel" aria-label="Close the panel" />
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="ClosePanel" Label="Close the panel" Position="MokaTooltipPosition.BottomEnd" />
 			</div>
 			<div class="mt-dk-scroll">
 				@if (_details is { } details && details.Name == selected)

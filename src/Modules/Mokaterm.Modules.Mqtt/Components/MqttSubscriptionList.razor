@@ -20,20 +20,17 @@
 				{
 					<MokaTag Text="MANUAL" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 				}
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Surface"
-							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Edit"
+				<IconButton Size="MokaSize.Xs"
+							Icon="MokaIcons.Action.Edit"
 							Disabled="Disabled"
 							OnClick="@(() => Toggle(subscription.Id))"
-							aria-label="Edit subscription" />
-				<MokaButton Variant="MokaVariant.Text"
-							Color="MokaColor.Error"
+							Label="Edit subscription" />
+				<IconButton Color="MokaColor.Error"
 							Size="MokaSize.Xs"
-							StartIcon="MokaIcons.Action.Delete"
+							Icon="MokaIcons.Action.Delete"
 							Disabled="Disabled"
 							OnClick="@(() => RemoveAsync(subscription.Id))"
-							aria-label="Remove subscription" />
+							Label="Remove subscription" />
 			</div>
 
 			@if (_editing == subscription.Id)
@@ -58,14 +55,15 @@
 					OnClick="@(() => AddAsync(MqttTopicFilters.Everything))">
 			Everything
 		</MokaButton>
-		<MokaButton Variant="MokaVariant.Outlined"
-					Color="MokaColor.Surface"
-					Size="MokaSize.Xs"
-					StartIcon="MokaIcons.Action.Add"
-					Disabled="@(Disabled || IsFull)"
-					OnClick="@(() => AddAsync(BrokerTopics))"
-					title="The topics a broker publishes about itself, which a subscription to # never reaches">
-			Broker topics
-		</MokaButton>
+		<Hint Text="The topics a broker publishes about itself, which a subscription to # never reaches">
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Action.Add"
+						Disabled="@(Disabled || IsFull)"
+						OnClick="@(() => AddAsync(BrokerTopics))">
+				Broker topics
+			</MokaButton>
+		</Hint>
 	</MokaFlexbox>
 </div>

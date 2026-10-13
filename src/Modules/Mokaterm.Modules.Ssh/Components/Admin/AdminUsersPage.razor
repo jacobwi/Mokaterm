@@ -53,12 +53,12 @@
 							<span class="mta-cell mta-mono mta-dim mta-wide">@group.Gid</span>
 							<span class="mta-cell mta-mono mta-dim" title="@string.Join(", ", group.Members)">@string.Join(", ", group.Members)</span>
 							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-								<MokaButton Variant="MokaVariant.Text"
-											Color="MokaColor.Surface"
-											Size="MokaSize.Xs"
-											StartIcon="MokaIcons.Navigation.MoreHorizontal"
+								<IconButton Size="MokaSize.Xs"
+											Icon="MokaIcons.Navigation.MoreHorizontal"
 											OnClick="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
-											aria-label="@($"Actions for {group.Name}")" />
+											Label="More actions"
+											AriaLabel="@($"Actions for {group.Name}")"
+											Position="MokaTooltipPosition.BottomEnd" />
 							</span>
 						</div>
 					}
@@ -117,12 +117,12 @@
 									<span class="mta-cell mta-mono @(user.Password is PasswordState.Set ? "" : "mta-dim")" style="@PasswordStyle(user.Password)">@PasswordLabel(user.Password)</span>
 								}
 								<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-									<MokaButton Variant="MokaVariant.Text"
-												Color="MokaColor.Surface"
-												Size="MokaSize.Xs"
-												StartIcon="MokaIcons.Navigation.MoreHorizontal"
+									<IconButton Size="MokaSize.Xs"
+												Icon="MokaIcons.Navigation.MoreHorizontal"
 												OnClick="@(args => ShowRowMenu(args, MenuFor(user)))"
-												aria-label="@($"Actions for {user.Name}")" />
+												Label="More actions"
+												AriaLabel="@($"Actions for {user.Name}")"
+												Position="MokaTooltipPosition.BottomEnd" />
 								</span>
 							</div>
 						}
@@ -225,21 +225,26 @@
 				{
 					@if (user.Password != PasswordState.Locked)
 					{
-						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" Disabled="blocked" title="@Context.RootChangeBlocked" OnClick="@(() => LockAsync(user, true))">Lock</MokaButton>
+						<Hint Text="@Context.RootChangeBlocked">
+							<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" Disabled="blocked" OnClick="@(() => LockAsync(user, true))">Lock</MokaButton>
+						</Hint>
 					}
 					@if (user.Password is PasswordState.Locked or PasswordState.Unknown)
 					{
-						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="blocked" title="@Context.RootChangeBlocked" OnClick="@(() => LockAsync(user, false))">Unlock</MokaButton>
+						<Hint Text="@Context.RootChangeBlocked">
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="blocked" OnClick="@(() => LockAsync(user, false))">Unlock</MokaButton>
+						</Hint>
 					}
-					<MokaButton Variant="MokaVariant.Outlined"
-								Color="MokaColor.Error"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Action.Delete"
-								Disabled="@(blocked || refusal is not null)"
-								title="@(refusal ?? Context.RootChangeBlocked)"
-								OnClick="@(() => DeleteAsync(user, snapshot))">
-						Delete
-					</MokaButton>
+					<Hint Text="@(refusal ?? Context.RootChangeBlocked)">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Color="MokaColor.Error"
+									Size="MokaSize.Xs"
+									StartIcon="MokaIcons.Action.Delete"
+									Disabled="@(blocked || refusal is not null)"
+									OnClick="@(() => DeleteAsync(user, snapshot))">
+							Delete
+						</MokaButton>
+					</Hint>
 				}
 			</Actions>
 			<ChildContent>
@@ -311,15 +316,16 @@
 			<Actions>
 				@if (Capabilities.Accounts.CanChange)
 				{
-					<MokaButton Variant="MokaVariant.Outlined"
-								Color="MokaColor.Error"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Action.Delete"
-								Disabled="@(Busy || refusal is not null || Context.RootChangeBlocked is not null)"
-								title="@(refusal ?? Context.RootChangeBlocked)"
-								OnClick="@(() => DeleteGroupAsync(group, snapshot))">
-						Delete
-					</MokaButton>
+					<Hint Text="@(refusal ?? Context.RootChangeBlocked)">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Color="MokaColor.Error"
+									Size="MokaSize.Xs"
+									StartIcon="MokaIcons.Action.Delete"
+									Disabled="@(Busy || refusal is not null || Context.RootChangeBlocked is not null)"
+									OnClick="@(() => DeleteGroupAsync(group, snapshot))">
+							Delete
+						</MokaButton>
+					</Hint>
 				}
 			</Actions>
 			<ChildContent>

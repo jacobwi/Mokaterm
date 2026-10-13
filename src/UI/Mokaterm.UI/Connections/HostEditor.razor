@@ -97,14 +97,15 @@
 					<div class="mt-swatches">
 						@foreach ((string name, string color) in ColorPresets)
 						{
-							<button type="button"
-									class="@SwatchClass(color)"
-									style="@($"--mt-swatch:{color}")"
-									title="@name"
-									aria-label="@($"Use the {name} color")"
-									aria-pressed="@AriaPressed(IsChosen(color))"
-									disabled="@_saving"
-									@onclick="() => PickColor(color)"></button>
+							<Hint Text="@name">
+								<button type="button"
+										class="@SwatchClass(color)"
+										style="@($"--mt-swatch:{color}")"
+										aria-label="@($"Use the {name} color")"
+										aria-pressed="@AriaPressed(IsChosen(color))"
+										disabled="@_saving"
+										@onclick="() => PickColor(color)"></button>
+							</Hint>
 						}
 						@* Clearing the field does not mean "no color": a host without one is drawn in a color taken from
 						   its address, so the choice shows that color rather than an empty box. *@

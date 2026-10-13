@@ -6,7 +6,9 @@
 	private protected RenderFragment UpdateChip(string? image) => @<text>
 		@if (Feature?.ImageUpdates.Find(image) is { HasUpdate: true } update)
 		{
-			<MokaTag Text="UPDATE" Size="MokaSize.Xs" Color="MokaColor.Info" title="@update.Detail" />
+			<Hint Text="@update.Detail">
+				<MokaTag Text="UPDATE" Size="MokaSize.Xs" Color="MokaColor.Info" />
+			</Hint>
 		}
 	</text>;
 }

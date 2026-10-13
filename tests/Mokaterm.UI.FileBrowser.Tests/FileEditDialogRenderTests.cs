@@ -64,8 +64,8 @@ public sealed class FileEditDialogRenderTests
 		Assert.DoesNotContain("UNSAVED", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("mt-edit-frame--dirty", html, StringComparison.Ordinal);
 
-		// Disabled while there is nothing to write, and the title is where Ctrl+S is spelled out.
-		Assert.Contains("disabled title=\"Save (Ctrl&#x2B;S)\"", html, StringComparison.Ordinal);
+		// Disabled while there is nothing to write, and the tooltip is where Ctrl+S is spelled out.
+		Assert.Matches("<button[^>]*\\sdisabled[\\s>]", Tooltips.ControlFor(html, "Save (Ctrl+S)"));
 		Assert.Contains(">Cancel<", html, StringComparison.Ordinal);
 	}
 
@@ -75,7 +75,7 @@ public sealed class FileEditDialogRenderTests
 		string html = await RenderAsync("alpha", ["5 B", "UTF-8", "LF"]);
 
 		Assert.Contains("Review changes", html, StringComparison.Ordinal);
-		Assert.Contains("disabled title=\"Compare the edits with the file as it was read\"", html, StringComparison.Ordinal);
+		Assert.Matches("<button[^>]*\\sdisabled[\\s>]", Tooltips.ControlFor(html, "Compare the edits with the file as it was read"));
 		Assert.DoesNotContain("mt-diff", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("inert", html, StringComparison.Ordinal);
 

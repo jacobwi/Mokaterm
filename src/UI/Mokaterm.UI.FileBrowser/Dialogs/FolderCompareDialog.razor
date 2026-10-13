@@ -49,19 +49,21 @@
 							<MokaSegment Value="@DifferencesFilter" Text="Differences" />
 							<MokaSegment Value="@AllFilter" Text="All" />
 						</MokaSegmentedControl>
-						<MokaCheckbox Label="Compare sizes only" Value="@_ignoreTimes" ValueChanged="OnIgnoreTimesChanged" Size="MokaSize.Sm"
-									  title="For a server whose times cannot be trusted. Changing this ticks the files again." />
+						<Hint Text="For a server whose times cannot be trusted. Changing this ticks the files again.">
+							<MokaCheckbox Label="Compare sizes only" Value="@_ignoreTimes" ValueChanged="OnIgnoreTimesChanged" Size="MokaSize.Sm" />
+						</Hint>
 						@if (CheckContents is not null && (_contentCandidates > 0 || _contentChecking))
 						{
-							<MokaButton Variant="MokaVariant.Outlined"
-										Color="MokaColor.Surface"
-										Size="MokaSize.Xs"
-										StartIcon="MokaIcons.Status.CheckCircle"
-										Disabled="_contentChecking"
-										OnClick="CheckContentsAsync"
-										title="Hash both copies of the files whose sizes match and only the times differ. Matching ones count as the same.">
-								@ContentButtonText
-							</MokaButton>
+							<Hint Text="Hash both copies of the files whose sizes match and only the times differ. Matching ones count as the same.">
+								<MokaButton Variant="MokaVariant.Outlined"
+											Color="MokaColor.Surface"
+											Size="MokaSize.Xs"
+											StartIcon="MokaIcons.Status.CheckCircle"
+											Disabled="_contentChecking"
+											OnClick="CheckContentsAsync">
+									@ContentButtonText
+								</MokaButton>
+							</Hint>
 						}
 					</div>
 
@@ -107,12 +109,13 @@
 													  aria-label="Tick every file shown" />
 									</HeaderTemplate>
 									<CellTemplate Context="row">
-										<MokaCheckbox Value="@_checked.Contains(row.RelativePath)"
-													  ValueChanged="@(value => SetChecked(row, value))"
-													  Disabled="@(!row.CanUpload)"
-													  Size="MokaSize.Sm"
-													  title="@(row.CanUpload ? null : "Nothing on the server is deleted")"
-													  aria-label="@("Upload " + row.RelativePath)" />
+										<Hint Text="@(row.CanUpload ? null : "Nothing on the server is deleted")">
+											<MokaCheckbox Value="@_checked.Contains(row.RelativePath)"
+														  ValueChanged="@(value => SetChecked(row, value))"
+														  Disabled="@(!row.CanUpload)"
+														  Size="MokaSize.Sm"
+														  aria-label="@("Upload " + row.RelativePath)" />
+										</Hint>
 									</CellTemplate>
 								</MokaColumn>
 								<MokaColumn TItem="FolderCompareRow" Title="Path" Field="PathField" MinWidth="140px">
@@ -161,14 +164,15 @@
 	</ChildContent>
 	<Actions>
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
-		<MokaButton Size="MokaSize.Sm"
-					Color="@(AsRoot ? MokaColor.Error : MokaColor.Primary)"
-					StartIcon="@(AsRoot ? MokatermIcons.Root : MokatermIcons.FileUpload)"
-					Disabled="@(!CanUpload)"
-					OnClick="Upload"
-					title="Replaces what the server has at these paths without asking again"
-					data-dialog-default="true">
-			@UploadText
-		</MokaButton>
+		<Hint Text="Replaces what the server has at these paths without asking again" Position="MokaTooltipPosition.TopEnd">
+			<MokaButton Size="MokaSize.Sm"
+						Color="@(AsRoot ? MokaColor.Error : MokaColor.Primary)"
+						StartIcon="@(AsRoot ? MokatermIcons.Root : MokatermIcons.FileUpload)"
+						Disabled="@(!CanUpload)"
+						OnClick="Upload"
+						data-dialog-default="true">
+				@UploadText
+			</MokaButton>
+		</Hint>
 	</Actions>
 </DialogFrame>

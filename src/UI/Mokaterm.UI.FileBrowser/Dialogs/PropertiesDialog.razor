@@ -61,8 +61,8 @@
 								break;
 							default:
 								<MokaText Element="span" Size="MokaSize.Xs" Mono>@SizeText</MokaText>
-								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-											OnClick="CalculateSizeAsync" title="Calculate again" aria-label="Calculate again" />
+								<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+											OnClick="CalculateSizeAsync" Label="Calculate again" />
 								break;
 						}
 					</MokaKeyValue>
@@ -246,14 +246,15 @@
 		else
 		{
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
-			<MokaButton Size="MokaSize.Sm"
-						Color="@(ApplyAsRoot ? MokaColor.Error : MokaColor.Primary)"
-						StartIcon="@(ApplyAsRoot ? MokatermIcons.Root : MokaIcons.Status.Check)"
-						Disabled="@(!_form.HasChanges)"
-						OnClick="Apply"
-						title="Apply (Ctrl+Enter)">
-				@(ApplyAsRoot ? "Apply as root" : "Apply")
-			</MokaButton>
+			<Hint Text="Apply" Shortcut="Ctrl+Enter" Position="MokaTooltipPosition.TopEnd">
+				<MokaButton Size="MokaSize.Sm"
+							Color="@(ApplyAsRoot ? MokaColor.Error : MokaColor.Primary)"
+							StartIcon="@(ApplyAsRoot ? MokatermIcons.Root : MokaIcons.Status.Check)"
+							Disabled="@(!_form.HasChanges)"
+							OnClick="Apply">
+					@(ApplyAsRoot ? "Apply as root" : "Apply")
+				</MokaButton>
+			</Hint>
 		}
 	</Actions>
 </DialogFrame>

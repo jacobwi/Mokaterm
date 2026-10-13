@@ -7,10 +7,12 @@
 		<span class="mt-dk-note mt-dk-cell--grow">Values are hidden until shown one at a time. Nothing here is logged.</span>
 		@if (_asRoot)
 		{
-			<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Read through sudo" />
+			<Hint Text="Read through sudo">
+				<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+			</Hint>
 		}
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-					Disabled="@(IsLoading || IsEditing)" OnClick="LoadAllAsync" title="Read the files again" aria-label="Read the files again" />
+		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+					Disabled="@(IsLoading || IsEditing)" OnClick="LoadAllAsync" Label="Read the files again" />
 	</div>
 
 	@LoadErrorPanel(LoadAllAsync)

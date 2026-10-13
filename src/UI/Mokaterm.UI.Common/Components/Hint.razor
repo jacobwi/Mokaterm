@@ -1,0 +1,11 @@
+@namespace Mokaterm.UI.Common.Components
+
+@* Moka.Red's tooltip with the app's defaults, around whatever it explains. IconButton draws its tooltip through this. *@
+<MokaTooltip Content="@(Format(Text, Shortcut) is { } text ? Body(text) : null)" Position="Position" Class="@Class" Style="@Style">
+	@ChildContent
+</MokaTooltip>
+
+@code {
+	// Moka's popup keeps its text on one line, which suits a name but runs a sentence past the window's edge.
+	private static RenderFragment Body(string text) => @<span class="mt-hint">@text</span>;
+}

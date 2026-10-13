@@ -17,8 +17,8 @@
 				OnClick="RemoveUnusedAsync">
 		@($"Remove unused ({Removable.Count.ToString(CultureInfo.CurrentCulture)})")
 	</MokaButton>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
 </div>
 
 @if (_creating)
@@ -64,9 +64,9 @@
 					<span class="mt-dk-cell mt-dk-cell--optional">@network.ShortId</span>
 				</div>
 				<span class="mt-dk-hover">
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+					<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
 								Disabled="@(IsBusy || !network.IsRemovable)" OnClick="@(() => RemoveAsync(network))"
-								title="@RemoveTitle(network)" aria-label="@($"Remove {network.Name}")" />
+								Label="@RemoveTitle(network)" AriaLabel="@($"Remove {network.Name}")" />
 				</span>
 			</div>
 		}

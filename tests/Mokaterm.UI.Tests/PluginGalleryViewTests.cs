@@ -94,7 +94,7 @@ public sealed partial class PluginGalleryViewTests
 		Assert.Contains(">Server tools<", html, StringComparison.Ordinal);
 		Assert.Contains(">MIT<", html, StringComparison.Ordinal);
 		Assert.Contains(">Desktop<", html, StringComparison.Ordinal);
-		Assert.Contains("title=\"https://github.com/acme/moka.certificates\"", Button(html, "Source of Certificates"), StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Source of Certificates\"", Tooltips.ControlFor(html, "https://github.com/acme/moka.certificates"), StringComparison.Ordinal);
 
 		// Not installed, an update, the same version, a waiting install, and nothing for this Mokaterm.
 		Assert.False(IsDisabled(Button(html, "Install Certificates")));

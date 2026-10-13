@@ -39,33 +39,33 @@
 							}
 						</MokaFlexbox>
 						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs">
-							<MokaButton Variant="MokaVariant.Text"
-										Size="MokaSize.Xs"
-										StartIcon="MokaIcons.Content.Copy"
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokaIcons.Content.Copy"
+										Color="MokaColor.Primary"
 										OnClick="() => DuplicateTheme(theme)"
-										title="Duplicate as custom theme"
-										aria-label="@($"Duplicate {theme.Name} as a custom theme")" />
-							<MokaButton Variant="MokaVariant.Text"
-										Size="MokaSize.Xs"
-										StartIcon="MokaIcons.Action.Download"
+										Label="Duplicate as custom theme"
+										AriaLabel="@($"Duplicate {theme.Name} as a custom theme")" />
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokaIcons.Action.Download"
+										Color="MokaColor.Primary"
 										OnClick="() => CopyThemeAsync(theme)"
-										title="Copy as a Windows Terminal scheme"
-										aria-label="@($"Copy {theme.Name} as a Windows Terminal scheme")" />
+										Label="Copy as a Windows Terminal scheme"
+										AriaLabel="@($"Copy {theme.Name} as a Windows Terminal scheme")" />
 							@if (theme.IsCustom)
 							{
-								<MokaButton Variant="MokaVariant.Text"
-											Size="MokaSize.Xs"
-											StartIcon="MokaIcons.Action.Edit"
+								<IconButton Size="MokaSize.Xs"
+											Icon="MokaIcons.Action.Edit"
+											Color="MokaColor.Primary"
 											OnClick="() => EditTheme(theme)"
-											title="Edit theme"
-											aria-label="@($"Edit {theme.Name}")" />
-								<MokaButton Variant="MokaVariant.Text"
-											Size="MokaSize.Xs"
+											Label="Edit theme"
+											AriaLabel="@($"Edit {theme.Name}")" />
+								<IconButton Size="MokaSize.Xs"
 											Color="MokaColor.Error"
-											StartIcon="MokaIcons.Action.Delete"
+											Icon="MokaIcons.Action.Delete"
 											OnClick="() => DeleteThemeAsync(theme)"
-											title="Delete theme"
-											aria-label="@($"Delete {theme.Name}")" />
+											Label="Delete theme"
+											AriaLabel="@($"Delete {theme.Name}")"
+											Position="MokaTooltipPosition.BottomEnd" />
 							}
 						</MokaFlexbox>
 					</div>

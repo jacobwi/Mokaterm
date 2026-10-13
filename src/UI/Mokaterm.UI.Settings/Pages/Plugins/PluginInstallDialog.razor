@@ -18,10 +18,11 @@
 					<div class="plugin-install__title">
 						<MokaText Element="span" Size="MokaSize.Lg" Weight="MokaFontWeight.Semibold">@package.Name</MokaText>
 						<MokaText Element="span" Size="MokaSize.Sm" Mono Style="@TextStyles.Muted">@package.Version</MokaText>
-						<MokaTag Text="@PluginDisplay.Kind(package.HasCode)"
-								 Size="MokaSize.Xs"
-								 Color="PluginDisplay.KindColor(package.HasCode)"
-								 title="@PluginDisplay.KindTitle(package.HasCode)" />
+						<Hint Text="@PluginDisplay.KindTitle(package.HasCode)">
+							<MokaTag Text="@PluginDisplay.Kind(package.HasCode)"
+									 Size="MokaSize.Xs"
+									 Color="PluginDisplay.KindColor(package.HasCode)" />
+						</Hint>
 					</div>
 					<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">@PluginDisplay.Publisher(package.Publisher)</MokaText>
 				</div>

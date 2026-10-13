@@ -23,10 +23,10 @@ public sealed partial class ToolNavigationTests
 			current: "services");
 
 		Assert.Equal(["Overview", "Services", "Fail2ban"], Labels(html));
-		Match current = CurrentButton().Match(html);
+		Match current = CurrentButton().Match(Tooltips.ControlFor(html, "Services"));
 		Assert.True(current.Success);
-		Assert.Contains("title=\"Services\"", current.Value, StringComparison.Ordinal);
 		Assert.Contains("mt-toolnav-item--active", current.Value, StringComparison.Ordinal);
+		Assert.DoesNotContain("title=", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -40,8 +40,8 @@ public sealed partial class ToolNavigationTests
 			current: "overview");
 
 		Assert.Contains("Fail2ban", Labels(html));
-		Assert.Contains("title=\"Fail2ban: fail2ban is not installed here.\"", html, StringComparison.Ordinal);
-		Assert.Contains("mt-toolnav-item--off", html, StringComparison.Ordinal);
+		Assert.Contains("mt-toolnav-item--off", Tooltips.ControlFor(html, "Fail2ban: fail2ban is not installed here."), StringComparison.Ordinal);
+		Assert.Contains("moka-tooltip-popup--right\"", Tooltips.PopupFor(html, "Fail2ban: fail2ban is not installed here."), StringComparison.Ordinal);
 	}
 
 	private static List<string> Labels(string html) => [.. Label().Matches(html).Select(match => match.Groups[1].Value)];

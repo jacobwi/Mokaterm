@@ -34,7 +34,7 @@ public sealed class PropertiesDialogRenderTests
 		// The owner list arrived, so the field says which uid the name stands for.
 		Assert.Contains("uid 33", html, StringComparison.Ordinal);
 		Assert.Contains("Apply to everything inside", html, StringComparison.Ordinal);
-		Assert.Contains("disabled title=\"Apply (Ctrl&#x2B;Enter)\"", html, StringComparison.Ordinal);
+		Assert.Matches("<button[^>]*\\sdisabled[\\s>]", Tooltips.ControlFor(html, "Apply (Ctrl+Enter)"));
 	}
 
 	[Fact]

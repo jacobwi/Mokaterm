@@ -79,19 +79,19 @@
 			</MokaColumn>
 		</ChildContent>
 		<RowActions Context="snippet">
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Edit"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Edit"
+						Color="MokaColor.Primary"
 						OnClick="() => Edit(snippet)"
-						title="Edit"
-						aria-label="@($"Edit {snippet.Name}")" />
-			<MokaButton Variant="MokaVariant.Text"
-						Size="MokaSize.Xs"
+						Label="Edit"
+						AriaLabel="@($"Edit {snippet.Name}")" />
+			<IconButton Size="MokaSize.Xs"
 						Color="MokaColor.Error"
-						StartIcon="MokaIcons.Action.Delete"
+						Icon="MokaIcons.Action.Delete"
 						OnClick="() => DeleteAsync(snippet)"
-						title="Delete"
-						aria-label="@($"Delete {snippet.Name}")" />
+						Label="Delete"
+						AriaLabel="@($"Delete {snippet.Name}")"
+						Position="MokaTooltipPosition.BottomEnd" />
 		</RowActions>
 		<EmptyContent>
 			@if (IsLoaded && _query.Trim().Length > 0)

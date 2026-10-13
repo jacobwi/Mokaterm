@@ -60,33 +60,33 @@
 					</MokaColumn>
 				</ChildContent>
 				<RowActions Context="rule">
-					<MokaButton Variant="MokaVariant.Text"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Navigation.ArrowUp"
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.ArrowUp"
+								Color="MokaColor.Primary"
 								Disabled="IsFirst(rules, rule)"
 								OnClick="() => MoveAsync(rule.Id, -1)"
-								title="Run earlier"
-								aria-label="@($"Move {rule.Pattern} up")" />
-					<MokaButton Variant="MokaVariant.Text"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Navigation.ArrowDown"
+								Label="Run earlier"
+								AriaLabel="@($"Move {rule.Pattern} up")" />
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.ArrowDown"
+								Color="MokaColor.Primary"
 								Disabled="IsLast(rules, rule)"
 								OnClick="() => MoveAsync(rule.Id, 1)"
-								title="Run later"
-								aria-label="@($"Move {rule.Pattern} down")" />
-					<MokaButton Variant="MokaVariant.Text"
-								Size="MokaSize.Xs"
-								StartIcon="MokaIcons.Action.Edit"
+								Label="Run later"
+								AriaLabel="@($"Move {rule.Pattern} down")" />
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Action.Edit"
+								Color="MokaColor.Primary"
 								OnClick="() => EditRule(rule)"
-								title="Edit"
-								aria-label="@($"Edit {rule.Pattern}")" />
-					<MokaButton Variant="MokaVariant.Text"
-								Size="MokaSize.Xs"
+								Label="Edit"
+								AriaLabel="@($"Edit {rule.Pattern}")" />
+					<IconButton Size="MokaSize.Xs"
 								Color="MokaColor.Error"
-								StartIcon="MokaIcons.Action.Delete"
+								Icon="MokaIcons.Action.Delete"
 								OnClick="() => DeleteAsync(rule)"
-								title="Delete"
-								aria-label="@($"Delete {rule.Pattern}")" />
+								Label="Delete"
+								AriaLabel="@($"Delete {rule.Pattern}")"
+								Position="MokaTooltipPosition.BottomEnd" />
 				</RowActions>
 				<EmptyContent>
 					<MokaEmptyState Icon="MokaIcons.Status.Bell"

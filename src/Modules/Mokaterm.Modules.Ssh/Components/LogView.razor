@@ -24,26 +24,24 @@
 		}
 		@if (FollowingChanged.HasDelegate)
 		{
-			<MokaButton Variant="@(Following ? MokaVariant.Filled : MokaVariant.Outlined)"
-						Color="@(Following ? MokaColor.Primary : MokaColor.Surface)"
-						Size="MokaSize.Xs"
-						StartIcon="@(Following ? MokatermIcons.Pause : MokatermIcons.Play)"
-						Disabled="@(!CanFollow)"
-						OnClick="ToggleFollowingAsync"
-						title="@(Following ? "Stop following" : FollowTitle)">
-				@(Following ? "Following" : "Follow")
-			</MokaButton>
+			<Hint Text="@(Following ? "Stop following" : FollowTitle)">
+				<MokaButton Variant="@(Following ? MokaVariant.Filled : MokaVariant.Outlined)"
+							Color="@(Following ? MokaColor.Primary : MokaColor.Surface)"
+							Size="MokaSize.Xs"
+							StartIcon="@(Following ? MokatermIcons.Pause : MokatermIcons.Play)"
+							Disabled="@(!CanFollow)"
+							OnClick="ToggleFollowingAsync">
+					@(Following ? "Following" : "Follow")
+				</MokaButton>
+			</Hint>
 		}
 		@if (OnRefresh.HasDelegate)
 		{
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Refresh"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Refresh"
 						Disabled="RefreshDisabled"
 						OnClick="OnRefresh"
-						title="@RefreshTitle"
-						aria-label="@RefreshTitle" />
+						Label="@RefreshTitle" />
 		}
 		<div class="mt-log-search">
 			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="@SearchPlaceholder" Debounce="150" aria-label="@SearchPlaceholder" />

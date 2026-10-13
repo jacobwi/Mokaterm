@@ -25,26 +25,25 @@
 		}
 		@if (PrimaryText is { Length: > 0 } primary)
 		{
-			<MokaButton Variant="MokaVariant.Outlined"
-						Size="MokaSize.Xs"
-						StartIcon="PrimaryIcon"
-						Disabled="PrimaryDisabled"
-						title="@PrimaryTitle"
-						OnClick="OnPrimary">
-				@primary
-			</MokaButton>
+			<Hint Text="@PrimaryTitle">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Xs"
+							StartIcon="PrimaryIcon"
+							Disabled="PrimaryDisabled"
+							OnClick="OnPrimary">
+					@primary
+				</MokaButton>
+			</Hint>
 		}
 		@if (OnRefresh.HasDelegate)
 		{
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Action.Refresh"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Refresh"
 						Loading="@(Loading && Loaded)"
 						Disabled="Loading"
 						OnClick="OnRefresh"
-						title="Read again"
-						aria-label="Read again" />
+						Label="Read again"
+						Position="MokaTooltipPosition.BottomEnd" />
 		}
 		</div>
 	</header>

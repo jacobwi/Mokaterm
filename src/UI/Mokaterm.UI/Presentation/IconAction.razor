@@ -1,19 +1,16 @@
-@* An icon-only button with a tooltip, used in the app bar, panel headers and the session toolbar. *@
+@* An icon-only button with a tooltip, used in the app bar, panel headers and the session toolbar. It keeps the
+   parameters those callers use; the button and its tooltip are IconButton's. *@
 
-<MokaTooltip Text="@TooltipText" Position="TooltipPosition">
-	<MokaButton Variant="MokaVariant.Text"
-				Color="@(Active ? MokaColor.Primary : MokaColor.Surface)"
-				Size="Size"
-				StartIcon="Icon"
-				Disabled="Disabled"
-				OnClick="OnClick"
-				aria-label="@Title"
-				aria-pressed="@(Active ? "true" : null)" />
-	@if (DotColor is { Length: > 0 } dot)
-	{
-		<span class="mt-icon-dot" style="--mt-icon-dot:@dot" aria-hidden="true"></span>
-	}
-</MokaTooltip>
+<IconButton Icon="Icon"
+			Label="@Title"
+			Shortcut="@Shortcut"
+			Size="Size"
+			Active="Active"
+			Pressed="@(Active ? true : null)"
+			Dot="@DotColor"
+			Disabled="Disabled"
+			Position="TooltipPosition"
+			OnClick="OnClick" />
 
 @code {
 	[Parameter, EditorRequired]
@@ -47,11 +44,11 @@
 	public MokaSize Size { get; set; } = MokaSize.Sm;
 
 	/// <summary>
-	/// Tooltips are laid out even while hidden, so near a scrolling container's right edge use Left to avoid a
-	/// horizontal scrollbar.
+	/// Where the tooltip goes, which must never be over the icons next to it. In a row of icons (a toolbar, a panel
+	/// header) that is Bottom, or BottomStart and BottomEnd for the first and last button against a window or panel edge;
+	/// Top for a row at the bottom of a view (a status bar, a footer); Left or Right only in a column of icons (a side
+	/// rail). The tooltip is placed against the window and moves to the side with room at its edges.
 	/// </summary>
 	[Parameter]
 	public MokaTooltipPosition TooltipPosition { get; set; } = MokaTooltipPosition.Bottom;
-
-	private string TooltipText => Shortcut is null ? Title : $"{Title} ({Shortcut})";
 }

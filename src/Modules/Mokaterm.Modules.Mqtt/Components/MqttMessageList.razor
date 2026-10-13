@@ -15,13 +15,10 @@
 			<MokaText Element="span" Size="MokaSize.Sm" Mono Truncate Class="mt-mqtt-messages-topic" title="@Topic">@Topic</MokaText>
 			<span class="mt-mqtt-messages-spacer"></span>
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-messages-meta">@CountText</MokaText>
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="MokaIcons.Content.Copy"
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Content.Copy"
 						OnClick="CopyTopicAsync"
-						title="Copy the topic"
-						aria-label="Copy the topic" />
+						Label="Copy the topic" />
 		</div>
 
 		@if (Messages.Count == 0)
@@ -58,11 +55,15 @@
 								<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Xxs" Align="MokaAlign.Center">
 									@if (message.Retain)
 									{
-										<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" title="Retained by the broker" />
+										<Hint Text="Retained by the broker">
+											<MokaTag Text="R" Size="MokaSize.Xs" Color="MokaColor.Info" />
+										</Hint>
 									}
 									@if (message.IsTruncated)
 									{
-										<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Only the start of this payload was kept" />
+										<Hint Text="Only the start of this payload was kept">
+											<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+										</Hint>
 									}
 								</MokaFlexbox>
 							</CellTemplate>

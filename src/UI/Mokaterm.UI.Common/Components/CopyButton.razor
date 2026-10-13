@@ -1,6 +1,6 @@
-<MokaButton Variant="MokaVariant.Text"
+<IconButton Icon="@(_copied ? MokaIcons.Status.Check : MokaIcons.Content.Copy)"
+			Label="@Label"
+			Color="MokaColor.Primary"
 			Size="MokaSize.Xs"
-			StartIcon="@(_copied ? MokaIcons.Status.Check : MokaIcons.Content.Copy)"
-			OnClick="CopyAsync"
-			title="@Label"
-			aria-label="@Label" />
+			Position="Position"
+			OnClick="CopyAsync" />

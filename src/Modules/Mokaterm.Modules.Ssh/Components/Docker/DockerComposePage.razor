@@ -11,12 +11,14 @@ else
 		<div class="mt-dk-toolbar-search">
 			<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by project, folder or service" Debounce="100" aria-label="Filter projects" />
 		</div>
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Search"
-					Disabled="_finding" Loading="_finding" OnClick="FindAsync" title="@FindTitle">
-			Find compose files
-		</MokaButton>
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-					Disabled="IsLoading" OnClick="RefreshAsync" title="Refresh" aria-label="Refresh" />
+		<Hint Text="@FindTitle">
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Search"
+						Disabled="_finding" Loading="_finding" OnClick="FindAsync">
+				Find compose files
+			</MokaButton>
+		</Hint>
+		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+					Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
 	</div>
 
 	@if (ToolNote is { } note)
@@ -53,8 +55,8 @@ else
 						@if (Feature?.Compose is not null)
 						{
 							<span class="mt-dk-hover">
-								<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect"
-											Disabled="IsBusy" OnClick="@(() => RestartAsync(project))" title="Restart" aria-label="@($"Restart {project.Name}")" />
+								<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Reconnect"
+											Disabled="IsBusy" OnClick="@(() => RestartAsync(project))" Label="Restart" AriaLabel="@($"Restart {project.Name}")" />
 							</span>
 						}
 					</div>
@@ -68,7 +70,7 @@ else
 				<div class="mt-dk-section-head">
 					<span class="mt-dk-label">Compose files with no project running</span>
 					<span class="mt-dk-spacer"></span>
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close" OnClick="CloseFound" aria-label="Close the search results" />
+					<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="CloseFound" Label="Close the search results" Position="MokaTooltipPosition.BottomEnd" />
 				</div>
 				@if (_findProblem is { } findProblem)
 				{

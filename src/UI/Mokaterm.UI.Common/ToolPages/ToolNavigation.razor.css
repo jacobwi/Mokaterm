@@ -19,9 +19,16 @@
 	display: none;
 }
 
-.mt-toolnav-item {
+/* Each item sits in its hint's wrapper, which is what the list lays out. */
+.mt-toolnav-list ::deep .mt-toolnav-hint {
 	display: flex;
 	flex-shrink: 0;
+}
+
+.mt-toolnav-item {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 	padding: 6px var(--moka-spacing-sm);

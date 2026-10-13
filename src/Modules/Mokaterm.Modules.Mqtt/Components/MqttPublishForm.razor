@@ -27,9 +27,15 @@
 								  ValueChanged="OnQosChanged"
 								  Disabled="@Busy"
 								  FullWidth>
-				<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="@Busy" title="At most once" />
-				<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="@Busy" title="At least once" />
-				<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="@Busy" title="Exactly once" />
+				<Hint Text="At most once" Style="flex: 1">
+					<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="@Busy" />
+				</Hint>
+				<Hint Text="At least once" Style="flex: 1">
+					<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="@Busy" />
+				</Hint>
+				<Hint Text="Exactly once" Style="flex: 1">
+					<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="@Busy" />
+				</Hint>
 			</MokaSegmentedControl>
 		</MokaFieldWrapper>
 

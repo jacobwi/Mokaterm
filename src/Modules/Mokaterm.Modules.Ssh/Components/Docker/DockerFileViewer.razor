@@ -4,18 +4,20 @@
 <div class="mt-dk-panel-head">
 	@if (_path != Root)
 	{
-		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp"
-					Disabled="_busy" OnClick="UpAsync" title="Up one folder" aria-label="Up one folder" />
+		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.ArrowUp"
+					Disabled="_busy" OnClick="UpAsync" Label="Up one folder" />
 	}
 	<span class="mt-dk-path-text" title="@_path">@_path</span>
 	@if (_asRoot)
 	{
-		<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" title="Read through sudo" />
+		<Hint Text="Read through sudo">
+			<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+		</Hint>
 	}
 	<span class="mt-dk-spacer"></span>
 	<CopyButton Text="@_path" Label="Copy the path" />
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Refresh"
-				Disabled="_busy" OnClick="ReloadAsync" title="Read again" aria-label="Read again" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
+				Disabled="_busy" OnClick="ReloadAsync" Label="Read again" />
 </div>
 
 @if (_busy && _entries is null && _file is null)

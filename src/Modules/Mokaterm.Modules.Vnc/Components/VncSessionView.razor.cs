@@ -321,8 +321,6 @@ public sealed partial class VncSessionView : SessionViewBase, IAsyncDisposable
 
 	private static MokaColor ToggleColor(bool on) => on ? MokaColor.Primary : MokaColor.Surface;
 
-	private static string Pressed(bool on) => on ? "true" : "false";
-
 	private async Task SwitchSessionAsync()
 	{
 		await ReleaseAsync();

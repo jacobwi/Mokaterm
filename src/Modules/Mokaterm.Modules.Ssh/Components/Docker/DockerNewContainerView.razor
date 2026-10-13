@@ -3,8 +3,8 @@
 @inherits DockerManagerPageBase
 
 <div class="mt-dk-panel-head">
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowLeft"
-				Disabled="IsBusy" OnClick="OnCancel" aria-label="Back to the containers" />
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.ArrowLeft"
+				Disabled="IsBusy" OnClick="OnCancel" Label="Back to the containers" />
 	<span class="mt-dk-cell-name">New container</span>
 	<span class="mt-dk-label">docker run</span>
 </div>
@@ -60,8 +60,8 @@
 								   autocomplete="off"
 								   aria-label="@($"Port {row + 1}")" />
 				</div>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
-							Disabled="IsBusy" OnClick="@(() => RemoveRow(_ports, row))" aria-label="@($"Remove port {row + 1}")" />
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveRow(_ports, row))" Label="Remove" AriaLabel="@($"Remove port {row + 1}")" />
 			</div>
 		}
 	</div>
@@ -88,8 +88,8 @@
 								   autocomplete="off"
 								   aria-label="@($"Mount {row + 1}")" />
 				</div>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
-							Disabled="IsBusy" OnClick="@(() => RemoveRow(_mounts, row))" aria-label="@($"Remove mount {row + 1}")" />
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveRow(_mounts, row))" Label="Remove" AriaLabel="@($"Remove mount {row + 1}")" />
 			</div>
 		}
 	</div>
@@ -125,8 +125,8 @@
 									   autocomplete="off"
 									   aria-label="@($"Value of variable {row + 1}")" />
 				</div>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.Close"
-							Disabled="IsBusy" OnClick="@(() => RemoveVariable(row))" aria-label="@($"Remove variable {row + 1}")" />
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
+							Disabled="IsBusy" OnClick="@(() => RemoveVariable(row))" Label="Remove" AriaLabel="@($"Remove variable {row + 1}")" />
 			</div>
 		}
 	</div>

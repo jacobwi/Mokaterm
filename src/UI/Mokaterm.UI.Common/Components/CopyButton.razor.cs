@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Moka.Red.Feedback.Tooltip;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.UI.Common.Platform;
 
@@ -34,6 +35,10 @@ public sealed partial class CopyButton : ComponentBase, IDisposable
 	/// <summary>Tooltip and accessible name, for example "Copy fingerprint".</summary>
 	[Parameter]
 	public string Label { get; set; } = "Copy";
+
+	/// <summary>Where the tooltip goes; <see cref="Hint.Position"/> has the rule.</summary>
+	[Parameter]
+	public MokaTooltipPosition Position { get; set; } = Hint.DefaultPosition;
 
 	public void Dispose() => StopConfirmation();
 

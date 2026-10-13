@@ -22,7 +22,9 @@
 	<ChipsEnd>
 		@if (_snapshot is { AsRoot: false } && Context.RootChangeBlocked is null)
 		{
-			<button type="button" class="mta-link" disabled="@Busy" @onclick="Context.EnableRoot" title="sshd -T, the login log, fail2ban and other users' ports need root">read more as root</button>
+			<Hint Text="sshd -T, the login log, fail2ban and other users' ports need root">
+				<button type="button" class="mta-link" disabled="@Busy" @onclick="Context.EnableRoot">read more as root</button>
+			</Hint>
 		}
 	</ChipsEnd>
 	<ChildContent>
@@ -158,12 +160,12 @@
 					</span>
 					<span class="mta-cell mta-mono" title="@check.Value">@check.Value</span>
 					<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-						<MokaButton Variant="MokaVariant.Text"
-									Color="MokaColor.Surface"
-									Size="MokaSize.Xs"
-									StartIcon="MokaIcons.Navigation.MoreHorizontal"
+						<IconButton Size="MokaSize.Xs"
+									Icon="MokaIcons.Navigation.MoreHorizontal"
 									OnClick="@(args => ShowRowMenu(args, MenuFor(check)))"
-									aria-label="@($"Actions for {check.Title}")" />
+									Label="More actions"
+									AriaLabel="@($"Actions for {check.Title}")"
+									Position="MokaTooltipPosition.BottomEnd" />
 					</span>
 				</div>
 			}
@@ -311,14 +313,15 @@
 				{
 					@if (sshd.RouteFor(keyword) is { } route)
 					{
-						<MokaButton Variant="MokaVariant.Outlined"
-									Color="@(fix.CutsConnection ? MokaColor.Error : MokaColor.Primary)"
-									Size="MokaSize.Xs"
-									Disabled="@(Busy || _editing || Context.RootChangeBlocked is not null)"
-									title="@(Context.RootChangeBlocked ?? (route.UsesDropIn ? $"Writes {fix.Keyword} {fix.Value} into {route.File}" : $"Opens {route.File} to change {fix.Keyword}"))"
-									OnClick="@(() => FixAsync(fix, route))">
-							@(route.UsesDropIn ? fix.Label : $"Edit {route.File}")
-						</MokaButton>
+						<Hint Text="@(Context.RootChangeBlocked ?? (route.UsesDropIn ? $"Writes {fix.Keyword} {fix.Value} into {route.File}" : $"Opens {route.File} to change {fix.Keyword}"))">
+							<MokaButton Variant="MokaVariant.Outlined"
+										Color="@(fix.CutsConnection ? MokaColor.Error : MokaColor.Primary)"
+										Size="MokaSize.Xs"
+										Disabled="@(Busy || _editing || Context.RootChangeBlocked is not null)"
+										OnClick="@(() => FixAsync(fix, route))">
+								@(route.UsesDropIn ? fix.Label : $"Edit {route.File}")
+							</MokaButton>
+						</Hint>
 					}
 				}
 				@if (check.Shows is { } shows)
