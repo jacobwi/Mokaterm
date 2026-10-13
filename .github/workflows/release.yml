@@ -3,6 +3,13 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Publishes the plugin SDK packages of a release that already exists, when only the nuget.org step failed. It has to
+  # live in this file: the nuget.org Trusted Publishing policy trusts release.yml and no other workflow.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release whose NuGet packages to publish, for example v0.2.0
+        required: true
 
 permissions:
   contents: write
@@ -18,6 +25,7 @@ env:
 jobs:
   release:
     name: Package & Publish
+    if: github.event_name == 'push'
     runs-on: windows-latest
 
     steps:
@@ -107,11 +115,48 @@ jobs:
         with:
           user: BCat
 
-      # --skip-duplicate lets a re-run of the same tag finish instead of failing on what already went up.
+      # One push per file: on the Windows runner dotnet nuget push did not expand a quoted pattern and found nothing,
+      # which is what left 0.2.0 off nuget.org. --skip-duplicate lets a re-run finish instead of failing on what already
+      # went up.
       - name: Publish the plugin SDK to nuget.org
         shell: bash
-        run: >
-          dotnet nuget push "artifacts/nuget/*.nupkg"
-          --source https://api.nuget.org/v3/index.json
-          --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}"
-          --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
+        run: |
+          for package in artifacts/nuget/*.nupkg; do
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          done
+
+  nuget:
+    name: Publish the plugin SDK of an existing release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # The packages the release workflow attached, so what goes to nuget.org is exactly what the release carries.
+      - name: Download the release's packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Mokaterm.*.nupkg' --dir artifacts/nuget
+          ls artifacts/nuget/*.nupkg
+
+      - name: Sign in to nuget.org
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: BCat
+
+      - name: Publish the plugin SDK to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
+        run: |
+          for package in artifacts/nuget/*.nupkg; do
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          done
