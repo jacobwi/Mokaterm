@@ -7,6 +7,7 @@ using Moka.Red.Feedback.Toast;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.Maui.ToolWindows;
 using Mokaterm.UI.Commands;
 using Mokaterm.UI.Common.Editing;
@@ -70,6 +71,7 @@ public sealed class ToolPageServicesTests
 	[InlineData(typeof(CatalogState))]
 	[InlineData(typeof(CommandSnippetActions))]
 	[InlineData(typeof(SessionViewRequests))]
+	[InlineData(typeof(ClipboardClearSchedule))]
 	public void WindowState_IsBorrowed(Type service) => Assert.False(Classified().IsPerPage(service), service.Name);
 
 	// The session manager takes the prompt queue to ask for passwords. The queue being the page's must not make the
@@ -130,6 +132,22 @@ public sealed class ToolPageServicesTests
 
 		Assert.True(js.Disposed);
 		Assert.False(vault.Disposed);
+	}
+
+	// The clipboard is the page's, but the clear after a secret copy is the window's: a tool window that closes before
+	// the deadline leaves the clear to the main window instead of taking it along.
+	[Fact]
+	public async Task AToolWindowsClipboard_SharesTheMainWindowsClearSchedule()
+	{
+		ServiceCollection services = Registrations();
+		services.AddSingleton<ISettingsService, FakeSettingsService>();
+		await using ServiceProvider root = services.BuildServiceProvider();
+		await using AsyncServiceScope owner = root.CreateAsyncScope();
+		IServiceProvider borrowed = new ToolPageServices(services, MokatermUiServiceCollectionExtensions.PageServices).Borrow(owner.ServiceProvider);
+		await using AsyncServiceScope page = borrowed.CreateAsyncScope();
+
+		Assert.NotSame(owner.ServiceProvider.GetRequiredService<IClipboardService>(), page.ServiceProvider.GetRequiredService<IClipboardService>());
+		Assert.Same(owner.ServiceProvider.GetRequiredService<ClipboardClearSchedule>(), page.ServiceProvider.GetRequiredService<ClipboardClearSchedule>());
 	}
 
 	// The main window's chrome is an app-wide singleton like any other, so without this a tool window's header would hand

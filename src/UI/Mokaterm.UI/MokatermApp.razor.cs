@@ -7,6 +7,7 @@ using Moka.Red.Feedback.Dialog;
 using Moka.Red.Feedback.Toast;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Vault;
@@ -58,6 +59,11 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 
 	[Inject]
 	private ILogger<MokatermApp> Logger { get; set; } = default!;
+
+	// Never called here. Taking it registers this window's page with the ClipboardClearSchedule from the start, so a
+	// secret copied in a tool window can still be cleared through the main window once that tool window has closed.
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
 
 	public void Dispose()
 	{

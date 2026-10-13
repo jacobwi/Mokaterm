@@ -13,6 +13,9 @@ public static class UiCommonServiceCollectionExtensions
 	{
 		services.TryAddSingleton(TimeProvider.System);
 		services.TryAddSingleton<IUiContributions, UiContributions>();
+		// Window state, not a page service: a tool window borrows its opener's, so a secret copied there is cleared
+		// through the main window when the tool window closes first.
+		services.TryAddScoped<ClipboardClearSchedule>();
 		services.TryAddScoped<IClipboardService, JsClipboardService>();
 		services.TryAddScoped<IUrlOpener, JsUrlOpener>();
 		services.TryAddScoped<FormInterop>();
