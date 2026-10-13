@@ -4,7 +4,7 @@ using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Tests;
 
-/// <summary>The checksum and read-from-offset scripts, run in a local POSIX shell when there is one, and their output parsed.</summary>
+/// <summary>The checksum and ranged read scripts, run in a local POSIX shell when there is one, and their output parsed.</summary>
 public sealed class RemoteChecksumTests
 {
 	private const string Sha256OfHello = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
@@ -73,7 +73,7 @@ public sealed class RemoteChecksumTests
 	}
 
 	[Fact]
-	public async Task ReadFrom_StreamsTheFileFromTheGivenByte()
+	public async Task ReadRange_PrintsTheFilesVersion_ThenThatPartOfIt_FromWholeBlocks()
 	{
 		if (PosixShellLocator.Find() is not { } shell)
 		{
@@ -81,23 +81,81 @@ public sealed class RemoteChecksumTests
 			return;
 		}
 
-		byte[] content = RandomNumberGenerator.GetBytes(10_000);
+		byte[] content = RandomNumberGenerator.GetBytes(200_000);
 		string directory = await MakeDirectoryAsync(shell, "");
 		try
 		{
-			await File.WriteAllBytesAsync(await NativePathAsync(shell, directory + "/data.bin"), content, TestContext.Current.CancellationToken);
+			string path = directory + "/data.bin";
+			await File.WriteAllBytesAsync(await NativePathAsync(shell, path), content, TestContext.Current.CancellationToken);
 
-			// The caller passes the offset plus one: tail counts its bytes from one.
-			(int exitCode, byte[] output, string error) = await PosixShellLocator.RunAsync(shell, PosixShellLocator.UnixPathPrefix + RemoteScripts.ReadFrom, [directory + "/data.bin", "6001"]);
+			// Block 1 is byte 65,536 on; 100,000 bytes from there.
+			FilePiece middle = await ReadRangeAsync(shell, path, 1, 100_000);
 
-			Assert.True(exitCode == 0, error);
-			Assert.True(RemoteOutput.TryGetPayload(output, out ReadOnlyMemory<byte> payload));
-			Assert.Equal(content[6000..], payload.ToArray());
+			// From block 2 the file holds less than asked, which is how the end shows.
+			FilePiece end = await ReadRangeAsync(shell, path, 2, 100_000);
+
+			// Past the end there is nothing, and still a version.
+			FilePiece past = await ReadRangeAsync(shell, path, 10, 4096);
+
+			Assert.Equal(content.AsSpan(65_536, 100_000).ToArray(), middle.Bytes.ToArray());
+			Assert.Equal(content.AsSpan(131_072).ToArray(), end.Bytes.ToArray());
+			Assert.True(past.Bytes.IsEmpty);
+
+			// device, inode, size, modification time: the size is the third field, and an unchanged file says the same.
+			string[] fields = middle.Version.Split(' ');
+			Assert.Equal(4, fields.Length);
+			Assert.Equal("200000", fields[2]);
+			Assert.Equal(middle.Version, end.Version);
+			Assert.Equal(middle.Version, past.Version);
+
+			await File.AppendAllTextAsync(await NativePathAsync(shell, path), "more", TestContext.Current.CancellationToken);
+			FilePiece grown = await ReadRangeAsync(shell, path, 0, 16);
+
+			Assert.NotEqual(middle.Version, grown.Version);
+			Assert.Equal(content.AsSpan(0, 16).ToArray(), grown.Bytes.ToArray());
 		}
 		finally
 		{
 			await RemoveDirectoryAsync(shell, directory);
 		}
+	}
+
+	[Theory]
+	[InlineData("missing.bin", RemoteScripts.ExitNotFound)]
+	[InlineData("", RemoteScripts.ExitWrongKind)]
+	public async Task ReadRange_OfSomethingThatIsNotAFile_ExitsWithItsCode(string name, int expected)
+	{
+		if (PosixShellLocator.Find() is not { } shell)
+		{
+			Assert.Skip("No POSIX sh is available on this machine.");
+			return;
+		}
+
+		string directory = await MakeDirectoryAsync(shell, "");
+		try
+		{
+			(int exitCode, _, _) = await PosixShellLocator.RunAsync(shell, PosixShellLocator.UnixPathPrefix + RemoteScripts.ReadRange, [directory + "/" + name, "0", "16"])
+				.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+			Assert.Equal(expected, exitCode);
+		}
+		finally
+		{
+			await RemoveDirectoryAsync(shell, directory);
+		}
+	}
+
+	private static async Task<FilePiece> ReadRangeAsync(string shell, string path, long block, int count)
+	{
+		(int exitCode, byte[] output, string error) = await PosixShellLocator.RunAsync(
+			shell,
+			PosixShellLocator.UnixPathPrefix + RemoteScripts.ReadRange,
+			[path, block.ToString(System.Globalization.CultureInfo.InvariantCulture), count.ToString(System.Globalization.CultureInfo.InvariantCulture)])
+			.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+		Assert.True(exitCode == 0, error);
+		Assert.True(RemoteOutput.TryGetPayload(output, out ReadOnlyMemory<byte> payload));
+		return FilePiece.Parse(payload, path);
 	}
 
 	private static async Task<string> MakeDirectoryAsync(string shell, string fill)

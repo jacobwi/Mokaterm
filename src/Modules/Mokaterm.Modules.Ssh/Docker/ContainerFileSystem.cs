@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Containers;
@@ -17,7 +16,7 @@ namespace Mokaterm.Modules.Ssh.Docker;
 /// </summary>
 /// <remarks>
 /// Operations run as the container's own user, the one <c>docker exec</c> picks. A read is a run of bounded pieces
-/// (<see cref="ContainerReadStream"/>). A write is staged on the docker host as the login, over the session's own file
+/// (<see cref="PieceReadStream"/>), the same as the root view's. A write is staged on the docker host as the login, over the session's own file
 /// system, and the host then pipes that file into <see cref="RemoteScripts.WriteInput"/> with <c>docker exec -i</c>: no exec
 /// channel here carries stdin as the login, and writing in place keeps an existing file's owner and mode, which
 /// <c>docker cp</c> would hand to root, and works on a single file mounted into the container, where a rename cannot.
@@ -27,14 +26,10 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 	/// <summary>The most a listing may print: past it a folder holds more than one listing carries, and it is refused.</summary>
 	internal const int ListingOutputBytes = 32 * 1024 * 1024;
 
-	private const int TransferBufferSize = 128 * 1024;
-
-	// What a piece may carry beyond the bytes asked for: the marker, and anything the login's shell printed first.
-	private const int PieceSlackBytes = 64 * 1024;
-
 	private const int AccountsOutputBytes = 4 * 1024 * 1024;
 
-	// A piece is at most 4 MB, which a slow link needs a while for; it is still far from a long call.
+	// A piece is at most 4 MB, which a slow link needs a while for. It counts as long all the same, like a root piece: a
+	// reader keeps two on their way.
 	private static readonly TimeSpan PieceTimeout = TimeSpan.FromMinutes(2);
 
 	private static readonly TimeSpan AccountsTimeout = TimeSpan.FromSeconds(15);
@@ -127,12 +122,6 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 		}
 	}
 
-	public override async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		return await ContainerReadStream.OpenAsync((start, count, token) => ReadPieceAsync(target, start, count, token), 0, cancellationToken);
-	}
-
 	public override async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(source);
@@ -157,38 +146,6 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 		DockerCall call = DockerCommands.ExecScriptWithInput(Container, staged.Path, RemoteScripts.WriteInput, [target, Flag(options.Overwrite), mode, stamp])
 			with { Timeout = DockerCall.LongTimeout, OutputLimitBytes = PieceSlackBytes };
 		await RunAsync(call, target, cancellationToken);
-	}
-
-	public override ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
-		DownloadAsync(path, destination, 0, progress, cancellationToken);
-
-	public override async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
-	{
-		ArgumentNullException.ThrowIfNull(destination);
-		ArgumentOutOfRangeException.ThrowIfNegative(offset);
-		string target = Absolute(path);
-		if (offset > 0 && await StatAsync(target, cancellationToken) is { Kind: RemoteEntryKind.File } entry && entry.Size < offset)
-		{
-			throw TransferStreams.ShorterThanCopied(target, offset);
-		}
-
-		await using ContainerReadStream source = await ContainerReadStream.OpenAsync((start, count, token) => ReadPieceAsync(target, start, count, token), offset, cancellationToken);
-		byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
-		try
-		{
-			long total = 0;
-			int read;
-			while ((read = await source.ReadAsync(buffer.AsMemory(0, TransferBufferSize), cancellationToken)) > 0)
-			{
-				await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-				total += read;
-				progress?.Report(total);
-			}
-		}
-		finally
-		{
-			ArrayPool<byte>.Shared.Return(buffer);
-		}
 	}
 
 	public override ValueTask DisposeAsync()
@@ -255,6 +212,12 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 		bool allowPartialListing = false) =>
 		RunAsync(Call(Container, script, arguments), path, cancellationToken, destination, allowPartialListing);
 
+	protected override Task<ReadOnlyMemory<byte>> ReadRangeAsync(IReadOnlyList<string> arguments, string path, int maxOutputBytes, CancellationToken cancellationToken) =>
+		RunAsync(
+			DockerCommands.ExecScript(Container, RemoteScripts.ReadRange, arguments) with { Timeout = PieceTimeout, RunsLong = true, OutputLimitBytes = maxOutputBytes },
+			path,
+			cancellationToken);
+
 	protected override void ThrowIfDisposed()
 	{
 		if (Volatile.Read(ref _disposed) != 0)
@@ -281,23 +244,5 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 	{
 		ThrowIfDisposed();
 		return ExecuteAsync(_client(), Container, call, path, cancellationToken, destination, allowPartialListing);
-	}
-
-	/// <summary>
-	/// Up to <paramref name="count"/> bytes from <paramref name="start"/>: <see cref="RemoteScripts.ReadRange"/> starts at a
-	/// whole block, so the bytes before <paramref name="start"/> in that block are read and dropped.
-	/// </summary>
-	private async Task<ReadOnlyMemory<byte>> ReadPieceAsync(string path, long start, int count, CancellationToken cancellationToken)
-	{
-		long block = start / RemoteScripts.ReadBlockBytes;
-		int lead = (int)(start % RemoteScripts.ReadBlockBytes);
-		int asked = lead + count;
-		DockerCall call = DockerCommands.ExecScript(
-			Container,
-			RemoteScripts.ReadRange,
-			[path, block.ToString(CultureInfo.InvariantCulture), asked.ToString(CultureInfo.InvariantCulture)])
-			with { Timeout = PieceTimeout, OutputLimitBytes = asked + PieceSlackBytes };
-		ReadOnlyMemory<byte> payload = await RunAsync(call, path, cancellationToken);
-		return payload.Length <= lead ? ReadOnlyMemory<byte>.Empty : payload[lead..];
 	}
 }

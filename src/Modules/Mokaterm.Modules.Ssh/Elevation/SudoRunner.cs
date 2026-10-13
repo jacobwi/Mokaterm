@@ -64,16 +64,27 @@ internal sealed class SudoRunner : IDisposable
 {
 	private const int MaxPasswordPrompts = 3;
 
-	private readonly SshClient _client;
+	private readonly Func<string, SecretBuffer?, bool, CancellationToken, Task<IExecChannel>> _start;
 	private readonly string _sudoCommand;
 	private SecretBuffer? _password;
 
-	private SudoRunner(SshClient client, string sudoCommand, string account, SecretBuffer? password)
+	/// <param name="start">
+	/// Starts a command line, writes the input it is given (the password, then any input for the script) on stdin and
+	/// closes stdin, also when there is no input; the bool is the channel's <c>runsLong</c>. The connection's own is
+	/// <see cref="RemoteCommand.StartAsync"/>; tests run the commands in a local shell instead.
+	/// </param>
+	/// <param name="password">The password sudo took, written ahead of every command from now on; owned. Null when sudo needs none.</param>
+	internal SudoRunner(Func<string, SecretBuffer?, bool, CancellationToken, Task<IExecChannel>> start, string sudoCommand, string account, SecretBuffer? password)
 	{
-		_client = client;
+		_start = start;
 		_sudoCommand = sudoCommand;
 		Account = account;
 		_password = password;
+	}
+
+	private SudoRunner(SshClient client, string sudoCommand, string account, SecretBuffer? password)
+		: this((command, input, runsLong, token) => StartOnAsync(client, command, input, runsLong, token), sudoCommand, account, password)
+	{
 	}
 
 	public string Account { get; }
@@ -178,16 +189,17 @@ internal sealed class SudoRunner : IDisposable
 	/// <summary>Runs a script as root to completion.</summary>
 	/// <param name="runsLong">The script may take minutes, as a copy or an archive can (<see cref="ExecChannelBudget"/>).</param>
 	public Task<RemoteCommandResult> RunAsync(string script, IEnumerable<string> arguments, bool runsLong, CancellationToken cancellationToken) =>
-		RemoteCommand.RunAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, runsLong, cancellationToken);
+		RunAsync(script, arguments, runsLong, RemoteCommand.MaxOutputBytes, cancellationToken);
 
 	/// <summary>
-	/// Starts a script as root whose output is streamed. A download reads at the pace of whoever saves it, so the
-	/// channel counts as long; disposing the stream closes it.
+	/// Runs a script as root to completion, refusing stdout past <paramref name="maxOutputBytes"/>. Every command gets
+	/// the password sudo took when this runner was made, the same way: nothing here ever asks again.
 	/// </summary>
-	public async Task<ElevatedReadStream> StartReadAsync(string script, IEnumerable<string> arguments, string path, CancellationToken cancellationToken)
+	/// <exception cref="RemoteFileSystemException">The script wrote more than <paramref name="maxOutputBytes"/>; it is stopped.</exception>
+	public async Task<RemoteCommandResult> RunAsync(string script, IEnumerable<string> arguments, bool runsLong, int maxOutputBytes, CancellationToken cancellationToken)
 	{
-		RemoteCommand command = await RemoteCommand.StartAsync(_client, BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, runsLong: true, cancellationToken);
-		return new ElevatedReadStream(command, Account, path);
+		IExecChannel channel = await _start(BuildCommand(_sudoCommand, _password is not null, script, arguments), _password, runsLong, cancellationToken);
+		return await CommandExecution.ReadToEndAsync(channel, maxOutputBytes, cancellationToken);
 	}
 
 	/// <summary>
@@ -212,17 +224,22 @@ internal sealed class SudoRunner : IDisposable
 
 	public void Dispose() => Interlocked.Exchange(ref _password, null)?.Dispose();
 
-	private async Task<IExecChannel> StartExecutionAsync(string command, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
+	private static async Task<IExecChannel> StartOnAsync(SshClient client, string command, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
 	{
-		using SecretBuffer? stdin = JoinInput(input);
-		RemoteCommand started = await RemoteCommand.StartAsync(_client, command, stdin, runsLong, cancellationToken);
-		if (stdin is null)
+		RemoteCommand started = await RemoteCommand.StartAsync(client, command, input, runsLong, cancellationToken);
+		if (input is null)
 		{
 			// Nothing was written, and SSH.NET sends EOF only after data, so stdin has to be closed by hand.
 			started.CloseInput();
 		}
 
 		return started;
+	}
+
+	private async Task<IExecChannel> StartExecutionAsync(string command, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
+	{
+		using SecretBuffer? stdin = JoinInput(input);
+		return await _start(command, stdin, runsLong, cancellationToken);
 	}
 
 	/// <summary>sudo -S reads the first line; the rest of stdin belongs to the script.</summary>

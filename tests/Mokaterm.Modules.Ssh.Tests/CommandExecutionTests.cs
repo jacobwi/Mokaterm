@@ -3,6 +3,7 @@ using System.Text;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Modules.Ssh.Shell;
+using Mokaterm.Modules.Ssh.Tests.Fakes;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
@@ -22,7 +23,7 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_ReturnsTheExitStatusAndBothStreams()
 	{
-		using FakeChannel channel = new(Stream("hello\n"), Stream("warning\n"), exitStatus: 3);
+		using FakeExecChannel channel = new(Stream("hello\n"), Stream("warning\n"), exitStatus: 3);
 
 		RemoteCommandOutcome outcome = await RunAsync(channel, "echo hello");
 
@@ -38,7 +39,7 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_ACommandEndedByASignal_HasNoExitStatusButSaysWhichSignal()
 	{
-		using FakeChannel channel = new(Stream(""), Stream(""), exitStatus: null, exitSignal: "KILL");
+		using FakeExecChannel channel = new(Stream(""), Stream(""), exitStatus: null, exitSignal: "KILL");
 
 		RemoteCommandOutcome outcome = await RunAsync(channel, "sleep 100");
 
@@ -52,7 +53,7 @@ public sealed class CommandExecutionTests
 	{
 		byte[] stdout = Encoding.ASCII.GetBytes(new string('o', 3 * OneMegabyte));
 		byte[] stderr = Encoding.ASCII.GetBytes(new string('e', 5000));
-		using FakeChannel channel = new(new MemoryStream(stdout), new MemoryStream(stderr), exitStatus: 0);
+		using FakeExecChannel channel = new(new MemoryStream(stdout), new MemoryStream(stderr), exitStatus: 0);
 
 		RemoteCommandOutcome outcome = await RunAsync(channel, "cat big", outputLimitBytes: 4096);
 
@@ -68,7 +69,7 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_NeverKeepsLessThanTheSmallestCap()
 	{
-		using FakeChannel channel = new(Stream(new string('x', 3000)), Stream(""), exitStatus: 0);
+		using FakeExecChannel channel = new(Stream(new string('x', 3000)), Stream(""), exitStatus: 0);
 
 		RemoteCommandOutcome outcome = await RunAsync(channel, "cat", outputLimitBytes: 10);
 
@@ -79,7 +80,7 @@ public sealed class CommandExecutionTests
 	public async Task RunAsync_StopsACommandThatFloodsStdout_WithoutWaitingForStderr()
 	{
 		using BlockingStream stderr = new();
-		using FakeChannel channel = new(new EndlessStream(), stderr, exitStatus: 0, execution: new TaskCompletionSource().Task);
+		using FakeExecChannel channel = new(new EndlessStream(), stderr, exitStatus: 0, execution: new TaskCompletionSource().Task);
 
 		RemoteCommandException failure = await Assert.ThrowsAsync<RemoteCommandException>(() => RunAsync(channel, "yes"));
 
@@ -102,7 +103,7 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_AConnectionThatDrops_FailsWithAMessageForTheUser()
 	{
-		using FakeChannel channel = new(
+		using FakeExecChannel channel = new(
 			Stream("partial"),
 			Stream(""),
 			exitStatus: null,
@@ -117,7 +118,7 @@ public sealed class CommandExecutionTests
 	[Fact]
 	public async Task RunAsync_Cancelled_StopsWaiting_AndClosesTheChannel()
 	{
-		using FakeChannel channel = await CancelWhileReadingAsync();
+		using FakeExecChannel channel = await CancelWhileReadingAsync();
 
 		Assert.True(channel.IsDisposed);
 	}
@@ -193,10 +194,10 @@ public sealed class CommandExecutionTests
 	}
 
 	/// <summary>Starts a command that prints nothing and cancels it while both streams are being read.</summary>
-	private static async Task<FakeChannel> CancelWhileReadingAsync()
+	private static async Task<FakeExecChannel> CancelWhileReadingAsync()
 	{
 		BlockingStream stdout = new();
-		FakeChannel channel = new(stdout, new BlockingStream(), exitStatus: null, execution: new TaskCompletionSource().Task);
+		FakeExecChannel channel = new(stdout, new BlockingStream(), exitStatus: null, execution: new TaskCompletionSource().Task);
 		using CancellationTokenSource cancel = CancellationTokenSource.CreateLinkedTokenSource(Ct);
 
 		Task<RemoteCommandOutcome> running = CommandExecution.RunAsync(
@@ -211,7 +212,7 @@ public sealed class CommandExecutionTests
 		return channel;
 	}
 
-	private static Task<RemoteCommandOutcome> RunAsync(FakeChannel channel, string command, int outputLimitBytes = 256 * 1024) =>
+	private static Task<RemoteCommandOutcome> RunAsync(FakeExecChannel channel, string command, int outputLimitBytes = 256 * 1024) =>
 		CommandExecution.RunAsync(
 			_ => Task.FromResult<IExecChannel>(channel),
 			new RemoteCommandRequest { Command = command, OutputLimitBytes = outputLimitBytes },
@@ -221,129 +222,4 @@ public sealed class CommandExecutionTests
 	private static MemoryStream Stream(string text) => new(Encoding.UTF8.GetBytes(text));
 
 	private static string Text(CapturedOutput output) => Encoding.UTF8.GetString(output.Bytes.Span);
-
-	private sealed class FakeChannel : IExecChannel
-	{
-		private int _disposed;
-
-		public FakeChannel(Stream output, Stream error, int? exitStatus, string? exitSignal = null, Task? execution = null)
-		{
-			Output = output;
-			ErrorOutput = error;
-			ExitStatus = exitStatus;
-			ExitSignal = exitSignal;
-			Execution = execution ?? Task.CompletedTask;
-		}
-
-		public Stream Output { get; }
-
-		public Stream ErrorOutput { get; }
-
-		public Task Execution { get; }
-
-		public int? ExitStatus { get; }
-
-		public string? ExitSignal { get; }
-
-		public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
-
-		public void Dispose()
-		{
-			if (Interlocked.Exchange(ref _disposed, 1) != 0)
-			{
-				return;
-			}
-
-			// Closing the channel ends the reads that are still waiting, as SSH.NET does.
-			Output.Dispose();
-			ErrorOutput.Dispose();
-		}
-	}
-
-	/// <summary>A stream that says nothing until it is closed, like a command that runs and prints nothing.</summary>
-	private sealed class BlockingStream : Stream
-	{
-		private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
-		private int _reading;
-
-		public bool Reading => Volatile.Read(ref _reading) != 0;
-
-		public override bool CanRead => true;
-
-		public override bool CanSeek => false;
-
-		public override bool CanWrite => false;
-
-		public override long Length => throw new NotSupportedException();
-
-		public override long Position
-		{
-			get => throw new NotSupportedException();
-			set => throw new NotSupportedException();
-		}
-
-		public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-		{
-			_ = Interlocked.Exchange(ref _reading, 1);
-			await _closed.Task;
-			throw new ObjectDisposedException(nameof(BlockingStream));
-		}
-
-		public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-		public override void Flush()
-		{
-		}
-
-		public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-
-		public override void SetLength(long value) => throw new NotSupportedException();
-
-		public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-		protected override void Dispose(bool disposing)
-		{
-			_ = _closed.TrySetResult();
-			base.Dispose(disposing);
-		}
-	}
-
-	/// <summary>A command that keeps printing, like <c>yes</c>.</summary>
-	private sealed class EndlessStream : Stream
-	{
-		private long _served;
-
-		public long Served => Interlocked.Read(ref _served);
-
-		public override bool CanRead => true;
-
-		public override bool CanSeek => false;
-
-		public override bool CanWrite => false;
-
-		public override long Length => throw new NotSupportedException();
-
-		public override long Position
-		{
-			get => throw new NotSupportedException();
-			set => throw new NotSupportedException();
-		}
-
-		public override int Read(byte[] buffer, int offset, int count)
-		{
-			buffer.AsSpan(offset, count).Fill((byte)'y');
-			_ = Interlocked.Add(ref _served, count);
-			return count;
-		}
-
-		public override void Flush()
-		{
-		}
-
-		public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-
-		public override void SetLength(long value) => throw new NotSupportedException();
-
-		public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-	}
 }

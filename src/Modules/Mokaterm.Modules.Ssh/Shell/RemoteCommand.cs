@@ -1,25 +1,33 @@
 using System.Buffers;
-using System.Globalization;
 using System.Security.Cryptography;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.UI.Common.Formatting;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
 namespace Mokaterm.Modules.Ssh.Shell;
 
 /// <summary>The outcome of a command that ran to completion.</summary>
-internal sealed record RemoteCommandResult(int? ExitStatus, byte[] Output, string Error);
+/// <param name="Error">The start of stderr, at most <see cref="RemoteCommand.MaxErrorBytes"/> of it.</param>
+/// <param name="ErrorTruncated">stderr held more than <paramref name="Error"/>; the rest was read and dropped.</param>
+internal sealed record RemoteCommandResult(int? ExitStatus, byte[] Output, string Error, bool ErrorTruncated = false);
 
 /// <summary>A running exec channel with its stdout available as a stream.</summary>
 internal sealed class RemoteCommand : IExecChannel
 {
 	/// <summary>
-	/// The most stdout <see cref="RunAsync"/> collects, and the most a command run reads from either stream before it
+	/// The most stdout <see cref="RunAsync"/> collects, and the most anything here reads from either stream before it
 	/// stops the command. Listings and account databases stay far below it; a server that sends more is broken or
 	/// hostile, and holding it all would exhaust memory.
 	/// </summary>
 	internal const int MaxOutputBytes = 64 * 1024 * 1024;
+
+	/// <summary>
+	/// The most stderr <see cref="RunAsync"/> keeps. Its stderr only ever becomes a message, which quotes a line or two;
+	/// the rest is still read, because SSH.NET holds whatever nobody reads, and dropped.
+	/// </summary>
+	internal const int MaxErrorBytes = 1024 * 1024;
 
 	internal const int CopyBufferBytes = 80 * 1024;
 
@@ -41,13 +49,13 @@ internal sealed class RemoteCommand : IExecChannel
 
 	public int? ExitStatus => _command.ExitStatus;
 
-	/// <summary>Stderr as a stream, for a caller that reads it alongside <see cref="Output"/> instead of through <see cref="ReadError"/>.</summary>
+	/// <summary>
+	/// Stderr as a stream. Read it alongside <see cref="Output"/> and to its end: SSH.NET's own <c>Error</c> would collect
+	/// all of it into one string, however much the server sent.
+	/// </summary>
 	public Stream ErrorOutput => _command.ExtendedOutputStream;
 
 	public string? ExitSignal => _command.ExitSignal;
-
-	/// <summary>Everything the command wrote to stderr. Blocks until the command finished, so read it after <see cref="Execution"/>.</summary>
-	public string ReadError() => _command.Error;
 
 	/// <summary>
 	/// Closes stdin without writing anything, so a command that reads it sees the end of its input instead of waiting
@@ -114,15 +122,13 @@ internal sealed class RemoteCommand : IExecChannel
 		}
 	}
 
-	/// <summary>Runs a command to completion and collects its output.</summary>
-	/// <exception cref="RemoteFileSystemException">The command wrote more than <see cref="MaxOutputBytes"/>; it is stopped.</exception>
-	public static async Task<RemoteCommandResult> RunAsync(SshClient client, string commandText, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken)
-	{
-		using RemoteCommand command = await StartAsync(client, commandText, input, runsLong, cancellationToken);
-		byte[] output = await ReadAllAsync(command.Output, MaxOutputBytes, cancellationToken);
-		await command.Execution;
-		return new RemoteCommandResult(command.ExitStatus, output, command.ReadError());
-	}
+	/// <summary>
+	/// Runs a command to completion and collects its output: stdout whole, stderr up to <see cref="MaxErrorBytes"/>
+	/// (<see cref="CommandExecution.ReadToEndAsync"/>).
+	/// </summary>
+	/// <exception cref="RemoteFileSystemException">The command wrote more than <see cref="MaxOutputBytes"/> to either stream; it is stopped.</exception>
+	public static async Task<RemoteCommandResult> RunAsync(SshClient client, string commandText, SecretBuffer? input, bool runsLong, CancellationToken cancellationToken) =>
+		await CommandExecution.ReadToEndAsync(await StartAsync(client, commandText, input, runsLong, cancellationToken), MaxOutputBytes, cancellationToken);
 
 	/// <summary>Reads <paramref name="source"/> to its end, refusing to hold more than <paramref name="maxBytes"/>.</summary>
 	/// <exception cref="RemoteFileSystemException">The stream holds more than <paramref name="maxBytes"/>.</exception>
@@ -137,9 +143,10 @@ internal sealed class RemoteCommand : IExecChannel
 			{
 				if (output.Length + read > maxBytes)
 				{
+					// A piece of a file is capped well under a megabyte at first, so the size is not always whole megabytes.
 					throw new RemoteFileSystemException(
 						RemoteFileErrorKind.Unknown,
-						string.Create(CultureInfo.CurrentCulture, $"The server sent more than {maxBytes / (1024 * 1024)} MB for one command, so it was stopped."));
+						$"The server sent more than {DisplayFormat.Bytes(maxBytes)} for one command, so it was stopped.");
 				}
 
 				await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);

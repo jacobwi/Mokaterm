@@ -35,7 +35,10 @@ internal static class DockerShellRun
 		}
 	}
 
-	/// <summary>The request a call runs under: its output cap, and long when its time limit is (a pull, a build).</summary>
+	/// <summary>
+	/// The request a call runs under: its output cap, and long when its time limit is (a pull, a build) or when it says
+	/// so itself (<see cref="DockerCall.RunsLong"/>).
+	/// </summary>
 	public static RemoteCommandRequest Request(DockerCall call, string commandLine)
 	{
 		ArgumentNullException.ThrowIfNull(call);
@@ -43,7 +46,7 @@ internal static class DockerShellRun
 		{
 			Command = commandLine,
 			OutputLimitBytes = call.OutputLimitBytes,
-			RunsLong = ExecChannelBudget.RunsLong(call.Timeout),
+			RunsLong = call.RunsLong || ExecChannelBudget.RunsLong(call.Timeout),
 		};
 	}
 

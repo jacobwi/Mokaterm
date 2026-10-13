@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.FileSystem;
@@ -8,13 +7,13 @@ using Mokaterm.Modules.Ssh.Shell;
 namespace Mokaterm.Modules.Ssh.Elevation;
 
 /// <summary>
-/// The same files as root: every operation is a small POSIX script run through sudo on an exec channel. Uploads first go
-/// to a private staging file as the logged-in user over SFTP, then move into place as root.
+/// The same files as root: every operation is a small POSIX script run through sudo on an exec channel. Reads are bounded
+/// pieces, one sudo each, because an exec channel has no flow control and a streamed <c>cat</c> would pile the file up
+/// in memory behind a slow reader. Uploads first go to a private staging file as the logged-in user over SFTP, then move
+/// into place as root.
 /// </summary>
 internal sealed class SudoFileSystem : ScriptFileSystem
 {
-	private const int TransferBufferSize = 128 * 1024;
-
 	private readonly SudoRunner _runner;
 	private readonly Func<CancellationToken, ValueTask<SftpFileSystem>> _userFileSystem;
 	private readonly RemoteAccountNames _accountNames;
@@ -75,21 +74,6 @@ internal sealed class SudoFileSystem : ScriptFileSystem
 		return (await _accountNames.GetAsync(cancellationToken)).Accounts;
 	}
 
-	public override async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
-	{
-		string target = Absolute(path);
-		RemoteFileEntry entry = await StatAsync(target, cancellationToken)
-			?? throw new RemoteFileSystemException(RemoteFileErrorKind.NotFound, $"{target} does not exist.", target);
-
-		if (entry.IsDirectoryLike)
-		{
-			throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, $"{target} is a directory.", target);
-		}
-
-		// The token only covers opening: SSH.NET would cancel the whole command with it.
-		return await StartReadAsync(target, RemoteScripts.Read, [target], CancellationToken.None);
-	}
-
 	public override async ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(source);
@@ -105,44 +89,6 @@ internal sealed class SudoFileSystem : ScriptFileSystem
 			: "";
 
 		await RunScriptAsync(RemoteScripts.PlaceUpload, [staged.Path, target, Flag(options.Overwrite), mode, stamp], target, cancellationToken);
-	}
-
-	public override ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
-		DownloadAsync(path, destination, 0, progress, cancellationToken);
-
-	public override async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
-	{
-		ArgumentNullException.ThrowIfNull(destination);
-		ArgumentOutOfRangeException.ThrowIfNegative(offset);
-		string target = Absolute(path);
-		if (offset > 0 && await StatAsync(target, cancellationToken) is { Kind: RemoteEntryKind.File } entry && entry.Size < offset)
-		{
-			throw TransferStreams.ShorterThanCopied(target, offset);
-		}
-
-		// tail starts at the byte it is given counting from one, so the server skips the part already here.
-		ElevatedReadStream source = offset == 0
-			? await StartReadAsync(target, RemoteScripts.Read, [target], cancellationToken)
-			: await StartReadAsync(target, RemoteScripts.ReadFrom, [target, (offset + 1).ToString(CultureInfo.InvariantCulture)], cancellationToken);
-		await using (source)
-		{
-			byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
-			try
-			{
-				long total = 0;
-				int read;
-				while ((read = await source.ReadAsync(buffer.AsMemory(0, TransferBufferSize), cancellationToken)) > 0)
-				{
-					await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-					total += read;
-					progress?.Report(total);
-				}
-			}
-			finally
-			{
-				ArrayPool<byte>.Shared.Return(buffer);
-			}
-		}
 	}
 
 	public override ChecksumAlgorithm? ServerChecksum => Volatile.Read(ref _checksumUnavailable) == 0 ? ChecksumAlgorithm.Sha256 : null;
@@ -210,24 +156,35 @@ internal sealed class SudoFileSystem : ScriptFileSystem
 		return SudoRunner.EnsureSucceeded(result, _runner.Account, path, destination, allowPartialListing);
 	}
 
+	/// <summary>
+	/// One piece of a file as root, through the runner like every other script, so the password sudo took at the start
+	/// goes on stdin each time and nothing asks again. A sudo that stops letting the login in (the password changed, the
+	/// sudoers entry went) fails the piece as <see cref="RemoteFileErrorKind.ElevationFailed"/>.
+	/// </summary>
+	protected override async Task<ReadOnlyMemory<byte>> ReadRangeAsync(IReadOnlyList<string> arguments, string path, int maxOutputBytes, CancellationToken cancellationToken)
+	{
+		ThrowIfDisposed();
+		RemoteCommandResult result;
+		try
+		{
+			// A piece is short, but a root download made of them runs for as long as its reader takes and keeps two on
+			// their way, so its pieces count as long the way the one streamed read they replace did: however many root
+			// downloads run, they never hold the slots the budget keeps for quick calls.
+			result = await _runner.RunAsync(RemoteScripts.ReadRange, arguments, runsLong: true, maxOutputBytes, cancellationToken);
+		}
+		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, path, out RemoteFileSystemException? mapped))
+		{
+			throw mapped;
+		}
+
+		return SudoRunner.EnsureSucceeded(result, _runner.Account, path);
+	}
+
 	protected override void ThrowIfDisposed()
 	{
 		if (Volatile.Read(ref _disposed) != 0)
 		{
 			throw new RemoteFileSystemException(RemoteFileErrorKind.ElevationFailed, "The root view was closed.");
-		}
-	}
-
-	private async Task<ElevatedReadStream> StartReadAsync(string target, string script, string[] arguments, CancellationToken cancellationToken)
-	{
-		ThrowIfDisposed();
-		try
-		{
-			return await _runner.StartReadAsync(script, arguments, target, cancellationToken);
-		}
-		catch (Exception ex) when (RemoteFileErrors.TryMap(ex, target, out RemoteFileSystemException? mapped))
-		{
-			throw mapped;
 		}
 	}
 }

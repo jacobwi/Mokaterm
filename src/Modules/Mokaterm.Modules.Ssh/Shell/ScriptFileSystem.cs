@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Globalization;
 using Mokaterm.Abstractions.FileSystem;
 
 namespace Mokaterm.Modules.Ssh.Shell;
@@ -8,8 +10,20 @@ namespace Mokaterm.Modules.Ssh.Shell;
 /// what it passes and how the output reads back is the same for both and lives here. An operation whose feature the
 /// file system does not declare fails as not supported instead of running.
 /// </summary>
+/// <remarks>
+/// Reads are pieces of <see cref="RemoteScripts.ReadRange"/> (<see cref="PieceReadStream"/>) on both, so what a file
+/// costs in memory is one piece, however slowly its reader takes it.
+/// </remarks>
 internal abstract class ScriptFileSystem : IRemoteFileSystem
 {
+	/// <summary>
+	/// What a piece's output may hold beyond the bytes asked for: the marker, the file's version, and anything the
+	/// login's shell printed first. A write prints no more than this either.
+	/// </summary>
+	protected const int PieceSlackBytes = 64 * 1024;
+
+	private const int TransferBufferSize = 128 * 1024;
+
 	public abstract RemoteFileSystemFeatures Features { get; }
 
 	public abstract string UserName { get; }
@@ -22,13 +36,53 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 
 	public abstract ValueTask<string> ResolvePathAsync(string path, CancellationToken cancellationToken = default);
 
-	public abstract ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default);
+	/// <summary>
+	/// The file a piece at a time. The first piece is read here, so a file that is missing, a folder or unreadable fails
+	/// at the open; the token covers only that piece, each later read brings its own.
+	/// </summary>
+	public async ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+	{
+		string target = Absolute(path);
+		return await OpenPiecesAsync(target, 0, cancellationToken);
+	}
 
 	public abstract ValueTask UploadAsync(string path, Stream source, UploadOptions options, IProgress<long>? progress = null, CancellationToken cancellationToken = default);
 
-	public abstract ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default);
+	public ValueTask DownloadAsync(string path, Stream destination, IProgress<long>? progress = null, CancellationToken cancellationToken = default) =>
+		DownloadAsync(path, destination, 0, progress, cancellationToken);
 
-	public abstract ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default);
+	/// <summary>
+	/// Copies the file from <paramref name="offset"/> on, a piece at a time: a download that continues starts its first
+	/// piece there, so the server never sends the part already copied.
+	/// </summary>
+	public async ValueTask DownloadAsync(string path, Stream destination, long offset, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(destination);
+		ArgumentOutOfRangeException.ThrowIfNegative(offset);
+		string target = Absolute(path);
+		if (offset > 0 && await StatAsync(target, cancellationToken) is { Kind: RemoteEntryKind.File } entry && entry.Size < offset)
+		{
+			throw TransferStreams.ShorterThanCopied(target, offset);
+		}
+
+		await using PieceReadStream source = await OpenPiecesAsync(target, offset, cancellationToken);
+		byte[] buffer = ArrayPool<byte>.Shared.Rent(TransferBufferSize);
+		try
+		{
+			long total = 0;
+			int read;
+			while ((read = await source.ReadAsync(buffer.AsMemory(0, TransferBufferSize), cancellationToken)) > 0)
+			{
+				await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+				total += read;
+				progress?.Report(total);
+			}
+		}
+		finally
+		{
+			ArrayPool<byte>.Shared.Return(buffer);
+		}
+	}
 
 	public virtual ValueTask<string?> ComputeChecksumAsync(string path, CancellationToken cancellationToken = default) =>
 		ValueTask.FromResult<string?>(null);
@@ -159,6 +213,14 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 		string? destination = null,
 		bool allowPartialListing = false);
 
+	/// <summary>
+	/// Runs <see cref="RemoteScripts.ReadRange"/> with <paramref name="arguments"/> and returns what it printed after its
+	/// marker, or throws what its exit and stderr describe, the way <see cref="RunScriptAsync"/> does.
+	/// </summary>
+	/// <param name="path">The file, for messages.</param>
+	/// <param name="maxOutputBytes">The most the script may print, past which the piece is refused rather than kept.</param>
+	protected abstract Task<ReadOnlyMemory<byte>> ReadRangeAsync(IReadOnlyList<string> arguments, string path, int maxOutputBytes, CancellationToken cancellationToken);
+
 	/// <exception cref="RemoteFileSystemException">The file system was closed.</exception>
 	protected abstract void ThrowIfDisposed();
 
@@ -198,6 +260,27 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 
 	/// <summary>The value a script reads as true: <c>1</c>, or empty for false.</summary>
 	protected static string Flag(bool value) => value ? "1" : "";
+
+	private Task<PieceReadStream> OpenPiecesAsync(string target, long start, CancellationToken cancellationToken) =>
+		PieceReadStream.OpenAsync((from, count, token) => ReadPieceAsync(target, from, count, token), target, start, cancellationToken);
+
+	/// <summary>
+	/// Up to <paramref name="count"/> bytes from <paramref name="start"/>: <see cref="RemoteScripts.ReadRange"/> starts at a
+	/// whole block, so the bytes before <paramref name="start"/> in that block are read and dropped.
+	/// </summary>
+	private async Task<FilePiece> ReadPieceAsync(string path, long start, int count, CancellationToken cancellationToken)
+	{
+		ThrowIfDisposed();
+		long block = start / RemoteScripts.ReadBlockBytes;
+		int lead = (int)(start % RemoteScripts.ReadBlockBytes);
+		int asked = lead + count;
+		ReadOnlyMemory<byte> payload = await ReadRangeAsync(
+			[path, block.ToString(CultureInfo.InvariantCulture), asked.ToString(CultureInfo.InvariantCulture)],
+			path,
+			asked + PieceSlackBytes,
+			cancellationToken);
+		return FilePiece.Parse(payload, path).Skip(lead);
+	}
 
 	private static string AccountName(string name, string path) => RemoteAccount.IsValidName(name)
 		? name

@@ -20,8 +20,6 @@ public sealed class RemoteScriptsTests
 		{ nameof(RemoteScripts.ChangeMode), RemoteScripts.ChangeMode },
 		{ nameof(RemoteScripts.ChangeOwner), RemoteScripts.ChangeOwner },
 		{ nameof(RemoteScripts.ChangeGroup), RemoteScripts.ChangeGroup },
-		{ nameof(RemoteScripts.Read), RemoteScripts.Read },
-		{ nameof(RemoteScripts.ReadFrom), RemoteScripts.ReadFrom },
 		{ nameof(RemoteScripts.Checksum), RemoteScripts.Checksum },
 		{ nameof(RemoteScripts.PlaceUpload), RemoteScripts.PlaceUpload },
 		{ nameof(RemoteScripts.Copy), RemoteScripts.Copy },

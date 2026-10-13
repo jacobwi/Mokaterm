@@ -36,6 +36,12 @@ internal sealed record DockerCall
 
 	public TimeSpan Timeout { get; init; } = DefaultTimeout;
 
+	/// <summary>
+	/// Counts as long in the connection's exec budget whatever <see cref="Timeout"/> says, as a piece of a file read does:
+	/// a reader keeps two pieces on their way, and they must never take the slots quick calls rely on.
+	/// </summary>
+	public bool RunsLong { get; init; }
+
 	public int OutputLimitBytes { get; init; } = ListingOutputBytes;
 
 	/// <summary>

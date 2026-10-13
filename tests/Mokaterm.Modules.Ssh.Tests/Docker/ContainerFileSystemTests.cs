@@ -105,8 +105,14 @@ public sealed class ContainerFileSystemTests : IAsyncLifetime
 		Assert.Equal(300_004, expected.Length);
 		Assert.Equal(expected, read.ToArray());
 
-		// 256 KiB first, then a 1 MiB piece that comes back short, which is the end of the file.
+		// 256 KiB first, then a 1 MiB piece that comes back short, which is the end of the file. Pieces count as long,
+		// so a reader with two on their way never takes the slots quick calls keep.
 		Assert.Equal(2, ReadCalls() - before);
+		Assert.All(_docker.Calls.Where(call => call.Arguments.Contains(RemoteScripts.ReadRange)), call =>
+		{
+			Assert.True(call.RunsLong);
+			Assert.True(DockerShellRun.Request(call, "docker exec").RunsLong);
+		});
 	}
 
 	[Fact]

@@ -19,8 +19,8 @@ namespace Mokaterm.Modules.Ssh.Shell;
 /// sets the limit lower than the default. Going over the limit fails the channel open outright.
 /// </para>
 /// <para>
-/// A call that may run for minutes (a package transaction of up to 30, an image pull, a copy, a streamed download, a
-/// followed log) says so with <c>runsLong</c>, and long calls never hold more than <see cref="Capacity"/> minus
+/// A call that may run for minutes (a package transaction of up to 30, an image pull, a copy, the pieces of a file read
+/// as root or from a container, a followed log) says so with <c>runsLong</c>, and long calls never hold more than <see cref="Capacity"/> minus
 /// <see cref="ReservedForShort"/> slots together. Short calls finish within their own time limits, so the reserved
 /// slots keep coming free and a read waits seconds at worst while an install runs; the long calls cannot starve them.
 /// Waiting is first come, first served among the calls that could take the slot that came free, so a long call queued

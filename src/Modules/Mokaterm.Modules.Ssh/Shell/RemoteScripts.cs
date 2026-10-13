@@ -158,19 +158,6 @@ internal static class RemoteScripts
 		exec chgrp -- "$2" "$1"
 		""";
 
-	private const string ReadBody = """
-		if [ ! -e "$1" ]; then exit 101; fi
-		if [ -d "$1" ]; then exit 102; fi
-		exec cat -- "$1"
-		""";
-
-	// tail counts from 1, so the byte at offset N is +N+1, which the caller passes.
-	private const string ReadFromBody = """
-		if [ ! -e "$1" ]; then exit 101; fi
-		if [ -d "$1" ]; then exit 102; fi
-		exec tail -c "+$2" -- "$1"
-		""";
-
 	// GNU and BusyBox have sha256sum, macOS shasum, the BSDs sha256; openssl is the last resort.
 	private const string ChecksumBody = """
 		if [ ! -e "$1" ]; then exit 101; fi
@@ -275,11 +262,14 @@ internal static class RemoteScripts
 
 	// dd skips by seeking on both GNU and BusyBox, and head -c keeps reading until it has its count, which dd's count
 	// would not do on a file that answers each read short (/proc). The pipeline exits with head's status whatever dd
-	// ran into, so a file the account cannot read is refused before either starts.
+	// ran into, so a file the account cannot read is refused before either starts. The version comes from stat before
+	// the read: GNU and BusyBox take -c, the BSDs -f, and a server with neither prints an empty one.
 	private const string ReadRangeBody = """
 		if [ ! -e "$1" ]; then exit 101; fi
 		if [ -d "$1" ]; then exit 102; fi
 		if [ ! -r "$1" ]; then printf '%s: Permission denied\n' "$1" >&2; exit 1; fi
+		v=$(stat -L -c '%d %i %s %Y' -- "$1" 2>/dev/null) || v=$(stat -L -f '%d %i %z %m' -- "$1" 2>/dev/null) || v=
+		printf '%s\0' "$v"
 		if command -v dd >/dev/null 2>&1; then
 			dd if="$1" bs=65536 skip="$2" 2>/dev/null | head -c "$3"
 		else
@@ -360,12 +350,6 @@ internal static class RemoteScripts
 	/// <summary><c>$1</c> path, <c>$2</c> group, <c>$3</c> <c>1</c> for recursive. Owners stay as they are.</summary>
 	public static readonly string ChangeGroup = Normalize(Preamble + ChangeGroupBody);
 
-	/// <summary><c>$1</c> path. Streams the file after the output marker.</summary>
-	public static readonly string Read = Normalize(Preamble + ReadBody);
-
-	/// <summary><c>$1</c> path, <c>$2</c> the offset to start at plus one. Streams the rest of the file after the output marker.</summary>
-	public static readonly string ReadFrom = Normalize(Preamble + ReadFromBody);
-
 	/// <summary>
 	/// <c>$1</c> path. Prints the file's SHA-256 as hex at the start of the output, followed by whatever the tool adds (a
 	/// file name, or nothing). Exits with <see cref="ExitUnsupported"/> when the server has no tool for it.
@@ -405,7 +389,9 @@ internal static class RemoteScripts
 
 	/// <summary>
 	/// <c>$1</c> path, <c>$2</c> where to start in blocks of <see cref="ReadBlockBytes"/>, <c>$3</c> how many bytes. Prints
-	/// that part of the file after the output marker; fewer bytes than asked for means the file ends there.
+	/// the file's version (device, inode, size and modification time, or nothing when <c>stat</c> cannot say) and a NUL,
+	/// then that part of the file; fewer bytes than asked for means the file ends there. Every read of a file's contents
+	/// is one of these, so no channel ever carries more than one piece (<see cref="PieceReadStream"/>).
 	/// </summary>
 	public static readonly string ReadRange = Normalize(Preamble + ReadRangeBody);
 
@@ -426,9 +412,7 @@ internal static class RemoteScripts
 		|| script == Compress
 		|| script == Extract
 		|| script == Checksum
-		|| script == PlaceUpload
-		|| script == Read
-		|| script == ReadFrom;
+		|| script == PlaceUpload;
 
 	// Raw strings take the line endings of this source file, and a carriage return breaks sh.
 	private static string Normalize(string script) => script.ReplaceLineEndings("\n");

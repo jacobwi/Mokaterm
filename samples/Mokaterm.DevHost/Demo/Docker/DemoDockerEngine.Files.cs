@@ -138,7 +138,10 @@ internal sealed partial class DemoDockerEngine
 		_ => "p",
 	};
 
-	/// <summary><c>dd bs=65536 skip=BLOCK | head -c COUNT</c>, from the stored bytes repeated up to the file's size as every demo read does.</summary>
+	/// <summary>
+	/// The file's version, then <c>dd bs=65536 skip=BLOCK | head -c COUNT</c>, from the stored bytes repeated up to the
+	/// file's size as every demo read does. The demo has no device or inode, so the version is its size and time.
+	/// </summary>
 	private static DemoDockerResult ReadRange(DemoFileTree tree, string path, long block, int count)
 	{
 		DemoFileData data;
@@ -157,10 +160,12 @@ internal sealed partial class DemoDockerEngine
 
 		long start = Math.Min(block * 65536, data.Size);
 		int length = (int)Math.Min(count, data.Size - start);
-		byte[] output = new byte[Marker.Length + length];
+		byte[] version = Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"0 0 {data.Size} {data.Modified.ToUnixTimeSeconds()}\0"));
+		byte[] output = new byte[Marker.Length + version.Length + length];
 		Marker.CopyTo(output, 0);
+		version.CopyTo(output, Marker.Length);
 		using GeneratedStream content = new(data.Size, data.Content) { Position = start };
-		content.ReadExactly(output.AsSpan(Marker.Length, length));
+		content.ReadExactly(output.AsSpan(Marker.Length + version.Length, length));
 		return Bytes(output);
 	}
 

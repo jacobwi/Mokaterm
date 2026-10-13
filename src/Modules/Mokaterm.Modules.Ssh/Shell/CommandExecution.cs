@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Commands;
+using Mokaterm.Abstractions.FileSystem;
 using Renci.SshNet.Common;
 
 namespace Mokaterm.Modules.Ssh.Shell;
@@ -61,6 +62,50 @@ internal static class CommandExecution
 			Observe(output);
 			Observe(error);
 			Observe(channel.Execution);
+		}
+	}
+
+	/// <summary>
+	/// Reads a started channel to its end the way <see cref="RemoteCommand.RunAsync"/> returns it: stdout whole, refused past
+	/// <paramref name="maxOutputBytes"/>, and stderr side by side with it, its first <see cref="RemoteCommand.MaxErrorBytes"/>
+	/// kept and the rest read and dropped, because SSH.NET holds whatever nobody reads. The channel is disposed on every way
+	/// out. Failures of the connection pass through as SSH.NET threw them, for <c>RemoteFileErrors.TryMap</c>.
+	/// </summary>
+	/// <exception cref="RemoteFileSystemException">
+	/// stdout passed <paramref name="maxOutputBytes"/> or stderr <see cref="RemoteCommand.MaxOutputBytes"/>; the command is stopped.
+	/// </exception>
+	public static async Task<RemoteCommandResult> ReadToEndAsync(IExecChannel channel, int maxOutputBytes, CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(channel);
+		Task<byte[]> output = RemoteCommand.ReadAllAsync(channel.Output, maxOutputBytes, cancellationToken);
+		Task<CapturedOutput> error = ReadErrorAsync(channel.ErrorOutput, cancellationToken);
+		Task finished = UntilAllOrFirstFailureAsync(output, error, channel.Execution);
+		try
+		{
+			await finished.WaitAsync(cancellationToken);
+			CapturedOutput stderr = await error;
+			return new RemoteCommandResult(channel.ExitStatus, await output, stderr.ToText(), stderr.IsTruncated);
+		}
+		finally
+		{
+			channel.Dispose();
+			Observe(finished);
+			Observe(output);
+			Observe(error);
+			Observe(channel.Execution);
+		}
+	}
+
+	private static async Task<CapturedOutput> ReadErrorAsync(Stream source, CancellationToken cancellationToken)
+	{
+		try
+		{
+			return await OutputCapture.ReadAsync(source, RemoteCommand.MaxErrorBytes, RemoteCommand.MaxOutputBytes, "stderr", cancellationToken);
+		}
+		catch (RemoteCommandException ex)
+		{
+			// The callers of RunAsync map file system failures; a flooded stderr is one, the way a flooded stdout is.
+			throw new RemoteFileSystemException(RemoteFileErrorKind.Unknown, ex.Message, path: null, ex);
 		}
 	}
 
