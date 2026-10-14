@@ -1,3 +1,17 @@
+## What's new in 0.2.2
+
+**Remote desktop (RDP)**
+
+- A connection that fails now says which step it reached and why. A PC that does not answer on port 3389 is reported
+  as such, with what to check: Remote Desktop turned on, the PC's firewall, and the port. Windows Home editions cannot
+  accept Remote Desktop connections at all. Before, every one of these ended in a plain timeout.
+- Every address a host name resolves to is tried, not only the first one.
+- The server's certificate is checked before the login is sent.
+- A Microsoft account name that the login cannot send is caught before connecting, with the name to use instead.
+- A Kerberos server that cannot be reached no longer holds the connection open.
+- Keys and clicks keep working after the remote desktop changes size, and a drag released outside the window no longer
+  leaves the mouse button held down.
+
 ## What's new in 0.2.1
 
 **Tool windows**
