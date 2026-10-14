@@ -39,6 +39,20 @@ public sealed class SocketFailuresTests
 	}
 
 	[Fact]
+	public async Task DescribeAsync_ATimedOutDial_CarriesTheProtocolsOwnHint()
+	{
+		SocketFailureReport report = await SocketFailures.DescribeAsync(
+			new SocketException((int)SocketError.TimedOut),
+			"web01",
+			Endpoint,
+			new SocketFailureHints { TimedOut = "Check the firewall." },
+			TestContext.Current.CancellationToken);
+
+		Assert.Equal(ConnectFailure.Timeout, report.Failure);
+		Assert.Equal("web01:5900 did not answer in time. Check the firewall.", report.Message);
+	}
+
+	[Fact]
 	public async Task DescribeAsync_ARefusedPort_CarriesTheProtocolsOwnHint()
 	{
 		SocketFailureReport report = await DescribeAsync(SocketError.ConnectionRefused);

@@ -151,7 +151,12 @@ export function resize(id, width, height) {
 
 	state.width = Math.max(1, width | 0);
 	state.height = Math.max(1, height | 0);
-	buildCanvas(state);
+
+	// The same element at a new size, which clears the picture and the context's settings. A new canvas would leave
+	// the input listeners on the old one, and the session would stop taking keys and clicks after its first resize.
+	state.canvas.width = state.width;
+	state.canvas.height = state.height;
+	state.context.imageSmoothingEnabled = false;
 	layout(state, false);
 }
 
@@ -322,6 +327,13 @@ function isFullscreen(state) {
 function listenForInput(state) {
 	const { canvas } = state;
 	state.disposables.push(
+		// A drag that ends outside the canvas still has to reach the server as a button release, or the remote button
+		// stays down. With the pointer captured, the mouse events that follow come here wherever the pointer is.
+		listen(canvas, 'pointerdown', event => {
+			if (takesInput(state) && event.pointerType === 'mouse') {
+				canvas.setPointerCapture(event.pointerId);
+			}
+		}),
 		listen(canvas, 'mousemove', event => onMouseMove(state, event)),
 		listen(canvas, 'mousedown', event => onMouseButton(state, event, true)),
 		listen(canvas, 'mouseup', event => onMouseButton(state, event, false)),

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Runs one RDP connect from a console with the module's own connector and prints every step with its time, so a
+		connect that fails or hangs on someone's machine says where. It never prints or stores the password.
+	-->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.RdpProbe</RootNamespace>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\Modules\Mokaterm.Modules.Rdp\Mokaterm.Modules.Rdp.csproj" />
+	</ItemGroup>
+
+</Project>

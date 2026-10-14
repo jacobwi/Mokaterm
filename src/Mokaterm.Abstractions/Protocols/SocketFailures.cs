@@ -34,7 +34,7 @@ public static class SocketFailures
 			case SocketError.TryAgain:
 				return new SocketFailureReport(ConnectFailure.HostUnreachable, UnknownHost(host));
 			case SocketError.TimedOut:
-				return new SocketFailureReport(ConnectFailure.Timeout, $"{endpoint} did not answer in time.");
+				return new SocketFailureReport(ConnectFailure.Timeout, With($"{endpoint} did not answer in time.", hints.TimedOut));
 			case SocketError.ConnectionRefused:
 				return new SocketFailureReport(
 					ConnectFailure.HostUnreachable,

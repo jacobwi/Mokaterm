@@ -11,6 +11,8 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Mokaterm.Modules.Rdp.Tests" />
+		<!-- The connect probe in the samples runs the connector itself, so what it reports is what the app does. -->
+		<InternalsVisibleTo Include="Mokaterm.RdpProbe" />
 	</ItemGroup>
 
 	<ItemGroup>

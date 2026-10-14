@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Authentication;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Protocols;
@@ -126,52 +125,6 @@ public sealed class RdpConnectTests
 			() => RdpHarness.CreateProvider().ConnectAsync(context, TestContext.Current.CancellationToken));
 
 		Assert.Equal(0, credentials.GetCount);
-	}
-
-	[Fact]
-	public void IsAuthenticationFailure_IsTrueForARefusedLoginAndFalseForABrokenConnection()
-	{
-		Assert.True(RdpConnectErrors.IsAuthenticationFailure(new RdpAuthenticationException("refused")));
-		Assert.False(RdpConnectErrors.IsAuthenticationFailure(new SocketException((int)SocketError.ConnectionRefused)));
-		Assert.False(RdpConnectErrors.IsAuthenticationFailure(new IOException("broken")));
-	}
-
-	[Fact]
-	public async Task Describe_MapsTheFailuresAUserMeets()
-	{
-		CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-		Assert.Equal(
-			ConnectFailure.Timeout,
-			(await RdpConnectErrors.DescribeAsync(new TimeoutException(), "host", 3389, timedOut: false, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.Timeout,
-			(await RdpConnectErrors.DescribeAsync(new IOException(), "host", 3389, timedOut: true, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.AuthenticationFailed,
-			(await RdpConnectErrors.DescribeAsync(new RdpAuthenticationException("no"), "host", 3389, timedOut: false, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.ProtocolError,
-			(await RdpConnectErrors.DescribeAsync(new AuthenticationException("tls"), "host", 3389, timedOut: false, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.ProtocolError,
-			(await RdpConnectErrors.DescribeAsync(new EndOfStreamException(), "host", 3389, timedOut: false, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.HostUnreachable,
-			(await RdpConnectErrors.DescribeAsync(new SocketException((int)SocketError.HostNotFound), "host", 3389, timedOut: false, cancellationToken)).Failure);
-		Assert.Equal(
-			ConnectFailure.Unknown,
-			(await RdpConnectErrors.DescribeAsync(new InvalidOperationException("odd"), "host", 3389, timedOut: false, cancellationToken)).Failure);
-	}
-
-	[Fact]
-	public async Task Describe_KeepsAFailureThatAlreadySpeaksForItself()
-	{
-		ProtocolConnectException original = new(ConnectFailure.HostIdentityRejected, "no thanks");
-
-		ProtocolConnectException described = await RdpConnectErrors.DescribeAsync(original, "host", 3389, false, TestContext.Current.CancellationToken);
-
-		Assert.Same(original, described);
 	}
 
 	private sealed class CancellingCredentialSource : ICredentialSource

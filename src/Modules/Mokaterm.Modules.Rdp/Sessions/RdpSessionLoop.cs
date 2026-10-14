@@ -1,5 +1,6 @@
 using Devolutions.IronRdp;
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Modules.Rdp.Protocol;
 using Action = Devolutions.IronRdp.Action;
 
@@ -239,7 +240,7 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		{
 			while (!_stopping.IsCancellationRequested)
 			{
-				(Action action, byte[] payload) = await _transport.Framed.ReadPdu();
+				(Action action, byte[] payload) = await _transport.Reader.ReadPduAsync(_stopping.Token);
 				bool terminate;
 				await _gate.WaitAsync(_stopping.Token);
 				try
@@ -271,7 +272,8 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		}
 		catch (Exception ex)
 		{
-			_logger.LogInformation(ex, "The RDP session stopped reading.");
+			// A dropped connection is expected here, and its message can name the server.
+			_logger.LogInformation("The RDP session stopped reading: {Error}", LogSafe.Describe(ex));
 			_completion.TrySetException(ex);
 		}
 		finally
@@ -507,17 +509,31 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		{
 			while (!cancellationToken.IsCancellationRequested)
 			{
-				using ConnectionActivationState state = sequence.GetState();
-				if (state.Type == ConnectionActivationStateType.Finalized)
+				bool finalizedNow;
+				int width = 0;
+				int height = 0;
+
+				// The state is a view of the sequence, so it goes before the next step changes the sequence.
+				using (ConnectionActivationState state = sequence.GetState())
 				{
-					using ConnectionActivationStateFinalized finalized = state.GetFinalized();
-					using DesktopSize size = finalized.GetDesktopSize();
-					_stage.SetFastpathProcessor(
-						finalized.GetIoChannelId(),
-						finalized.GetUserChannelId(),
-						finalized.GetEnableServerPointer(),
-						finalized.GetPointerSoftwareRendering());
-					await ResetDesktopAsync(size.GetWidth(), size.GetHeight(), cancellationToken);
+					finalizedNow = state.Type == ConnectionActivationStateType.Finalized;
+					if (finalizedNow)
+					{
+						using ConnectionActivationStateFinalized finalized = state.GetFinalized();
+						using DesktopSize size = finalized.GetDesktopSize();
+						_stage.SetFastpathProcessor(
+							finalized.GetIoChannelId(),
+							finalized.GetUserChannelId(),
+							finalized.GetEnableServerPointer(),
+							finalized.GetPointerSoftwareRendering());
+						width = size.GetWidth();
+						height = size.GetHeight();
+					}
+				}
+
+				if (finalizedNow)
+				{
+					await ResetDesktopAsync(width, height, cancellationToken);
 					return;
 				}
 
@@ -534,7 +550,7 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		{
 			using (hint)
 			{
-				input = await _transport.Framed.ReadByHint(hint);
+				input = await _transport.Reader.ReadByHintAsync(hint, cancellationToken);
 			}
 		}
 

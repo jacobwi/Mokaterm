@@ -43,6 +43,7 @@
 	<Folder Name="/samples/">
 		<Project Path="samples/Mokaterm.DevHost/Mokaterm.DevHost.csproj" />
 		<Project Path="samples/Mokaterm.Plugins.Sample/Mokaterm.Plugins.Sample.csproj" />
+		<Project Path="samples/Mokaterm.RdpProbe/Mokaterm.RdpProbe.csproj" />
 	</Folder>
 	<Folder Name="/tests/">
 		<File Path="tests/Directory.Build.props" />

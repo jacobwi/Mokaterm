@@ -8,7 +8,7 @@ namespace Mokaterm.Modules.Rdp;
 public interface IRdpSink
 {
 	/// <summary>
-	/// One changed region, as <see cref="Protocol.RdpFrame"/> writes it: a small header followed by raw RGBA or a
+	/// One changed region, as <see cref="Protocol.RdpFrameEncoder"/> writes it: a small header followed by raw RGBA or a
 	/// PNG. The buffer is reused as soon as the call returns: copy what you keep.
 	/// </summary>
 	ValueTask FrameAsync(ReadOnlyMemory<byte> frame, CancellationToken cancellationToken);

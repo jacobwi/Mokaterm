@@ -6,7 +6,7 @@
 
 <SettingsPage Title="RDP" OnReset="ResetAsync">
 	<SettingsSection Title="Connections">
-		<SettingsRow Label="Connect timeout" Description="Covers the connection, the TLS handshake and the login check.">
+		<SettingsRow Label="Connect timeout" Description="Covers one attempt from the connection to the session, not the time a certificate question is open.">
 			<NumberSetting TValue="int"
 						   Value="settings.ConnectTimeoutSeconds"
 						   ValueChanged="value => SaveAsync(s => s with { ConnectTimeoutSeconds = value })"

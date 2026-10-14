@@ -15,4 +15,10 @@ public sealed record SocketFailureHints
 
 	/// <summary>Follows "{endpoint} closed the connection unexpectedly."</summary>
 	public string? Reset { get; init; }
+
+	/// <summary>
+	/// Follows "{endpoint} did not answer in time." A firewall that drops the packets of a closed port looks exactly
+	/// like this, so it is where a protocol says what has to be switched on at the other end.
+	/// </summary>
+	public string? TimedOut { get; init; }
 }

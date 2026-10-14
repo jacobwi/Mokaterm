@@ -10,15 +10,13 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// </summary>
 internal sealed class RdpTransport : IAsyncDisposable
 {
-	private readonly Config _config;
 	private int _closed;
 	private int _disposed;
 
 	public RdpTransport(
-		Config config,
 		ConnectionResult result,
-		Framed<SslStream> framed,
 		SslStream stream,
+		RdpFrameReader reader,
 		int width,
 		int height,
 		bool networkLevelAuthentication,
@@ -26,10 +24,11 @@ internal sealed class RdpTransport : IAsyncDisposable
 		bool identityVerified)
 	{
 		ArgumentNullException.ThrowIfNull(result);
-		_config = config;
+		ArgumentNullException.ThrowIfNull(stream);
+		ArgumentNullException.ThrowIfNull(reader);
 		Result = result;
-		Framed = framed;
 		Stream = stream;
+		Reader = reader;
 		Width = width;
 		Height = height;
 		NetworkLevelAuthentication = networkLevelAuthentication;
@@ -39,13 +38,14 @@ internal sealed class RdpTransport : IAsyncDisposable
 
 	public ConnectionResult Result { get; }
 
-	public Framed<SslStream> Framed { get; }
-
 	/// <summary>
-	/// The TLS stream underneath <see cref="Framed"/>. Writes go here rather than through the frame reader, whose
-	/// write lock is a thread-affine mutex that an await can move off its owning thread.
+	/// The TLS stream. Writes go straight here, each one under the session's gate, never through IronRDP's
+	/// <c>Framed&lt;T&gt;.Write</c>, whose write lock is a thread-affine mutex that an await can move off its owning thread.
 	/// </summary>
 	public SslStream Stream { get; }
+
+	/// <summary>Reads whole messages from <see cref="Stream"/>. Only the session's pump reads.</summary>
+	public RdpFrameReader Reader { get; }
 
 	public int Width { get; }
 
@@ -74,8 +74,8 @@ internal sealed class RdpTransport : IAsyncDisposable
 	};
 
 	/// <summary>
-	/// Closes the connection and leaves everything else alone. The frame reader has no cancellation of its own, so
-	/// this is what ends a session loop that is waiting on the wire, before the handles it is using go away.
+	/// Closes the connection and leaves everything else alone. A read that is waiting on the wire fails at once, which
+	/// is what ends a session loop before the handles it is using go away.
 	/// </summary>
 	public async ValueTask CloseAsync()
 	{
@@ -102,7 +102,7 @@ internal sealed class RdpTransport : IAsyncDisposable
 		}
 
 		await CloseAsync();
+		Reader.Dispose();
 		Result.Dispose();
-		_config.Dispose();
 	}
 }

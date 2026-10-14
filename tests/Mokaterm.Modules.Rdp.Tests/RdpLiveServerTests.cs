@@ -6,7 +6,9 @@ namespace Mokaterm.Modules.Rdp.Tests;
 
 /// <summary>
 /// Runs against a real server when MOKATERM_TEST_RDP is set to <c>user:password@host:port</c>, with the port
-/// optional. Percent-encode special characters in the password, and add <c>?domain=CORP</c> for a domain account.
+/// optional. Percent-encode special characters in the login (<c>%5C</c> for a backslash, <c>%40</c> for an at sign),
+/// add <c>?domain=CORP</c> for a domain account and <c>?nla=false</c> to leave the login to the server's own screen.
+/// It connects, waits for the first picture, sends a harmless key and disconnects.
 /// </summary>
 public sealed class RdpLiveServerTests
 {
@@ -25,7 +27,11 @@ public sealed class RdpLiveServerTests
 			target.Port,
 			credentials,
 			verifier,
-			RdpConnectionOptions.Default with { Domain = target.Option("domain") ?? "" },
+			RdpConnectionOptions.Default with
+			{
+				Domain = target.Option("domain") ?? "",
+				NetworkLevelAuthentication = target.Flag("nla", fallback: true),
+			},
 			address: target.Host);
 
 		await using IProtocolSession session = await RdpHarness.CreateProvider().ConnectAsync(context, cancellationToken);

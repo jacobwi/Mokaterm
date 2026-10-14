@@ -21,7 +21,10 @@ public sealed record RdpSettings : ISettingsSection
 
 	public static string SectionKey => "rdp";
 
-	/// <summary>How long to wait for the connection, the TLS handshake and the login check together.</summary>
+	/// <summary>
+	/// How long one connect attempt may take from the dial to the session, the login check included. A certificate
+	/// question pauses it, and a failure says which step it reached.
+	/// </summary>
 	public int ConnectTimeoutSeconds { get; init; } = 20;
 
 	/// <summary>Password prompts, the first one included, before a rejected login is final.</summary>
