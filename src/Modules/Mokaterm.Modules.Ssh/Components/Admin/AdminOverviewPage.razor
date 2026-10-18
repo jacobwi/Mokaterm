@@ -84,7 +84,8 @@
 
 			@if (sample?.Interfaces.Count > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Network))" title="@NetworkTitle(rates)">
+				<Hint Text="@NetworkTitle(rates)" Class="mta-card-hint">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Network))">
 					<span class="mta-card-label">Network</span>
 					<span class="mta-stat">@(rates?.ReceivedPerSecond is { } received ? AdminFormat.Rate(received) : "...")</span>
 					<span class="mta-spark-pair">
@@ -96,11 +97,13 @@
 						<span class="mta-key mta-key--out">out @AdminFormat.Rate(rates?.SentPerSecond)</span>
 					</span>
 				</button>
+				</Hint>
 			}
 
 			@if (sample?.Disks.Count > 0)
 			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))" title="@DiskTitle(rates)">
+				<Hint Text="@DiskTitle(rates)" Class="mta-card-hint">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">
 					<span class="mta-card-label">Disk I/O</span>
 					<span class="mta-stat">@(rates?.ReadPerSecond is { } read ? AdminFormat.Rate(read) : "...")</span>
 					<span class="mta-spark-pair">
@@ -112,6 +115,7 @@
 						<span class="mta-key mta-key--out">write @AdminFormat.Rate(rates?.WrittenPerSecond)</span>
 					</span>
 				</button>
+				</Hint>
 			}
 
 			<button type="button" class="mta-card" @onclick="OpenFailedServices" disabled="@(Capabilities.Services is null)">
@@ -123,14 +127,14 @@
 			<button type="button" class="mta-card" @onclick="OpenUpdates" disabled="@(Capabilities.Packages is null)">
 				<span class="mta-card-label">Pending updates</span>
 				<span class="mta-stat">@(_updates is { } updates ? AdminFormat.Count(updates) : Capabilities.Packages is null ? "none" : _updatesError is null ? "..." : "?")</span>
-				<span class="mta-card-sub" title="@_updatesError">@UpdatesText</span>
+				<Hint Text="@_updatesError" Class="mta-card-sub">@UpdatesText</Hint>
 			</button>
 
 			<AdminUpdateCards />
 
 			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Time))">
 				<span class="mta-card-label">Time zone</span>
-				<span class="mta-stat mta-stat--small" title="@_clock?.LocalTime">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</span>
+				<Hint Text="@_clock?.LocalTime" Class="mta-stat mta-stat--small">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</Hint>
 				<span class="mta-card-sub">
 					<MokaStatusDot Size="MokaSize.Xs" Color="@AdminFormat.Dot(_clock?.Synchronized)" Glow="@(_clock?.Synchronized == true)" />
 					@(_clock?.Synchronized switch { true => " NTP synchronized", false => " not synchronized", _ => " sync unknown" })
@@ -139,12 +143,14 @@
 
 			@foreach (FileSystemUsage disk in snapshot.Disks)
 			{
-				<button type="button" class="mta-card" @key="disk.MountPoint" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))" title="@($"{disk.Source} on {disk.MountPoint}")">
+				<Hint @key="disk.MountPoint" Text="@($"{disk.Source} on {disk.MountPoint}")" Class="mta-card-hint">
+				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">
 					<span class="mta-card-label">@($"Disk {disk.MountPoint}")</span>
 					<span class="mta-stat">@AdminFormat.Percent(disk.UsedPercent)</span>
 					<UsageBar Percent="disk.UsedPercent" />
 					<span class="mta-card-sub">@AdminFormat.Kb(disk.AvailableKb) free of @AdminFormat.Kb(disk.TotalKb)</span>
 				</button>
+				</Hint>
 			}
 		</div>
 
@@ -162,12 +168,14 @@
 						@foreach (InterfaceRate item in rates.Interfaces.Take(MaxDevices))
 						{
 							<div class="mta-row" role="row" @key="item.Name">
-								<span class="mta-cell mta-mono" role="cell" title="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")">
+								<span class="mta-cell mta-mono" role="cell">
+									<Hint Text="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell">
 									@item.Name
 									@if (!item.IsDevice && rates.Interfaces.Any(other => other.IsDevice))
 									{
 										<span class="mta-dim mta-after">virtual</span>
 									}
+									</Hint>
 								</span>
 								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.ReceivedPerSecond)</span>
 								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.SentPerSecond)</span>

@@ -68,7 +68,7 @@
 						}
 						@if (_followError is { } followError)
 						{
-							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim" title="@followError">@($"Following paused: {followError}")</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"Following paused: {followError}")</MokaText>
 						}
 						else if (_followNotice is { } notice)
 						{

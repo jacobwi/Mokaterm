@@ -41,6 +41,57 @@ public sealed partial class IconTooltipMarkupTests
 		Assert.Empty(found);
 	}
 
+	/// <summary>
+	/// A title is right for the full value of text that may be cut off, and that value always comes from the data, so a
+	/// fixed sentence in a title is a hint, and so is any title on a status dot, a tag or an icon: those belong in Hint.
+	/// </summary>
+	[Fact]
+	public void NoHintIsLeftInANativeTitle()
+	{
+		string src = Path.Combine(RepositoryRoot(), "src");
+		List<string> found = [];
+		int titles = 0;
+		foreach (string file in Directory.EnumerateFiles(src, "*.razor", SearchOption.AllDirectories))
+		{
+			string relative = Path.GetRelativePath(src, file);
+			if (relative.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
+			{
+				continue;
+			}
+
+			string text = File.ReadAllText(file);
+			foreach (Match tag in TagStart().Matches(text))
+			{
+				if (FlagsHint(text, tag) is { } flagged)
+				{
+					titles++;
+					if (flagged)
+					{
+						found.Add($"{relative}:{LineOf(text, tag.Index)}");
+					}
+				}
+			}
+		}
+
+		// Full-value titles stay on cut-off names and paths, so a reader that finds none is not reading the files.
+		Assert.True(titles > 50, $"Only {titles} titles were read under {src}.");
+		Assert.Empty(found);
+	}
+
+	[Theory]
+	[InlineData("""<span class="mta-cell" title="Freed when it goes">@size</span>""", true)]
+	[InlineData("""<MokaText Element="span" Size="MokaSize.Xs" title="Only root can read it">needs root</MokaText>""", true)]
+	[InlineData("""<MokaStatusDot Color="@Color" title="@State" />""", true)]
+	[InlineData("""<MokaTag Text="RO" Size="MokaSize.Xs" title="@(why ? "a" : "b")" />""", true)]
+	[InlineData("""<span title="@reason"><MokaIcon Icon="X" /></span>""", true)]
+	[InlineData("""<div class="fb-crumbs" title="@_path (click to type a path)">""", false)]
+	[InlineData("""<span class="mta-cell" title="@entry.Path">@entry.Name</span>""", false)]
+	[InlineData("""<MokaText Truncate title="@name">@name</MokaText>""", false)]
+	[InlineData("""<span class="mt-label" title="Logs"> Logs </span>""", false)]
+	[InlineData("""<span title="">@value</span>""", false)]
+	public void TheReader_FindsHintsInTitles_AndLeavesFullValues(string markup, bool flagged) =>
+		Assert.Equal(flagged, FlagsHint(markup, TagStart().Match(markup)) == true);
+
 	[Theory]
 	[InlineData("""<MokaButton StartIcon="X" title="Refresh" />""", true)]
 	[InlineData("""<MokaButton StartIcon="X" aria-label="Refresh" />""", false)]
@@ -76,11 +127,42 @@ public sealed partial class IconTooltipMarkupTests
 
 		if (name == "button")
 		{
-			return !selfClosing && OnlyIconsUntilClose(text, end);
+			return !selfClosing && OnlyIconsUntilClose(text, end, name);
 		}
 
 		bool hasIcon = attributes.ContainsKey("StartIcon") || attributes.ContainsKey("EndIcon") || attributes.ContainsKey("Icon");
 		return hasIcon && (selfClosing || EmptyUntilClose(text, end, name));
+	}
+
+	// Null for a tag without a title the browser would show; otherwise whether that title is a hint: on a mark that
+	// explains itself only through a tooltip, on an element that holds nothing but icons, or fixed text that is not the
+	// element's own.
+	private static bool? FlagsHint(string text, Match tag)
+	{
+		string name = tag.Groups[1].Value;
+		(Dictionary<string, string> attributes, bool selfClosing, int end) = ReadTag(text, tag.Index + tag.Length);
+		if (!attributes.TryGetValue("title", out string? title) || title.Length == 0)
+		{
+			return null;
+		}
+
+		if (name is "MokaStatusDot" or "MokaTag" or "MokaIcon" or "ProtocolIcon" or "MokaBadge" or "MokaKbd")
+		{
+			return true;
+		}
+
+		if (!selfClosing && OnlyIconsUntilClose(text, end, name))
+		{
+			return true;
+		}
+
+		return !title.Contains('@', StringComparison.Ordinal) && (selfClosing || ContentUntilClose(text, end, name) != title);
+	}
+
+	private static string? ContentUntilClose(string text, int i, string name)
+	{
+		int close = text.IndexOf($"</{name}>", i, StringComparison.Ordinal);
+		return close < 0 ? null : text[i..close].Trim();
 	}
 
 	// The attributes of the tag whose name ends just before at, each with its value as written, and where the tag ends.
@@ -153,10 +235,10 @@ public sealed partial class IconTooltipMarkupTests
 		return close >= 0 && string.IsNullOrWhiteSpace(text[i..close]);
 	}
 
-	// A plain button's content up to its close: one or more MokaIcon tags and nothing else but white space.
-	private static bool OnlyIconsUntilClose(string text, int i)
+	// An element's content up to its close: one or more MokaIcon tags and nothing else but white space.
+	private static bool OnlyIconsUntilClose(string text, int i, string name)
 	{
-		const string close = "</button>";
+		string close = $"</{name}>";
 		const string icon = "<MokaIcon";
 		bool sawIcon = false;
 		while (i < text.Length)
@@ -336,4 +418,7 @@ public sealed partial class IconTooltipMarkupTests
 
 	[GeneratedRegex("<(MokaButton|IconButton|button)\\b")]
 	private static partial Regex ButtonStart();
+
+	[GeneratedRegex("<([A-Za-z][A-Za-z0-9]*)\\b")]
+	private static partial Regex TagStart();
 }

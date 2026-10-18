@@ -85,10 +85,9 @@
 					</MokaColumn>
 					<MokaColumn Title="Written" Field="file => file.WrittenAt">
 						<CellTemplate Context="file">
-							<MokaText Element="span"
-									  Size="MokaSize.Xs"
-									  Mono
-									  title="@DisplayFormat.Timestamp(file.WrittenAt)">@DisplayFormat.Relative(file.WrittenAt, Time.GetUtcNow())</MokaText>
+							<Hint Text="@DisplayFormat.Timestamp(file.WrittenAt)" Position="MokaTooltipPosition.BottomStart">
+								<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Relative(file.WrittenAt, Time.GetUtcNow())</MokaText>
+							</Hint>
 						</CellTemplate>
 					</MokaColumn>
 				</ChildContent>

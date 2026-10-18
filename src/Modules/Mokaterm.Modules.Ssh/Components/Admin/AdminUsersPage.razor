@@ -24,7 +24,9 @@
 	<ChipsEnd>
 		@if (_snapshot is { KnowsPasswords: false })
 		{
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim" title="Only root can read whether a password is set or locked">password states need root mode</MokaText>
+			<Hint Text="Only root can read whether a password is set or locked" Position="MokaTooltipPosition.BottomEnd">
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">password states need root mode</MokaText>
+			</Hint>
 		}
 	</ChipsEnd>
 	<ChildContent>

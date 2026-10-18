@@ -5,7 +5,7 @@
 	<div class="mt-dk-toolbar-search">
 		<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name" Debounce="100" aria-label="Filter containers" />
 	</div>
-	<span class="mt-dk-mono mt-dk-muted" title="Running containers, sampled every three seconds while this page shows">@CountText</span>
+	<Hint Text="Running containers, sampled every three seconds while this page shows"><span class="mt-dk-mono mt-dk-muted">@CountText</span></Hint>
 	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
 				Disabled="IsLoading" OnClick="RefreshAsync" Label="Sample now" />
 </div>

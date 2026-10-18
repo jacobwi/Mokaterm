@@ -148,6 +148,19 @@
 	display: flex;
 }
 
+/* A hint inside a cell lays the cell's content out the way the cell itself would, the figure and its bar included. */
+.mt-fleet-table ::deep .mt-fleet-cell[role="gridcell"] > .moka-tooltip-trigger {
+	align-items: center;
+	gap: inherit;
+	min-width: 0;
+}
+
+.mt-fleet-table ::deep .mt-fleet-cell--usage[role="gridcell"] > .moka-tooltip-trigger {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+}
+
 .mt-fleet-table ::deep .mt-fleet-cell--count,
 .mt-fleet-table ::deep .mt-fleet-cell--uptime {
 	justify-content: flex-end;

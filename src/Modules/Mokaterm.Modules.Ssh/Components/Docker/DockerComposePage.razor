@@ -51,7 +51,7 @@ else
 								<MokaStatusDot Size="MokaSize.Xs" Color="@ProjectColor(project)" />
 							</Hint>
 							<span class="mt-dk-cell-name mt-dk-cell--w30">@project.Name</span>
-							<span class="mt-dk-cell mt-dk-cell--count" title="Containers running, of all of them">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
+							<Hint Text="Containers running, of all of them" Class="mt-dk-cell mt-dk-cell--count">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</Hint>
 							<span class="mt-dk-cell mt-dk-cell--grow" title="@project.WorkingDirectory">@project.WorkingDirectory</span>
 						</button>
 						@if (Feature?.Compose is not null)

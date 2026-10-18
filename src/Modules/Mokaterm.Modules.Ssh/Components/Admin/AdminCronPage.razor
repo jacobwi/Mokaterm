@@ -172,10 +172,10 @@
 						{
 							<div class="mta-row" @key="timer.Name">
 								<MokaStatusDot Size="MokaSize.Xs" Color="@(timer.ActiveState == "active" ? MokaColor.Success : MokaColor.Surface)" Glow="@(timer.ActiveState == "active")" />
-								<span class="mta-cell" title="@($"{timer.Description}. Starts {timer.Activates}.")">
+								<Hint Text="@($"{timer.Description}. Starts {timer.Activates}.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell">
 									<span class="mta-mono">@timer.Name</span><br />
 									<span class="mta-mono mta-dim">@timer.Schedule</span>
-								</span>
+								</Hint>
 								<span class="mta-cell mta-mono" title="@timer.Next">@(timer.Next.Length == 0 ? "never" : timer.Next)</span>
 								<span class="mta-cell mta-mono mta-dim mta-wide" title="@timer.Last">@(timer.Last.Length == 0 ? "never" : timer.Last)</span>
 							</div>

@@ -143,6 +143,18 @@ public sealed class FleetViewTests
 
 		// The failed row keeps the summary of its earlier read, and looks stale.
 		Assert.Contains("mt-fleet-row--stale", html, StringComparison.Ordinal);
+
+		// What needs a look and what a figure stands for are Moka tooltips: the reasons on the state, the details on
+		// the figures. The system's name, which a narrow column cuts, keeps a title with its full value.
+		List<string> tooltips = Tooltips.Texts(html);
+		string reasons = Assert.Single(tooltips, text => text.StartsWith("1 failed service", StringComparison.Ordinal) && text.Contains("Reboot required", StringComparison.Ordinal));
+		Assert.Contains("mt-fleet-state", Tooltips.ControlFor(html, reasons), StringComparison.Ordinal);
+		Assert.Contains("6.20 4.10 3.00 on 4 CPUs", tooltips);
+		Assert.Contains("4 pending, 2 for security", tooltips);
+		Assert.Contains("backup-agent", tooltips);
+		Assert.Contains("6 running of 8", tooltips);
+		Assert.Contains("title=\"Ubuntu 24.04.1 LTS\"", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("title=\"Linux", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

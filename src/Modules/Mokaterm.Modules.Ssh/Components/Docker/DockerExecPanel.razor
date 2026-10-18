@@ -95,8 +95,8 @@ else
 			@foreach ((DockerExecRequest entry, int index) in History.Select((entry, index) => (entry, index)))
 			{
 				<div class="mt-dk-row" @key="index">
-					<button type="button" class="mt-dk-row-main" disabled="@_running" @onclick="@(() => Load(entry))" title="Put it back in the box">
-						<span class="mt-dk-cell mt-dk-cell--grow">@HistoryLine(entry)</span>
+					<button type="button" class="mt-dk-row-main" disabled="@_running" @onclick="@(() => Load(entry))">
+						<Hint Text="Put it back in the box" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-cell mt-dk-cell--grow">@HistoryLine(entry)</Hint>
 					</button>
 				</div>
 			}

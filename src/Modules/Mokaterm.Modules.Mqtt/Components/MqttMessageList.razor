@@ -42,7 +42,9 @@
 					<ChildContent>
 						<MokaColumn Title="Time" Field="message => message.ReceivedAt" Width="90px">
 							<CellTemplate Context="message">
-								<MokaText Element="span" Size="MokaSize.Xs" Mono title="@message.TimestampText">@message.TimeText</MokaText>
+								<Hint Text="@message.TimestampText" Position="MokaTooltipPosition.BottomStart">
+									<MokaText Element="span" Size="MokaSize.Xs" Mono>@message.TimeText</MokaText>
+								</Hint>
 							</CellTemplate>
 						</MokaColumn>
 						<MokaColumn Title="QoS" Field="message => message.QualityOfService" Width="56px">

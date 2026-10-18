@@ -55,12 +55,12 @@
 		SystemProfile profile = _profile;
 		<div class="mta-strip">
 			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow />
-			<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Truncate Class="mta-strip-name" title="@profile.Facts.Kernel">@profile.DisplayName</MokaText>
+			<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Truncate Class="mta-strip-name" title="@profile.DisplayName">@profile.DisplayName</MokaText>
 			@foreach (string part in SystemParts(profile))
 			{
 				<span class="mta-strip-part">@part</span>
 			}
-			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mta-dim mta-strip-kernel">@profile.Facts.Kernel</MokaText>
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mta-dim mta-strip-kernel" title="@profile.Facts.Kernel">@profile.Facts.Kernel</MokaText>
 			<span class="mta-spacer"></span>
 
 			@if (_feature.LoginIsRoot)

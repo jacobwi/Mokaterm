@@ -132,9 +132,9 @@
 									<CellTemplate Context="row">
 										@if (row.Local is { } local)
 										{
-											<div class="fc-cell fc-copy" title="@ExactTime(local.LastModified)">
+											<div class="fc-cell fc-copy">
 												<span class="fc-size">@LocalSize(local)</span>
-												<span>@DisplayFormat.Timestamp(local.LastModified)</span>
+												<Hint Text="@ExactTime(local.LastModified)"><span>@DisplayFormat.Timestamp(local.LastModified)</span></Hint>
 											</div>
 										}
 									</CellTemplate>
@@ -143,9 +143,9 @@
 									<CellTemplate Context="row">
 										@if (row.Remote is { } remote)
 										{
-											<div class="fc-cell fc-copy" title="@ExactTime(remote.LastModified)">
+											<div class="fc-cell fc-copy">
 												<span class="fc-size">@EntryVisuals.SizeText(remote)</span>
-												<span>@DisplayFormat.Timestamp(remote.LastModified)</span>
+												<Hint Text="@ExactTime(remote.LastModified)"><span>@DisplayFormat.Timestamp(remote.LastModified)</span></Hint>
 											</div>
 										}
 									</CellTemplate>

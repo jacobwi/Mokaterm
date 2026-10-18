@@ -74,7 +74,9 @@
 			</MokaColumn>
 			<MokaColumn Title="Used" Field="snippet => snippet.UseCount">
 				<CellTemplate Context="snippet">
-					<MokaText Element="span" Size="MokaSize.Xs" Mono title="@UsedTitle(snippet)">@UsedText(snippet)</MokaText>
+					<Hint Text="@UsedTitle(snippet)" Position="MokaTooltipPosition.BottomStart">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@UsedText(snippet)</MokaText>
+					</Hint>
 				</CellTemplate>
 			</MokaColumn>
 		</ChildContent>

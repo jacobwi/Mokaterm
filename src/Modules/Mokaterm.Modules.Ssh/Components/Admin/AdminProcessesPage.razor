@@ -62,7 +62,7 @@
 						 @oncontextmenu:preventDefault="true">
 						<span class="mta-cell mta-mono">@process.Pid</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide">@process.User</span>
-						<span class="mta-cell mta-mono" title="@(process.CpuSampled ? "Share of one CPU over the sampling second" : "ps's average over the process's life: it started after the sample")">@CpuText(process)</span>
+						<Hint Text="@(process.CpuSampled ? "Share of one CPU over the sampling second" : "ps's average over the process's life: it started after the sample")" Class="mta-cell mta-mono">@CpuText(process)</Hint>
 						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Memory, "0.0")</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide">@process.Nice</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide">@AdminFormat.Kb(process.ResidentKb)</span>

@@ -282,6 +282,12 @@
 	color: var(--moka-color-error);
 }
 
+/* A hint that is itself a cell is a block, so its text still aligns and ends in an ellipsis: the tooltip's own
+   inline-flex would let it run out of the box instead. */
+.mt-dk ::deep .moka-tooltip-trigger:is(.mt-dk-cell, .mt-dk-cell-name) {
+	display: block;
+}
+
 .mt-dk ::deep .mt-dk-row-actions {
 	display: flex;
 	flex-shrink: 0;

@@ -34,9 +34,11 @@
 
 				@if (package.Origin is { } origin)
 				{
-					<div class="plugin-install__origin" title="@($"Commit {origin.Commit}")">
+					<div class="plugin-install__origin">
 						<MokaIcon Icon="MokatermIcons.Globe" SizeValue="12px" />
-						<MokaText Element="span" Size="MokaSize.Xs">@PluginDisplay.Origin(origin)</MokaText>
+						<Hint Text="@($"Commit {origin.Commit}")" Position="MokaTooltipPosition.BottomStart">
+							<MokaText Element="span" Size="MokaSize.Xs">@PluginDisplay.Origin(origin)</MokaText>
+						</Hint>
 						@if (origin.Verified)
 						{
 							<PluginVerifiedBadge />

@@ -14,7 +14,9 @@
 					OnClick="OpenSubscriptions"
 					Label="@SubscriptionsTitle"
 					AriaLabel="Subscriptions" />
-		<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-meta mt-mqtt-subs-count" title="@SubscriptionsTitle">@SubscriptionsText</MokaText>
+		<Hint Text="@SubscriptionsTitle" Class="mt-mqtt-meta mt-mqtt-subs-count">
+			<MokaText Element="span" Size="MokaSize.Xs" Mono>@SubscriptionsText</MokaText>
+		</Hint>
 
 		<IconButton Icon="MokatermIcons.Eraser"
 					Disabled="@(_connection is null)"
@@ -26,7 +28,9 @@
 
 		@if (_connection is { } connection)
 		{
-			<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-meta mt-mqtt-counts" title="@CountsTitle">@CountsText</MokaText>
+			<Hint Text="@CountsTitle" Class="mt-mqtt-meta mt-mqtt-counts">
+				<MokaText Element="span" Size="MokaSize.Xs" Mono>@CountsText</MokaText>
+			</Hint>
 
 			@if (connection.State == MqttConnectionState.Closed)
 			{

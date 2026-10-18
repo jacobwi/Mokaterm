@@ -65,7 +65,6 @@ public sealed partial class QuickConnectList : ComponentBase
 	{
 		QuickConnectRowKind.SavedLogin or QuickConnectRowKind.Recent or QuickConnectRowKind.Detected =>
 			$"{ProtocolName(row)}: {row.Completion}",
-		QuickConnectRowKind.ConnectAndSave => "Open the login editor with this target, then connect",
 		_ => null,
 	};
 }

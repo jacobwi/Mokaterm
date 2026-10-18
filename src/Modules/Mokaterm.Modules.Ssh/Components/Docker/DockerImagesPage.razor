@@ -75,7 +75,7 @@
 						}
 						else if (update is { Label.Length: > 0 })
 						{
-							<span class="mt-dk-label" title="@update.Detail">@update.Label</span>
+							<Hint Text="@update.Detail"><span class="mt-dk-label">@update.Label</span></Hint>
 						}
 					</span>
 					<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>

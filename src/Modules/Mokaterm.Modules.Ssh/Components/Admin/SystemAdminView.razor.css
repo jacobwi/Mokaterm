@@ -350,6 +350,18 @@
 	justify-content: flex-end;
 }
 
+/* A hint that is itself a cell, a card's line or a figure is a block, so its text still ends in an ellipsis: the
+   tooltip's own inline-flex would let it run out of the box instead. One around a card fills the card's place. */
+.mt-admin ::deep .moka-tooltip-trigger:is(.mta-cell, .mta-card-sub, .mta-stat) {
+	display: block;
+}
+
+.mt-admin ::deep .moka-tooltip-trigger.mta-card-hint {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+}
+
 /* The row menu stays quiet until the row is pointed at or chosen. */
 .mt-admin ::deep .mta-row-menu {
 	opacity: 0.35;

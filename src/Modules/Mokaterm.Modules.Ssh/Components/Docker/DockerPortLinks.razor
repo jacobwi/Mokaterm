@@ -32,11 +32,12 @@ else if (_routes.Count > 0)
 					@foreach (string choice in route.Schemes)
 					{
 						<MokaDropdownItem OnClick="@(() => OpenAsync(route, choice))">
-							<span class="mt-port-item" title="@Hint(route, choice)">
+							<span class="mt-port-item">
 								<span class="mt-port-line">
 									<span class="mt-port-name">@route.Port.Display</span>
 									<span class="mt-port-scheme">@choice</span>
 								</span>
+								<span class="mt-port-route">@RouteText(route, choice)</span>
 							</span>
 						</MokaDropdownItem>
 					}

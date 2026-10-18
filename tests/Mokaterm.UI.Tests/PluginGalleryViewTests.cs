@@ -257,7 +257,7 @@ public sealed partial class PluginGalleryViewTests
 			.WaitAsync(Limit, Ct);
 
 		Assert.Contains("From the Mokaterm gallery, built from https://github.com/jacobwi/mokaterm-plugins at 9f2c4e1", html, StringComparison.Ordinal);
-		Assert.Contains($"title=\"Commit {Commit}\"", html, StringComparison.Ordinal);
+		Assert.Contains("From the Mokaterm gallery", Tooltips.ControlFor(html, $"Commit {Commit}"), StringComparison.Ordinal);
 		Assert.Matches(">\\s*Verified\\s*<", html);
 
 		// The trust step is the same one a picked file gets.

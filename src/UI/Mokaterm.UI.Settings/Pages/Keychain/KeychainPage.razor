@@ -66,10 +66,9 @@
 			</MokaColumn>
 			<MokaColumn Title="Updated" Field="credential => credential.UpdatedAt">
 				<CellTemplate Context="credential">
-					<MokaText Element="span"
-							  Size="MokaSize.Xs"
-							  Mono
-							  title="@DisplayFormat.Timestamp(credential.UpdatedAt)">@DisplayFormat.Relative(credential.UpdatedAt, Time.GetUtcNow())</MokaText>
+					<Hint Text="@DisplayFormat.Timestamp(credential.UpdatedAt)" Position="MokaTooltipPosition.BottomStart">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Relative(credential.UpdatedAt, Time.GetUtcNow())</MokaText>
+					</Hint>
 				</CellTemplate>
 			</MokaColumn>
 		</ChildContent>

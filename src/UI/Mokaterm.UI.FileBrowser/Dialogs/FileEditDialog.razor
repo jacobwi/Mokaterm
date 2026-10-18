@@ -71,7 +71,9 @@
 					<div class="mt-edit-language">
 						@if (ShowsTooLarge)
 						{
-							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted" title="@TooLargeTitle">Too large to highlight</MokaText>
+							<Hint Text="@TooLargeTitle" Position="MokaTooltipPosition.Top">
+								<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">Too large to highlight</MokaText>
+							</Hint>
 						}
 						<MokaContextMenuTrigger Trigger="MokaContextMenuTriggerType.LeftClick" Items="_languageMenu">
 							<Hint Text="Highlighting">
@@ -100,10 +102,12 @@
 						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Transform="MokaTextTransform.Uppercase" Style="@TextStyles.MicroLabel">@DiffTitle</MokaText>
 						@if (_diff is { IsTooDifferent: false, HasChanges: true } summary)
 						{
-							<span class="mt-diff-sum" title="@SummaryTitle(summary)">
-								<span class="mt-diff-plus">+@summary.Added</span>
-								<span class="mt-diff-minus">-@summary.Removed</span>
-							</span>
+							<Hint Text="@SummaryTitle(summary)" Position="MokaTooltipPosition.BottomEnd">
+								<span class="mt-diff-sum">
+									<span class="mt-diff-plus">+@summary.Added</span>
+									<span class="mt-diff-minus">-@summary.Removed</span>
+								</span>
+							</Hint>
 						}
 					</div>
 					@* Focusable so the keyboard can scroll it, and Enter here does not press the dialog's default button. *@

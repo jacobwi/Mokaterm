@@ -42,6 +42,11 @@ public sealed partial class DockerPortLinks : DockerManagerPageBase
 		? $"Open {route.Link(scheme)}"
 		: $"Open {route.Port.Display} over {scheme} through a tunnel from this computer";
 
+	// A menu item says where it goes in a line of its own: a tooltip inside the menu would be held to the menu's box.
+	private static string RouteText(DockerPortRoute route, string scheme) => route.Kind == DockerPortRouteKind.Direct
+		? route.Link(scheme)?.AbsoluteUri ?? ""
+		: "Through a tunnel from this computer";
+
 	private async Task OpenAsync(DockerPortRoute route, string scheme)
 	{
 		if (_opening || !route.CanOpen)

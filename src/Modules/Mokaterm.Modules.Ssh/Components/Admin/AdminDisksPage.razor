@@ -57,10 +57,9 @@
 									 @key="@($"{device.Name}|{depth}|{device.MountPoint}")"
 									 role="button"
 									 tabindex="0"
-									 title="@DeviceTitle(device)"
 									 @onclick="@(() => SelectDevice(device))"
 									 @onkeydown="@(args => OnDeviceKey(args, device))">
-									<span class="mta-cell" style="@($"padding-left:{depth * 14}px")">
+									<Hint Text="@DeviceTitle(device)" Position="MokaTooltipPosition.BottomStart" Class="mta-cell" Style="@($"padding-left:{depth * 14}px")">
 										<span class="mta-mono">@device.Name</span>
 										@if (device.Model.Length > 0 || device.Label.Length > 0)
 										{
@@ -70,7 +69,7 @@
 										{
 											<span class="mta-after"><MokaTag Text="@(passed && !health.NeedsAttention ? "OK" : "CHECK")" Size="MokaSize.Xs" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : MokaColor.Error)" /></span>
 										}
-									</span>
+									</Hint>
 									<span class="mta-cell mta-mono mta-dim mta-wide">@device.Type</span>
 									<span class="mta-cell mta-mono mta-dim mta-wide">@device.FileSystem</span>
 									<span class="mta-cell mta-mono">@(device.SizeBytes is { } size ? DisplayFormat.Bytes(size) : "")</span>
@@ -100,17 +99,17 @@
 								 @key="@($"{item.MountPoint}|{item.Source}")"
 								 role="button"
 								 tabindex="0"
-								 title="@($"See what is using space on {item.MountPoint}")"
 								 @onclick="@(() => OpenSpaceAsync(item.MountPoint))"
 								 @onkeydown="@(args => OnUsageKeyAsync(args, item.MountPoint))">
-								<span class="mta-cell mta-mono" title="@item.MountPoint">@item.MountPoint</span>
+								@* The hint names the whole mount point, so the cell needs no title of its own. *@
+								<Hint Text="@($"See what is using space on {item.MountPoint}")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@item.MountPoint</Hint>
 								<span class="mta-cell mta-mono mta-dim mta-wide" title="@item.Source">@item.Source</span>
 								<span class="mta-cell mta-mono mta-dim mta-wide">@item.Type</span>
-								<span class="mta-cell" title="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")">
+								<Hint Text="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")" Class="mta-cell">
 									<span class="mta-mono">@AdminFormat.Percent(item.UsedPercent)</span>
 									<span class="mta-mono mta-dim mta-after">@AdminFormat.Kb(item.AvailableKb) free</span>
 									<UsageBar Percent="item.UsedPercent" />
-								</span>
+								</Hint>
 								<span class="mta-cell mta-mono">@AdminFormat.Kb(item.TotalKb)</span>
 							</div>
 						}
@@ -299,10 +298,10 @@
 					</div>
 					@foreach (SpaceEntry entry in report.Entries.Where(entry => Matches(entry.Name) && !mounts.Any(mount => mount.MountPoint == entry.Path)))
 					{
-						<div class="mta-row mta-row--clickable" @key="entry.Path" role="button" tabindex="0" title="@($"Open {entry.Path}")"
+						<div class="mta-row mta-row--clickable" @key="entry.Path" role="button" tabindex="0"
 							 @onclick="@(() => MeasureAsync(entry.Path))"
 							 @onkeydown="@(args => OnFolderKeyAsync(args, entry.Path))">
-							<span class="mta-cell mta-mono">@entry.Name/</span>
+							<Hint Text="@($"Open {entry.Path}")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@entry.Name/</Hint>
 							<span class="mta-cell mta-mono">@AdminFormat.Kb(entry.Kb)</span>
 							<span class="mta-cell mta-wide"><UsageBar Percent="@(entry.Kb * 100.0 / top)" /></span>
 						</div>
@@ -317,13 +316,13 @@
 					}
 					@foreach (FileSystemUsage mount in mounts.Where(mount => Matches(SpaceCommands.NameOf(mount.MountPoint))))
 					{
-						<div class="mta-row mta-row--clickable" @key="@($"mount|{mount.MountPoint}")" role="button" tabindex="0" title="@($"{mount.Source}, a file system of its own, so du left it out here. Open it to measure it.")"
+						<div class="mta-row mta-row--clickable" @key="@($"mount|{mount.MountPoint}")" role="button" tabindex="0"
 							 @onclick="@(() => MeasureAsync(mount.MountPoint))"
 							 @onkeydown="@(args => OnFolderKeyAsync(args, mount.MountPoint))">
-							<span class="mta-cell mta-mono">
+							<Hint Text="@($"{mount.Source}, a file system of its own, so du left it out here. Open it to measure it.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
 								@SpaceCommands.NameOf(mount.MountPoint)/
 								<span class="mta-dim mta-after">@($"{mount.Type} file system of its own")</span>
-							</span>
+							</Hint>
 							<span class="mta-cell mta-mono mta-dim">@AdminFormat.Kb(mount.UsedKb)</span>
 							<span class="mta-cell mta-wide"></span>
 						</div>
@@ -531,11 +530,11 @@
 				</div>
 				@foreach (SmartAttribute row in report.Attributes)
 				{
-					<div class="@(row.Failed ? "mta-row mta-smart--failed" : row.Worrying ? "mta-row mta-smart--worrying" : "mta-row")" role="row" @key="row.Id"
-						 title="@(row.Failed ? $"The disk calls this attribute failed{(row.WhenFailed.Length > 0 ? $" ({row.WhenFailed})" : "")}." : row.Worrying ? "Damaged or unreadable sectors: a disk usually gets worse from here." : null)">
+					<div class="@(row.Failed ? "mta-row mta-smart--failed" : row.Worrying ? "mta-row mta-smart--worrying" : "mta-row")" role="row" @key="row.Id">
 						<span class="mta-cell mta-mono" role="cell">@row.Id</span>
 						<span class="mta-cell mta-mono" role="cell" title="@row.Name">@row.Name</span>
-						<span class="mta-cell mta-mono" role="cell">@row.Value</span>
+						@* The name keeps its title for its full value, so the reason a row is coloured goes on its figure. *@
+						<span class="mta-cell mta-mono" role="cell"><Hint Text="@(row.Failed ? $"The disk calls this attribute failed{(row.WhenFailed.Length > 0 ? $" ({row.WhenFailed})" : "")}." : row.Worrying ? "Damaged or unreadable sectors: a disk usually gets worse from here." : null)">@row.Value</Hint></span>
 						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Worst</span>
 						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Threshold</span>
 						<span class="mta-cell mta-mono" role="cell" title="@row.Raw">@row.Raw</span>

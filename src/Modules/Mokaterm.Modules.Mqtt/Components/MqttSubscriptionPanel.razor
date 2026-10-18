@@ -58,9 +58,11 @@
 					{
 						<MokaTag Text="SESSION" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 					}
-					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-live-count" title="Messages this filter matched">
-						@status.Matched
-					</MokaText>
+					<Hint Text="Messages this filter matched">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-live-count">
+							@status.Matched
+						</MokaText>
+					</Hint>
 					@if (status.State is MqttSubscriptionState.Idle or MqttSubscriptionState.Failed)
 					{
 						<IconButton Size="MokaSize.Xs"

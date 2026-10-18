@@ -45,7 +45,9 @@
 			}
 			else if (_loaded)
 			{
-				<div class="fb-crumbs" @onclick="BeginPathEdit" title="@_path (click to type a path, Ctrl+L)">
+				@* The hint carries the whole path as well, since the crumbs fold long ones: a title beside it would show twice. *@
+				<div class="fb-crumbs" @onclick="BeginPathEdit">
+					<Hint Text="@($"{_path} (click to type a path, Ctrl+L)")" Position="MokaTooltipPosition.BottomStart" Class="fb-crumbs-hint">
 					<MokaBreadcrumb @key="_path" MaxItems="@(IsNarrow ? 3 : 6)">
 						<SeparatorContent>
 							<MokaIcon Icon="MokaIcons.Navigation.ChevronRight" SizeValue="12px" />
@@ -59,6 +61,7 @@
 							}
 						</ChildContent>
 					</MokaBreadcrumb>
+					</Hint>
 				</div>
 			}
 		</div>

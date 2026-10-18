@@ -82,7 +82,7 @@ public sealed partial class FleetHostRow : ComponentBase
 
 	private MokaColor StateColor => Row.Result is { } result ? HostRunDisplay.Color(result) : MokaColor.Surface;
 
-	/// <summary>The whole row's reasons for a look, or what it is doing, for a pointer resting on it.</summary>
+	/// <summary>The row's reasons for a look, or what it is doing, as the hint on its state.</summary>
 	private string? Tooltip
 	{
 		get

@@ -1,5 +1,5 @@
-/* A menu row is the port as docker writes it and how it opens; a port that cannot be opened says why underneath, in
-   prose that wraps rather than widening the menu. */
+/* A menu row is the port as docker writes it and how it opens, with where it goes underneath, or why it cannot be
+   opened, in prose that wraps rather than widening the menu. */
 .mt-port-item {
 	display: flex;
 	flex-direction: column;
@@ -25,6 +25,14 @@
 	letter-spacing: 0.08em;
 	font-size: 10px;
 	font-weight: var(--moka-font-weight-semibold);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-port-route {
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	color: var(--moka-color-on-surface-variant);
 }
 

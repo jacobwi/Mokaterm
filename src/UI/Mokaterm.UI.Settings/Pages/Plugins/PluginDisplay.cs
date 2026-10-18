@@ -133,7 +133,7 @@ internal static class PluginDisplay
 		return $"From the Mokaterm gallery, built from {origin.Source} at {ShortCommit(origin.Commit)}";
 	}
 
-	/// <summary>A commit as git shortens it, for text; the full one goes in a title.</summary>
+	/// <summary>A commit as git shortens it, for text; the full one goes in a hint.</summary>
 	public static string ShortCommit(string commit) => commit.Length > 7 ? commit[..7] : commit;
 
 	/// <summary>A gallery category in words. One the gallery added after this build reads as its own name.</summary>

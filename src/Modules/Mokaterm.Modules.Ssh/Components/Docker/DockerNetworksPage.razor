@@ -55,12 +55,12 @@
 		@foreach (DockerNetwork network in Shown)
 		{
 			<div class="mt-dk-row" role="listitem" @key="network.Id">
-				<div class="mt-dk-row-main mt-dk-row-static" title="@string.Join(", ", network.Containers)">
+				<div class="mt-dk-row-main mt-dk-row-static">
 					<MokaStatusDot Size="MokaSize.Xs" Color="@(network.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="network.InUse" />
 					<span class="mt-dk-cell-name mt-dk-cell--w30">@network.Name</span>
 					<span class="mt-dk-label mt-dk-cell--w12">@(network.IsBuiltIn ? "built in" : network.Internal ? "internal" : "")</span>
 					<span class="mt-dk-cell mt-dk-cell--w12">@network.Driver</span>
-					<span class="mt-dk-cell mt-dk-cell--grow">@ContainersText(network)</span>
+					<Hint Text="@string.Join(", ", network.Containers)" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-cell mt-dk-cell--grow">@ContainersText(network)</Hint>
 					<span class="mt-dk-cell mt-dk-cell--optional">@network.ShortId</span>
 				</div>
 				<span class="mt-dk-hover">

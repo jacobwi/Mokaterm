@@ -60,7 +60,7 @@
 					 @onclick="@(() => Select(jail))"
 					 @onkeydown="@(args => OnRowKey(args, jail))">
 					<MokaStatusDot Size="MokaSize.Xs" Color="@DotColor(jail)" Glow="@(jail.CurrentlyBanned > 0 || jail.Problem is not null)" />
-					<span class="mta-cell mta-mono" title="@jail.Source">@jail.Name</span>
+					<Hint Text="@jail.Source" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@jail.Name</Hint>
 					<span class="mta-cell mta-mono">@Number(jail.CurrentlyBanned)</span>
 					<span class="mta-cell mta-mono mta-dim mta-wide">@Number(jail.CurrentlyFailed)</span>
 				</div>

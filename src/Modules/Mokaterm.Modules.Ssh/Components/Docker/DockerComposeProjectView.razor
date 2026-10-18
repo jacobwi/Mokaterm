@@ -10,7 +10,7 @@
 		<MokaStatusDot Size="MokaSize.Xs" Color="@HealthColor(Health)" Pulse="IsBusy" />
 		<span class="mt-dk-cell-name">@ProjectName</span>
 		<span class="mt-dk-label">@HealthLabel(Health)</span>
-		<span class="mt-dk-mono mt-dk-muted" title="Services running, of all of them">@ServiceCount</span>
+		<Hint Text="Services running, of all of them"><span class="mt-dk-mono mt-dk-muted">@ServiceCount</span></Hint>
 		<span class="mt-dk-spacer"></span>
 		@if (Tool is { } tool)
 		{
@@ -140,7 +140,7 @@
 						<span class="mt-dk-cell mt-dk-cell--grow" title="@service.Image">@service.Image</span>
 						@UpdateChip(service.Image)
 						<span class="mt-dk-cell mt-dk-cell--optional">@string.Join(", ", service.Ports)</span>
-						<span class="mt-dk-cell mt-dk-cell--count" title="Containers running, of all of them">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</span>
+						<Hint Text="Containers running, of all of them" Class="mt-dk-cell mt-dk-cell--count">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</Hint>
 						<span class="mt-dk-cell mt-dk-cell--time mt-dk-cell--optional">@service.Uptime</span>
 					</button>
 					@if (_target is not null)

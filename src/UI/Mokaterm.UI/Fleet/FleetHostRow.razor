@@ -11,22 +11,23 @@
 	 aria-keyshortcuts="Space Enter R O"
 	 data-mt-row="true"
 	 data-no-submit="true"
-	 title="@Tooltip"
 	 @onclick="OnToggleExpand"
 	 @onkeydown="OnKeyDownAsync">
 	<span class="mt-fleet-cell mt-fleet-cell--pick" role="gridcell" @onclick="OnTogglePick" @onclick:stopPropagation>
 		<MokaCheckbox Value="@Picked" DisplayOnly />
 	</span>
 	<span class="mt-fleet-cell mt-fleet-cell--state" role="gridcell">
-		<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor" Pulse="@Row.IsPending" Glow="@(Row.Result?.State == HostRunState.Done)" />
-		<span class="mt-fleet-state">@StateLabel</span>
+		<Hint Text="@Tooltip" Position="MokaTooltipPosition.BottomStart">
+			<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor" Pulse="@Row.IsPending" Glow="@(Row.Result?.State == HostRunState.Done)" />
+			<span class="mt-fleet-state">@StateLabel</span>
+		</Hint>
 	</span>
 	<span class="mt-fleet-cell mt-fleet-cell--login" role="gridcell">
 		<ProtocolIcon ProtocolId="@Row.Login.ProtocolId" Size="MokaSize.Xs" />
 		<SessionLabel Host="Row.Host" Connection="Row.Login" />
 	</span>
 	@* Until a machine was read, its system column says what the read is doing or why it did not get through. *@
-	<span class="mt-fleet-cell mt-fleet-cell--os" role="gridcell" title="@(Summary?.Kernel ?? Row.Result?.Message)">
+	<span class="mt-fleet-cell mt-fleet-cell--os" role="gridcell" title="@(Summary?.OperatingSystem ?? Row.Result?.Message)">
 		@if (Summary?.OperatingSystem is { } system)
 		{
 			@system
@@ -41,8 +42,9 @@
 		}
 	</span>
 	<span class="mt-fleet-cell mt-fleet-cell--uptime mt-fleet-mono" role="gridcell">@(DisplayFormat.Span(Summary?.Uptime) is { Length: > 0 } up ? up : Unknown)</span>
-	<span class="@LoadClass" role="gridcell" title="@LoadText">@(Summary?.Load1 is { } load ? load.ToString("0.00", CultureInfo.InvariantCulture) : Unknown)</span>
-	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory" role="gridcell" title="@MemoryText">
+	<span class="@LoadClass" role="gridcell"><Hint Text="@LoadText">@(Summary?.Load1 is { } load ? load.ToString("0.00", CultureInfo.InvariantCulture) : Unknown)</Hint></span>
+	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--memory" role="gridcell">
+		<Hint Text="@MemoryText">
 		@if (Summary?.MemoryPercent is { } memory)
 		{
 			<span class="mt-fleet-mono">@Percent(memory)</span>
@@ -52,8 +54,10 @@
 		{
 			<span class="mt-fleet-mono mt-fleet-dim">@Unknown</span>
 		}
+		</Hint>
 	</span>
-	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk" role="gridcell" title="@DiskText">
+	<span class="mt-fleet-cell mt-fleet-cell--usage mt-fleet-cell--disk" role="gridcell">
+		<Hint Text="@DiskText">
 		@if (Summary?.FullestDisk is { } disk)
 		{
 			<span class="mt-fleet-mono">@Percent(disk.UsedPercent)</span>
@@ -63,8 +67,10 @@
 		{
 			<span class="mt-fleet-mono mt-fleet-dim">@Unknown</span>
 		}
+		</Hint>
 	</span>
-	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates mt-fleet-mono" role="gridcell" title="@UpdatesText">
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--updates mt-fleet-mono" role="gridcell">
+		<Hint Text="@UpdatesText">
 		@if (Summary?.PendingUpdates is { } updates)
 		{
 			<span class="@(updates > 0 ? null : "mt-fleet-dim")">@Count(updates)</span>
@@ -77,6 +83,7 @@
 		{
 			<span class="mt-fleet-dim">@Unknown</span>
 		}
+		</Hint>
 	</span>
 	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--reboot" role="gridcell">
 		@switch (Summary?.RebootRequired)
@@ -92,7 +99,8 @@
 				break;
 		}
 	</span>
-	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed mt-fleet-mono" role="gridcell" title="@FailedText">
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--failed mt-fleet-mono" role="gridcell">
+		<Hint Text="@FailedText">
 		@if (Summary?.FailedServices is { } failed)
 		{
 			<span class="@(failed > 0 ? "mt-fleet-alert" : "mt-fleet-dim")">@Count(failed)</span>
@@ -101,8 +109,10 @@
 		{
 			<span class="mt-fleet-dim">@Unknown</span>
 		}
+		</Hint>
 	</span>
-	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker mt-fleet-mono" role="gridcell" title="@ContainersText">
+	<span class="mt-fleet-cell mt-fleet-cell--count mt-fleet-cell--docker mt-fleet-mono" role="gridcell">
+		<Hint Text="@ContainersText">
 		@if (Summary is { ContainersRunning: { } running, ContainersTotal: { } total })
 		{
 			<span class="@(total == 0 ? "mt-fleet-dim" : null)">@($"{Count(running)}/{Count(total)}")</span>
@@ -111,9 +121,9 @@
 		{
 			<span class="mt-fleet-dim">@Unknown</span>
 		}
+		</Hint>
 	</span>
-	@* An empty title keeps the row's own from showing over the buttons' tooltips. *@
-	<span class="mt-fleet-cell mt-fleet-cell--actions" role="gridcell" title="" @onclick:stopPropagation>
+	<span class="mt-fleet-cell mt-fleet-cell--actions" role="gridcell" @onclick:stopPropagation>
 		<IconButton Size="MokaSize.Xs"
 					Icon="MokatermIcons.Reconnect"
 					Disabled="@Row.IsPending"

@@ -33,6 +33,14 @@
 	cursor: text;
 }
 
+/* The hint fills the strip, so the empty part that takes a typed path explains itself too. */
+.fb-crumbs ::deep .fb-crumbs-hint {
+	flex: 1;
+	align-self: stretch;
+	align-items: center;
+	min-width: 0;
+}
+
 .fb-crumbs ::deep .moka-breadcrumb,
 .fb-crumbs ::deep .moka-breadcrumb__list {
 	display: flex;

@@ -51,7 +51,9 @@
 					OnClick="ShowQualityMenu"
 					Label="@QualityTitle"
 					AriaLabel="Quality and compression" />
-		<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-vnc-meta mt-vnc-quality" title="@QualityTitle">@QualityText</MokaText>
+		<Hint Text="@QualityTitle" Class="mt-vnc-meta mt-vnc-quality">
+			<MokaText Element="span" Size="MokaSize.Xs" Mono>@QualityText</MokaText>
+		</Hint>
 
 		<IconButton Class="mt-vnc-wide"
 					Icon="MokaIcons.Action.Download"

@@ -65,7 +65,9 @@
 						}
 					</div>
 
-					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-topics-count" title="@CountTitle(row)">@CountText(row)</MokaText>
+					<Hint Text="@CountTitle(row)" Position="MokaTooltipPosition.BottomEnd">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-mqtt-topics-count">@CountText(row)</MokaText>
+					</Hint>
 				</div>
 			}
 		</div>

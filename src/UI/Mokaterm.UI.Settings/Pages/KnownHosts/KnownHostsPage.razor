@@ -47,18 +47,16 @@
 			</MokaColumn>
 			<MokaColumn Title="Added" Field="host => host.AddedAt">
 				<CellTemplate Context="host">
-					<MokaText Element="span"
-							  Size="MokaSize.Xs"
-							  Mono
-							  title="@DisplayFormat.Timestamp(host.AddedAt)">@DisplayFormat.Relative(host.AddedAt, Time.GetUtcNow())</MokaText>
+					<Hint Text="@DisplayFormat.Timestamp(host.AddedAt)" Position="MokaTooltipPosition.BottomStart">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Relative(host.AddedAt, Time.GetUtcNow())</MokaText>
+					</Hint>
 				</CellTemplate>
 			</MokaColumn>
 			<MokaColumn Title="Last seen" Field="host => host.LastSeenAt">
 				<CellTemplate Context="host">
-					<MokaText Element="span"
-							  Size="MokaSize.Xs"
-							  Mono
-							  title="@DisplayFormat.Timestamp(host.LastSeenAt)">@LastSeenText(host)</MokaText>
+					<Hint Text="@DisplayFormat.Timestamp(host.LastSeenAt)" Position="MokaTooltipPosition.BottomStart">
+						<MokaText Element="span" Size="MokaSize.Xs" Mono>@LastSeenText(host)</MokaText>
+					</Hint>
 				</CellTemplate>
 			</MokaColumn>
 		</ChildContent>

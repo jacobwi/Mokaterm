@@ -101,7 +101,7 @@
 					<div class="mt-dk-row-main mt-dk-row-static">
 						<span class="mt-dk-cell-name mt-dk-cell--w45" title="@image.Id">@image.Reference</span>
 						<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>
-						<span class="mt-dk-cell mt-dk-cell--size" title="Freed when it goes">@(image.UniqueSize.Length > 0 ? image.UniqueSize : image.Size)</span>
+						<Hint Text="Freed when it goes" Position="MokaTooltipPosition.BottomEnd" Class="mt-dk-cell mt-dk-cell--size">@(image.UniqueSize.Length > 0 ? image.UniqueSize : image.Size)</Hint>
 					</div>
 				</div>
 			}
