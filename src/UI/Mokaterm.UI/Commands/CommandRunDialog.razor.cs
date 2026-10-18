@@ -45,6 +45,10 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 	private bool _subscribed;
 
 	private ICommandRun? _run;
+
+	// The command as it was written for the run on screen, placeholders and all: what saving and editing again go back
+	// to, since the run's own command holds the values filled in, and those are never kept.
+	private string? _runTemplate;
 	private IReadOnlyList<CommandHostResult> _results = [];
 	private List<LoginRow> _ranOn = [];
 	private ResultView _resultView = ResultView.All;
@@ -73,6 +77,9 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 
 	[Inject]
 	private CommandSnippetActions SnippetActions { get; set; } = default!;
+
+	[Inject]
+	private CommandTemplateFiller Filler { get; set; } = default!;
 
 	[Inject]
 	private ISettingsService Settings { get; set; } = default!;
@@ -108,9 +115,9 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 	/// <summary>The picked logins that can run a command, in list order: what Run sends.</summary>
 	private List<LoginRow> PickedRows => [.. _logins.Where(row => row.Unavailable is null && _selected.Contains(row.Login.Id))];
 
-	private string? CommandProblem => RemoteCommandRequest.Normalize(_command).Length == 0 ? null : RemoteCommandRequest.Problem(_command);
+	private string? CommandProblem => RemoteCommandRequest.Normalize(_command).Length == 0 ? null : ProblemOf(_command);
 
-	private bool CanRun => !_starting && RemoteCommandRequest.Problem(_command) is null && PickedRows.Count > 0;
+	private bool CanRun => !_starting && ProblemOf(_command) is null && PickedRows.Count > 0;
 
 	private string RunLabel => PickedRows.Count switch
 	{
@@ -128,14 +135,17 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 		}
 	}
 
-	/// <summary>The command as the run sent it, or as it is typed before a run.</summary>
-	private string CurrentCommand => _run?.Command ?? RemoteCommandRequest.Normalize(_command);
+	/// <summary>
+	/// The command as it was written for the run, placeholders and all, or as it is typed before a run. This is what
+	/// saving keeps: the values filled in for a run are never stored.
+	/// </summary>
+	private string CurrentCommand => _run is null ? RemoteCommandRequest.Normalize(_command) : _runTemplate ?? _run.Command;
 
 	private List<LoginRow> SaveTargets => _run is null ? PickedRows : _ranOn;
 
 	/// <summary>A saved command is one line, so a script cannot be saved, and saving needs something to save.</summary>
 	private bool CanSaveCommand =>
-		RemoteCommandRequest.Problem(CurrentCommand) is null
+		ProblemOf(CurrentCommand) is null
 		&& !CurrentCommand.AsSpan().ContainsAny('\r', '\n')
 		&& SaveTargets.Count > 0;
 
@@ -204,6 +214,7 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 
 		// The command can carry a token, so nothing of it outlives the request.
 		_command = "";
+		_runTemplate = null;
 		_filter = "";
 		_error = null;
 		_selected.Clear();
@@ -229,6 +240,10 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 
 		base.Dispose(disposing);
 	}
+
+	/// <summary>Why <paramref name="command"/> cannot run: the remote command's own rule, then a broken placeholder.</summary>
+	private static string? ProblemOf(string command) =>
+		RemoteCommandRequest.Problem(command) ?? CommandTemplate.Parse(RemoteCommandRequest.Normalize(command)).Problem;
 
 	private static string SnippetLabel(CommandSnippet snippet) =>
 		string.Equals(snippet.Name, snippet.Command, StringComparison.Ordinal) ? snippet.Command : $"{snippet.Name}: {snippet.Command}";
@@ -388,13 +403,21 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 		}
 
 		List<LoginRow> targets = PickedRows;
+		string template = RemoteCommandRequest.Normalize(_command);
 		_starting = true;
 		_error = null;
 		try
 		{
+			// Asked once, before any host is reached, so every host runs the same command.
+			string? command = await Filler.FillAsync(CommandTemplate.Parse(template), RunLabel);
+			if (command is null || !IsCurrent(request))
+			{
+				return;
+			}
+
 			ICommandRun run = await Runner.StartAsync(new CommandRunRequest
 			{
-				Command = _command,
+				Command = command,
 				ConnectionIds = [.. targets.Select(row => row.Login.Id)],
 				Options = _options,
 			});
@@ -405,7 +428,7 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 				return;
 			}
 
-			AttachRun(run, targets);
+			AttachRun(run, targets, template);
 		}
 		catch (ArgumentException ex)
 		{
@@ -422,10 +445,11 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 		}
 	}
 
-	private void AttachRun(ICommandRun run, List<LoginRow> targets)
+	private void AttachRun(ICommandRun run, List<LoginRow> targets, string template)
 	{
 		ReleaseRun();
 		_run = run;
+		_runTemplate = template;
 		_ranOn = targets;
 		_results = run.Hosts;
 		_collapsed.Clear();
@@ -506,12 +530,14 @@ public sealed partial class CommandRunDialog : ShellEditorBase<CommandRunEditorR
 	{
 		if (_run is { } run)
 		{
-			_command = run.Command;
+			// Back to the placeholders rather than the values, which a new run asks for again.
+			_command = _runTemplate ?? run.Command;
 			_selected.Clear();
 			_selected.UnionWith(_ranOn.Select(row => row.Login.Id));
 		}
 
 		ReleaseRun();
+		_runTemplate = null;
 		_results = [];
 		_ranOn = [];
 		_error = null;

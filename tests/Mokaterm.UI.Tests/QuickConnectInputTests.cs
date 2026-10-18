@@ -136,4 +136,20 @@ public sealed class QuickConnectInputTests
 		Assert.Null(login.Port);
 		Assert.Equal(AuthenticationMethod.Anonymous, login.AuthenticationMethod);
 	}
+
+	[Theory]
+	[InlineData("vnc", "vnc")]
+	[InlineData("RDP", "rdp")]
+	[InlineData(null, "ssh")]
+	[InlineData("", "ssh")]
+	[InlineData("telnet", "ssh")]
+	public void StartingProtocol_IsTheOneLastPicked_WhileThisHostStillHasIt(string? lastPicked, string expected) =>
+		Assert.Equal(expected, QuickConnectInput.StartingProtocol(lastPicked, ["ssh", "vnc", "rdp", "serial"]));
+
+	[Fact]
+	public void StartingProtocol_WithoutSsh_FallsBackToTheFirstListed()
+	{
+		Assert.Equal("vnc", QuickConnectInput.StartingProtocol("telnet", ["vnc", "rdp"]));
+		Assert.Equal("ssh", QuickConnectInput.StartingProtocol("vnc", []));
+	}
 }

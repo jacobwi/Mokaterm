@@ -12,15 +12,29 @@
 	<ChildContent>
 		<form id="@FormId" @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
 			<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
-				<MokaTextField Label="Command"
-							   @bind-Value="_command"
-							   Required
-							   ErrorText="@_commandError"
-							   Disabled="_saving"
-							   Placeholder="systemctl status nginx"
-							   spellcheck="false"
-							   autocomplete="off"
-							   data-autofocus="true" />
+				<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Xs">
+					<MokaTextField Label="Command"
+								   Value="@_command"
+								   ValueChanged="OnCommandChanged"
+								   Required
+								   ErrorText="@_commandError"
+								   HelperText="{{name}} or {{name:default}} is asked for each time and typed exactly as given, so add quotes yourself. Go templates such as {{.Names}} stay as typed, and {{{{ is a literal {{."
+								   Disabled="_saving"
+								   Placeholder="systemctl status {{service:nginx}}"
+								   spellcheck="false"
+								   autocomplete="off"
+								   data-autofocus="true" />
+					@if (_commandError is null && Placeholders.Count > 0)
+					{
+						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xxs" Wrap>
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">Asks for</MokaText>
+							@foreach (CommandPlaceholder placeholder in Placeholders)
+							{
+								<MokaTag Text="@PlaceholderLabel(placeholder)" Size="MokaSize.Xs" />
+							}
+						</MokaFlexbox>
+					}
+				</MokaFlexbox>
 				<MokaTextField Label="Name"
 							   @bind-Value="_name"
 							   Disabled="_saving"

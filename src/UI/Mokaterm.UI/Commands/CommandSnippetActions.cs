@@ -18,6 +18,7 @@ internal sealed class CommandSnippetActions
 	private readonly IUserInteraction _interaction;
 	private readonly InputBroadcast _broadcast;
 	private readonly ShellState _shell;
+	private readonly CommandTemplateFiller _filler;
 	private readonly ILogger<CommandSnippetActions> _logger;
 
 	public CommandSnippetActions(
@@ -25,12 +26,14 @@ internal sealed class CommandSnippetActions
 		IUserInteraction interaction,
 		InputBroadcast broadcast,
 		ShellState shell,
+		CommandTemplateFiller filler,
 		ILogger<CommandSnippetActions> logger)
 	{
 		_store = store;
 		_interaction = interaction;
 		_broadcast = broadcast;
 		_shell = shell;
+		_filler = filler;
 		_logger = logger;
 	}
 
@@ -45,7 +48,8 @@ internal sealed class CommandSnippetActions
 
 	/// <summary>
 	/// The snippet the quick button saves: this login on this machine, named after the command itself, and never set
-	/// to run on its own.
+	/// to run on its own. The line already ran as it stands, so anything in it that would read as a placeholder is
+	/// escaped and it types back exactly as it was.
 	/// </summary>
 	public static CommandSnippet CreateQuickSnippet(string command, HostProfile host, ConnectionProfile connection, bool isTransient)
 	{
@@ -56,7 +60,7 @@ internal sealed class CommandSnippetActions
 		{
 			Id = Guid.NewGuid(),
 			Name = CommandSnippetName.Derive(text),
-			Command = text,
+			Command = CommandTemplate.EscapeText(text),
 
 			// A quick-connect session has no saved login to hang the command on, so it belongs to the machine.
 			Scope = isTransient ? CommandSnippetScope.Host : CommandSnippetScope.Connection,
@@ -140,19 +144,33 @@ internal sealed class CommandSnippetActions
 
 	/// <summary>
 	/// Sends a saved command to the session's terminal. With <paramref name="run"/> the line break goes too, which
-	/// runs it.
+	/// runs it. A command with placeholders asks for their values first, and Cancel there types nothing.
 	/// </summary>
 	public async Task ApplyAsync(ISessionHandle session, CommandSnippet snippet, bool run)
 	{
 		ArgumentNullException.ThrowIfNull(session);
 		ArgumentNullException.ThrowIfNull(snippet);
+		if (session.Terminal is not { IsOpen: true })
+		{
+			_interaction.Notify(NoticeSeverity.Warning, "The session has no open terminal to type into.");
+			return;
+		}
+
+		// Filled in once, before anything is typed, so every session that types together gets the same line.
+		string? command = await _filler.FillAsync(CommandTemplate.Parse(snippet.Command), run ? "Run" : "Type");
+		if (command is null)
+		{
+			return;
+		}
+
+		// The question can stay open for a while, and the session can drop meanwhile.
 		if (session.Terminal is not { IsOpen: true } stream)
 		{
 			_interaction.Notify(NoticeSeverity.Warning, "The session has no open terminal to type into.");
 			return;
 		}
 
-		string text = run ? snippet.Command + "\r" : snippet.Command;
+		string text = run ? command + "\r" : command;
 		try
 		{
 			await stream.SendTextAsync(text);

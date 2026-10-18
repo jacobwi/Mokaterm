@@ -95,6 +95,23 @@ public sealed class CommandSnippetStoreTests
 	}
 
 	[Fact]
+	public async Task SaveAsync_BrokenPlaceholder_IsRefusedWithItsReason_WhileAGoTemplateIsKept()
+	{
+		await using CoreTestContext context = new();
+		await using AsyncServiceScope scope = await context.CreateVaultScopeAsync();
+		ICommandSnippetStore store = scope.ServiceProvider.GetRequiredService<ICommandSnippetStore>();
+
+		ArgumentException unclosed = await Assert.ThrowsAsync<ArgumentException>(() => store.SaveAsync(New("Ping", "ping {{host", CommandSnippetScope.Global), Ct));
+		ArgumentException nameless = await Assert.ThrowsAsync<ArgumentException>(() => store.SaveAsync(New("Echo", "echo {{}}", CommandSnippetScope.Global), Ct));
+		CommandSnippet docker = await store.SaveAsync(New("Names", "docker ps --format '{{.Names}}' --filter name={{name:web}}", CommandSnippetScope.Global), Ct);
+
+		Assert.Contains("\"{{host\" is not closed", unclosed.Message, StringComparison.Ordinal);
+		Assert.Contains("\"{{}}\" has no name", nameless.Message, StringComparison.Ordinal);
+		Assert.Equal("docker ps --format '{{.Names}}' --filter name={{name:web}}", docker.Command);
+		Assert.Single(await store.ListAsync(Ct));
+	}
+
+	[Fact]
 	public async Task SaveAsync_GlobalScope_DropsHostAndConnection()
 	{
 		await using CoreTestContext context = new();

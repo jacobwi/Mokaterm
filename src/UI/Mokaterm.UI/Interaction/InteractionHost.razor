@@ -17,6 +17,9 @@
 	case ConfirmRequest confirm:
 		<ConfirmPromptDialog @key="confirm.Id" Prompt="confirm.Prompt" OnResult="answer => Service.Complete(confirm, answer)" />
 		break;
+	case PlaceholderRequest placeholders:
+		<PlaceholderPromptDialog @key="placeholders.Id" Prompt="placeholders.Prompt" OnResult="values => Service.Complete(placeholders, values)" />
+		break;
 	case OverwriteRequest overwrite:
 		<OverwritePromptDialog @key="overwrite.Id" Prompt="overwrite.Prompt" OnDecision="decision => Service.Complete(overwrite, decision)" />
 		break;

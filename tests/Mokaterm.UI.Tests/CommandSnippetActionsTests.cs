@@ -96,6 +96,64 @@ public sealed class CommandSnippetActionsTests
 		Assert.Empty(Sent(other));
 	}
 
+	[Fact]
+	public void CreateQuickSnippet_ALineThatWouldReadAsPlaceholders_IsEscaped_SoItTypesBackAsItRan()
+	{
+		const string Line = "ansible all -m debug -a 'msg={{inventory_hostname}}' && docker ps --format '{{.Names}}'";
+
+		CommandSnippet snippet = CommandSnippetActions.CreateQuickSnippet(Line, Host, Connection, isTransient: false);
+
+		Assert.Equal("ansible all -m debug -a 'msg={{{{inventory_hostname}}' && docker ps --format '{{.Names}}'", snippet.Command);
+		Assert.False(CommandTemplate.Parse(snippet.Command).HasPlaceholders);
+		Assert.Equal(Line, CommandTemplate.Parse(snippet.Command).Fill(null));
+	}
+
+	[Fact]
+	public async Task ApplyAsync_Placeholders_AreAskedForOnce_AndEverySessionThatTypesTogetherGetsTheSameLine()
+	{
+		ManualSessionManager manager = new();
+		using SessionWorkspace workspace = new(manager);
+		using InputBroadcast broadcast = new(workspace);
+		using UserInteractionService prompts = new();
+		FakeSession sender = manager.Add(terminal: new RecordingTerminalStream());
+		FakeSession partner = manager.Add(terminal: new RecordingTerminalStream());
+		broadcast.Toggle(sender.Id);
+		broadcast.Toggle(partner.Id);
+
+		Task applying = Actions(broadcast, prompts).ApplyAsync(sender, Snippet("systemctl restart {{service:nginx}}"), run: true);
+		await Eventually.TrueAsync(() => prompts.Current is PlaceholderRequest, "the placeholder question is queued");
+		PlaceholderRequest request = (PlaceholderRequest)prompts.Current!;
+		Assert.Equal("Run", request.Prompt.ConfirmText);
+		Assert.Empty(Sent(sender));
+		prompts.Complete(request, new Dictionary<string, string>(StringComparer.Ordinal) { ["service"] = "php-fpm" });
+		await applying.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+		Assert.Equal(["systemctl restart php-fpm\r"], Sent(sender));
+		Assert.Equal(["systemctl restart php-fpm\r"], Sent(partner));
+		Assert.Null(prompts.Current);
+	}
+
+	[Fact]
+	public async Task ApplyAsync_PlaceholdersCancelled_TypesNothingAnywhere()
+	{
+		ManualSessionManager manager = new();
+		using SessionWorkspace workspace = new(manager);
+		using InputBroadcast broadcast = new(workspace);
+		using UserInteractionService prompts = new();
+		FakeSession sender = manager.Add(terminal: new RecordingTerminalStream());
+		FakeSession partner = manager.Add(terminal: new RecordingTerminalStream());
+		broadcast.Toggle(sender.Id);
+		broadcast.Toggle(partner.Id);
+
+		Task applying = Actions(broadcast, prompts).ApplyAsync(sender, Snippet("kill {{pid}}"), run: false);
+		await Eventually.TrueAsync(() => prompts.Current is PlaceholderRequest, "the placeholder question is queued");
+		prompts.Complete((PlaceholderRequest)prompts.Current!, null);
+		await applying.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+		Assert.Empty(Sent(sender));
+		Assert.Empty(Sent(partner));
+	}
+
 	private static List<string> Sent(FakeSession session) => ((RecordingTerminalStream)session.Terminal!).Sent;
 
 	private static CommandSnippet Snippet(string command) => new()
@@ -105,12 +163,17 @@ public sealed class CommandSnippetActionsTests
 		Command = command,
 	};
 
-	private static CommandSnippetActions Actions(InputBroadcast broadcast) => new(
-		new EmptySnippetStore(),
-		new UserInteractionService(),
-		broadcast,
-		new ShellState(new UiStateStore(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance)),
-		NullLogger<CommandSnippetActions>.Instance);
+	private static CommandSnippetActions Actions(InputBroadcast broadcast, UserInteractionService? prompts = null)
+	{
+		UserInteractionService interaction = prompts ?? new UserInteractionService();
+		return new(
+			new EmptySnippetStore(),
+			interaction,
+			broadcast,
+			new ShellState(new UiStateStore(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance)),
+			new CommandTemplateFiller(interaction, new LockableVault()),
+			NullLogger<CommandSnippetActions>.Instance);
+	}
 
 	/// <summary>A store that holds nothing; these tests only care about what reaches a terminal.</summary>
 	private sealed class EmptySnippetStore : ICommandSnippetStore

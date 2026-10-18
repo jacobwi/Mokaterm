@@ -72,6 +72,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<CatalogState>();
 		services.AddScoped<ConnectionActions>();
 		services.AddScoped<QuickConnectHistory>();
+		services.AddScoped<CommandTemplateFiller>();
 		services.AddScoped<CommandSnippetActions>();
 		services.AddScoped<FleetOverview>();
 		services.AddScoped<VaultScreenState>();

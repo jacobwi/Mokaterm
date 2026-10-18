@@ -56,6 +56,16 @@ public sealed partial class CommandSnippetEditorDialog : DraftDialogBase
 
 	private string DialogTitle => IsNew ? "Save command" : "Edit command";
 
+	/// <summary>The values the command asks for as it stands, listed under the field while it reads cleanly.</summary>
+	private IReadOnlyList<CommandPlaceholder> Placeholders
+	{
+		get
+		{
+			CommandTemplate template = CommandTemplate.Parse(_command.Trim());
+			return template.Problem is null ? template.Placeholders : [];
+		}
+	}
+
 	private string ScopeHelp => _scope switch
 	{
 		CommandSnippetScope.Connection => ConnectionLabel is { } login ? $"Offered when you open {login}." : "Offered for one saved login.",
@@ -94,6 +104,16 @@ public sealed partial class CommandSnippetEditorDialog : DraftDialogBase
 		_ => scope,
 	};
 
+	private static string PlaceholderLabel(CommandPlaceholder placeholder) =>
+		placeholder.Default is { Length: > 0 } value ? $"{placeholder.Name} ({value})" : placeholder.Name;
+
+	// A problem is said on Save rather than while typing, which would flag every placeholder until its braces close.
+	private void OnCommandChanged(string? value)
+	{
+		_command = value ?? "";
+		_commandError = null;
+	}
+
 	private void OnScopeChanged(string value)
 	{
 		if (Enum.TryParse(value, out CommandSnippetScope scope))
@@ -111,7 +131,7 @@ public sealed partial class CommandSnippetEditorDialog : DraftDialogBase
 			return;
 		}
 
-		_commandError = string.IsNullOrWhiteSpace(_command) ? "A command is needed." : null;
+		_commandError = string.IsNullOrWhiteSpace(_command) ? "A command is needed." : CommandTemplate.Parse(_command.Trim()).Problem;
 		_error = null;
 		if (_commandError is not null)
 		{

@@ -1,0 +1,34 @@
+@* Asks for the values a command's placeholders need, with the command as it will go out below the fields. *@
+@inherits PromptDialogBase
+
+<HeadedDialog Open="true"
+			  Title="@Prompt.Title"
+			  Icon="MokatermIcons.Command"
+			  DialogSize="MokaDialogSize.Small"
+			  CloseOnBackdropClick="false"
+			  OnClose="CancelAsync">
+	<ChildContent>
+		<PromptBody @ref="Body">
+			@for (int i = 0; i < _names.Length; i++)
+			{
+				int index = i;
+				<MokaTextField Label="@_names[index]"
+							   Value="@_values[index]"
+							   ValueChanged="value => SetValue(index, value)"
+							   ErrorText="@CommandTemplate.ValueProblem(_values[index])"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus="@Flag(index == 0)" />
+			}
+			<div>
+				<div class="mt-section">Command</div>
+				<pre class="mt-prompt-details">@Preview</pre>
+			</div>
+			<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">Each value goes in exactly as typed, with no quotes added.</MokaText>
+		</PromptBody>
+	</ChildContent>
+	<Actions>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" OnClick="CancelAsync">Cancel</MokaButton>
+		<MokaButton data-primary="true" Disabled="HasProblem" OnClick="SubmitAsync">@Prompt.ConfirmText</MokaButton>
+	</Actions>
+</HeadedDialog>

@@ -21,8 +21,6 @@ namespace Mokaterm.UI.Shell;
 /// </summary>
 public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 {
-	private const string PreferredProtocolId = "ssh";
-
 	private const string SchemeSeparator = "://";
 
 	private readonly string _listId = "mt-qc-list-" + Guid.NewGuid().ToString("N");
@@ -30,7 +28,7 @@ public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 	private ElementReference _root;
 	private IReadOnlyList<string> _protocolIds = [];
 	private Dictionary<string, ProtocolDescriptor> _descriptors = new(StringComparer.OrdinalIgnoreCase);
-	private string _protocolId = PreferredProtocolId;
+	private string _protocolId = QuickConnectInput.DefaultProtocolId;
 	private string _text = "";
 	private string? _error;
 
@@ -61,6 +59,9 @@ public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 
 	[Inject]
 	private QuickConnectHistory History { get; set; } = default!;
+
+	[Inject]
+	private UiStateStore UiState { get; set; } = default!;
 
 	[Inject]
 	private FormInterop Forms { get; set; } = default!;
@@ -118,10 +119,7 @@ public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 	{
 		_protocolIds = [.. Protocols.Protocols.Select(protocol => protocol.Id)];
 		_descriptors = Protocols.Protocols.ToDictionary(protocol => protocol.Id, StringComparer.OrdinalIgnoreCase);
-		if (!_protocolIds.Contains(PreferredProtocolId, StringComparer.OrdinalIgnoreCase) && _protocolIds.Count > 0)
-		{
-			_protocolId = _protocolIds[0];
-		}
+		_protocolId = QuickConnectInput.StartingProtocol(UiState.Current.QuickConnectProtocolId, _protocolIds);
 
 		Shell.QuickConnectFocusRequested += OnFocusRequested;
 		History.Changed += OnHistoryChanged;
@@ -202,6 +200,11 @@ public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 	{
 		_protocolId = protocolId;
 		_error = null;
+
+		// Only a pick from this list is remembered. A scheme typed into the box, a history row or a completed name each
+		// carry a protocol for that one target, the way vnc:// says "this time", so connecting through one leaves the
+		// next start on what the user chose here. The id names a module, never a machine, so the plain file may hold it.
+		UiState.Update(state => state with { QuickConnectProtocolId = protocolId });
 
 		// The scheme would win over the pick when connecting, so it goes rather than leave the two disagreeing.
 		int scheme = _text.IndexOf(SchemeSeparator, StringComparison.Ordinal);

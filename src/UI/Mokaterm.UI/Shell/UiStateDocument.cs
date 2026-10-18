@@ -22,6 +22,8 @@ internal sealed record UiStateDocument
 
 	public double? CommandsPanelWidth { get; init; }
 
+	public string? QuickConnectProtocolId { get; init; }
+
 	/// <summary>The logins that had a tab, in tab order, for the next start to offer.</summary>
 	public IReadOnlyList<Guid> RestoreConnectionIds { get; init; } = [];
 

@@ -147,6 +147,34 @@ public sealed class CommandRunTests
 	}
 
 	[Fact]
+	public async Task Dialog_FromASavedCommandWithPlaceholders_ShowsThemAsWritten_AndAsksOnlyWhenItRuns()
+	{
+		CommandSnippet snippet = Snippet(CommandSnippetScope.Connection) with
+		{
+			ConnectionId = LooseShell.Id,
+			Host = Loose.Address,
+			Command = "journalctl -u {{unit:nginx}} -n {{lines}}",
+		};
+
+		string html = await RenderDialogAsync(new CommandRunEditorRequest { Snippet = snippet });
+
+		Assert.Contains("journalctl -u {{unit:nginx}} -n {{lines}}", html, StringComparison.Ordinal);
+		Assert.Contains("Run on 1 login", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Fill in the command", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Dialog_ABrokenPlaceholder_IsSaidUnderTheCommand_AndNothingCanRun()
+	{
+		CommandSnippet snippet = Snippet(CommandSnippetScope.Connection) with { ConnectionId = LooseShell.Id, Host = Loose.Address, Command = "ping -c 1 {{host" };
+
+		string html = await RenderDialogAsync(new CommandRunEditorRequest { Snippet = snippet });
+
+		Assert.Contains("&quot;{{host&quot; is not closed.", html, StringComparison.Ordinal);
+		Assert.Matches("<button[^>]*data-primary=\"true\"[^>]*disabled|<button[^>]*disabled[^>]*data-primary=\"true\"", html);
+	}
+
+	[Fact]
 	public void Request_NeverPrintsTheCommandOfItsSavedCommand()
 	{
 		CommandRunEditorRequest request = new() { Snippet = Snippet(CommandSnippetScope.Global) with { Command = "curl -H token-s3cr3t" } };
@@ -195,6 +223,8 @@ public sealed class CommandRunTests
 				services.AddScoped<ISessionManager, ManualSessionManager>();
 				services.AddScoped<SessionWorkspace>();
 				services.AddScoped<InputBroadcast>();
+				services.AddScoped<UserInteractionService>();
+				services.AddScoped<CommandTemplateFiller>();
 				services.AddScoped<CommandSnippetActions>();
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal));

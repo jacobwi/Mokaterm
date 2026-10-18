@@ -70,6 +70,7 @@ public sealed class ToolPageServicesTests
 	[InlineData(typeof(InputBroadcast))]
 	[InlineData(typeof(CatalogState))]
 	[InlineData(typeof(CommandSnippetActions))]
+	[InlineData(typeof(CommandTemplateFiller))]
 	[InlineData(typeof(SessionViewRequests))]
 	[InlineData(typeof(ClipboardClearSchedule))]
 	public void WindowState_IsBorrowed(Type service) => Assert.False(Classified().IsPerPage(service), service.Name);

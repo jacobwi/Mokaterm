@@ -68,6 +68,16 @@ internal sealed class UserInteractionService : IUserInteraction, IDisposable
 		return EnqueueAsync(new OverwriteRequest(prompt), cancellationToken);
 	}
 
+	/// <summary>
+	/// Asks for the values a command's placeholders need, one per name, or null when cancelled. Not part of
+	/// <see cref="IUserInteraction"/>: only the shell's own saved commands and command runs have placeholders.
+	/// </summary>
+	public Task<IReadOnlyDictionary<string, string>?> PromptPlaceholdersAsync(PlaceholderPrompt prompt, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(prompt);
+		return EnqueueAsync(new PlaceholderRequest(prompt), cancellationToken);
+	}
+
 	public void Notify(NoticeSeverity severity, string message, string? title = null)
 	{
 		ArgumentNullException.ThrowIfNull(message);

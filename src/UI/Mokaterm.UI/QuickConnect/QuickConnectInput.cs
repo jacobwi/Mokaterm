@@ -16,7 +16,24 @@ internal static class QuickConnectInput
 	/// <summary>The hint for a port that is a number but not one a port can be, which is the commonest slip.</summary>
 	public const string PortRange = "A port is a number from 1 to 65535.";
 
+	/// <summary>The protocol the picker starts on when none was picked before, or the one picked is not installed.</summary>
+	public const string DefaultProtocolId = "ssh";
+
 	private const string SchemeSeparator = "://";
+
+	/// <summary>
+	/// The protocol the picker starts on: <paramref name="lastPicked"/> while a module on this host still registers
+	/// it, otherwise SSH, otherwise the first protocol listed. Ids compare without case, and the registered spelling is
+	/// the one returned.
+	/// </summary>
+	public static string StartingProtocol(string? lastPicked, IReadOnlyList<string> protocolIds)
+	{
+		ArgumentNullException.ThrowIfNull(protocolIds);
+		return Registered(lastPicked) ?? Registered(DefaultProtocolId) ?? (protocolIds.Count > 0 ? protocolIds[0] : DefaultProtocolId);
+
+		string? Registered(string? protocolId) =>
+			protocolId is null ? null : protocolIds.FirstOrDefault(id => string.Equals(id, protocolId, StringComparison.OrdinalIgnoreCase));
+	}
 
 	/// <summary>
 	/// The protocol the text asks for: the one its <c>scheme://</c> names when a module registered it, otherwise

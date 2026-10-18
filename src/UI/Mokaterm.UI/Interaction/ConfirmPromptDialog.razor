@@ -12,7 +12,7 @@
 			<MokaText Size="MokaSize.Sm" Class="mt-break">@Prompt.Message</MokaText>
 			@if (Prompt.Details is { Length: > 0 } details)
 			{
-				<pre class="mt-confirm-details">@details</pre>
+				<pre class="mt-prompt-details">@details</pre>
 			}
 			@if (Prompt.RememberText is { Length: > 0 } rememberText)
 			{

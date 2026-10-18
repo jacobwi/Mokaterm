@@ -65,6 +65,11 @@ internal sealed class CommandSnippetStore : ICommandSnippetStore, IDisposable
 			throw new ArgumentException("A saved command is a single line.", nameof(snippet));
 		}
 
+		if (CommandTemplate.Parse(command).Problem is { } placeholderProblem)
+		{
+			throw new ArgumentException(placeholderProblem, nameof(snippet));
+		}
+
 		string? host = NormalizeHost(snippet.Host);
 		if (snippet.Scope == CommandSnippetScope.Host && host is null)
 		{

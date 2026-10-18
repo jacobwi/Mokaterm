@@ -19,3 +19,21 @@
 .mt-prompt ::deep .mt-break {
 	overflow-wrap: anywhere;
 }
+
+/* What a prompt is about, kept as it came (a paste preview, a command line): wrapped rather than scrolled sideways. */
+.mt-prompt ::deep .mt-prompt-details {
+	max-height: 200px;
+	margin: 0;
+	padding: var(--moka-spacing-sm);
+	overflow: auto;
+	border-left: 3px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	line-height: var(--moka-line-height-base);
+	color: var(--moka-color-on-surface-variant);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	tab-size: 4;
+}

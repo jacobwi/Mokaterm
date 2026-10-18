@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Storage;
 using Mokaterm.UI.Commands;
@@ -54,6 +55,9 @@ public sealed partial class CommandsPanelTests
 				services.AddScoped<ISessionManager, ManualSessionManager>();
 				services.AddScoped<SessionWorkspace>();
 				services.AddScoped<InputBroadcast>();
+				services.AddSingleton<IVault, UnlockedVault>();
+				services.AddScoped<UserInteractionService>();
+				services.AddScoped<CommandTemplateFiller>();
 				services.AddScoped<CommandSnippetActions>();
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal) { [nameof(CommandsPanel.Session)] = new FakeSession() });
