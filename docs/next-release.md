@@ -44,13 +44,15 @@ SDK packages and template, and automatic updates (items 2 and 15); the rest move
 
 8. A Kubernetes manager, built like the Docker manager (pods, logs, exec, rollout restart over kubectl through SSH).
 9. Live host stats (CPU, memory, disk) for a session in the toolbar or status bar, reusing the System view's sampler.
+   Done in 0.2.3: the status bar, with one sampler per session shared with the System view's Overview.
 10. `rz`/`sz` (ZMODEM) file transfer inside the terminal, which would also give serial sessions a transfer.
 11. Command snippets with placeholders, such as `systemctl restart {{service}}`, asked for when run, including across
-    several hosts.
+    several hosts. Done in 0.2.3.
 12. Vault sync through a folder (OneDrive, Dropbox): the vault is encrypted per document already, so no account and no
     server of ours.
-13. Windows notifications for trigger alerts, so a notice raised while the window is minimized is not missed.
-14. Docker registry login, image push and build.
+13. Windows notifications for trigger alerts, so a notice raised while the window is minimized is not missed. Done in
+    0.2.3.
+14. Docker registry login, image push and build. Done in 0.2.3, with tag and compose build.
 
 ## License
 

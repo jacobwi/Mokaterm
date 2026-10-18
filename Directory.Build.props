@@ -45,7 +45,7 @@
 		<Product>Mokaterm</Product>
 		<Copyright>Copyright (c) Moka 2026</Copyright>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<VersionPrefix>0.2.2</VersionPrefix>
+		<VersionPrefix>0.2.3</VersionPrefix>
 	</PropertyGroup>
 
 	<!--

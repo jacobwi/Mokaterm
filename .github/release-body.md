@@ -1,3 +1,55 @@
+## What's new in 0.2.3
+
+**Sessions and terminals**
+
+- The status bar shows live CPU, memory and root disk use for the machine of the SSH session in front, coloured when it
+  gets busy or full. Point at it for load, swap and uptime, or click it to open the System tool. Settings, Appearance
+  turns it off or changes how often it reads.
+- Saved commands can ask for values: write `{{name}}` or `{{name:default}}` and Mokaterm asks before typing or running
+  the command, with a preview of the final line. Docker and Go templates such as `{{.Names}}` keep working as before.
+- On the desktop, a trigger that shows a notice also shows a Windows notification while Mokaterm is minimized or behind
+  another window, and clicking it brings that session's tab back. By default it names only the session and the rule; a
+  setting adds the matched line.
+- Pausing a session's triggers now holds when its tab moves to another pane.
+- The quick connect box remembers the protocol you last picked.
+
+**Files**
+
+- Searching files over SSH runs one search on the server instead of opening every folder in turn, so a big tree takes
+  seconds instead of minutes, as root and inside containers too. Accounts limited to SFTP, and BSD and macOS servers,
+  search folder by folder as before.
+- A folder that cannot be read, as root or in a container, now says so instead of looking empty.
+
+**Docker**
+
+- Log in to container registries from the new Registries page. The password goes to docker on stdin, and you can keep
+  it in the vault for one-click logins.
+- Build images (build args masked), tag and push them, with live output and a Stop button, and build a compose
+  project's images.
+
+**Import and session logs**
+
+- Importing from OpenSSH, PuTTY or WinSCP on the desktop can copy the private keys your logins use into the keychain,
+  PuTTY `.ppk` files included, and set those logins to sign in with them. A key with a passphrase asks for it when you
+  connect.
+- Session logs can clean up after themselves: delete logs older than a set number of days, or keep them under a size
+  cap. The settings page shows how much space they take and can delete one, several or all of them.
+
+**Remote desktop (RDP)**
+
+- Sideways scrolling goes the right way, and a fast scroll no longer arrives as a tiny one.
+- When the server ends a session (you sign out, an administrator disconnects you, or someone else connects), the tab
+  says why instead of reporting a lost connection; a real drop still reconnects.
+- A remote desktop that can no longer be drawn drops the session so you can reconnect, instead of freezing.
+
+**Security and look**
+
+- A password copied from Mokaterm is cleared at its timeout even while the window is in the background, and when you
+  close the app before the timeout, unless something else has been copied since.
+- Every remaining hint (what a figure or count means, why a row is marked, the exact time behind "3 days ago") shows in
+  Mokaterm's own tooltip. The browser's tooltip stays only for the full text of names and paths that are cut short.
+- The fingerprint copy buttons in a host key question say which fingerprint they copy.
+
 ## What's new in 0.2.2
 
 **Remote desktop (RDP)**
