@@ -23,7 +23,7 @@
 
 			@if (_active is { } active)
 			{
-				<MokaStatusBarItem Class="mt-status-session" Tooltip="@ActiveTooltip(active)">
+				<MokaStatusBarItem Class="mt-status-session" TooltipClass="mt-status-session-slot" Tooltip="@ActiveTooltip(active)">
 					@* The machine's own colour, the one its tab and its session toolbar already carry. *@
 					<span class="mt-status-accent" style="background:@HostAccent.For(active.Host)" aria-hidden="true"></span>
 					<MokaTag Text="@active.Protocol.DisplayName.ToUpperInvariant()"
@@ -63,7 +63,7 @@
 
 				@if (_remoteTitle is { Length: > 0 } remoteTitle)
 				{
-					<MokaStatusBarItem Class="mt-status-remote-item" Tooltip="@RemoteTitleTooltip(remoteTitle)">
+					<MokaStatusBarItem Class="mt-status-remote-item" TooltipClass="mt-status-remote-slot" Tooltip="@RemoteTitleTooltip(remoteTitle)">
 						<span class="mt-status-remote">@remoteTitle</span>
 					</MokaStatusBarItem>
 				}

@@ -33,16 +33,16 @@
 /*
 	An item only gives way at all once it may shrink past its content. The remote title is weighted to lose most of the
 	room, because which machine you are typing at matters more than what its shell calls itself. The tooltip's element
-	around an item is the one the group shrinks, so it carries the same rules, and the item inside still has to give way
-	to it.
+	around an item is the one the group shrinks, so it carries the same rules through its TooltipClass, and the item
+	inside still has to give way to it.
 */
 .mt-status-group ::deep .mt-status-session,
-.mt-status-group ::deep .moka-statusbar-item-tooltip:has(> .mt-status-session) {
+.mt-status-group ::deep .mt-status-session-slot {
 	min-width: 0;
 }
 
 .mt-status-group ::deep .mt-status-remote-item,
-.mt-status-group ::deep .moka-statusbar-item-tooltip:has(> .mt-status-remote-item) {
+.mt-status-group ::deep .mt-status-remote-slot {
 	flex-shrink: 4;
 	min-width: 0;
 }

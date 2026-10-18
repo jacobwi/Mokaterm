@@ -30,11 +30,12 @@
 			</MokaKeyValue>
 			@if (Prompt.Previous is { } previous)
 			{
-				<MokaKeyValue Label="TRUSTED" LabelWidth="96px" Value="@previous.Fingerprint" Copyable>
+				<MokaKeyValue Label="TRUSTED" LabelWidth="96px" Value="@previous.Fingerprint" Copyable CopyLabel="Copy the trusted fingerprint">
 					<MokaText Element="span" Mono Size="MokaSize.Sm" Class="mt-break">@previous.Fingerprint</MokaText>
 				</MokaKeyValue>
 			}
-			<MokaKeyValue Label="@(IsChanged ? "PRESENTED" : "FINGERPRINT")" LabelWidth="96px" Value="@Identity.Fingerprint" Copyable>
+			<MokaKeyValue Label="@(IsChanged ? "PRESENTED" : "FINGERPRINT")" LabelWidth="96px" Value="@Identity.Fingerprint" Copyable
+			              CopyLabel="@(IsChanged ? "Copy the presented fingerprint" : "Copy the fingerprint")">
 				<MokaText Element="span" Mono Size="MokaSize.Sm" Class="mt-break">@Identity.Fingerprint</MokaText>
 			</MokaKeyValue>
 			@if (Identity.Subject is { } subject)
