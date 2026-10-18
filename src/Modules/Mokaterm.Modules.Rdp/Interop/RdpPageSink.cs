@@ -23,16 +23,17 @@ internal sealed class RdpPageSink : IRdpSink, IDisposable
 		_calls = new PageCalls(dispatch);
 	}
 
-	public ValueTask FrameAsync(ReadOnlyMemory<byte> frame, CancellationToken cancellationToken)
+	public ValueTask FrameAsync(byte[] frame, CancellationToken cancellationToken)
 	{
-		if (frame.IsEmpty)
+		ArgumentNullException.ThrowIfNull(frame);
+		if (frame.Length == 0)
 		{
 			return ValueTask.CompletedTask;
 		}
 
-		// The encoder reuses its buffer, so the frame is copied before it crosses into JavaScript.
-		byte[] copy = frame.ToArray();
-		return _calls.CallAsync(token => _interop.FrameAsync(_instanceId, copy, token), cancellationToken);
+		// The encoder makes a new array for every frame and never touches it again, so the frame crosses as it is. The
+		// copy PageCalls asks for is for a buffer the caller reuses, which this one is not.
+		return _calls.CallAsync(token => _interop.FrameAsync(_instanceId, frame, token), cancellationToken);
 	}
 
 	public ValueTask PointerImageAsync(RdpPointerImage cursor, CancellationToken cancellationToken)

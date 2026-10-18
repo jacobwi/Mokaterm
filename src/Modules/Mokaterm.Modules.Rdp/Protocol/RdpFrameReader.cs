@@ -41,17 +41,20 @@ internal sealed class RdpFrameReader : IDisposable
 
 	/// <summary>The next message whose length <paramref name="hint"/> knows how to find.</summary>
 	/// <exception cref="EndOfStreamException">The server closed the connection first.</exception>
-	public async ValueTask<byte[]> ReadByHintAsync(PduHint hint, CancellationToken cancellationToken)
+	public ValueTask<byte[]> ReadByHintAsync(PduHint hint, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(hint);
+		return ReadMessageAsync(bytes => RdpMessageSize.Find(hint, bytes), cancellationToken);
+	}
+
+	/// <summary>The next message, whose length <paramref name="findSize"/> reads from the bytes it starts with.</summary>
+	/// <exception cref="EndOfStreamException">The server closed the connection first.</exception>
+	public async ValueTask<byte[]> ReadMessageAsync(Func<byte[], nuint?> findSize, CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(findSize);
 		while (true)
 		{
-			int? size = FindSize(bytes =>
-			{
-				using OptionalUsize found = hint.FindSize(bytes);
-				return found.IsSome() ? found.Get() : null;
-			});
-
+			int? size = FindSize(findSize);
 			if (size is int length)
 			{
 				return await ReadExactAsync(length, cancellationToken);

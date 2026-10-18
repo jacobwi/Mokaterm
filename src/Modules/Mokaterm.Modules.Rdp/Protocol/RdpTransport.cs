@@ -1,6 +1,7 @@
 using System.Net.Security;
 using Devolutions.IronRdp;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Modules.Rdp.Sessions;
 
 namespace Mokaterm.Modules.Rdp.Protocol;
 
@@ -8,7 +9,7 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// A connected RDP session before anything has been decoded: the TLS stream, the frame reader over it and what
 /// the server agreed to. Disposing it closes the connection.
 /// </summary>
-internal sealed class RdpTransport : IAsyncDisposable
+internal sealed class RdpTransport : IRdpWire, IAsyncDisposable
 {
 	private int _closed;
 	private int _disposed;
@@ -59,6 +60,13 @@ internal sealed class RdpTransport : IAsyncDisposable
 
 	/// <summary>True when the certificate was known or the user accepted it.</summary>
 	public bool IdentityVerified { get; }
+
+	public async ValueTask WriteAsync(byte[] bytes, CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(bytes);
+		await Stream.WriteAsync(bytes, cancellationToken);
+		await Stream.FlushAsync(cancellationToken);
+	}
 
 	public RdpConnectionInfo Describe() => new()
 	{

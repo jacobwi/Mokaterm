@@ -435,6 +435,9 @@ function onWheel(state, event) {
 	}
 
 	event.preventDefault();
+
+	// Both axes go as the page reports them, down and right positive. RdpInputTranslator turns the vertical one around
+	// for Windows and splits a turn too big for one RDP event.
 	const scale = event.deltaMode === 1 ? LinesPerNotch : event.deltaMode === 2 ? 1 : PixelsPerNotch;
 	state.wheelY += (event.deltaY / scale) * WheelNotch;
 	state.wheelX += (event.deltaX / scale) * WheelNotch;

@@ -10,8 +10,9 @@ internal sealed class FirstPictureSink : IRdpSink
 	/// <summary>Completes with the size of the first region's message.</summary>
 	public Task<int> FirstFrame => _firstFrame.Task;
 
-	public ValueTask FrameAsync(ReadOnlyMemory<byte> frame, CancellationToken cancellationToken)
+	public ValueTask FrameAsync(byte[] frame, CancellationToken cancellationToken)
 	{
+		ArgumentNullException.ThrowIfNull(frame);
 		_firstFrame.TrySetResult(frame.Length);
 		return ValueTask.CompletedTask;
 	}

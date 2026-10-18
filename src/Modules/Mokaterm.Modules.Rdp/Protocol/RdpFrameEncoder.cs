@@ -7,7 +7,12 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// both sides handle them without work; large ones are compressed, since a full screen of raw is megabytes and
 /// the web host pushes every frame through one SignalR message.
 /// </summary>
-internal sealed class RdpFrameEncoder
+/// <remarks>
+/// The rows are read straight out of the desktop copy, raw ones into the message and PNG ones into the deflater, so a
+/// region costs one copy of its own bytes at most and nothing the size of the desktop. The message is a new array of
+/// exactly its size, which is what JS interop needs anyway; the deflate scratch is kept from frame to frame.
+/// </remarks>
+internal sealed class RdpFrameEncoder : IDisposable
 {
 	/// <summary>Six little-endian 16 bit fields. The last one is padding that puts the pixels on a four byte boundary.</summary>
 	public const int HeaderLength = 12;
@@ -16,7 +21,11 @@ internal sealed class RdpFrameEncoder
 
 	public const int PngFormat = 1;
 
-	private byte[] _buffer = [];
+	// A full screen of noise deflates to about its raw size, which would otherwise stay held for the whole session.
+	private const int MaxKeptScratchBytes = 4 * 1024 * 1024;
+
+	private readonly MemoryStream _compressed = new();
+	private byte[] _row = [];
 
 	/// <param name="rawLimitBytes">Regions whose pixels fit in this many bytes are sent raw.</param>
 	public RdpFrameEncoder(int rawLimitBytes) => RawLimitBytes = Math.Max(0, rawLimitBytes);
@@ -28,10 +37,11 @@ internal sealed class RdpFrameEncoder
 		region.Area * PngWriter.BytesPerPixel <= RawLimitBytes ? RawFormat : PngFormat;
 
 	/// <summary>
-	/// Cuts <paramref name="region"/> out of a desktop held as rows of RGBA pixels and returns the message for it.
-	/// The result points into a buffer this encoder reuses, so send it before the next call.
+	/// Cuts <paramref name="region"/> out of a desktop held as rows of RGBA pixels and returns the message for it, with
+	/// every pixel opaque. The array is new and the caller's to keep.
 	/// </summary>
-	public ReadOnlyMemory<byte> Encode(ReadOnlySpan<byte> desktop, int desktopWidth, RdpRegion region)
+	/// <exception cref="ArgumentException">The region is empty or reaches outside the desktop.</exception>
+	public byte[] Encode(ReadOnlySpan<byte> desktop, int desktopWidth, RdpRegion region)
 	{
 		ArgumentOutOfRangeException.ThrowIfLessThan(desktopWidth, 1);
 		if (region.IsEmpty)
@@ -39,34 +49,47 @@ internal sealed class RdpFrameEncoder
 			throw new ArgumentException("An empty region has nothing to send.", nameof(region));
 		}
 
-		int pixelBytes = (int)region.Area * PngWriter.BytesPerPixel;
-		bool raw = pixelBytes <= RawLimitBytes;
-		int needed = raw ? HeaderLength + pixelBytes : HeaderLength;
-		if (_buffer.Length < needed)
+		int stride = desktopWidth * PngWriter.BytesPerPixel;
+		if (region.X < 0 || region.Y < 0 || region.Right > desktopWidth || (long)region.Bottom * stride > desktop.Length)
 		{
-			_buffer = new byte[needed];
+			throw new ArgumentException($"The region {region} is not inside the desktop.", nameof(region));
 		}
 
-		WriteHeader(_buffer, raw ? RawFormat : PngFormat, region);
-		if (raw)
+		int rowBytes = region.Width * PngWriter.BytesPerPixel;
+		if (FormatFor(region) == RawFormat)
 		{
-			CopyRegion(desktop, desktopWidth, region, _buffer.AsSpan(HeaderLength, pixelBytes));
-			return _buffer.AsMemory(0, needed);
+			byte[] message = GC.AllocateUninitializedArray<byte>(HeaderLength + (rowBytes * region.Height));
+			WriteHeader(message, RawFormat, region);
+			Span<byte> pixels = message.AsSpan(HeaderLength);
+			for (int row = 0; row < region.Height; row++)
+			{
+				int source = ((region.Y + row) * stride) + (region.X * PngWriter.BytesPerPixel);
+				desktop.Slice(source, rowBytes).CopyTo(pixels.Slice(row * rowBytes, rowBytes));
+			}
+
+			// The desktop has nothing behind it, and a codec that leaves the fourth byte alone would otherwise paint
+			// holes in the canvas.
+			PngWriter.MakeOpaque(pixels);
+			return message;
 		}
 
-		byte[] pixels = new byte[pixelBytes];
-		CopyRegion(desktop, desktopWidth, region, pixels);
-		byte[] png = PngWriter.Encode(pixels, region.Width, region.Height);
-		if (_buffer.Length < HeaderLength + png.Length)
+		if (_row.Length < rowBytes)
 		{
-			byte[] grown = new byte[HeaderLength + png.Length];
-			_buffer.AsSpan(0, HeaderLength).CopyTo(grown);
-			_buffer = grown;
+			_row = new byte[rowBytes];
 		}
 
-		png.CopyTo(_buffer.AsSpan(HeaderLength));
-		return _buffer.AsMemory(0, HeaderLength + png.Length);
+		byte[] png = PngWriter.Encode(desktop, stride, region, opaque: true, HeaderLength, _compressed, _row);
+		WriteHeader(png, PngFormat, region);
+		if (_compressed.Capacity > MaxKeptScratchBytes)
+		{
+			_compressed.SetLength(0);
+			_compressed.Capacity = 0;
+		}
+
+		return png;
 	}
+
+	public void Dispose() => _compressed.Dispose();
 
 	private static void WriteHeader(Span<byte> target, int format, RdpRegion region)
 	{
@@ -76,23 +99,5 @@ internal sealed class RdpFrameEncoder
 		BinaryPrimitives.WriteUInt16LittleEndian(target[6..], (ushort)region.Width);
 		BinaryPrimitives.WriteUInt16LittleEndian(target[8..], (ushort)region.Height);
 		BinaryPrimitives.WriteUInt16LittleEndian(target[10..], 0);
-	}
-
-	private static void CopyRegion(ReadOnlySpan<byte> desktop, int desktopWidth, RdpRegion region, Span<byte> target)
-	{
-		int stride = desktopWidth * PngWriter.BytesPerPixel;
-		int rowBytes = region.Width * PngWriter.BytesPerPixel;
-		for (int row = 0; row < region.Height; row++)
-		{
-			int source = ((region.Y + row) * stride) + (region.X * PngWriter.BytesPerPixel);
-			desktop.Slice(source, rowBytes).CopyTo(target.Slice(row * rowBytes, rowBytes));
-		}
-
-		// The desktop has nothing behind it, and a codec that leaves the fourth byte alone would otherwise paint
-		// holes in the canvas.
-		for (int i = PngWriter.BytesPerPixel - 1; i < target.Length; i += PngWriter.BytesPerPixel)
-		{
-			target[i] = 0xFF;
-		}
 	}
 }

@@ -134,6 +134,10 @@ internal static class Program
 			{
 				PrintFailure(ended);
 			}
+			else if (session.CloseReason is { } reason)
+			{
+				Console.WriteLine($"The server ended it: {reason}");
+			}
 
 			return 1;
 		}

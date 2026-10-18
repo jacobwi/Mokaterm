@@ -10,6 +10,12 @@ public interface IRdpConnection
 	RdpConnectionInfo Info { get; }
 
 	/// <summary>
+	/// Why the server ended the session, such as the user signing out or another user connecting, once it has. Null
+	/// while the session runs, after the user closed it and after a drop, which faults the session with its own reason.
+	/// </summary>
+	string? CloseReason { get; }
+
+	/// <summary>
 	/// Attaches <paramref name="sink"/> and returns the channel. Only one page can be attached at a time; a second
 	/// one replaces the first. Dispose the result to detach, which leaves the session running.
 	/// </summary>

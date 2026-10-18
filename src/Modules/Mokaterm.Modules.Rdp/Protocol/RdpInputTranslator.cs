@@ -9,6 +9,15 @@ internal sealed class RdpInputTranslator
 	/// <summary>One wheel notch, the unit RDP counts in.</summary>
 	public const int WheelNotch = 120;
 
+	/// <summary>The most one pointer event carries: its rotation field is nine bits of two's complement.</summary>
+	public const int MaxUnitsPerEvent = 255;
+
+	/// <summary>
+	/// The most one page event may turn the wheel. A fling on a touchpad can report thousands of pixels at once, and
+	/// each 255 units is an event of its own on the wire.
+	/// </summary>
+	public const int MaxWheelUnits = 16 * WheelNotch;
+
 	private readonly List<RdpScancode> _heldKeys = [];
 	private readonly List<int> _heldButtons = [];
 	private int _width;
@@ -133,13 +142,30 @@ internal sealed class RdpInputTranslator
 		operations.Add(new RdpOperation(RdpOperationKind.MouseMove, x, y));
 	}
 
+	/// <summary>
+	/// The page reports a wheel the way a document scrolls, down and right positive (<c>WheelEvent.deltaY</c> and
+	/// <c>deltaX</c>). MS-RDPBCGR only says the rotation is negative when PTRFLAGS_WHEEL_NEGATIVE is set; what the sign
+	/// means is Windows' own, because the server injects the value as it comes: for <c>MOUSEEVENTF_WHEEL</c> positive is
+	/// the wheel turned away from the user, which scrolls up, and for <c>MOUSEEVENTF_HWHEEL</c> positive is the wheel
+	/// tilted right. So the vertical axis turns around and the horizontal one does not. FreeRDP's clients agree: X11
+	/// button 7 (scroll right) is PTR_FLAGS_HWHEEL with a positive 0x78 and button 6 (left) the negative one, and the
+	/// Windows client passes WM_MOUSEHWHEEL's delta through unchanged. IronRDP's own web client negates both axes, which
+	/// reverses its horizontal scrolling, so it is not followed here.
+	/// </summary>
 	private static void TranslateWheel(RdpInputEvent input, List<RdpOperation> operations)
 	{
-		// The page counts the way a document scrolls, down and right positive; RDP counts the way the wheel turns.
-		int units = Math.Clamp(-input.B, short.MinValue, short.MaxValue);
-		if (units != 0)
+		bool vertical = input.A != 0;
+		long requested = vertical ? -(long)input.B : input.B;
+		int units = (int)Math.Clamp(requested, -MaxWheelUnits, MaxWheelUnits);
+
+		// The rotation travels in nine bits of two's complement, and IronRDP keeps the low eight of whatever it is given
+		// and sets the sign flag apart, so 360 would arrive as 104 and 256 as nothing at all. FreeRDP's SDL client sends a
+		// large turn as several events of at most 255 for the same reason.
+		while (units != 0)
 		{
-			operations.Add(new RdpOperation(RdpOperationKind.Wheel, input.A != 0 ? 1 : 0, units));
+			int step = Math.Clamp(units, -MaxUnitsPerEvent, MaxUnitsPerEvent);
+			operations.Add(new RdpOperation(RdpOperationKind.Wheel, vertical ? 1 : 0, step));
+			units -= step;
 		}
 	}
 

@@ -44,6 +44,7 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 	private RdpConnectionInfo? _info;
 	private ScreenState _state = ScreenState.Idle;
 	private string? _error;
+	private string? _closeReason;
 	private string _scaling = ScalingFit;
 	private bool _viewOnly;
 	private int _instanceId;
@@ -84,7 +85,11 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 
 	private bool IsRunning => _state == ScreenState.Running && _instanceId != 0;
 
-	private string IdleDescription => SessionIdleText.For(Session.State, "Reconnect the session to open its desktop again.");
+	private string IdleDescription => SessionIdleText.For(Session.State, AfterCloseReason("Reconnect the session to open its desktop again."));
+
+	private string EndedDescription => _closeReason is null
+		? "The session ended it. Reconnect the session to see it again."
+		: AfterCloseReason("Reconnect the session to see it again.");
 
 	private string ScreenSizeText => _screenWidth > 0
 		? string.Create(CultureInfo.InvariantCulture, $"{_screenWidth} x {_screenHeight}")
@@ -158,6 +163,11 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 		catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
 		{
 			// The view or the session closed while the resize was on its way.
+		}
+		catch (Exception ex)
+		{
+			// A resize that could not be written means the connection broke, which the session reports itself.
+			Logger.LogDebug(ex, "Asking the RDP server for a new desktop size failed.");
 		}
 	}
 
@@ -247,9 +257,12 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 
 	private async Task SwitchSessionAsync()
 	{
+		// The shell lets go of a session that ended, and the reason the server gave would go with it.
+		string? closed = ClosedReasonOf(_attachedSession);
 		await ReleaseAsync();
 		_attachedSession = Session.Session;
 		_error = null;
+		_closeReason = closed;
 		if (_attachedSession?.GetFeature<IRdpConnection>() is not { } connection)
 		{
 			_state = ScreenState.Idle;
@@ -260,6 +273,7 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 		}
 
 		_state = ScreenState.Starting;
+		_closeReason = null;
 		_info = connection.Info;
 		_screenWidth = _info.Width;
 		_screenHeight = _info.Height;
@@ -298,6 +312,13 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 		StateHasChanged();
 	}
 
+	/// <summary>The reason the server gave for ending the session, when it gave one, followed by <paramref name="hint"/>.</summary>
+	private string AfterCloseReason(string hint) => _closeReason is null ? hint : $"{_closeReason} {hint}";
+
+	/// <summary>Why the server ended <paramref name="session"/>, when it ended cleanly and the server said.</summary>
+	private static string? ClosedReasonOf(IProtocolSession? session) =>
+		session is { Completion.IsCompletedSuccessfully: true } ? session.GetFeature<IRdpConnection>()?.CloseReason : null;
+
 	/// <summary>Turns the end of the connection into the overlay that says so, without waiting for the shell.</summary>
 	private void WatchSession(IProtocolSession session) => _ = WatchSessionAsync(session);
 
@@ -327,6 +348,7 @@ public sealed partial class RdpSessionView : SessionViewBase, IAsyncDisposable
 
 			_state = failure is null ? ScreenState.Ended : ScreenState.Failed;
 			_error = failure;
+			_closeReason = ClosedReasonOf(session);
 			StateHasChanged();
 		});
 	}

@@ -11,6 +11,7 @@ namespace Mokaterm.Modules.Rdp.Sessions;
 /// </summary>
 internal sealed class RdpSession : IProtocolSession, IRdpConnection
 {
+	private readonly RdpTransport _transport;
 	private readonly RdpSessionLoop _loop;
 	private readonly LoginCredentials? _credentials;
 	private readonly RdpConnectionInfo _connected;
@@ -18,19 +19,33 @@ internal sealed class RdpSession : IProtocolSession, IRdpConnection
 	private AttachedChannel? _channel;
 	private int _disposed;
 
+	/// <param name="transport">The connection, which the session owns and disposes from here.</param>
 	/// <param name="credentials">A copy the session owns and disposes; nothing else keeps the login.</param>
 	public RdpSession(RdpTransport transport, RdpSettings settings, LoginCredentials? credentials, ILogger logger)
 	{
 		ArgumentNullException.ThrowIfNull(transport);
 		_connected = transport.Describe();
+		IronRdpStage stage = IronRdpStage.Create(transport.Result, transport.Width, transport.Height);
+		try
+		{
+			_loop = new RdpSessionLoop(transport, stage, transport.Width, transport.Height, settings, logger);
+		}
+		catch
+		{
+			stage.Dispose();
+			throw;
+		}
+
+		_transport = transport;
 		_credentials = credentials;
-		_loop = new RdpSessionLoop(transport, settings, logger);
 		_loop.Start();
 	}
 
 	public Task Completion => _loop.Completion;
 
 	public RdpConnectionInfo Info => _connected with { Width = _loop.Width, Height = _loop.Height };
+
+	public string? CloseReason => _loop.CloseReason;
 
 	public TFeature? GetFeature<TFeature>() where TFeature : class =>
 		typeof(TFeature) == typeof(IRdpConnection) ? (TFeature)(object)this : null;
@@ -74,7 +89,9 @@ internal sealed class RdpSession : IProtocolSession, IRdpConnection
 			_attachLock.Release();
 		}
 
+		// The loop frees the stage, and only then does the connection result the stage was built from go.
 		await _loop.DisposeAsync();
+		await _transport.DisposeAsync();
 		_credentials?.Dispose();
 		_attachLock.Dispose();
 	}

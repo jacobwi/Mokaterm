@@ -84,24 +84,66 @@ public sealed class RdpInputTranslatorTests
 		Assert.Empty(translator.Translate([RdpInputEvent.MouseDown(button)]));
 	}
 
-	[Fact]
-	public void Translate_Wheel_TurnsThePageDirectionAround()
+	[Theory]
+	[InlineData(RdpInputTranslator.WheelNotch, -RdpInputTranslator.WheelNotch)]
+	[InlineData(-RdpInputTranslator.WheelNotch, RdpInputTranslator.WheelNotch)]
+	public void Translate_VerticalWheel_TurnsThePageDirectionAround(int page, int rdp)
 	{
+		// The page scrolls down for a positive deltaY; Windows scrolls down for a negative MOUSEEVENTF_WHEEL.
 		RdpInputTranslator translator = Translator();
 
-		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical: true, RdpInputTranslator.WheelNotch)]);
+		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical: true, page)]);
 
-		Assert.Equal(new RdpOperation(RdpOperationKind.Wheel, 1, -RdpInputTranslator.WheelNotch), Assert.Single(operations));
+		Assert.Equal(new RdpOperation(RdpOperationKind.Wheel, 1, rdp), Assert.Single(operations));
 	}
 
-	[Fact]
-	public void Translate_HorizontalWheel_KeepsItsOwnAxis()
+	[Theory]
+	[InlineData(RdpInputTranslator.WheelNotch)]
+	[InlineData(-RdpInputTranslator.WheelNotch)]
+	[InlineData(240)]
+	[InlineData(-240)]
+	public void Translate_HorizontalWheel_KeepsThePageDirection(int page)
+	{
+		// The page scrolls right for a positive deltaX, and so does Windows for a positive MOUSEEVENTF_HWHEEL, the
+		// way FreeRDP's clients send it (X11 button 7 is a positive PTR_FLAGS_HWHEEL).
+		RdpInputTranslator translator = Translator();
+
+		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical: false, page)]);
+
+		Assert.Equal(new RdpOperation(RdpOperationKind.Wheel, 0, page), Assert.Single(operations));
+	}
+
+	[Theory]
+	[InlineData(true, 600, new[] { -255, -255, -90 })]
+	[InlineData(true, -600, new[] { 255, 255, 90 })]
+	[InlineData(false, 600, new[] { 255, 255, 90 })]
+	[InlineData(false, -600, new[] { -255, -255, -90 })]
+	[InlineData(false, 255, new[] { 255 })]
+	[InlineData(false, 256, new[] { 255, 1 })]
+	public void Translate_ATurnTooBigForOneEvent_GoesAsSeveral(bool vertical, int page, int[] expected)
+	{
+		// The rotation is nine bits of two's complement, and IronRDP would keep only the low eight of 600.
+		RdpInputTranslator translator = Translator();
+
+		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical, page)]);
+
+		Assert.Equal(expected, operations.Select(operation => operation.B));
+		Assert.All(operations, operation => Assert.Equal(vertical ? 1 : 0, operation.A));
+	}
+
+	[Theory]
+	[InlineData(true, int.MaxValue)]
+	[InlineData(true, int.MinValue)]
+	[InlineData(false, int.MaxValue)]
+	[InlineData(false, int.MinValue)]
+	public void Translate_AnAbsurdTurn_IsCappedAtWhatOneEventMayAskFor(bool vertical, int page)
 	{
 		RdpInputTranslator translator = Translator();
 
-		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical: false, -240)]);
+		IReadOnlyList<RdpOperation> operations = translator.Translate([RdpInputEvent.Wheel(vertical, page)]);
 
-		Assert.Equal(new RdpOperation(RdpOperationKind.Wheel, 0, 240), Assert.Single(operations));
+		Assert.Equal(RdpInputTranslator.MaxWheelUnits, Math.Abs(operations.Sum(operation => operation.B)));
+		Assert.All(operations, operation => Assert.InRange(Math.Abs(operation.B), 1, RdpInputTranslator.MaxUnitsPerEvent));
 	}
 
 	[Fact]

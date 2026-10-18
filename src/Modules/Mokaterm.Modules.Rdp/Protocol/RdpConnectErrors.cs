@@ -176,8 +176,10 @@ internal static class RdpConnectErrors
 		}
 	}
 
-	private static string Describe(IronRdpException exception)
+	/// <summary>IronRDP's own text for a failure, for messages the user reads. Logs take <c>LogSafe.Describe</c> instead.</summary>
+	public static string Describe(IronRdpException exception)
 	{
+		ArgumentNullException.ThrowIfNull(exception);
 		try
 		{
 			return exception.Inner.ToDisplay();

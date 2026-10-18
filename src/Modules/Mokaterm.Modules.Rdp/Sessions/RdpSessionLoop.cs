@@ -1,7 +1,7 @@
-using Devolutions.IronRdp;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Modules.Rdp.Protocol;
+using Mokaterm.UI.Common.Interop;
 using Action = Devolutions.IronRdp.Action;
 
 namespace Mokaterm.Modules.Rdp.Sessions;
@@ -11,60 +11,77 @@ namespace Mokaterm.Modules.Rdp.Sessions;
 /// page is attached and turns the page's events into input. Every IronRDP handle here is single threaded, so one
 /// gate guards all of them; the reads and the picture compression happen outside it.
 /// </summary>
+/// <remarks>
+/// Nothing that holds the gate ever waits on the page. The pump and the input calls only record what the page should
+/// learn (changed regions, the pointer, the desktop size), and the frame loop takes that state each tick and is the one
+/// caller of the sink, so a slow page slows its own picture and holds up neither the wire nor the keyboard. Taking the
+/// state rather than queueing it also coalesces: a page that falls behind gets the latest pointer, not every one.
+/// </remarks>
 internal sealed class RdpSessionLoop : IAsyncDisposable
 {
-	/// <summary>Browsers refuse a CSS cursor larger than this, so bigger pointers fall back to the default one.</summary>
-	private const int MaxCursorSize = 128;
-
-	private readonly RdpTransport _transport;
+	private readonly IRdpWire _wire;
+	private readonly IRdpStage _stage;
 	private readonly RdpSettings _settings;
 	private readonly ILogger _logger;
+	private readonly int _ioChannelId;
 	private readonly SemaphoreSlim _gate = new(1, 1);
-	private readonly Lock _dirtyGate = new();
-	private readonly RdpDirtyRegions _dirty = new();
-	private readonly RdpFrameEncoder _encoder;
 	private readonly CancellationTokenSource _stopping = new();
 	private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-	private readonly ActiveStage _stage;
-	private readonly InputDatabase _input;
 	private readonly RdpInputTranslator _translator;
-	private DecodedImage _image;
+
+	// What the page should learn next, under _pageGate. Producers hold the session gate or not; it does not matter.
+	private readonly Lock _pageGate = new();
+	private readonly RdpDirtyRegions _dirty = new();
+	private RdpPointerState? _pointer;
+	private int _pointerVersion;
+	private (int X, int Y) _serverPointer;
+	private int _serverPointerVersion;
+	private int _serverPointerAtAttach;
+
+	// Only the frame loop touches these: what the page it last painted already has.
+	private readonly RdpFrameEncoder _encoder;
 	private byte[] _pixels = [];
+	private IRdpSink? _painted;
+	private int _paintedWidth;
+	private int _paintedHeight;
+	private int _paintedPointerVersion;
+	private int _paintedServerPointerVersion;
+
 	private Task? _pump;
 	private Task? _frames;
 	private IRdpSink? _sink;
 	private int _width;
 	private int _height;
 	private volatile bool _viewOnly;
+	private string? _closeReason;
 	private int _disposed;
 
-	public RdpSessionLoop(RdpTransport transport, RdpSettings settings, ILogger logger)
+	/// <param name="wire">The connection. The loop closes it when the session ends, but the caller disposes it.</param>
+	/// <param name="stage">The IronRDP handles, which the loop owns from here and frees in <see cref="DisposeAsync"/>.</param>
+	public RdpSessionLoop(IRdpWire wire, IRdpStage stage, int width, int height, RdpSettings settings, ILogger logger)
 	{
-		ArgumentNullException.ThrowIfNull(transport);
+		ArgumentNullException.ThrowIfNull(wire);
+		ArgumentNullException.ThrowIfNull(stage);
 		ArgumentNullException.ThrowIfNull(settings);
-		_transport = transport;
+		_wire = wire;
+		_stage = stage;
 		_settings = settings;
 		_logger = logger;
-		_width = transport.Width;
-		_height = transport.Height;
+		_ioChannelId = stage.IoChannelId;
+		_width = width;
+		_height = height;
 		_encoder = new RdpFrameEncoder(settings.RawFrameKilobytes * 1024);
-		_translator = new RdpInputTranslator(_width, _height);
-		_stage = ActiveStage.New(transport.Result);
-		try
-		{
-			_image = DecodedImage.New(PixelFormat.RgbA32, (ushort)_width, (ushort)_height);
-			_input = InputDatabase.New();
-		}
-		catch
-		{
-			_image?.Dispose();
-			_stage.Dispose();
-			throw;
-		}
+		_translator = new RdpInputTranslator(width, height);
 	}
 
-	/// <summary>Completes when the session ends, and faults with the reason when it drops.</summary>
+	/// <summary>
+	/// Completes when the session ends, and faults with a reason the user can read when it drops. An end the server
+	/// announced completes it, with <see cref="CloseReason"/> saying why.
+	/// </summary>
 	public Task Completion => _completion.Task;
+
+	/// <summary>Why the server ended the session, once it has. Null while it runs and after a drop.</summary>
+	public string? CloseReason => Volatile.Read(ref _closeReason);
 
 	public int Width => Volatile.Read(ref _width);
 
@@ -77,8 +94,19 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		_frames ??= Task.Run(SendFramesAsync, CancellationToken.None);
 	}
 
-	/// <summary>Points the frames at <paramref name="sink"/>, or at nothing when it is null.</summary>
-	public void Attach(IRdpSink? sink) => Volatile.Write(ref _sink, sink);
+	/// <summary>
+	/// Points the frames at <paramref name="sink"/>, or at nothing when it is null. A new page is told the desktop size
+	/// before its first frame, and gets the pointer the server last drew.
+	/// </summary>
+	public void Attach(IRdpSink? sink)
+	{
+		lock (_pageGate)
+		{
+			// Where the server put the pointer before this page came is old news: the user has moved it since.
+			_serverPointerAtAttach = _serverPointerVersion;
+			Volatile.Write(ref _sink, sink);
+		}
+	}
 
 	/// <summary>Sends the whole desktop with the next frame, which is what a page that just attached needs.</summary>
 	public void Repaint() => MarkEverythingDirty();
@@ -165,16 +193,16 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		await _gate.WaitAsync(linked.Token);
 		try
 		{
-			using ActiveStageOutputIterator? outputs = _stage.EncodedResize((uint)target, (uint)targetHeight);
-			if (outputs is null)
+			List<RdpStageOutput> outputs = [];
+			if (!_stage.TryEncodeResize(target, targetHeight, outputs))
 			{
 				return false;
 			}
 
-			await HandleOutputsAsync(outputs, linked.Token);
+			await HandleOutputsAsync(outputs, reactivate: false, linked.Token);
 			return true;
 		}
-		catch (IronRdpException ex)
+		catch (Devolutions.IronRdp.IronRdpException ex)
 		{
 			_logger.LogDebug(ex, "The RDP server refused the resize to {Width}x{Height}.", target, targetHeight);
 			return false;
@@ -195,9 +223,9 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		await _stopping.CancelAsync();
 		Volatile.Write(ref _sink, null);
 
-		// The frame reader has no cancellation of its own, so closing the connection is what ends the pump. The
-		// connection result goes last, after the stage built from it has gone.
-		await _transport.CloseAsync();
+		// The frame reader has no cancellation of its own once IronRDP is working out a length, so closing the
+		// connection is what ends the pump.
+		await _wire.CloseAsync();
 		await WaitForAsync(_pump);
 		await WaitForAsync(_frames);
 
@@ -206,9 +234,7 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		// quickly. It is never released again: a handle freed under a native call would take the process down.
 		await _gate.WaitAsync(CancellationToken.None);
 		_stage.Dispose();
-		_image.Dispose();
-		_input.Dispose();
-		await _transport.DisposeAsync();
+		_encoder.Dispose();
 		_gate.Dispose();
 		_stopping.Dispose();
 		_completion.TrySetResult();
@@ -238,31 +264,21 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 	{
 		try
 		{
-			while (!_stopping.IsCancellationRequested)
+			while (true)
 			{
-				(Action action, byte[] payload) = await _transport.Reader.ReadPduAsync(_stopping.Token);
-				bool terminate;
-				await _gate.WaitAsync(_stopping.Token);
-				try
+				(Action action, byte[] payload) = await _wire.Reader.ReadPduAsync(_stopping.Token);
+				RdpServerEnd? end;
+				using (action)
 				{
-					using (action)
-					{
-						using ActiveStageOutputIterator outputs = _stage.Process(_image, action, payload);
-						terminate = await HandleOutputsAsync(outputs, _stopping.Token);
-					}
-				}
-				finally
-				{
-					_gate.Release();
+					end = RdpServerEnd.Read(payload, _ioChannelId) ?? await ProcessAsync(action, payload);
 				}
 
-				if (terminate)
+				if (end is not null)
 				{
-					break;
+					Finish(end);
+					return;
 				}
 			}
-
-			_completion.TrySetResult();
 		}
 		catch (Exception ex) when (_stopping.IsCancellationRequested || ex is OperationCanceledException or ObjectDisposedException)
 		{
@@ -274,12 +290,190 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		{
 			// A dropped connection is expected here, and its message can name the server.
 			_logger.LogInformation("The RDP session stopped reading: {Error}", LogSafe.Describe(ex));
-			_completion.TrySetException(ex);
+			_completion.TrySetException(RdpSessionErrors.Dropped(ex));
 		}
 		finally
 		{
-			await _stopping.CancelAsync();
+			await StopAsync();
 		}
+	}
+
+	private async ValueTask<RdpServerEnd?> ProcessAsync(Action action, byte[] payload)
+	{
+		await _gate.WaitAsync(_stopping.Token);
+		try
+		{
+			List<RdpStageOutput> outputs = [];
+			_stage.Process(action, payload, outputs);
+			return await HandleOutputsAsync(outputs, reactivate: true, _stopping.Token);
+		}
+		finally
+		{
+			_gate.Release();
+		}
+	}
+
+	/// <summary>
+	/// Acts on what IronRDP asked for, in order. Only call this while holding the gate. Returns how the session ends
+	/// when one of the outputs ends it.
+	/// </summary>
+	/// <param name="reactivate">
+	/// False for input and resize calls, which must never run a reactivation: that reads the wire, which only the pump
+	/// may do. IronRDP never answers input with one.
+	/// </param>
+	private async ValueTask<RdpServerEnd?> HandleOutputsAsync(List<RdpStageOutput> outputs, bool reactivate, CancellationToken cancellationToken)
+	{
+		RdpServerEnd? end = null;
+		int next = 0;
+
+		// The pointer changes of one message reach the page together, so a frame tick in between cannot show it a
+		// pointer the same message already replaced.
+		RdpPointerState? pointer = null;
+		(int X, int Y)? moved = null;
+		try
+		{
+			while (next < outputs.Count && end is null)
+			{
+				RdpStageOutput output = outputs[next++];
+				switch (output.Kind)
+				{
+					case RdpStageOutputKind.ResponseFrame:
+						// Everything that writes holds the gate, which is what keeps two writers off one TLS stream.
+						await _wire.WriteAsync(output.Frame, cancellationToken);
+						break;
+					case RdpStageOutputKind.GraphicsUpdate:
+						AddDirty(output.Region);
+						break;
+					case RdpStageOutputKind.PointerBitmap:
+						pointer = new RdpPointerState(output.Pointer, Hidden: false);
+						break;
+					case RdpStageOutputKind.PointerHidden:
+						pointer = RdpPointerState.HiddenPointer;
+						break;
+					case RdpStageOutputKind.PointerDefault:
+						pointer = RdpPointerState.Default;
+						break;
+					case RdpStageOutputKind.PointerPosition:
+						_translator.PointerMovedByServer(output.X, output.Y);
+						moved = (output.X, output.Y);
+						break;
+					case RdpStageOutputKind.Terminate:
+						end = RdpServerEnd.Terminated;
+						break;
+					case RdpStageOutputKind.DeactivateAll when output.Activation is { } activation:
+						if (reactivate)
+						{
+							end = await ReactivateAsync(activation, cancellationToken);
+						}
+						else
+						{
+							activation.Dispose();
+						}
+
+						break;
+					default:
+						break;
+				}
+			}
+		}
+		finally
+		{
+			RdpStageOutput.DisposeFrom(outputs, next);
+			if (pointer is not null || moved is not null)
+			{
+				SetPointer(pointer, moved);
+			}
+		}
+
+		return end;
+	}
+
+	/// <summary>
+	/// The server tore the session down to build it again, which is what a resize looks like on the wire, and what a
+	/// login on the server's own screen does once it moves to the user's session. The activation runs to its end and
+	/// the decoded desktop is replaced with one of the new size. The server can still end the session here, in which
+	/// case the step it would have fed is skipped and the end comes back.
+	/// </summary>
+	private async ValueTask<RdpServerEnd?> ReactivateAsync(IRdpActivation activation, CancellationToken cancellationToken)
+	{
+		using (activation)
+		{
+			while (true)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				if (activation.TryFinish(out int width, out int height))
+				{
+					ResetDesktop(width, height);
+					return null;
+				}
+
+				byte[]? input = null;
+				using (RdpMessageSize? size = activation.NextInputSize())
+				{
+					if (size is not null)
+					{
+						input = await _wire.Reader.ReadMessageAsync(size.Find, cancellationToken);
+					}
+				}
+
+				if (input is not null && RdpServerEnd.Read(input, _ioChannelId) is { } end)
+				{
+					return end;
+				}
+
+				byte[] reply = activation.Step(input);
+				if (reply.Length > 0)
+				{
+					await _wire.WriteAsync(reply, cancellationToken);
+				}
+			}
+		}
+	}
+
+	/// <summary>Only call this while holding the gate.</summary>
+	private void ResetDesktop(int width, int height)
+	{
+		if (!RdpDesktopBounds.IsSupported(width, height))
+		{
+			throw new RdpSessionException(RdpDesktopBounds.DescribeRefusal(width, height));
+		}
+
+		_stage.ResetDesktop(width, height);
+		Volatile.Write(ref _width, width);
+		Volatile.Write(ref _height, height);
+		_translator.Resize(width, height);
+		MarkEverythingDirty();
+	}
+
+	private async ValueTask ApplyAsync(IReadOnlyList<RdpOperation> operations, CancellationToken cancellationToken)
+	{
+		foreach (RdpOperation operation in operations)
+		{
+			List<RdpStageOutput> outputs = [];
+			_stage.ApplyInput(operation, outputs);
+			await HandleOutputsAsync(outputs, reactivate: false, cancellationToken);
+		}
+	}
+
+	/// <summary>The server ended the session on purpose and said why.</summary>
+	private void Finish(RdpServerEnd end)
+	{
+		_logger.LogInformation("The RDP server ended the session ({Code}).", end.Code);
+		if (end.Reconnects)
+		{
+			_completion.TrySetException(new RdpSessionException(end.Reason));
+			return;
+		}
+
+		Volatile.Write(ref _closeReason, end.Reason);
+		_completion.TrySetResult();
+	}
+
+	/// <summary>Stops both loops and closes the connection. The completion must already say how the session ended.</summary>
+	private async Task StopAsync()
+	{
+		await _stopping.CancelAsync();
+		await _wire.CloseAsync();
 	}
 
 	private async Task SendFramesAsync()
@@ -289,45 +483,112 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 		{
 			while (await timer.WaitForNextTickAsync(_stopping.Token))
 			{
-				IRdpSink? sink = Volatile.Read(ref _sink);
-				if (sink is null)
+				if (Volatile.Read(ref _sink) is { } sink)
 				{
-					continue;
+					await PaintAsync(sink);
 				}
-
-				IReadOnlyList<RdpRegion> regions = TakeDirty();
-				if (regions.Count == 0)
-				{
-					continue;
-				}
-
-				await SendRegionsAsync(sink, regions, _stopping.Token);
 			}
 		}
-		catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+		catch (Exception) when (_stopping.IsCancellationRequested)
 		{
 			// The session is closing.
 		}
 		catch (Exception ex)
 		{
-			_logger.LogWarning(ex, "The RDP session stopped sending frames.");
+			// Something on this side failed to make or hand over the picture. The connection still works, but a
+			// session whose picture no longer changes looks alive while it is not, so it drops instead and the tab
+			// offers to reconnect.
+			_logger.LogWarning("The RDP session stopped sending frames: {Error}", LogSafe.Describe(ex));
+			_completion.TrySetException(RdpSessionErrors.StoppedDrawing(ex));
+			await StopAsync();
 		}
 	}
 
-	private async Task SendRegionsAsync(IRdpSink sink, IReadOnlyList<RdpRegion> regions, CancellationToken cancellationToken)
+	/// <summary>One tick: what changed since the last one goes to the page, the desktop size first.</summary>
+	private async Task PaintAsync(IRdpSink sink)
+	{
+		if (!ReferenceEquals(sink, _painted))
+		{
+			// A page that just attached has nothing: it learns the size before its first frame and the pointer the
+			// server last drew, and where the server moved the pointer since it attached.
+			_painted = sink;
+			_paintedWidth = 0;
+			_paintedHeight = 0;
+			_paintedPointerVersion = 0;
+			lock (_pageGate)
+			{
+				_paintedServerPointerVersion = _serverPointerAtAttach;
+			}
+		}
+
+		IReadOnlyList<RdpRegion> regions;
+		RdpPointerState? pointer = null;
+		(int X, int Y)? moved = null;
+		lock (_pageGate)
+		{
+			regions = _dirty.IsEmpty ? [] : _dirty.Take();
+			if (_pointerVersion != _paintedPointerVersion)
+			{
+				pointer = _pointer;
+				_paintedPointerVersion = _pointerVersion;
+			}
+
+			if (_serverPointerVersion != _paintedServerPointerVersion)
+			{
+				moved = _serverPointer;
+				_paintedServerPointerVersion = _serverPointerVersion;
+			}
+		}
+
+		if (regions.Count > 0 && !await PaintRegionsAsync(sink, regions))
+		{
+			return;
+		}
+
+		if (pointer is not null && !await ToPageAsync(sink, PointerCall(pointer)))
+		{
+			return;
+		}
+
+		if (moved is (int x, int y))
+		{
+			await ToPageAsync(sink, (page, token) => page.PointerMovedAsync(x, y, token));
+		}
+	}
+
+	/// <returns>False when the page went away on the way.</returns>
+	private async Task<bool> PaintRegionsAsync(IRdpSink sink, IReadOnlyList<RdpRegion> regions)
 	{
 		int width;
 		int height;
-		await _gate.WaitAsync(cancellationToken);
+		await _gate.WaitAsync(_stopping.Token);
 		try
 		{
+			// One copy of the desktop per tick, the only way the bindings hand the picture out (see the RDP notes);
+			// every region below is cut from it outside the gate.
 			width = _width;
 			height = _height;
-			CopyDesktop();
+			_pixels = _stage.CopyDesktop(_pixels);
 		}
 		finally
 		{
 			_gate.Release();
+		}
+
+		if (_pixels.Length != width * height * PngWriter.BytesPerPixel)
+		{
+			throw new InvalidOperationException("The decoded desktop is not the size the session thinks it is.");
+		}
+
+		if ((width, height) != (_paintedWidth, _paintedHeight))
+		{
+			if (!await ToPageAsync(sink, (page, token) => page.DesktopResizedAsync(width, height, token)))
+			{
+				return false;
+			}
+
+			_paintedWidth = width;
+			_paintedHeight = height;
 		}
 
 		foreach (RdpRegion region in regions)
@@ -339,271 +600,80 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 			}
 
 			// Compressing outside the gate keeps a large PNG from holding up the wire.
-			await sink.FrameAsync(_encoder.Encode(_pixels, width, clipped), cancellationToken);
-		}
-	}
-
-	/// <summary>Copies the decoded desktop out of IronRDP. Only call this while holding the gate.</summary>
-	private void CopyDesktop()
-	{
-		using BytesSlice data = _image.GetData();
-		int size = (int)data.GetSize();
-		if (_pixels.Length != size)
-		{
-			// Fill refuses any buffer that is not exactly the picture's size.
-			_pixels = new byte[size];
-		}
-
-		data.Fill(_pixels);
-	}
-
-	private async Task<bool> HandleOutputsAsync(ActiveStageOutputIterator outputs, CancellationToken cancellationToken)
-	{
-		bool terminate = false;
-		while (true)
-		{
-			ActiveStageOutput? output = outputs.Next();
-			if (output is null)
+			byte[] frame = _encoder.Encode(_pixels, width, clipped);
+			if (!await ToPageAsync(sink, (page, token) => page.FrameAsync(frame, token)))
 			{
-				return terminate;
-			}
-
-			using (output)
-			{
-				switch (output.GetEnumType())
-				{
-					case ActiveStageOutputType.ResponseFrame:
-						await WriteAsync(output, cancellationToken);
-						break;
-					case ActiveStageOutputType.GraphicsUpdate:
-						AddGraphicsUpdate(output);
-						break;
-					case ActiveStageOutputType.PointerBitmap:
-						await SendPointerAsync(output, cancellationToken);
-						break;
-					case ActiveStageOutputType.PointerPosition:
-						await SendPointerPositionAsync(output, cancellationToken);
-						break;
-					case ActiveStageOutputType.PointerHidden:
-						await SendPointerStyleAsync(hidden: true, cancellationToken);
-						break;
-					case ActiveStageOutputType.PointerDefault:
-						await SendPointerStyleAsync(hidden: false, cancellationToken);
-						break;
-					case ActiveStageOutputType.Terminate:
-						using (output.GetTerminate())
-						{
-							terminate = true;
-						}
-
-						break;
-					case ActiveStageOutputType.DeactivateAll:
-						await ReactivateAsync(output.GetDeactivateAll(), cancellationToken);
-						break;
-					default:
-						break;
-				}
+				return false;
 			}
 		}
+
+		return true;
 	}
 
-	private async ValueTask WriteAsync(ActiveStageOutput output, CancellationToken cancellationToken)
+	private static Func<IRdpSink, CancellationToken, ValueTask> PointerCall(RdpPointerState pointer)
 	{
-		using BytesSlice frame = output.GetResponseFrame();
-		byte[] bytes = new byte[(int)frame.GetSize()];
-		frame.Fill(bytes);
-		await WriteAsync(bytes, cancellationToken);
-	}
-
-	private async ValueTask WriteAsync(byte[] bytes, CancellationToken cancellationToken)
-	{
-		if (bytes.Length == 0)
+		if (pointer.Image is not { } image)
 		{
-			return;
+			return (page, token) => page.PointerStyleAsync(pointer.Hidden, token);
 		}
 
-		// Everything that writes holds the gate, which is what keeps two writers off one TLS stream.
-		await _transport.Stream.WriteAsync(bytes, cancellationToken);
-		await _transport.Stream.FlushAsync(cancellationToken);
-	}
-
-	private void AddGraphicsUpdate(ActiveStageOutput output)
-	{
-		using InclusiveRectangle rectangle = output.GetGraphicsUpdate();
-		RdpRegion region = new(rectangle.GetLeft(), rectangle.GetTop(), rectangle.GetWidth(), rectangle.GetHeight());
-		lock (_dirtyGate)
-		{
-			_dirty.Add(region.Clip(_width, _height));
-		}
-	}
-
-	private async ValueTask SendPointerAsync(ActiveStageOutput output, CancellationToken cancellationToken)
-	{
-		IRdpSink? sink = Volatile.Read(ref _sink);
-		if (sink is null)
-		{
-			return;
-		}
-
-		using DecodedPointer pointer = output.GetPointerBitmap();
-		int width = pointer.GetWidth();
-		int height = pointer.GetHeight();
-		if (width is <= 0 or > MaxCursorSize || height is <= 0 or > MaxCursorSize)
-		{
-			await sink.PointerStyleAsync(hidden: false, cancellationToken);
-			return;
-		}
-
-		using BytesSlice data = pointer.GetData();
-		int size = (int)data.GetSize();
-		if (size != width * height * PngWriter.BytesPerPixel)
-		{
-			_logger.LogDebug("Skipped a {Width}x{Height} pointer with {Size} bytes, which is not RGBA.", width, height, size);
-			return;
-		}
-
-		byte[] pixels = new byte[size];
-		data.Fill(pixels);
-		RdpPointerImage image = new(PngWriter.Encode(pixels, width, height), width, height, pointer.GetHotspotX(), pointer.GetHotspotY());
-		await sink.PointerImageAsync(image, cancellationToken);
-	}
-
-	private async ValueTask SendPointerPositionAsync(ActiveStageOutput output, CancellationToken cancellationToken)
-	{
-		Position position = output.GetPointerPosition();
-		_translator.PointerMovedByServer(position.X, position.Y);
-		IRdpSink? sink = Volatile.Read(ref _sink);
-		if (sink is not null)
-		{
-			await sink.PointerMovedAsync(position.X, position.Y, cancellationToken);
-		}
-	}
-
-	private async ValueTask SendPointerStyleAsync(bool hidden, CancellationToken cancellationToken)
-	{
-		IRdpSink? sink = Volatile.Read(ref _sink);
-		if (sink is not null)
-		{
-			await sink.PointerStyleAsync(hidden, cancellationToken);
-		}
-	}
-
-	private async ValueTask ApplyAsync(IReadOnlyList<RdpOperation> operations, CancellationToken cancellationToken)
-	{
-		foreach (RdpOperation operation in operations)
-		{
-			using RdpOperationHandle handle = RdpOperationHandle.Create(operation);
-			using FastPathInputEventIterator events = _input.Apply(handle.Operation);
-			using ActiveStageOutputIterator outputs = _stage.ProcessFastpathInput(_image, events);
-			await HandleOutputsAsync(outputs, cancellationToken);
-		}
+		RdpPointerImage cursor = new(PngWriter.Encode(image.Rgba, image.Width, image.Height), image.Width, image.Height, image.HotspotX, image.HotspotY);
+		return (page, token) => page.PointerImageAsync(cursor, token);
 	}
 
 	/// <summary>
-	/// The server tore the session down to build it again, which is what a resize looks like on the wire. The
-	/// activation sequence runs to its end and the decoded desktop is replaced with one of the new size.
+	/// One call into the page. The page going away under it (the interop teardown and script failures that
+	/// <see cref="JsModule.IsExpected"/> names, which <see cref="PageCalls"/> already swallows for the real page) is an
+	/// ordinary detach: this page gets nothing more, and the next one to attach is repainted. Anything else is thrown.
 	/// </summary>
-	private async ValueTask ReactivateAsync(ConnectionActivationSequence sequence, CancellationToken cancellationToken)
+	/// <returns>False when the page went away.</returns>
+	private async Task<bool> ToPageAsync(IRdpSink sink, Func<IRdpSink, CancellationToken, ValueTask> call)
 	{
-		using (sequence)
+		try
 		{
-			while (!cancellationToken.IsCancellationRequested)
-			{
-				bool finalizedNow;
-				int width = 0;
-				int height = 0;
-
-				// The state is a view of the sequence, so it goes before the next step changes the sequence.
-				using (ConnectionActivationState state = sequence.GetState())
-				{
-					finalizedNow = state.Type == ConnectionActivationStateType.Finalized;
-					if (finalizedNow)
-					{
-						using ConnectionActivationStateFinalized finalized = state.GetFinalized();
-						using DesktopSize size = finalized.GetDesktopSize();
-						_stage.SetFastpathProcessor(
-							finalized.GetIoChannelId(),
-							finalized.GetUserChannelId(),
-							finalized.GetEnableServerPointer(),
-							finalized.GetPointerSoftwareRendering());
-						width = size.GetWidth();
-						height = size.GetHeight();
-					}
-				}
-
-				if (finalizedNow)
-				{
-					await ResetDesktopAsync(width, height, cancellationToken);
-					return;
-				}
-
-				await StepActivationAsync(sequence, cancellationToken);
-			}
+			await call(sink, _stopping.Token);
+			return true;
+		}
+		catch (Exception ex) when (!_stopping.IsCancellationRequested && JsModule.IsExpected(ex))
+		{
+			_logger.LogDebug("The RDP page went away while it was being painted: {Error}", LogSafe.Describe(ex));
+			Interlocked.CompareExchange(ref _sink, null, sink);
+			return false;
 		}
 	}
 
-	private async ValueTask StepActivationAsync(ConnectionActivationSequence sequence, CancellationToken cancellationToken)
+	private void AddDirty(RdpRegion region)
 	{
-		byte[]? input = null;
-		PduHint? hint = sequence.NextPduHint();
-		if (hint is not null)
+		lock (_pageGate)
 		{
-			using (hint)
-			{
-				input = await _transport.Reader.ReadByHintAsync(hint, cancellationToken);
-			}
+			_dirty.Add(region.Clip(Width, Height));
 		}
-
-		using WriteBuf buffer = WriteBuf.New();
-		using Written written = input is null ? sequence.StepNoInput(buffer) : sequence.Step(input, buffer);
-		if (written.GetWrittenType() != WrittenType.Size)
-		{
-			return;
-		}
-
-		using VecU8 filled = buffer.GetFilled();
-		byte[] bytes = new byte[(int)filled.GetSize()];
-		filled.Fill(bytes);
-		await WriteAsync(bytes, cancellationToken);
 	}
 
-	private async ValueTask ResetDesktopAsync(int width, int height, CancellationToken cancellationToken)
+	private void SetPointer(RdpPointerState? pointer, (int X, int Y)? moved)
 	{
-		if (!RdpDesktopBounds.IsSupported(width, height))
+		lock (_pageGate)
 		{
-			throw new InvalidDataException(RdpDesktopBounds.DescribeRefusal(width, height));
-		}
+			if (pointer is not null)
+			{
+				_pointer = pointer;
+				_pointerVersion++;
+			}
 
-		DecodedImage replacement = DecodedImage.New(PixelFormat.RgbA32, (ushort)width, (ushort)height);
-		DecodedImage previous = _image;
-		_image = replacement;
-		previous.Dispose();
-		Volatile.Write(ref _width, width);
-		Volatile.Write(ref _height, height);
-		_translator.Resize(width, height);
-		MarkEverythingDirty();
-
-		IRdpSink? sink = Volatile.Read(ref _sink);
-		if (sink is not null)
-		{
-			await sink.DesktopResizedAsync(width, height, cancellationToken);
+			if (moved is { } position)
+			{
+				_serverPointer = position;
+				_serverPointerVersion++;
+			}
 		}
 	}
 
 	private void MarkEverythingDirty()
 	{
-		lock (_dirtyGate)
+		lock (_pageGate)
 		{
 			_dirty.Clear();
 			_dirty.Add(new RdpRegion(0, 0, Width, Height));
-		}
-	}
-
-	private IReadOnlyList<RdpRegion> TakeDirty()
-	{
-		lock (_dirtyGate)
-		{
-			return _dirty.IsEmpty ? [] : _dirty.Take();
 		}
 	}
 }
