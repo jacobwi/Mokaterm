@@ -1,0 +1,39 @@
+/* Three short figures read as one fact about the machine: a quiet label beside a mono value each. */
+.mt-host-figures {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 10px;
+	white-space: nowrap;
+}
+
+.mt-host-figure {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.mt-host-figure-label {
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.06em;
+}
+
+.mt-host-figure-value {
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+/* The level rule every usage bar follows, so a busy machine stands out without being read. */
+.mt-host-figure--warn .mt-host-figure-value {
+	color: var(--moka-color-warning);
+}
+
+.mt-host-figure--full .mt-host-figure-value {
+	color: var(--moka-color-error);
+}
+
+/* The last read failed: still worth seeing, but no longer live. The tooltip says from when. */
+.mt-host-figures--stale {
+	opacity: 0.55;
+}

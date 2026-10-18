@@ -37,6 +37,9 @@ internal static class MonitorFixtures
 		dm-0
 		loop0
 		vda
+		@@mt:rootfs
+		Filesystem     1024-blocks     Used Available Capacity Mounted on
+		/dev/vda1         60795672 41234567  16443997      72% /
 		""";
 
 	/// <summary>The same machine two seconds later: 400 ticks over 4 CPUs, 100 of them busy and 8 waiting on I/O.</summary>
@@ -71,6 +74,9 @@ internal static class MonitorFixtures
 		dm-0
 		loop0
 		vda
+		@@mt:rootfs
+		Filesystem     1024-blocks     Used Available Capacity Mounted on
+		/dev/vda1         60795672 41234601  16443963      72% /
 		""";
 
 	/// <summary>
@@ -103,5 +109,23 @@ internal static class MonitorFixtures
 		 259       1 nvme0n1p1 41000 1201 3300000 9900 82000 9011 6612000 41000 0 40100 51000 0 0 0 0 0 0
 		@@mt:blocks
 		nvme0n1
+		@@mt:rootfs
+		Filesystem           1024-blocks    Used Available Capacity Mounted on
+		overlay                 61202244   9221112  48853352  16% /
+		""";
+
+	/// <summary>FreeBSD, which has no <c>/proc</c>: every read in the sample prints nothing but df.</summary>
+	public const string FreeBsd = """
+		@@mt:uptime
+		@@mt:stat
+		@@mt:loadavg
+		@@mt:meminfo
+		@@mt:netdev
+		@@mt:nics
+		@@mt:diskstats
+		@@mt:blocks
+		@@mt:rootfs
+		Filesystem 1024-blocks    Used   Avail Capacity  Mounted on
+		/dev/ada0p2   19279644 4105512 13631764    23%    /
 		""";
 }

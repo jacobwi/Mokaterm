@@ -83,8 +83,12 @@ export function attachShell(dotNetRef, options) {
 
 	const onPointer = () => reportActivity();
 
+	// Both ways, for what reads a server only to be looked at; .NET decides whether hiding also locks.
+	const isVisible = () => document.visibilityState !== 'hidden';
 	const onVisibilityChange = () => {
-		if (document.visibilityState === 'hidden') {
+		const visible = isVisible();
+		invoke(state, 'OnVisibilityChanged', visible);
+		if (!visible) {
 			invoke(state, 'OnHidden');
 		}
 	};
@@ -113,6 +117,11 @@ export function attachShell(dotNetRef, options) {
 	document.addEventListener('dragstart', onDragStart);
 	if (options.watchVisibility) {
 		document.addEventListener('visibilitychange', onVisibilityChange);
+
+		// .NET starts out assuming the page is seen, which a shell mounted behind another tab is not.
+		if (!isVisible()) {
+			invoke(state, 'OnVisibilityChanged', false);
+		}
 	}
 
 	if (options.confirmLeave) {

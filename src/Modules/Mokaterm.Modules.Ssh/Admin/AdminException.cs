@@ -26,4 +26,10 @@ internal sealed class AdminException : SystemScriptException
 
 	/// <summary>sudo turned the login down, so the root mode that was on has to be asked for again.</summary>
 	public bool RootRefused { get; init; }
+
+	/// <summary>
+	/// The script never printed its output marker: the login is held to a forced command, an SFTP-only setup or a shell
+	/// that is not POSIX, so no script will run on this session.
+	/// </summary>
+	public bool NeverStarted { get; init; }
 }

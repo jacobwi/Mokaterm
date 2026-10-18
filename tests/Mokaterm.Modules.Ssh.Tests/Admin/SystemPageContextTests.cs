@@ -4,6 +4,7 @@ using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
 using Mokaterm.Modules.Ssh.Components.Admin;
 using Mokaterm.Modules.Ssh.Tests.Fakes;
 using Mokaterm.UI.Common.Contributions;
@@ -278,6 +279,7 @@ public sealed class SystemPageContextTests
 		{
 			Feature = feature,
 			Profile = profile,
+			Monitor = new HostMonitor(feature.ReadAsync, TimeProvider.System, NullLogger.Instance, toolKey: null),
 			Run = review,
 			EnableRoot = () => feature.EnableRootAsync(CancellationToken.None),
 			Show = show ?? (_ => { }),

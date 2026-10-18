@@ -2,6 +2,7 @@ using System.Text;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Monitoring;
 using Mokaterm.Modules.Ssh.Admin.Overview;
+using Mokaterm.Modules.Ssh.Admin.Storage;
 using Mokaterm.Modules.Ssh.Shell;
 
 namespace Mokaterm.Modules.Ssh.Tests.Admin;
@@ -28,6 +29,32 @@ public sealed class MonitorTests
 		// The loop image and the LVM volume on top of vda would count vda's bytes again; vda1 is a partition.
 		DiskCounters disk = Assert.Single(sample.Disks);
 		Assert.Equal(new DiskCounters("vda", 6158522, 9946376), disk);
+	}
+
+	[Fact]
+	public void Sample_ReadsTheRootFileSystem_FromDfOfSlashAlone()
+	{
+		SystemSample sample = MonitorCommands.Parse(MonitorFixtures.UbuntuFirst);
+
+		FileSystemUsage root = Assert.IsType<FileSystemUsage>(sample.RootDisk);
+		Assert.Equal("/dev/vda1", root.Source);
+		Assert.Equal("/", root.MountPoint);
+		Assert.Equal(60795672, root.TotalKb);
+		Assert.Equal(41234567, root.UsedKb);
+		Assert.Equal(72, root.UsedPercent);
+		Assert.False(sample.ReadsNoProc);
+		Assert.Contains("df -P -k / 2>/dev/null", MonitorCommands.Sample().Body, StringComparison.Ordinal);
+	}
+
+	// No /proc means no Linux: the status bar's figures turn off for the session instead of failing every few seconds.
+	[Fact]
+	public void Sample_OnAMachineWithoutProc_SaysSo()
+	{
+		SystemSample sample = MonitorCommands.Parse(MonitorFixtures.FreeBsd);
+
+		Assert.True(sample.ReadsNoProc);
+		Assert.Equal(23, sample.RootDisk?.UsedPercent);
+		Assert.False(MonitorCommands.Parse(MonitorFixtures.AlpineContainer).ReadsNoProc);
 	}
 
 	[Fact]

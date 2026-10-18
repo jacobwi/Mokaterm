@@ -4,16 +4,23 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Connections;
+using Mokaterm.Abstractions.Fleet;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Transfers;
+using Mokaterm.UI.Common.Components;
+using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Connections;
+using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Tests.Fakes;
+using Mokaterm.UI.Tools;
 using Mokaterm.UI.Workspace;
 
 namespace Mokaterm.UI.Tests;
@@ -212,6 +219,164 @@ public sealed partial class ShellStatusBarTests
 		Assert.Contains("3 sessions are open. They are split over 3 panes.", html, StringComparison.Ordinal);
 	}
 
+	// The shell knows nothing of SSH: a session that offers live figures gets three short shares, coloured by the usage
+	// level rule, which a click opens in the tool they name.
+	[Fact]
+	public async Task Render_TheSessionHasFigures_ShowsThemByLevel_AndOpensTheirTool()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 80, disk: 95) });
+
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }));
+
+		Assert.Matches("mt-host-figure-label\"[^>]*>CPU</span>\\s*<span class=\"mt-host-figure-value\"[^>]*>12%</span>", html);
+		Assert.Contains("class=\"mt-host-figure mt-host-figure--warn\"", html, StringComparison.Ordinal);
+		Assert.Contains("class=\"mt-host-figure mt-host-figure--full\"", html, StringComparison.Ordinal);
+		string tooltip = Assert.Single(Tooltips.Texts(html), text => text.StartsWith("CPU 12% busy", StringComparison.Ordinal));
+		Assert.EndsWith("Click to open the System tool.", tooltip, StringComparison.Ordinal);
+		Assert.Equal("top", Tooltips.PositionOf(html, tooltip));
+		Assert.Contains("role=\"button\"", Tooltips.ControlFor(html, tooltip), StringComparison.Ordinal);
+
+		// Leased once, at the setting's default pace, and let go when the bar went away.
+		Assert.Equal([TimeSpan.FromSeconds(AppearanceSettings.DefaultHostFiguresSeconds)], monitor.Asked);
+		Assert.Empty(monitor.Leases);
+		Assert.Equal(0, monitor.Subscribers);
+	}
+
+	[Fact]
+	public async Task Render_FiguresNamingNoToolOfTheProtocol_AreNotAButton()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50) }, toolKey: "elsewhere");
+
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }));
+
+		string tooltip = Assert.Single(Tooltips.Texts(html), text => text.StartsWith("CPU 12% busy", StringComparison.Ordinal));
+		Assert.DoesNotContain("Click", tooltip, StringComparison.Ordinal);
+		Assert.DoesNotContain("role=\"button\"", Tooltips.ControlFor(html, tooltip), StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_TwoSessions_WatchesTheActiveOneOnly()
+	{
+		FakeHostMonitor first = new(new HostMonitorState { Figures = Figures(cpu: 1, memory: 1, disk: 1) });
+		FakeHostMonitor second = new(new HostMonitorState { Figures = Figures(cpu: 22, memory: 33, disk: 44) });
+		ISessionHandle? active = null;
+
+		string html = await RenderAsync(CatalogWith(1), (manager, workspace, _) =>
+		{
+			manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(first) });
+			manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(second) });
+			active = workspace.Active;
+		});
+
+		FakeHostMonitor watched = ReferenceEquals(active?.Session?.GetFeature<IHostMonitorFeature>(), first) ? first : second;
+		FakeHostMonitor other = ReferenceEquals(watched, first) ? second : first;
+		Assert.Single(watched.Asked);
+		Assert.Empty(other.Asked);
+		Assert.Contains(ReferenceEquals(watched, second) ? ">22%<" : ">1%<", html, StringComparison.Ordinal);
+	}
+
+	// Off in settings, a page nobody sees, a dropped session: nothing is read for any of them.
+	[Fact]
+	public async Task Render_FiguresTurnedOff_ReadsNothing()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50) });
+
+		string html = await RenderAsync(
+			CatalogWith(1),
+			(manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }),
+			appearance: new AppearanceSettings { ShowHostFigures = false });
+
+		Assert.DoesNotContain("mt-host-figures", html, StringComparison.Ordinal);
+		Assert.Empty(monitor.Asked);
+	}
+
+	[Fact]
+	public async Task Render_AHiddenPage_ReadsNothing()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50) });
+		PageVisibility hidden = new();
+		hidden.Set(false);
+
+		string html = await RenderAsync(
+			CatalogWith(1),
+			(manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }),
+			visibility: hidden);
+
+		Assert.DoesNotContain("mt-host-figures", html, StringComparison.Ordinal);
+		Assert.Empty(monitor.Asked);
+	}
+
+	[Fact]
+	public async Task Render_ADroppedSession_ReadsNothing()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50) });
+
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) =>
+			manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }.Become(SessionState.Disconnected)));
+
+		Assert.DoesNotContain("mt-host-figures", html, StringComparison.Ordinal);
+		Assert.Empty(monitor.Asked);
+	}
+
+	[Fact]
+	public async Task Render_TheIntervalSetting_IsThePaceAskedFor()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50) });
+
+		await RenderAsync(
+			CatalogWith(1),
+			(manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }),
+			appearance: new AppearanceSettings { HostFiguresSeconds = 12 });
+
+		Assert.Equal([TimeSpan.FromSeconds(12)], monitor.Asked);
+	}
+
+	// Watched, but nothing to show: before the first read, after several failed ones, or on a login that cannot give any.
+	[Theory]
+	[InlineData(0)]
+	[InlineData(1)]
+	[InlineData(2)]
+	public async Task Render_NothingWorthShowing_ShowsNoItem(int which)
+	{
+		HostMonitorState state = which switch
+		{
+			0 => HostMonitorState.Waiting,
+			1 => new HostMonitorState { Figures = Figures(cpu: 12, memory: 40, disk: 50), FailedReads = HostMonitorState.HideAfterFailures },
+			_ => new HostMonitorState { Unavailable = "This login does not run scripts." },
+		};
+		FakeHostMonitor monitor = new(state);
+
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }));
+
+		Assert.DoesNotContain("mt-host-figures", html, StringComparison.Ordinal);
+		Assert.Single(monitor.Asked);
+	}
+
+	[Fact]
+	public async Task Render_AfterAFailedRead_ShowsTheOldFiguresDimmed_AndSaysSo()
+	{
+		FakeHostMonitor monitor = new(new HostMonitorState
+		{
+			Figures = Figures(cpu: 12, memory: 40, disk: 50),
+			FailedReads = 1,
+			Problem = "The connection closed before the command finished.",
+		});
+
+		string html = await RenderAsync(CatalogWith(1), (manager, _, _) => manager.Add(new FakeSession { Session = FakeHostMonitor.SessionWith(monitor) }));
+
+		Assert.Contains("class=\"mt-host-figures mt-host-figures--stale\"", html, StringComparison.Ordinal);
+		Assert.Contains("the read after them failed. The connection closed before the command finished.", html, StringComparison.Ordinal);
+	}
+
+	private static HostFigures Figures(double cpu, double memory, int disk) => new()
+	{
+		ReadAt = DateTimeOffset.UnixEpoch,
+		CpuPercent = cpu,
+		MemoryUsedBytes = (long)(memory * 1024 * 1024),
+		MemoryTotalBytes = 100L * 1024 * 1024,
+		RootDisk = new HostDiskUsage { MountPoint = "/", UsedBytes = disk, TotalBytes = 100, UsedPercent = disk },
+	};
+
 	private static ConnectionCatalog CatalogWith(int hosts)
 	{
 		List<HostProfile> profiles = [];
@@ -230,13 +395,15 @@ public sealed partial class ShellStatusBarTests
 	private static async Task<string> RenderAsync(
 		ConnectionCatalog catalog,
 		Action<ManualSessionManager, SessionWorkspace, InputBroadcast>? arrange = null,
-		SecuritySettings? security = null)
+		SecuritySettings? security = null,
+		AppearanceSettings? appearance = null,
+		PageVisibility? visibility = null)
 	{
 		await using UiStateStore uiState = new(new MemoryAppDataStore(), TimeProvider.System, NullLogger<UiStateStore>.Instance);
 		ManualSessionManager manager = new();
 		using SessionWorkspace workspace = new(manager);
 		using InputBroadcast broadcast = new(workspace);
-		FixedSettings settings = security is null ? new() : new(security);
+		FixedSettings settings = new([.. new object?[] { security, appearance }.OfType<object>()]);
 		arrange?.Invoke(manager, workspace, broadcast);
 
 		return await StaticRender.RenderAsync<ShellStatusBar>(
@@ -255,6 +422,19 @@ public sealed partial class ShellStatusBarTests
 				services.AddSingleton(uiState);
 				services.AddScoped<ShellState>();
 				services.AddScoped<CatalogState>();
+				services.AddSingleton(visibility ?? new PageVisibility());
+				services.AddScoped<UserInteractionService>();
+				services.AddScoped<ShellToolWindows>();
+				services.AddScoped<ISessionTabs, ToolHarness.RecordingTabs>();
+				services.AddScoped<SessionToolActions>();
+				services.AddSessionTool(new SessionToolDescriptor
+				{
+					ProtocolId = "ssh",
+					Id = "system",
+					Title = "System",
+					Icon = MokatermIcons.Server,
+					Component = typeof(NoView),
+				});
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal)).WaitAsync(Patience, Ct);
 	}
@@ -264,6 +444,8 @@ public sealed partial class ShellStatusBarTests
 
 	[GeneratedRegex("aria-description=\"([^\"]*)\"")]
 	private static partial Regex DescriptionAttribute();
+
+	private sealed class NoView : SessionViewBase;
 
 	/// <summary>A live session whose only feature is the indicators it was given.</summary>
 	private sealed class IndicatingSession(params SessionIndicator[] indicators) : IProtocolSession, ISessionIndicators

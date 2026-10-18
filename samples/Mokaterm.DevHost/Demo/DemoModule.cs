@@ -43,7 +43,7 @@ internal sealed class DemoModule : IMokatermModule
 		services.AddSessionTool(new SessionToolDescriptor
 		{
 			ProtocolId = DemoProtocolProvider.ProtocolId,
-			Id = "system",
+			Id = SystemAdminView.ToolId,
 			Title = "System",
 			Icon = MokatermIcons.Server,
 			Component = typeof(SystemAdminView),

@@ -1,0 +1,17 @@
+@* The active session's machine at a glance. Nothing shows until the first read is back, nor once the session cannot
+   give figures, nor after several reads in a row failed. *@
+@if (_watch.Feature?.State is { IsShown: true, Figures: { } figures } state && HostFiguresText.Figures(figures) is { Count: > 0 } shown)
+{
+	SessionToolDescriptor? tool = Tool;
+	<MokaStatusBarItem Tooltip="@HostFiguresText.Tooltip(state, tool?.Title)" OnClick="@ClickFor(tool)">
+		<span class="@(state.IsStale ? "mt-host-figures mt-host-figures--stale" : "mt-host-figures")">
+			@foreach (HostFigure figure in shown)
+			{
+				<span class="@LevelClass(figure.Level)">
+					<span class="mt-host-figure-label">@figure.Label</span>
+					<span class="mt-host-figure-value">@figure.Value</span>
+				</span>
+			}
+		</span>
+	</MokaStatusBarItem>
+}

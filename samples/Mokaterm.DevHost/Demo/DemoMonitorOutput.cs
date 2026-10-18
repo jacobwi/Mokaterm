@@ -80,8 +80,19 @@ internal static partial class DemoMonitorOutput
 			.Append(DiskLine(8, 0, "sda", Integral(t, 1_000, (900, 50)), 0))
 			.Append(DiskLine(8, 1, "sda1", Integral(t, 900, (800, 50)), 0))
 			.Append(DiskLine(7, 0, "loop0", 0, 0))
-			.Append("@@mt:blocks\nloop0\nsda\nvda\nvdb\n");
+			.Append("@@mt:blocks\nloop0\nsda\nvda\nvdb\n")
+			.Append(RootDisk(t));
 		return text.ToString();
+	}
+
+	/// <summary>df for <c>/</c>: the root file system of the overview's df, filling and emptying slowly, as logs and caches do.</summary>
+	private static string RootDisk(double t)
+	{
+		const long Total = 81_971_444;
+		long used = 38_213_332 + (long)(2_400_000 * Math.Sin(t / 600));
+		long available = Total - used;
+		long percent = (used * 100 + Total - 1) / Total;
+		return string.Create(CultureInfo.InvariantCulture, $"@@mt:rootfs\nFilesystem     1024-blocks     Used Available Capacity Mounted on\n/dev/vda1      {Total} {used} {available} {percent}% /\n");
 	}
 
 	/// <summary>Seconds the demo machine has been up.</summary>

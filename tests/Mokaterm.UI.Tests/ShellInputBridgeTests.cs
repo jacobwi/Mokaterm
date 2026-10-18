@@ -73,6 +73,34 @@ public sealed class ShellInputBridgeTests
 		Assert.Equal(harness.SubscribersBeforeAttach, harness.Sessions.SubscriberCount);
 	}
 
+	// The live figures stop while the page is hidden, on every host; only the desktop also locks then.
+	[Fact]
+	public async Task Visibility_IsWatchedOnEveryHost_AndFollowsThePage()
+	{
+		Harness harness = new();
+		Task attach = harness.Bridge.AttachAsync();
+		harness.Js.Module.CompleteAttach(5);
+		await Bounded(attach);
+
+		ShellListenerOptions options = Assert.IsType<ShellListenerOptions>(harness.Js.Module.Calls.First(call => call.Identifier == "attachShell").Args[1]);
+		Assert.True(options.WatchVisibility);
+
+		int changes = 0;
+		harness.Visibility.Changed += () => changes++;
+		harness.Bridge.OnVisibilityChanged(false);
+		Assert.False(harness.Visibility.IsVisible);
+		harness.Bridge.OnVisibilityChanged(false);
+		harness.Bridge.OnHidden();
+		harness.Bridge.OnVisibilityChanged(true);
+		Assert.True(harness.Visibility.IsVisible);
+		Assert.Equal(2, changes);
+
+		// A shell that goes away hands the next one a page assumed to be seen.
+		harness.Bridge.OnVisibilityChanged(false);
+		await Bounded(harness.Bridge.DetachAsync());
+		Assert.True(harness.Visibility.IsVisible);
+	}
+
 	private static Task Bounded(Task task) => task.WaitAsync(Patience, TestContext.Current.CancellationToken);
 
 	/// <summary>
@@ -88,13 +116,15 @@ public sealed class ShellInputBridgeTests
 			UserInteractionService interaction = new();
 			SessionActions actions = new(Sessions, workspace, null!, null!, interaction, null!, shell, NullLogger<SessionActions>.Instance);
 			ShellCommandRegistry commands = new(new MokaCommandPaletteService(), shell, workspace, actions, null!, null!, null!, null!, null!, new UiContributions([], [], []), interaction, null!, null!, null!, new SessionViewRequests());
-			Bridge = new ShellInputBridge(new ShellInterop(Js), commands, null!, new FixedSettings(), new WebEnvironment(), Sessions, NullLogger<ShellInputBridge>.Instance);
+			Bridge = new ShellInputBridge(new ShellInterop(Js), commands, null!, new FixedSettings(), new WebEnvironment(), Sessions, Visibility, NullLogger<ShellInputBridge>.Instance);
 			SubscribersBeforeAttach = Sessions.SubscriberCount;
 		}
 
 		public ScriptedJsRuntime Js { get; } = new();
 
 		public CountingSessionManager Sessions { get; } = new();
+
+		public PageVisibility Visibility { get; } = new();
 
 		public ShellInputBridge Bridge { get; }
 

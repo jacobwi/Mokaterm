@@ -34,6 +34,14 @@ public sealed record AppearanceSettings : ISettingsSection
 	/// <summary>The longest button id <see cref="HiddenToolbarButtons"/> keeps.</summary>
 	public const int MaxToolbarButtonIdLength = 64;
 
+	/// <summary>Shortest <see cref="HostFiguresSeconds"/> the settings page offers and a saved file keeps.</summary>
+	public const int MinHostFiguresSeconds = 2;
+
+	/// <summary>Longest <see cref="HostFiguresSeconds"/> the settings page offers and a saved file keeps.</summary>
+	public const int MaxHostFiguresSeconds = 60;
+
+	public const int DefaultHostFiguresSeconds = 5;
+
 	public static string SectionKey => "appearance";
 
 	public ThemeMode Mode { get; init; } = ThemeMode.Dark;
@@ -47,6 +55,15 @@ public sealed record AppearanceSettings : ISettingsSection
 	public double FontScale { get; init; } = DefaultFontScale;
 
 	public bool ShowStatusBar { get; init; } = true;
+
+	/// <summary>
+	/// Shows the CPU, memory and root disk use of the active session's machine in the status bar, for sessions that can
+	/// read them. Reading them runs a short command on that machine every <see cref="HostFiguresSeconds"/>.
+	/// </summary>
+	public bool ShowHostFigures { get; init; } = true;
+
+	/// <summary>How often the status bar's host figures are read while they show, in seconds.</summary>
+	public int HostFiguresSeconds { get; init; } = DefaultHostFiguresSeconds;
 
 	/// <summary>How the bar above a session arranges its buttons.</summary>
 	public SessionToolbarLayout ToolbarLayout { get; init; } = SessionToolbarLayout.Grouped;
@@ -80,10 +97,11 @@ public sealed record AppearanceSettings : ISettingsSection
 	/// </summary>
 	public bool ShowToolDescriptions { get; init; }
 
-	/// <summary>A copy with the accent color and the font scale inside the range the settings page offers.</summary>
+	/// <summary>A copy with the accent color, the font scale and the host figures' interval inside the range the settings page offers.</summary>
 	public AppearanceSettings Clamped() => this with
 	{
 		AccentColor = HexColor.Normalize(AccentColor, HexColorForms.Accent) ?? DefaultAccentColor,
 		FontScale = SettingsRange.Clamp(FontScale, MinFontScale, MaxFontScale, DefaultFontScale),
+		HostFiguresSeconds = Math.Clamp(HostFiguresSeconds, MinHostFiguresSeconds, MaxHostFiguresSeconds),
 	};
 }

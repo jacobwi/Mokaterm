@@ -102,7 +102,10 @@ internal static class AdminScriptText
 			string reason = RemoteText.FirstLine(scriptError);
 			throw new AdminException(reason.Length > 0
 				? $"The server did not run the script: {reason}"
-				: "The server did not run the script. The login may be limited to a forced command or a restricted shell.");
+				: "The server did not run the script. The login may be limited to a forced command or a restricted shell.")
+			{
+				NeverStarted = true,
+			};
 		}
 
 		bool truncated = outcome.Output.IsTruncated;

@@ -5,10 +5,13 @@ using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Terminal;
 using Mokaterm.Modules.Ssh.Admin;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
+using Mokaterm.Modules.Ssh.Components.Admin;
 using Mokaterm.Modules.Ssh.Connection;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Elevation;
@@ -42,6 +45,7 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 	private readonly SshForwarding? _forwarding;
 	private readonly SshForwardingIndicators? _indicators;
 	private readonly SystemAdminFeature _admin;
+	private readonly HostMonitor _hostMonitor;
 	private readonly DockerSessionFeature _docker;
 	private readonly ConnectionKeepAlive _keepAlive;
 	private readonly ConnectionMonitor _monitor;
@@ -94,6 +98,9 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 		_tunnels = new SshTunnelManager(_client, Context.SessionId, Context.Interaction, logger, _keepAlive.Forwards);
 		_commands = new SshCommandFeature(GetSshClientAsync, connector.Time);
 		_admin = new SystemAdminFeature(new SshAdminShell(this, logger), connector.Time, logger, _rootFiles);
+
+		// Through the system view's feature as the login, and shared by the System view's overview and the status bar.
+		_hostMonitor = new HostMonitor(_admin.ReadAsync, connector.Time, logger, SystemAdminView.ToolId);
 		_docker = new DockerSessionFeature(
 			new UserDockerShell(_commands),
 			Context.Options.Elevation == SshElevationMode.None ? null : AuthenticateSudoAsync,
@@ -220,6 +227,11 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 			return (TFeature)(object)_admin;
 		}
 
+		if (typeof(TFeature) == typeof(IHostMonitorFeature))
+		{
+			return (TFeature)(object)_hostMonitor;
+		}
+
 		if (typeof(TFeature) == typeof(DockerSessionFeature))
 		{
 			return (TFeature)(object)_docker;
@@ -266,6 +278,9 @@ internal sealed class SshSession : IProtocolSession, ISshSessionHost
 		// Before the tunnels: a remote tunnel still waiting to start gives up at once instead of after the settle limit.
 		await SessionTeardown.ReleaseAsync(_keepAlive.DisposeAsync, _logger, id, "the keepalive");
 		await SessionTeardown.ReleaseAsync(_docker.DisposeAsync, _logger, id, "the Docker manager");
+
+		// Before the system view, which its reads go through.
+		await SessionTeardown.ReleaseAsync(_hostMonitor.DisposeAsync, _logger, id, "the live figures");
 		await SessionTeardown.ReleaseAsync(_admin.DisposeAsync, _logger, id, "the system view");
 		await SessionTeardown.ReleaseAsync(_rootFiles.DisposeAsync, _logger, id, "the tools' root file system");
 		await SessionTeardown.ReleaseAsync(_fileSystem.DisposeAsync, _logger, id, "its file systems");

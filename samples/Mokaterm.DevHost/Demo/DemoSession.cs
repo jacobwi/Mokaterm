@@ -1,11 +1,14 @@
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Protocols;
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Terminal;
 using Mokaterm.DevHost.Demo.Docker;
 using Mokaterm.DevHost.Demo.FileSystem;
 using Mokaterm.DevHost.Demo.Terminal;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
+using Mokaterm.Modules.Ssh.Components.Admin;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Tunnels;
 
@@ -26,6 +29,7 @@ internal sealed class DemoSession : IProtocolSession
 	private readonly DemoTunnels _tunnels;
 	private readonly DemoCommandFeature _commands;
 	private readonly DockerSessionFeature _docker;
+	private readonly HostMonitor _monitor;
 	private readonly DemoIndicators _indicators = new();
 	private int _disposed;
 
@@ -44,6 +48,9 @@ internal sealed class DemoSession : IProtocolSession
 			hostName,
 			account.Name,
 			_files);
+
+		// The status bar's live figures and the System view's overview, from the demo's moving samples.
+		_monitor = HostMonitor.ForCommands(_commands, timeProvider, SystemAdminView.ToolId, logger);
 	}
 
 	public Task Completion => _completion.Task;
@@ -75,6 +82,11 @@ internal sealed class DemoSession : IProtocolSession
 			return _indicators as TFeature;
 		}
 
+		if (typeof(TFeature) == typeof(IHostMonitorFeature))
+		{
+			return _monitor as TFeature;
+		}
+
 		return typeof(TFeature) == typeof(IFileSystemFeature) ? _files as TFeature : null;
 	}
 
@@ -87,6 +99,7 @@ internal sealed class DemoSession : IProtocolSession
 
 		// File system views keep the token and fail with "connection lost" from here on.
 		_closed.Cancel();
+		await _monitor.DisposeAsync();
 		await _terminal.DisposeAsync();
 		await _docker.DisposeAsync();
 		await _files.DisposeAsync();

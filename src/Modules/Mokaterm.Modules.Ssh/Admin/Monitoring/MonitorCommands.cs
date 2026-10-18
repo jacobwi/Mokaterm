@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Mokaterm.Modules.Ssh.Admin.Storage;
 
 namespace Mokaterm.Modules.Ssh.Admin.Monitoring;
 
@@ -21,7 +22,8 @@ internal static partial class MonitorCommands
 	/// <summary>
 	/// The lines of a sample, which the overview's first read prints as well so it starts with one. <c>/sys/block</c>
 	/// names the whole disks among the diskstats lines, and a <c>device</c> link under <c>/sys/class/net</c> tells a
-	/// real (or virtual machine) NIC from a bridge or a veth.
+	/// real (or virtual machine) NIC from a bridge or a veth. df asks about <c>/</c> alone, so a network mount that hangs
+	/// elsewhere cannot hold the sample up.
 	/// </summary>
 	public static IReadOnlyList<string> SampleLines { get; } =
 	[
@@ -41,6 +43,8 @@ internal static partial class MonitorCommands
 		"cat /proc/diskstats 2>/dev/null",
 		AdminSections.Start("blocks"),
 		"ls /sys/block 2>/dev/null",
+		AdminSections.Start("rootfs"),
+		"df -P -k / 2>/dev/null",
 	];
 
 	public static AdminScript Sample() => new()
@@ -65,6 +69,7 @@ internal static partial class MonitorCommands
 			Memory = MemoryInfo.Parse(sections.Get("meminfo")),
 			Interfaces = ParseNetDev(sections.Get("netdev"), DeviceInterfaces(sections.Get("nics"))),
 			Disks = ParseDiskStats(sections.Get("diskstats"), [.. AdminSections.Lines(sections.Get("blocks")).Select(name => name.Trim())]),
+			RootDisk = DiskCommands.ParseDf(sections.Get("rootfs"), []).FirstOrDefault(usage => usage.MountPoint == "/"),
 		};
 	}
 

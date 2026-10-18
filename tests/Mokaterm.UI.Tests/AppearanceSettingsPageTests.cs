@@ -85,6 +85,36 @@ public sealed class AppearanceSettingsPageTests
 		Assert.Contains("Show tool descriptions", html, StringComparison.Ordinal);
 	}
 
+	[Fact]
+	public async Task Render_OffersTheHostFigures_AndHowOftenTheyAreRead()
+	{
+		string html = await RenderAsync(new AppearanceSettings());
+
+		Assert.Contains("Live host figures", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Show live host figures\"", html, StringComparison.Ordinal);
+		Assert.Contains("Host figures interval", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Host figures interval in seconds\"", html, StringComparison.Ordinal);
+	}
+
+	// On by default, every five seconds, and a hand-edited interval is pulled back into the range the page offers.
+	[Fact]
+	public void HostFigures_AreOnEveryFiveSeconds_AndTheIntervalStaysInItsRange()
+	{
+		AppearanceSettings defaults = new();
+
+		Assert.True(defaults.ShowHostFigures);
+		Assert.Equal(5, defaults.HostFiguresSeconds);
+		Assert.Equal(AppearanceSettings.MinHostFiguresSeconds, (defaults with { HostFiguresSeconds = 0 }).Clamped().HostFiguresSeconds);
+		Assert.Equal(AppearanceSettings.MaxHostFiguresSeconds, (defaults with { HostFiguresSeconds = 3600 }).Clamped().HostFiguresSeconds);
+		Assert.Equal(17, (defaults with { HostFiguresSeconds = 17 }).Clamped().HostFiguresSeconds);
+
+		AppearanceSettings older = System.Text.Json.JsonSerializer.Deserialize<AppearanceSettings>(
+			"{\"showStatusBar\":true}",
+			System.Text.Json.JsonSerializerOptions.Web)!;
+		Assert.True(older.ShowHostFigures);
+		Assert.Equal(AppearanceSettings.DefaultHostFiguresSeconds, older.HostFiguresSeconds);
+	}
+
 	// The windows open, come back and keep their places; the header holds no description until asked.
 	[Fact]
 	public void ToolWindowDefaults_AreOn_ExceptDescriptions()

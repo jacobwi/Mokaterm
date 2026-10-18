@@ -69,7 +69,7 @@ public sealed class SshModule : IMokatermModule
 		services.AddSessionTool(new SessionToolDescriptor
 		{
 			ProtocolId = SshProtocolIds.Ssh,
-			Id = "system",
+			Id = SystemAdminView.ToolId,
 			Title = "System",
 			Icon = MokatermIcons.Server,
 			Component = typeof(SystemAdminView),

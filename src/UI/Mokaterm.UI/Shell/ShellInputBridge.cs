@@ -24,6 +24,7 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 	private readonly ISettingsService _settings;
 	private readonly IAppEnvironment _environment;
 	private readonly ISessionManager _sessions;
+	private readonly PageVisibility _visibility;
 	private readonly ILogger<ShellInputBridge> _logger;
 	private DotNetObjectReference<ShellInputBridge>? _reference;
 	private int? _handle;
@@ -35,6 +36,7 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 		ISettingsService settings,
 		IAppEnvironment environment,
 		ISessionManager sessions,
+		PageVisibility visibility,
 		ILogger<ShellInputBridge> logger)
 	{
 		_interop = interop;
@@ -43,6 +45,7 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 		_settings = settings;
 		_environment = environment;
 		_sessions = sessions;
+		_visibility = visibility;
 		_logger = logger;
 	}
 
@@ -60,10 +63,13 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 		_reference = reference;
 		ShellShortcuts.Apply(_settings.Get<ShortcutSettings>());
 		_settings.Changed += OnSettingsChanged;
+
+		// Visibility is watched on every host: the live figures stop while the page is hidden. Only the desktop locks then,
+		// which OnHidden decides.
 		ShellListenerOptions options = new(
 			ShellShortcuts.Bindings,
 			(int)ActivityReportInterval.TotalMilliseconds,
-			WatchVisibility: _environment.Kind == HostKind.Desktop,
+			WatchVisibility: true,
 			ConfirmLeave);
 
 		int handle;
@@ -104,6 +110,9 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 		int? handle = _handle;
 		_reference = null;
 		_handle = null;
+
+		// The next shell starts out seen; shell.js says so at once if it is not.
+		_visibility.Set(true);
 		if (handle is { } attached)
 		{
 			await _interop.DetachShellAsync(attached);
@@ -135,6 +144,9 @@ internal sealed class ShellInputBridge : IAsyncDisposable
 			_vault.ReportActivity();
 		}
 	}
+
+	[JSInvokable]
+	public void OnVisibilityChanged(bool visible) => _visibility.Set(visible);
 
 	[JSInvokable]
 	public void OnHidden()

@@ -15,7 +15,6 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 internal sealed class AdminPageContext : ISystemPageContext
 {
 	private string? _hint;
-	private MonitorSampler? _liveSampler;
 
 	public required SystemAdminFeature Feature { get; init; }
 
@@ -49,10 +48,11 @@ internal sealed class AdminPageContext : ISystemPageContext
 	public required IRemoteTextEditor Editor { get; init; }
 
 	/// <summary>
-	/// The overview's live figures, kept for as long as the view is open: leaving the page and coming back keeps the
-	/// lines drawn so far, and the next sample's rates cover the time away.
+	/// The session's live figures, which the status bar may be reading as well: one sampler per session, so the overview
+	/// and the status bar never run two samples at once. Its lines last as long as the session, and the next sample's
+	/// rates cover any time away.
 	/// </summary>
-	public MonitorSampler LiveSampler => _liveSampler ??= new MonitorSampler(Feature.ReadAsync);
+	public required HostMonitor Monitor { get; init; }
 
 	/// <summary>The account this session logged in as.</summary>
 	public string LoginName => Profile.Facts.UserName;

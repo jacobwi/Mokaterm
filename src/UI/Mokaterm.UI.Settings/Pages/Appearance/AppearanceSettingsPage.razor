@@ -9,7 +9,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale, status bar, session toolbar and tool windows back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, font scale, status bar, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms.">
 			<EnumSegmentedControl TEnum="ThemeMode"
@@ -56,6 +56,23 @@
 			<MokaSwitch Value="settings.ShowStatusBar"
 						ValueChanged="value => UpdateAsync(s => s with { ShowStatusBar = value })"
 						aria-label="Show status bar" />
+		</SettingsRow>
+		<SettingsRow Label="Live host figures"
+					 Description="CPU, memory and root disk use of the active session's machine in the status bar, where the session can read them. Clicking them opens its System tool.">
+			<MokaSwitch Value="settings.ShowHostFigures"
+						ValueChanged="value => UpdateAsync(s => s with { ShowHostFigures = value })"
+						aria-label="Show live host figures" />
+		</SettingsRow>
+		<SettingsRow Label="Host figures interval"
+					 Description="How often the figures are read while they show. Each read runs one short command on the machine, and only while its tab is the one in front.">
+			<NumberSetting TValue="int"
+						   Value="settings.HostFiguresSeconds"
+						   ValueChanged="value => SaveAsync(s => s with { HostFiguresSeconds = value })"
+						   Min="AppearanceSettings.MinHostFiguresSeconds"
+						   Max="AppearanceSettings.MaxHostFiguresSeconds"
+						   Suffix="s"
+						   Disabled="!settings.ShowHostFigures"
+						   AriaLabel="Host figures interval in seconds" />
 		</SettingsRow>
 	</SettingsSection>
 

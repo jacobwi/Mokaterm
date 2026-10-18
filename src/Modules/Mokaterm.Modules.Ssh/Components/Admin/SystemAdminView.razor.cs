@@ -9,10 +9,12 @@ using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Abstractions.ServerAdmin;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Terminal;
 using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Admin.Detection;
+using Mokaterm.Modules.Ssh.Admin.Monitoring;
 using Mokaterm.Modules.Ssh.Admin.Reboot;
 using Mokaterm.Modules.Ssh.FileSystem;
 using Mokaterm.UI.Common.Components;
@@ -35,12 +37,20 @@ namespace Mokaterm.Modules.Ssh.Components.Admin;
 /// </remarks>
 public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 {
+	/// <summary>
+	/// The id this view registers under as a session tool. A session's live figures name it, so a click on them in the
+	/// status bar opens this view.
+	/// </summary>
+	public const string ToolId = "system";
+
 	private readonly CancellationTokenSource _closed = new();
 	private ISessionHandle? _handle;
 	private IProtocolSession? _attached;
 	private SystemAdminFeature? _feature;
 	private SystemAdminFeature? _ownedFeature;
 	private SessionRootFiles? _ownedRootFiles;
+	private HostMonitor? _monitor;
+	private HostMonitor? _ownedMonitor;
 	private Task<SessionLogin>? _login;
 	private SystemProfile? _profile;
 	private AdminPageContext? _context;
@@ -302,6 +312,14 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 
 		if (_feature is { } feature)
 		{
+			// The session's own sampler when it has one, which the status bar reads too; otherwise one of the view's own.
+			_monitor = session.GetFeature<IHostMonitorFeature>() as HostMonitor;
+			if (_monitor is null)
+			{
+				_ownedMonitor = new HostMonitor(feature.ReadAsync, Time, Logger, toolKey: null);
+				_monitor = _ownedMonitor;
+			}
+
 			feature.Changed += OnFeatureChanged;
 			_profile = feature.Profile;
 			BuildContext();
@@ -322,6 +340,14 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 			}
 		}
 
+		// Before the feature it reads through.
+		if (_ownedMonitor is { } monitor)
+		{
+			_ownedMonitor = null;
+			await monitor.DisposeAsync();
+		}
+
+		_monitor = null;
 		if (_ownedFeature is { } owned)
 		{
 			_ownedFeature = null;
@@ -372,7 +398,7 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 
 	private void BuildContext()
 	{
-		if (_feature is not { } feature || _profile is not { } profile)
+		if (_feature is not { } feature || _profile is not { } profile || _monitor is not { } monitor)
 		{
 			_context = null;
 			return;
@@ -387,6 +413,7 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 		{
 			Feature = feature,
 			Profile = profile,
+			Monitor = monitor,
 			Run = ReviewAndRunAsync,
 			EnableRoot = EnableRootAsync,
 			Show = Show,

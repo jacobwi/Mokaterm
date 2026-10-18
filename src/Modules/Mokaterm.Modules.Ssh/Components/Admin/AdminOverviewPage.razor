@@ -204,6 +204,8 @@
 	private const int MaxDevices = 8;
 
 	private OverviewSnapshot? _snapshot;
+	private HostMonitor? _monitor;
+	private IDisposable? _watch;
 	private IReadOnlyList<ServiceUnit>? _services;
 	private int _failed;
 	private int? _updates;
@@ -224,13 +226,22 @@
 		? "no package manager"
 		: _updatesError is not null ? "could not check" : _updates is null ? $"asking {packages.DisplayName}" : packages.DisplayName;
 
-	private MonitorHistory History => Sampler.History;
+	private MonitorHistory History => Context.Monitor.History;
 
-	private string? SampleError => Sampler.Error;
+	private string? SampleError => Context.Monitor.State.Problem;
 
-	private MonitorSampler Sampler => Context.LiveSampler;
+	/// <summary>Follows the session's sampler while the view is shown; the parameters come round again whenever it is hidden or shown.</summary>
+	protected override void OnParametersSet() => Follow();
 
-	protected override void OnInitialized() => StartPolling(MonitorCommands.Interval, SampleAsync);
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			Leave();
+		}
+
+		base.Dispose(disposing);
+	}
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
@@ -240,7 +251,8 @@
 		_ = LoadClockAsync(cancellationToken);
 		AdminOutcome outcome = await ReadAsync(OverviewCommands.Read(), cancellationToken);
 		_snapshot = OverviewCommands.Parse(outcome.Output);
-		History.Add(_snapshot.Sample);
+		Context.Monitor.Record(_snapshot.Sample);
+		Follow();
 	}
 
 	private static TimeSpan? Uptime(SystemSample? sample) =>
@@ -277,19 +289,50 @@
 
 	private void OpenUpdates() => Context.Navigate(AdminPageIds.Packages, "updates");
 
-	private async Task SampleAsync()
+	/// <summary>
+	/// Watches at the overview's pace while the view is shown and lets go while it is hidden, so a hidden System view
+	/// reads nothing of its own. The first read already brings a sample, so watching starts once it is in, and the next
+	/// sample comes an interval after it. A reconnect brings a new session and with it a new sampler.
+	/// </summary>
+	private void Follow()
 	{
-		try
-		{
-			await Sampler.SampleAsync(Lifetime);
-		}
-		catch (OperationCanceledException)
+		if (IsDisposed)
 		{
 			return;
 		}
 
-		StateHasChanged();
+		HostMonitor monitor = Context.Monitor;
+		if (!ReferenceEquals(monitor, _monitor))
+		{
+			Leave();
+			_monitor = monitor;
+			monitor.Changed += OnMonitorChanged;
+		}
+
+		if (Context.IsVisible() && _snapshot is not null)
+		{
+			_watch ??= monitor.Watch(MonitorCommands.Interval);
+		}
+		else
+		{
+			_watch?.Dispose();
+			_watch = null;
+		}
 	}
+
+	private void Leave()
+	{
+		_watch?.Dispose();
+		_watch = null;
+		if (_monitor is { } monitor)
+		{
+			monitor.Changed -= OnMonitorChanged;
+			_monitor = null;
+		}
+	}
+
+	// Raised on the sampler's own loop.
+	private void OnMonitorChanged() => _ = InvokeAsync(StateHasChanged);
 
 	private async Task LoadServicesAsync(CancellationToken cancellationToken)
 	{
