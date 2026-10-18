@@ -26,12 +26,28 @@ internal sealed class FileBrowserDialogService : IFileBrowserDialog
 			return;
 		}
 
-		await _dialogs.ShowComponentAsync<FileBrowserDialog>(
+		_ = await OpenAsync(request, pickFolder: false, cancellationToken);
+	}
+
+	public async Task<string?> PickFolderAsync(FileBrowserRequest request, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(request);
+		if (cancellationToken.IsCancellationRequested)
+		{
+			return null;
+		}
+
+		return await OpenAsync(request, pickFolder: true, cancellationToken) as string;
+	}
+
+	private Task<object?> OpenAsync(FileBrowserRequest request, bool pickFolder, CancellationToken cancellationToken) =>
+		_dialogs.ShowComponentAsync<FileBrowserDialog>(
 			request.Title,
 			parameters =>
 			{
 				parameters[nameof(FileBrowserDialog.Request)] = request;
 				parameters[nameof(FileBrowserDialog.Closing)] = cancellationToken;
+				parameters[nameof(FileBrowserDialog.PickFolder)] = pickFolder;
 			},
 			options =>
 			{
@@ -47,5 +63,4 @@ internal sealed class FileBrowserDialogService : IFileBrowserDialog
 				options.CloseOnEscape = false;
 				options.CloseOnBackdropClick = false;
 			});
-	}
 }

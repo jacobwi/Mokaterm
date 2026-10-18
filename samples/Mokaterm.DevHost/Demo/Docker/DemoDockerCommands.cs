@@ -33,6 +33,24 @@ internal sealed class DemoDockerCommands : IRemoteCommandFeature
 			words.RemoveRange(0, 4);
 		}
 
+		// A build or a push runs under the server's own time limit: the command after the seconds is what docker sees.
+		if (words is ["sh", "-c", var script, "sh", _, .. var limited] && IsLimitScript(script))
+		{
+			words = [.. limited];
+		}
+
+		if (words is ["docker", "login", .. var login])
+		{
+			await Task.Delay(TimeSpan.FromSeconds(0.8), _time, cancellationToken);
+			string? input = request.Input is { } secret ? Encoding.UTF8.GetString(secret.Span) : null;
+			return Outcome(_engine.Login(login, input), request, started);
+		}
+
+		if (_engine.Stream([.. words], directory) is { } stream)
+		{
+			return await StreamAsync(stream, request, started, cancellationToken);
+		}
+
 		// Stats take docker about two seconds, since it measures CPU over an interval.
 		bool slow = words is ["docker", "stats", ..] or ["docker", "pull", ..] || (words is ["docker", "compose", ..] && words.Contains("up"));
 		await Task.Delay(slow ? TimeSpan.FromSeconds(1.5) : Pause, _time, cancellationToken);
@@ -46,6 +64,44 @@ internal sealed class DemoDockerCommands : IRemoteCommandFeature
 			Duration = _time.GetElapsedTime(started),
 		};
 	}
+
+	/// <summary>The manager's time limit around a build or a push: the limit's probe and function, then the command under it.</summary>
+	internal static bool IsLimitScript(string script) =>
+		script.StartsWith("if timeout 1 true", StringComparison.Ordinal) && script.EndsWith("mokaterm_limit \"$@\"", StringComparison.Ordinal);
+
+	/// <summary>
+	/// Plays a build or a push: each line after its pause, heard live through the request's listener and kept up to the
+	/// request's cap as a channel keeps it. A cancel stops between two lines, before the change is made.
+	/// </summary>
+	private async Task<RemoteCommandOutcome> StreamAsync(DemoDockerStream stream, RemoteCommandRequest request, long started, CancellationToken cancellationToken)
+	{
+		using MemoryStream output = new();
+		using MemoryStream error = new();
+		foreach (DemoDockerLine line in stream.Steps)
+		{
+			await Task.Delay(line.Pause, _time, cancellationToken);
+			byte[] bytes = Encoding.UTF8.GetBytes(line.Text + "\n");
+			request.OnOutput?.Invoke(line.IsError ? CommandStream.Error : CommandStream.Output, bytes);
+			await (line.IsError ? error : output).WriteAsync(bytes, cancellationToken);
+		}
+
+		int exit = stream.Finish();
+		return new RemoteCommandOutcome
+		{
+			ExitCode = exit,
+			Output = Captured(output.ToArray(), request.OutputLimitBytes),
+			Error = Captured(error.ToArray(), request.OutputLimitBytes),
+			Duration = _time.GetElapsedTime(started),
+		};
+	}
+
+	private RemoteCommandOutcome Outcome(DemoDockerResult result, RemoteCommandRequest request, long started) => new()
+	{
+		ExitCode = result.ExitCode,
+		Output = Captured(result.Bytes ?? Encoding.UTF8.GetBytes(result.Output), request.OutputLimitBytes),
+		Error = Captured(Encoding.UTF8.GetBytes(result.Error), request.OutputLimitBytes),
+		Duration = _time.GetElapsedTime(started),
+	};
 
 	/// <summary>POSIX word splitting for the lines the manager builds: bare words and single-quoted ones.</summary>
 	internal static List<string> Split(string line)

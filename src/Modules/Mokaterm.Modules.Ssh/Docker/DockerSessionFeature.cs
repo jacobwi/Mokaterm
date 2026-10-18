@@ -30,6 +30,8 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 	private SudoRunner? _runner;
 	private DockerClient _client;
 	private DockerEngineStatus? _status;
+	private DockerClientConfig? _clientConfig;
+	private BuilderFound? _builder;
 	private int _disposed;
 
 	/// <param name="userShell">Commands as the login.</param>
@@ -64,6 +66,7 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 			: files is null ? null : new DockerHostFiles(files, stagingDirectory);
 		ImageUpdates = new DockerImageUpdates(time);
 		Changes = new DockerChangeLog(time);
+		LiveRuns = new DockerLiveRuns(time, Changes, logger);
 	}
 
 	/// <summary>Raised when the status or the shell changes. Handlers may run on any thread.</summary>
@@ -79,6 +82,12 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 
 	/// <summary>The changes the user ran this session, so the health watch never reports them.</summary>
 	internal DockerChangeLog Changes { get; }
+
+	/// <summary>The session's builds and pushes, which run on whatever page is shown.</summary>
+	internal DockerLiveRuns LiveRuns { get; }
+
+	/// <summary>The registries the client config named at its last read this session, or null before one.</summary>
+	internal DockerClientConfig? ClientConfig => Volatile.Read(ref _clientConfig);
 
 	/// <summary>What the last look found, or null before the first one.</summary>
 	internal DockerEngineStatus? Status => Volatile.Read(ref _status);
@@ -176,6 +185,76 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 		}
 	}
 
+	/// <summary>
+	/// BuildKit when <c>docker buildx version</c> answers, the classic builder otherwise: asked once per session, and again
+	/// after a switch to sudo, since buildx is a plugin each account can have or not.
+	/// </summary>
+	internal async Task<DockerBuilder> BuilderAsync(CancellationToken cancellationToken)
+	{
+		DockerClient client = Client;
+		if (Volatile.Read(ref _builder) is { } known && ReferenceEquals(known.Client, client))
+		{
+			return known.Builder;
+		}
+
+		DockerBuilder builder;
+		try
+		{
+			builder = (await client.RunAsync(DockerCommands.BuildxVersion(), cancellationToken)).Succeeded ? DockerBuilder.BuildKit : DockerBuilder.Legacy;
+		}
+		catch (DockerCommandException)
+		{
+			builder = DockerBuilder.Legacy;
+		}
+
+		Volatile.Write(ref _builder, new BuilderFound(client, builder));
+		return builder;
+	}
+
+	/// <summary>Reads which registries the client is logged in to, through the current shell, and keeps it for the push form.</summary>
+	/// <exception cref="DockerCommandException">The file could not be read.</exception>
+	internal async Task<DockerClientConfig> ReadClientConfigAsync(CancellationToken cancellationToken)
+	{
+		DockerClient client = Client;
+		DockerOutput output = await client.RunAsync(DockerRegistryCommands.ReadClientConfig(), cancellationToken);
+		if (!output.Succeeded)
+		{
+			// The bytes are wiped whatever the exit, since a file cut short can still hold part of a credential.
+			Wipe(output);
+			throw client.Failed(output);
+		}
+
+		DockerClientConfig config = DockerClientConfigReader.Read(output);
+		Volatile.Write(ref _clientConfig, config);
+		return config;
+	}
+
+	/// <summary>
+	/// Starts a build or a push in the background through <paramref name="client"/>, the client whose commands the
+	/// question showed, and drops the update checks of what it rebuilt or pushed once it succeeded.
+	/// </summary>
+	/// <exception cref="InvalidOperationException">Another build or push is still running.</exception>
+	internal DockerLiveRun StartLive(DockerLivePlan plan, DockerClient client)
+	{
+		ArgumentNullException.ThrowIfNull(plan);
+		ArgumentNullException.ThrowIfNull(client);
+		ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+		IReadOnlyList<string> shown = Shown(client, plan.Calls);
+		return LiveRuns.Start(client, plan, shown, plan.Refreshes.Count == 0 ? null : () => ImageUpdates.Forget(plan.Refreshes));
+	}
+
+	/// <summary>Each call as a question shows it, with <c>sudo</c> in front while the manager runs through it.</summary>
+	internal static IReadOnlyList<string> Shown(DockerClient client, IReadOnlyList<DockerCall> calls)
+	{
+		ArgumentNullException.ThrowIfNull(client);
+		ArgumentNullException.ThrowIfNull(calls);
+		string prefix = client.IsElevated ? "sudo " : "";
+		return [.. calls.Select(call => prefix + call.Display)];
+	}
+
+	private static void Wipe(DockerOutput output) =>
+		System.Security.Cryptography.CryptographicOperations.ZeroMemory(System.Runtime.InteropServices.MemoryMarshal.AsMemory(output.RawOutput).Span);
+
 	/// <summary>Looks for Docker again with the current shell and keeps what it found.</summary>
 	internal async Task<DockerEngineStatus> DetectAsync(CancellationToken cancellationToken)
 	{
@@ -229,6 +308,8 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 			return;
 		}
 
+		// A build still going is stopped before the sudo password it may run with is wiped.
+		await LiveRuns.DisposeAsync();
 		Interlocked.Exchange(ref _runner, null)?.Dispose();
 		ContainerFileSystemFeature[] containers;
 		lock (_containerFiles)
@@ -247,4 +328,6 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 			await files.DisposeAsync();
 		}
 	}
+
+	private sealed record BuilderFound(DockerClient Client, DockerBuilder Builder);
 }

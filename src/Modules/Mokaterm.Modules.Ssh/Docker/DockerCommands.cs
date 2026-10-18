@@ -200,6 +200,39 @@ internal static class DockerCommands
 
 	public static DockerCall Pull(string reference) => Docker(["pull", Image(reference)]).AsChange(DockerCall.LongTimeout);
 
+	/// <summary>
+	/// <c>docker image tag SOURCE TARGET</c>: one more name for an image, which moves <paramref name="target"/> when it
+	/// already names another one.
+	/// </summary>
+	/// <param name="source">A tag or an image id.</param>
+	/// <param name="target">A new tag, checked by <see cref="DockerImageName.TagProblem"/>.</param>
+	public static DockerCall Tag(string source, string target) =>
+		Docker(["image", "tag", Image(source), Checked(target.Trim(), DockerImageName.TagProblem(target))]).AsChange();
+
+	/// <summary>
+	/// <c>docker push NAME:TAG</c>, or <c>docker push --all-tags REPOSITORY</c> for every local tag of a repository, under
+	/// the server's own time limit and shown live.
+	/// </summary>
+	/// <exception cref="ArgumentException">The reference is not a tag, or the repository names a tag or digest.</exception>
+	public static DockerCall Push(string reference, bool allTags)
+	{
+		ArgumentNullException.ThrowIfNull(reference);
+		string text = reference.Trim();
+		DockerCall call;
+		if (allTags)
+		{
+			// A repository alone reads as its latest tag, so a reference with a tag or digest of its own is refused here.
+			bool bare = DockerImageName.TagProblem(text) is null && !text[(text.LastIndexOf('/') + 1)..].Contains(':', StringComparison.Ordinal);
+			call = Docker(["push", "--all-tags", Checked(text, bare ? null : "--all-tags takes a repository without a tag, such as registry.example.com/team/app.")]);
+		}
+		else
+		{
+			call = Docker(["push", Checked(text, DockerImageName.TagProblem(text))]);
+		}
+
+		return DockerTimeLimit.Wrap(call with { OutputLimitBytes = DockerCall.LiveOutputBytes }, DockerCall.PushTimeout);
+	}
+
 	/// <param name="force">Removes it even when containers use it or several tags point at it (<c>--force</c>).</param>
 	public static DockerCall RemoveImage(string reference, bool force) =>
 		Docker(force ? ["image", "rm", "--force", Image(reference)] : ["image", "rm", Image(reference)]).AsChange();

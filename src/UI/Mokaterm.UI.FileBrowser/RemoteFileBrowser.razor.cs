@@ -120,6 +120,10 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	[Parameter]
 	public string? InitialPath { get; set; }
 
+	/// <summary>Told the folder on show, as an absolute path, each time a listing of another folder came in.</summary>
+	[Parameter]
+	public EventCallback<string> FolderChanged { get; set; }
+
 	[Parameter]
 	public string? Class { get; set; }
 
@@ -647,7 +651,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 				return LoadOutcome.Superseded;
 			}
 
-			if (!_loaded || _path != path)
+			bool moved = !_loaded || _path != path;
+			if (moved)
 			{
 				_selection.Reset();
 				_filter = "";
@@ -660,6 +665,11 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			if (select is not null)
 			{
 				Reveal(select);
+			}
+
+			if (moved && FolderChanged.HasDelegate)
+			{
+				await FolderChanged.InvokeAsync(path);
 			}
 
 			return LoadOutcome.Loaded;

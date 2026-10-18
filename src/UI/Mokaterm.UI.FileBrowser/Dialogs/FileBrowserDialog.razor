@@ -1,7 +1,18 @@
 @namespace Mokaterm.UI.FileBrowser.Dialogs
 @using Mokaterm.UI.Common.Files
 
-@* The browser fills the dialog and scrolls its own list; the dialog itself never scrolls. *@
+@* The browser fills the dialog and scrolls its own list; the dialog itself never scrolls. Picking a folder adds a line
+   under it with the folder on show and the button that hands it back. *@
 <div class="mt-files-dialog">
-	<RemoteFileBrowser Files="Request" IsActive="true" />
+	<RemoteFileBrowser Files="Request" IsActive="true" FolderChanged="OnFolderChanged" />
+	@if (PickFolder)
+	{
+		<div class="mt-files-pick">
+			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mt-files-pick-path">@(_folder ?? "")</MokaText>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="Cancel">Cancel</MokaButton>
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.FolderOpen" Disabled="@(_folder is null)" OnClick="Use">
+				Use this folder
+			</MokaButton>
+		</div>
+	}
 </div>

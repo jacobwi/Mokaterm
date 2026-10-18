@@ -33,8 +33,9 @@ internal static class AdminScriptText
 	// sudo -S reads its password line from stdin only when it needs one: with a cached ticket or NOPASSWD it reads
 	// nothing, and that line would reach chpasswd or crontab as data. So the payload follows a marker line, and
 	// whatever comes before the marker is dropped. read takes one byte at a time from a pipe, so the command after it
-	// starts exactly at the payload. A payload that never arrived must not become an empty crontab.
-	private const string InputReader = """
+	// starts exactly at the payload. A payload that never arrived must not become an empty crontab. The Docker manager's
+	// sudo calls put it in front of theirs too (docker login --password-stdin). Its line endings are this file's.
+	internal const string InputReader = """
 		mokaterm_found=
 		while IFS= read -r mokaterm_line; do
 			if [ "$mokaterm_line" = MOKATERM-STDIN ]; then mokaterm_found=1; break; fi
@@ -61,7 +62,12 @@ internal static class AdminScriptText
 	public static SecretBuffer FrameInput(AdminInput input)
 	{
 		ArgumentNullException.ThrowIfNull(input);
-		ReadOnlySpan<byte> payload = input.Bytes.Span;
+		return FrameInput(input.Bytes.Span);
+	}
+
+	/// <summary><see cref="FrameInput(AdminInput)"/> for any payload, such as a password a docker command reads.</summary>
+	public static SecretBuffer FrameInput(ReadOnlySpan<byte> payload)
+	{
 		if (!payload.IsEmpty && payload[^1] == (byte)'\n')
 		{
 			payload = payload[..^1];

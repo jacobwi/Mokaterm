@@ -44,6 +44,62 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 	/// <summary>False when the connection does not run anything as root, so no page offers it.</summary>
 	private protected bool CanUseRoot => HostFiles?.CanUseRoot ?? false;
 
+	/// <summary>The session's builds and pushes, which outlive the page that started them.</summary>
+	private protected DockerLiveRuns? LiveRuns => Feature?.LiveRuns;
+
+	/// <summary>True while a change of this page or a build or push of the session runs.</summary>
+	private protected bool IsWorking => IsBusy || LiveRuns?.IsRunning == true;
+
+	/// <summary>
+	/// Asks first, showing every command exactly as it runs (masked values aside), then starts a build or a push in the
+	/// background. Null when the user said no, the session went, or another one is still running.
+	/// </summary>
+	private protected async Task<DockerLiveRun?> StartLiveAsync(DockerLivePlan plan)
+	{
+		ArgumentNullException.ThrowIfNull(plan);
+		if (Feature is not { } feature || IsDisposed)
+		{
+			return null;
+		}
+
+		if (feature.LiveRuns.IsRunning)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "A build or a push is still running. Let it finish, or stop it, first.");
+			return null;
+		}
+
+		DockerClient client = feature.Client;
+		ConfirmResult answer = await Interaction.ConfirmAsync(
+			new ConfirmPrompt
+			{
+				Title = plan.Title,
+				Message = plan.Confirm,
+				ConfirmText = plan.ConfirmText,
+				Destructive = false,
+				Details = string.Join('\n', DockerSessionFeature.Shown(client, plan.Calls)),
+			},
+			Lifetime);
+		if (!answer.Confirmed || IsDisposed)
+		{
+			return null;
+		}
+
+		try
+		{
+			return feature.StartLive(plan, client);
+		}
+		catch (ObjectDisposedException)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "The session is closed.");
+			return null;
+		}
+		catch (InvalidOperationException ex)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, ex.Message);
+			return null;
+		}
+	}
+
 	/// <summary>Runs a load with the session's client; nothing at all while the session has none.</summary>
 	private protected Task LoadAsync(Func<DockerClient, CancellationToken, Task> load)
 	{
@@ -141,6 +197,30 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 		{
 			return $"Could not open a shell: {problem}";
 		}
+	}
+
+	/// <summary>
+	/// Lets the user pick a folder on the docker host in the built-in file browser, over the session's own files and so as
+	/// the login. Null when the session has no files, or the browser was closed without a folder.
+	/// </summary>
+	/// <param name="startFolder">Where to open, such as what is typed already; null for the login's home.</param>
+	private protected async Task<string?> PickHostFolderAsync(string title, string? startFolder)
+	{
+		ArgumentNullException.ThrowIfNull(title);
+		if (Session.Session?.GetFeature<IFileSystemFeature>() is not { } files || Feature is not { } feature)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "This session has no files to pick a folder from. Type the folder instead.");
+			return null;
+		}
+
+		FileBrowserRequest request = new()
+		{
+			FileSystem = files,
+			Title = title,
+			Location = feature.Host,
+			StartFolder = startFolder is { Length: > 0 } && startFolder.StartsWith('/') ? startFolder : null,
+		};
+		return await FileBrowser.PickFolderAsync(request, Lifetime);
 	}
 
 	/// <summary>

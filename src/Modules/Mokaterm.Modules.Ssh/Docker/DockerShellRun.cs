@@ -36,10 +36,11 @@ internal static class DockerShellRun
 	}
 
 	/// <summary>
-	/// The request a call runs under: its output cap, and long when its time limit is (a pull, a build) or when it says
-	/// so itself (<see cref="DockerCall.RunsLong"/>).
+	/// The request a call runs under: its output cap, its live output listener, and long when its time limit is (a pull,
+	/// a build) or when it says so itself (<see cref="DockerCall.RunsLong"/>). The call's stdin is left to each shell,
+	/// since sudo needs it framed behind its own password line.
 	/// </summary>
-	public static RemoteCommandRequest Request(DockerCall call, string commandLine)
+	public static RemoteCommandRequest Request(DockerCall call, string commandLine, CommandOutputHandler? onOutput = null)
 	{
 		ArgumentNullException.ThrowIfNull(call);
 		return new RemoteCommandRequest
@@ -47,6 +48,7 @@ internal static class DockerShellRun
 			Command = commandLine,
 			OutputLimitBytes = call.OutputLimitBytes,
 			RunsLong = call.RunsLong || ExecChannelBudget.RunsLong(call.Timeout),
+			OnOutput = onOutput,
 		};
 	}
 

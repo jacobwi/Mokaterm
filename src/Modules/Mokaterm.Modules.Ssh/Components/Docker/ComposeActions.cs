@@ -35,6 +35,12 @@ internal static class ComposeActions
 				$"Every container of {service ?? project} gets SIGTERM and, ten seconds later, SIGKILL. They stay, and Start brings them back.",
 				"Stop"),
 			"pull" => new([ComposeCommands.Pull(target, service)], $"Pull images for {touched}"),
+			"build" => new(
+				[ComposeCommands.Build(target, service)],
+				$"Build images for {touched}",
+				$"Compose builds the images of {service ?? project} that have a build section, running whatever their Dockerfiles say. Running containers keep their old image until Up makes them again. The output shows here while it runs, and the server stops the build after {DockerTimeLimit.Describe(DockerCall.BuildTimeout)}.",
+				"Build",
+				Live: true),
 			"update" => new(
 				[ComposeCommands.Pull(target, service), ComposeCommands.Up(target, service: service)],
 				$"Update {touched}",

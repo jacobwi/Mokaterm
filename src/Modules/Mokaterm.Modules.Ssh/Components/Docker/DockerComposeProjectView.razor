@@ -64,6 +64,7 @@
 						<MokaDropdownItem Text="Up" Icon="MokaIcons.Navigation.ArrowUp" Class="mt-dk-narrow-only" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("up"))" />
 						<MokaDropdownItem Text="Down" Icon="MokaIcons.Action.Delete" Class="mt-dk-narrow-only" OnClick="@(() => RunAsync("down"))" />
 						<MokaDropdownItem Text="Pull" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull"))" />
+						<MokaDropdownItem Text="Build" Icon="DockerIcons.Build" Disabled="@(!_target.HasFiles || IsWorking)" OnClick="@(() => RunAsync("build"))" />
 						<MokaDropdownItem Text="Update (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update"))" />
 						<MokaDropdownItem Text="Recreate (--force-recreate)" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate"))" />
 						<MokaDropdownItem Divider />
@@ -79,7 +80,7 @@
 
 		@ChangePanel
 
-		<ViewTabs Tabs="Tabs" Active="@_tab" ActiveChanged="Show" Label="Project views" />
+		<ViewTabs Tabs="ShownTabs" Active="@_tab" ActiveChanged="Show" Label="Project views" />
 
 		<CascadingValue Value="_context">
 			@switch (_tab)
@@ -92,6 +93,9 @@
 					break;
 				case "env":
 					<div class="mt-dk-scroll"><ComposeEnvPanel Session="Session" Visible="Visible" /></div>
+					break;
+				case BuildTab:
+					<DockerLiveRunPanel Session="Session" Visible="Visible" Owner="@LiveOwner" OnBack="@(() => Show("services"))" BackLabel="Back to the services" />
 					break;
 				case "config":
 					<div class="mt-dk-scroll"><ComposeConfigPanel Session="Session" Visible="Visible" /></div>
@@ -168,6 +172,7 @@
 									<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => RunAsync("start", service.Name))" />
 									<MokaDropdownItem Text="Recreate this service" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate", service.Name))" />
 									<MokaDropdownItem Text="Pull its image" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull", service.Name))" />
+									<MokaDropdownItem Text="Build its image" Icon="DockerIcons.Build" Disabled="@(!_target.HasFiles || IsWorking)" OnClick="@(() => RunAsync("build", service.Name))" />
 									<MokaDropdownItem Text="Update this service (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update", service.Name))" />
 									<MokaDropdownItem Divider />
 									<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => ShowLogs(service.Name))" />

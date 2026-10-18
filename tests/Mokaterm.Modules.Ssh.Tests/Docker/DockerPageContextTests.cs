@@ -120,6 +120,19 @@ public sealed class DockerPageContextTests
 	}
 
 	[Fact]
+	public void BuildImage_OpensTheImagesPage_AndAsksForTheFormOnce()
+	{
+		List<string> shown = [];
+		DockerPageContext context = new(shown.Add, () => null);
+
+		context.BuildImage();
+
+		Assert.Equal(["images"], shown);
+		Assert.True(context.TakeBuildImage());
+		Assert.False(context.TakeBuildImage());
+	}
+
+	[Fact]
 	public void TheBuiltInPages_AreDescriptors_InTheirOrder()
 	{
 		ServiceCollection collection = new();
@@ -128,7 +141,7 @@ public sealed class DockerPageContextTests
 		using ServiceProvider services = collection.BuildServiceProvider();
 		IReadOnlyList<DockerPageDescriptor> pages = services.GetRequiredService<IUiContributions>().DockerPages;
 
-		Assert.Equal(["overview", "containers", "stats", "compose", "images", "volumes", "networks", "cleanup"], pages.Select(page => page.Id));
+		Assert.Equal(["overview", "containers", "stats", "compose", "images", "volumes", "networks", "cleanup", "registries"], pages.Select(page => page.Id));
 		Assert.All(pages, page => Assert.True(typeof(DockerManagerPageBase).IsAssignableFrom(page.Component)));
 		Assert.All(pages, page => Assert.Null(page.Unavailable));
 	}

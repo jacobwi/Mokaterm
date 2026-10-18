@@ -9,10 +9,23 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <summary>
 /// The host's images, one line each: pull one by reference, ask the registries whether a tag moved on (and pull the
 /// newer image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu
-/// only). Pruning lives on the cleanup page, which lists what would go first.
+/// only). A selected image opens its panel, where it is tagged and pushed; Build opens the build form. Builds and
+/// pushes run in the session's background and show their output in place of the list. Pruning lives on the cleanup
+/// page, which lists what would go first.
 /// </summary>
 public sealed partial class DockerImagesPage : DockerManagerPageBase
 {
+	private const string ListView = "list";
+
+	private const string BuildView = "build";
+
+	private const string LiveView = "live";
+
+	private DockerLiveRuns? _watched;
+	private DockerLiveRun? _seenRun;
+	private bool _seenRunning;
+	private string _view = ListView;
+	private string? _selected;
 	private IReadOnlyList<DockerImage> _images = [];
 	private IReadOnlyList<DockerImage> _shown = [];
 	private IReadOnlyList<string> _tagged = [];
@@ -31,7 +44,87 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 
 	private int DanglingCount => _images.Count(image => image.IsDangling);
 
-	protected override Task OnInitializedAsync() => RefreshAsync();
+	/// <summary>The session's build or push started from this page, running or the last one until dismissed.</summary>
+	private DockerLiveRun? LiveRun => LiveRuns?.Current is { Owner: DockerLivePlan.ImagesOwner } run ? run : null;
+
+	private DockerImage? SelectedImage => _selected is { } key ? _images.FirstOrDefault(image => Key(image) == key) : null;
+
+	protected override Task OnInitializedAsync()
+	{
+		if (Navigation?.TakeBuildImage() == true)
+		{
+			_view = BuildView;
+		}
+		else if (LiveRun is { IsRunning: true })
+		{
+			_view = LiveView;
+		}
+
+		Watch();
+		return RefreshAsync();
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing && _watched is { } watched)
+		{
+			watched.Changed -= OnRunsChanged;
+			_watched = null;
+		}
+
+		base.Dispose(disposing);
+	}
+
+	private static string Key(DockerImage image) => image.Reference + "|" + image.Id;
+
+	private static string PanelDetails(DockerImage image) =>
+		string.Join(", ", new[] { image.Size, image.CreatedSince }.Where(part => part.Length > 0));
+
+	private IReadOnlyList<string> RepositoryTags(DockerImage image) =>
+		image.IsTagged
+			? [.. _images.Where(other => other.IsTagged && other.Repository == image.Repository).Select(other => other.Reference).Distinct(StringComparer.Ordinal)]
+			: [];
+
+	private void Select(DockerImage image) => _selected = Key(image);
+
+	private void ClosePanel() => _selected = null;
+
+	private void ShowBuild() => _view = BuildView;
+
+	private void ShowLive() => _view = LiveView;
+
+	private void ShowList() => _view = ListView;
+
+	/// <summary>Follows the session's runs, so the list is read again once a build or a push ended.</summary>
+	private void Watch()
+	{
+		_watched = LiveRuns;
+		if (_watched is not null)
+		{
+			_watched.Changed += OnRunsChanged;
+			_seenRun = LiveRun;
+			_seenRunning = _seenRun?.IsRunning == true;
+		}
+	}
+
+	private void OnRunsChanged() => _ = InvokeAsync(async () =>
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+
+		DockerLiveRun? run = LiveRun;
+		bool ended = run is not null && ReferenceEquals(run, _seenRun) && _seenRunning && !run.IsRunning;
+		_seenRun = run;
+		_seenRunning = run?.IsRunning == true;
+		if (ended)
+		{
+			await RefreshAsync();
+		}
+
+		StateHasChanged();
+	});
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{

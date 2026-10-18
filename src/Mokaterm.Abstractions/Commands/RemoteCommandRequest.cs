@@ -1,5 +1,6 @@
 using System.Text;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Security;
 
 namespace Mokaterm.Abstractions.Commands;
 
@@ -20,6 +21,22 @@ public sealed record RemoteCommandRequest
 	/// once keeps some room for quick ones, which such a command never takes.
 	/// </summary>
 	public bool RunsLong { get; init; }
+
+	/// <summary>
+	/// What the command reads on stdin: written once the command started, followed by a line break, and then stdin is
+	/// closed. Null closes stdin at once. The caller keeps the buffer and disposes it after the run; it is never printed.
+	/// </summary>
+	/// <remarks>
+	/// It is how a secret reaches a command without being part of its line, as <c>docker login --password-stdin</c> takes
+	/// a password.
+	/// </remarks>
+	public SecretBuffer? Input { get; init; }
+
+	/// <summary>
+	/// Hears both streams as they arrive, beside what <see cref="OutputLimitBytes"/> keeps, for a command whose output is
+	/// shown while it runs. See <see cref="CommandOutputHandler"/> for what it must and must not do.
+	/// </summary>
+	public CommandOutputHandler? OnOutput { get; init; }
 
 	/// <summary>The command with the blank space around it removed, which is what gets sent.</summary>
 	public static string Normalize(string? command) => command?.Trim() ?? "";
@@ -53,7 +70,8 @@ public sealed record RemoteCommandRequest
 		builder
 			.Append("Command = ").Append(SecretText.Describe(Command))
 			.Append(", OutputLimitBytes = ").Append(OutputLimitBytes)
-			.Append(", RunsLong = ").Append(RunsLong);
+			.Append(", RunsLong = ").Append(RunsLong)
+			.Append(", Input = ").Append(Input is null ? "null" : "(set)");
 		return true;
 	}
 }

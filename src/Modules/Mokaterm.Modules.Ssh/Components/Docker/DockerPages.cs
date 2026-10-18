@@ -20,6 +20,7 @@ internal static class DockerPages
 		Add(services, DockerPageIds.Volumes, "Volumes", DockerIcons.Volume, typeof(DockerVolumesPage), 500);
 		Add(services, DockerPageIds.Networks, "Networks", DockerIcons.Network, typeof(DockerNetworksPage), 600);
 		Add(services, DockerPageIds.Cleanup, "Cleanup", DockerIcons.Prune, typeof(DockerCleanupPage), 700);
+		Add(services, DockerPageIds.Registries, "Registries", DockerIcons.Registry, typeof(DockerRegistriesPage), 800);
 	}
 
 	private static void Add(IServiceCollection services, string id, string title, MokaIconDefinition icon, Type component, int order) =>

@@ -93,4 +93,22 @@
 			</dl>
 		}
 	</div>
+
+	@if (Navigation is { } images)
+	{
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Build and push</span>
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build" OnClick="images.BuildImage">
+					Build image
+				</MokaButton>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry"
+							OnClick="@(() => images.Navigate(DockerPageIds.Registries))">
+					Registries
+				</MokaButton>
+			</div>
+			<span class="mt-dk-note">Builds and pushes show their output while they run, and carry on when the page changes.</span>
+		</div>
+	}
 </div>

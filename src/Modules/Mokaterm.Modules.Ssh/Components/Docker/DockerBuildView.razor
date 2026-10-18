@@ -1,0 +1,154 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Forms.PasswordField
+@inherits DockerManagerPageBase
+
+<div class="mt-dk-panel-head">
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.ArrowLeft"
+				Disabled="_starting" OnClick="OnCancel" Label="Back to the images" />
+	<span class="mt-dk-cell-name">Build an image</span>
+	<span class="mt-dk-label">@(_builder == DockerBuilder.Legacy ? "docker build" : "docker buildx build")</span>
+</div>
+
+<form class="mt-dk-scroll" @onsubmit="BuildAsync" @onsubmit:preventDefault="true">
+	<div class="mt-dk-form">
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Build context"
+						   Value="@_context"
+						   ValueChanged="@(value => Set(ref _context, value, DockerBuildSpec.ContextField))"
+						   ErrorText="@Problem(DockerBuildSpec.ContextField)"
+						   Placeholder="/srv/app, the folder the Dockerfile builds from"
+						   Disabled="_starting"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   data-autofocus />
+		</div>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen"
+					Disabled="_starting" OnClick="PickContextAsync">
+			Choose
+		</MokaButton>
+	</div>
+
+	<div class="mt-dk-form">
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Dockerfile"
+						   Value="@_dockerfile"
+						   ValueChanged="@(value => Set(ref _dockerfile, value, DockerBuildSpec.DockerfileField))"
+						   ErrorText="@Problem(DockerBuildSpec.DockerfileField)"
+						   Placeholder="Dockerfile in the context, a path from it, or an absolute one"
+						   Disabled="_starting"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		</div>
+	</div>
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Tags</span>
+			<span class="mt-dk-note">name:tag, with the registry in front to push it there</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="_starting" OnClick="@(() => _tags.Add(""))">Add tag</MokaButton>
+		</div>
+		@for (int index = 0; index < _tags.Count; index++)
+		{
+			int row = index;
+			<div class="mt-dk-form" @key="row">
+				<div class="mt-dk-form-field">
+					<MokaTextField Value="@_tags[row]"
+								   ValueChanged="@(value => SetTag(row, value))"
+								   ErrorText="@Problem(DockerBuildSpec.TagField(row))"
+								   Placeholder="app:1.4 or registry.example.com/team/app:1.4"
+								   Disabled="_starting"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="@($"Tag {row + 1}")" />
+				</div>
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
+							Disabled="_starting" OnClick="@(() => RemoveTag(row))" Label="Remove" AriaLabel="@($"Remove tag {row + 1}")" />
+			</div>
+		}
+	</div>
+
+	<div class="mt-dk-section">
+		<div class="mt-dk-section-head">
+			<span class="mt-dk-label">Build arguments</span>
+			<span class="mt-dk-note">Values stay hidden here and in the command the confirmation shows; the image's history still keeps them.</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="_starting" OnClick="AddArgument">Add argument</MokaButton>
+		</div>
+		@for (int index = 0; index < _arguments.Count; index++)
+		{
+			int row = index;
+			<div class="mt-dk-form" @key="_arguments[row]">
+				<div class="mt-dkb-name">
+					<MokaTextField Value="@_arguments[row].Name"
+								   ValueChanged="@(value => SetArgument(row, name: value))"
+								   ErrorText="@Problem(DockerBuildSpec.ArgumentField(row))"
+								   Placeholder="NAME"
+								   Disabled="_starting"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="@($"Name of argument {row + 1}")" />
+				</div>
+				<div class="mt-dk-form-field">
+					<MokaPasswordField Value="@_arguments[row].Value"
+									   ValueChanged="@(value => SetArgument(row, value: value))"
+									   Placeholder="value"
+									   Disabled="_starting"
+									   Size="MokaSize.Sm"
+									   autocomplete="off"
+									   aria-label="@($"Value of argument {row + 1}")" />
+				</div>
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
+							Disabled="_starting" OnClick="@(() => RemoveArgument(row))" Label="Remove" AriaLabel="@($"Remove argument {row + 1}")" />
+			</div>
+		}
+	</div>
+
+	<div class="mt-dk-form">
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Target stage"
+						   Value="@_target"
+						   ValueChanged="@(value => Set(ref _target, value, DockerBuildSpec.TargetField))"
+						   ErrorText="@Problem(DockerBuildSpec.TargetField)"
+						   Placeholder="the last one"
+						   Disabled="_starting"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		</div>
+		<div class="mt-dk-form-field">
+			<MokaTextField Label="Platform"
+						   Value="@_platform"
+						   ValueChanged="@(value => Set(ref _platform, value, DockerBuildSpec.PlatformField))"
+						   ErrorText="@Problem(DockerBuildSpec.PlatformField)"
+						   Placeholder="this host's own, or linux/arm64"
+						   Disabled="_starting"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+		</div>
+	</div>
+
+	<div class="mt-dk-toolbar">
+		<MokaCheckbox Label="No cache (--no-cache)" Value="_noCache" ValueChanged="@(value => _noCache = value)" Disabled="_starting" />
+		<MokaCheckbox Label="Pull base images (--pull)" Value="_pull" ValueChanged="@(value => _pull = value)" Disabled="_starting" />
+	</div>
+
+	@if (_startProblem is { } startProblem)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Error" Dense>@startProblem</MokaAlert>
+	}
+
+	<div class="mt-dk-toolbar">
+		<span class="mt-dk-note">The exact command is shown before anything runs, and the output shows while it builds.</span>
+		<span class="mt-dk-spacer"></span>
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="_starting" OnClick="OnCancel">Cancel</MokaButton>
+		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Build" Loading="_starting" Disabled="@(_starting || LiveRuns?.IsRunning == true)">
+			Build
+		</MokaButton>
+	</div>
+</form>

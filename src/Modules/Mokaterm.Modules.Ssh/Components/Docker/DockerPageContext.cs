@@ -15,6 +15,7 @@ internal sealed class DockerPageContext : IDockerPageContext
 	private readonly Action<string> _show;
 	private readonly Func<DockerSessionFeature?> _feature;
 	private string? _newContainerImage;
+	private bool _buildImage;
 
 	/// <param name="show">Shows a page by its id.</param>
 	/// <param name="feature">The session's manager state at the moment of asking, which changes on a reconnect.</param>
@@ -46,6 +47,21 @@ internal sealed class DockerPageContext : IDockerPageContext
 		ArgumentNullException.ThrowIfNull(image);
 		_newContainerImage = image;
 		_show(DockerPageIds.Containers);
+	}
+
+	/// <summary>Opens the images page with the build form open, as the overview's "Build image" does.</summary>
+	public void BuildImage()
+	{
+		_buildImage = true;
+		_show(DockerPageIds.Images);
+	}
+
+	/// <summary>Whether the build form was asked for, once; later calls get false.</summary>
+	public bool TakeBuildImage()
+	{
+		bool asked = _buildImage;
+		_buildImage = false;
+		return asked;
 	}
 
 	/// <summary>The image a new container was asked for, once; later calls get null.</summary>

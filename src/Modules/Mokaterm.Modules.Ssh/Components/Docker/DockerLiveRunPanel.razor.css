@@ -1,0 +1,17 @@
+/* The panel takes the page's height so the log fills what the header and the command lines leave. */
+.mt-dkl {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dkl-command {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}

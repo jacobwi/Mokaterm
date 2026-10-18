@@ -27,4 +27,14 @@
 		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
+	<!--
+		The DevHost's demo docker engine and the file tree it reads, so its registry, build and push flows are played end
+		to end through the module's own shell, client and readers. The tree's seed is left out: it needs the rest of the demo.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\samples\Mokaterm.DevHost\Demo\Docker\*.cs" LinkBase="DevHost\Docker" />
+		<Compile Include="..\..\samples\Mokaterm.DevHost\Demo\FileSystem\*.cs" Exclude="..\..\samples\Mokaterm.DevHost\Demo\FileSystem\DemoTreeSeed.cs" LinkBase="DevHost\FileSystem" />
+		<Compile Include="..\..\samples\Mokaterm.DevHost\Demo\GeneratedStream.cs;..\..\samples\Mokaterm.DevHost\Demo\DemoRandom.cs" LinkBase="DevHost" />
+	</ItemGroup>
+
 </Project>

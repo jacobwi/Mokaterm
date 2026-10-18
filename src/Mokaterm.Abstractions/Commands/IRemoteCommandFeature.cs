@@ -14,7 +14,8 @@ public interface IRemoteCommandFeature
 	/// <summary>
 	/// Runs <paramref name="request"/> and waits for it to end. Output past <see cref="RemoteCommandRequest.OutputLimitBytes"/>
 	/// on either stream is read and dropped rather than kept, so a chatty command still reports its exit status. Cancelling
-	/// asks the server to stop the command and closes its channel.
+	/// asks the server to stop the command and closes its channel. <see cref="RemoteCommandRequest.Input"/> goes on stdin,
+	/// and <see cref="RemoteCommandRequest.OnOutput"/> hears both streams as they are read.
 	/// </summary>
 	/// <exception cref="RemoteCommandException">
 	/// The command could not start, the connection dropped while it ran, or a stream went past what the protocol is willing

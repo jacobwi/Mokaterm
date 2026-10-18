@@ -1,0 +1,5 @@
+/* An argument's name keeps a third of the row and its value takes the rest, as the new container form's variables do. */
+.mt-dkb-name {
+	flex: 0 1 34%;
+	min-width: 96px;
+}

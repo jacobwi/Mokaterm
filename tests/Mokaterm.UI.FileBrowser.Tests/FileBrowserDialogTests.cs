@@ -49,6 +49,29 @@ public sealed class FileBrowserDialogTests
 	}
 
 	[Fact]
+	public async Task PickFolder_OpensTheSameBrowserWithThePickLine_AndHandsBackWhatItClosedWith()
+	{
+		_dialogs.Answer = _ => Task.FromResult<object?>("/srv/app");
+
+		string? picked = await new FileBrowserDialogService(_dialogs).PickFolderAsync(Request(), Ct).WaitAsync(Limit, Ct);
+
+		ScriptedDialogs.ShownDialog shown = Assert.Single(_dialogs.Shown);
+		Assert.Equal(typeof(FileBrowserDialog), shown.Component);
+		Assert.True(shown.Parameter<bool>(nameof(FileBrowserDialog.PickFolder)));
+		Assert.Equal("/srv/app", picked);
+	}
+
+	[Fact]
+	public async Task PickFolder_ClosedWithoutAFolder_IsNull()
+	{
+		string? picked = await new FileBrowserDialogService(_dialogs).PickFolderAsync(Request(), Ct).WaitAsync(Limit, Ct);
+		await new FileBrowserDialogService(_dialogs).ShowAsync(Request(), Ct).WaitAsync(Limit, Ct);
+
+		Assert.Null(picked);
+		Assert.False(_dialogs.Shown[1].Parameter<bool>(nameof(FileBrowserDialog.PickFolder)));
+	}
+
+	[Fact]
 	public async Task Show_ForAPageAlreadyGone_OpensNothing()
 	{
 		using CancellationTokenSource page = new();

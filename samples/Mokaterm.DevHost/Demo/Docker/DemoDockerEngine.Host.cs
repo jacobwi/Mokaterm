@@ -8,7 +8,8 @@ internal sealed partial class DemoDockerEngine
 {
 	/// <summary>
 	/// The scripts the manager sends, told apart by how they start: the batched <c>test -f</c>, answered from the files
-	/// the demo tree holds, the search for compose files, and the health watch's read of every container.
+	/// the demo tree holds, the search for compose files, the health watch's read of every container, and the read of the
+	/// client config the Registries page makes.
 	/// </summary>
 	private DemoDockerResult Script(string script, string[] arguments)
 	{
@@ -30,6 +31,11 @@ internal sealed partial class DemoDockerEngine
 		if (script.StartsWith("ids=$(docker ps", StringComparison.Ordinal))
 		{
 			return ContainerStates();
+		}
+
+		if (script.StartsWith("f=\"${DOCKER_CONFIG", StringComparison.Ordinal))
+		{
+			return ClientConfig();
 		}
 
 		return DemoDockerResult.Fail(2, "sh: 1: the demo runs only the manager's own scripts");

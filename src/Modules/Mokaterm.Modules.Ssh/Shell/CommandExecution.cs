@@ -34,8 +34,9 @@ internal static class CommandExecution
 			throw new RemoteCommandException("The server did not start the command.", ex);
 		}
 
-		Task<CapturedOutput> output = OutputCapture.ReadAsync(channel.Output, keepBytes, RemoteCommand.MaxOutputBytes, "stdout", cancellationToken);
-		Task<CapturedOutput> error = OutputCapture.ReadAsync(channel.ErrorOutput, keepBytes, RemoteCommand.MaxOutputBytes, "stderr", cancellationToken);
+		CommandOutputHandler? listener = request.OnOutput;
+		Task<CapturedOutput> output = OutputCapture.ReadAsync(channel.Output, keepBytes, RemoteCommand.MaxOutputBytes, "stdout", cancellationToken, listener, CommandStream.Output);
+		Task<CapturedOutput> error = OutputCapture.ReadAsync(channel.ErrorOutput, keepBytes, RemoteCommand.MaxOutputBytes, "stderr", cancellationToken, listener, CommandStream.Error);
 		Task finished = UntilAllOrFirstFailureAsync(output, error, channel.Execution);
 		try
 		{

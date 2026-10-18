@@ -15,8 +15,19 @@ internal static class OutputCapture
 	/// <param name="keepBytes">How much of the start is kept.</param>
 	/// <param name="maxBytes">How much is read at all. Past it the stream is refused, which stops the command.</param>
 	/// <param name="streamName"><c>stdout</c> or <c>stderr</c>, for the message.</param>
+	/// <param name="listener">
+	/// Hears every piece as it is read, as <paramref name="stream"/>, before the cap decides what is kept, so a view can
+	/// show the whole stream while the capture keeps only its start. Called on this loop, which never waits for it.
+	/// </param>
 	/// <exception cref="RemoteCommandException">The stream held more than <paramref name="maxBytes"/>.</exception>
-	public static async Task<CapturedOutput> ReadAsync(Stream source, int keepBytes, long maxBytes, string streamName, CancellationToken cancellationToken)
+	public static async Task<CapturedOutput> ReadAsync(
+		Stream source,
+		int keepBytes,
+		long maxBytes,
+		string streamName,
+		CancellationToken cancellationToken,
+		CommandOutputHandler? listener = null,
+		CommandStream stream = CommandStream.Output)
 	{
 		ArgumentNullException.ThrowIfNull(source);
 		ArgumentOutOfRangeException.ThrowIfNegative(keepBytes);
@@ -36,6 +47,7 @@ internal static class OutputCapture
 						$"The command wrote more than {maxBytes / (1024 * 1024)} MB to {streamName}, so it was stopped."));
 				}
 
+				listener?.Invoke(stream, buffer.AsSpan(0, read));
 				int room = keepBytes - (int)kept.Length;
 				if (room > 0)
 				{

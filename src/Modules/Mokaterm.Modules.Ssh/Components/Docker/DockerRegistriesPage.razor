@@ -1,0 +1,216 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Feedback.Dropdown
+@using Moka.Red.Feedback.Popover
+@using Moka.Red.Forms.PasswordField
+@inherits DockerManagerPageBase
+
+<ToolPageFrame Title="Registries"
+			   Summary="@Summary"
+			   Search="@_query"
+			   SearchChanged="OnQueryChanged"
+			   SearchPlaceholder="Filter by registry"
+			   PrimaryText="Log in"
+			   PrimaryIcon="DockerIcons.Registry"
+			   PrimaryDisabled="IsWorking"
+			   OnPrimary="@(() => StartLogin(null))"
+			   Loading="IsLoading"
+			   Loaded="@(!IsFirstLoad)"
+			   Error="@LoadError"
+			   LoadingText="Reading the client config"
+			   OnRefresh="RefreshAsync"
+			   ListPage
+			   Detail="@DetailFragment">
+	<Chips>
+		@if (_config is { } config)
+		{
+			<Hint Text="@($"{DockerRegistryWording.Whose(config)} reads {config.Path}")">
+				<MokaTag Text="@(config.User == "root" ? "ROOT'S CONFIG" : "LOGIN'S CONFIG")" Size="MokaSize.Xs" Color="@(config.User == "root" ? MokaColor.Warning : MokaColor.Surface)" />
+			</Hint>
+			@if (config.CredentialsStore is { } store)
+			{
+				<Hint Text="@($"Logins go to docker-credential-{store}, not into the file")">
+					<MokaTag Text="@($"STORE {store}".ToUpperInvariant())" Size="MokaSize.Xs" Color="MokaColor.Success" />
+				</Hint>
+			}
+			else
+			{
+				<Hint Text="No credsStore is set, so docker writes each login's password into config.json as base64">
+					<MokaTag Text="NO CREDENTIAL STORE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				</Hint>
+			}
+		}
+	</Chips>
+	<ChildContent>
+		@ChangePanel
+		@if (_warning is { } warning)
+		{
+			<MokaCallout Type="MokaCalloutType.Warning" Title="docker said">
+				<pre class="mt-dk-box mt-dk-box--short">@warning</pre>
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" OnClick="@(() => _warning = null)">Dismiss</MokaButton>
+			</MokaCallout>
+		}
+		@if (_savedProblem is { } savedProblem)
+		{
+			<span class="mt-dk-note">@savedProblem</span>
+		}
+
+		@if (_config is { Exists: false } missing)
+		{
+			<span class="mt-dk-note">@($"{missing.Path} does not exist yet: {DockerRegistryWording.Whose(missing)} has never logged in anywhere.")</span>
+		}
+
+		@if (Shown.Count == 0)
+		{
+			<MokaEmptyState Icon="DockerIcons.Registry"
+							Title="@(_rows.Count == 0 ? "Not logged in anywhere" : "Nothing matches")"
+							Description="@(_rows.Count == 0 ? "Log in to push to a registry or pull private images. Docker Hub is used when no registry is named." : "No registry matches the filter.")">
+				@if (_rows.Count == 0)
+				{
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="DockerIcons.Registry" Disabled="IsWorking" OnClick="@(() => StartLogin(null))">Log in</MokaButton>
+				}
+			</MokaEmptyState>
+		}
+		<div class="mt-dk-list" role="list" aria-label="Registries">
+			@foreach (RegistryRow row in Shown)
+			{
+				<div class="@(row.Host == _selected && !_loggingIn ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="row.Host">
+					<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(row))" aria-description="@RowState(row)">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@(row.Entry is { LoggedIn: true } ? MokaColor.Success : MokaColor.Surface)" Glow="@(row.Entry is { LoggedIn: true })" />
+						<span class="mt-dk-cell-name mt-dk-cell--w45">@row.Display</span>
+						<span class="mt-dk-cell mt-dk-cell--grow">@RowState(row)</span>
+						@if (row.Entry is { StoredInFile: true })
+						{
+							<MokaTag Text="IN FILE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+						}
+						@if (row.Saved is not null)
+						{
+							<MokaTag Text="SAVED" Size="MokaSize.Xs" Color="MokaColor.Info" />
+						}
+					</button>
+					<span class="mt-dk-hover">
+						<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
+							<ChildContent>
+								<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+											Disabled="IsWorking" Label="More actions" AriaLabel="@($"Actions for {row.Display}")" Position="MokaTooltipPosition.BottomEnd" />
+							</ChildContent>
+							<Items>
+								@if (row.Saved is { } saved)
+								{
+									<MokaDropdownItem Text="@($"Log in as {saved.User}")" Icon="DockerIcons.Registry" OnClick="@(() => LoginSavedAsync(saved))" />
+								}
+								<MokaDropdownItem Text="Log in with another account" Icon="DockerIcons.Registry" OnClick="@(() => StartLogin(row))" />
+								@if (row.Entry is { LoggedIn: true })
+								{
+									<MokaDropdownItem Text="Log out" Icon="MokatermIcons.Disconnect" OnClick="@(() => LogoutAsync(row))" />
+								}
+								@if (row.Saved is { } forget)
+								{
+									<MokaDropdownItem Text="Forget the saved login" Icon="MokaIcons.Action.Delete" OnClick="@(() => ForgetAsync(forget))" />
+								}
+							</Items>
+						</MokaDropdown>
+					</span>
+				</div>
+			}
+		</div>
+	</ChildContent>
+</ToolPageFrame>
+
+@code {
+	private RenderFragment? DetailFragment => _loggingIn ? LoginForm : SelectedRow is { } row ? RowPanel(row) : null;
+
+	private RenderFragment LoginForm => @<ToolDetailPanel Title="Log in to a registry" Mono="false" OnClose="CloseDetail">
+		<form class="mt-dk-scroll" @onsubmit="LoginAsync" @onsubmit:preventDefault="true">
+			<MokaTextField Label="Registry"
+						   Value="@_registry"
+						   ValueChanged="@(value => { _registry = value ?? ""; _registryError = null; })"
+						   ErrorText="@_registryError"
+						   Placeholder="empty for Docker Hub, or ghcr.io, registry.example.com:5000"
+						   Disabled="IsWorking"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   data-autofocus />
+			<MokaTextField Label="User"
+						   Value="@_user"
+						   ValueChanged="@(value => { _user = value ?? ""; _userError = null; })"
+						   ErrorText="@_userError"
+						   Disabled="IsWorking"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off" />
+			<MokaPasswordField Label="Password or token"
+							   Value="@_password"
+							   ValueChanged="@(value => { _password = value ?? ""; _passwordError = null; })"
+							   ErrorText="@_passwordError"
+							   Disabled="IsWorking"
+							   Size="MokaSize.Sm"
+							   autocomplete="off" />
+			@if (CanSave)
+			{
+				<MokaCheckbox Label="Save in the vault" Value="_save" ValueChanged="@(value => _save = value)" Disabled="IsWorking" />
+				<span class="mt-dk-note">Kept with this login, encrypted like its own password, so logging in again here is one click. It goes when the login is deleted.</span>
+			}
+			else
+			{
+				<span class="mt-dk-note">A quick connection is not saved, so neither is a registry login made from it.</span>
+			}
+			<span class="mt-dk-note">
+				The password goes to docker on stdin (docker login --password-stdin), never on the command line.
+				@(_config?.CredentialsStore is null ? " Without a credential store docker then writes it into config.json as base64." : "")
+			</span>
+			<div class="mt-dk-toolbar">
+				<span class="mt-dk-spacer"></span>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="IsWorking" OnClick="CloseDetail">Cancel</MokaButton>
+				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry" Loading="IsBusy" Disabled="IsWorking">Log in</MokaButton>
+			</div>
+		</form>
+	</ToolDetailPanel>;
+
+	private RenderFragment RowPanel(RegistryRow row) => @<ToolDetailPanel Title="@row.Display"
+																		 Subtitle="@row.Key"
+																		 DotColor="@(row.Entry is { LoggedIn: true } ? MokaColor.Success : MokaColor.Surface)"
+																		 DotGlow="@(row.Entry is { LoggedIn: true })"
+																		 OnClose="CloseDetail">
+		<Actions>
+			@if (row.Saved is { } saved)
+			{
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry" Disabled="IsWorking" OnClick="@(() => LoginSavedAsync(saved))">
+					@($"Log in as {saved.User}")
+				</MokaButton>
+			}
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="IsWorking" OnClick="@(() => StartLogin(row))">
+				@(row.Entry is { LoggedIn: true } ? "Log in again" : "Log in")
+			</MokaButton>
+			@if (row.Entry is { LoggedIn: true })
+			{
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Disconnect" Disabled="IsWorking" OnClick="@(() => LogoutAsync(row))">
+					Log out
+				</MokaButton>
+			}
+		</Actions>
+		<ChildContent>
+			<div class="mt-dk-section">
+				<span class="mt-dk-label">Client config</span>
+				<span class="mt-dk-note">@RowState(row)</span>
+				@if (row.Entry is { } entry && _config is { } config)
+				{
+					<span class="mt-dk-note">@DockerRegistryWording.Storage(config, entry)</span>
+				}
+			</div>
+			@if (row.Saved is { } kept)
+			{
+				<div class="mt-dk-section">
+					<div class="mt-dk-section-head">
+						<span class="mt-dk-label">Saved in the vault</span>
+						<span class="mt-dk-spacer"></span>
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete" Disabled="IsWorking" OnClick="@(() => ForgetAsync(kept))">
+							Forget
+						</MokaButton>
+					</div>
+					<span class="mt-dk-note">@($"As {kept.User}, for this login only.")</span>
+				</div>
+			}
+		</ChildContent>
+	</ToolDetailPanel>;
+}

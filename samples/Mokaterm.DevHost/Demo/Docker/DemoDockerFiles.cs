@@ -55,6 +55,20 @@ internal static class DemoDockerFiles
 		EMPTY_ONE=
 		""";
 
+	/// <summary>What the demo builds from: <c>/srv/shop/api</c> is a build context with a Dockerfile in it.</summary>
+	private const string ApiDockerfile = """
+		FROM node:22-alpine AS build
+		WORKDIR /app
+		COPY package*.json ./
+		RUN npm ci --omit=dev
+		COPY . .
+
+		FROM node:22-alpine
+		WORKDIR /app
+		COPY --from=build /app .
+		CMD ["node", "server.js"]
+		""";
+
 	private const string WebEnv = """
 		NGINX_PORT=80
 		NGINX_ENTRYPOINT_QUIET_LOGS=1
@@ -95,6 +109,9 @@ internal static class DemoDockerFiles
 		Text(shop, "compose.yaml", "644", now.AddDays(-3), ShopCompose);
 		Text(shop, ".env", "640", now.AddDays(-20), ShopEnv);
 		Text(shop, "web.env", "644", now.AddDays(-20), WebEnv);
+		DemoNode api = shop.Add(DemoNode.NewDirectory("api", "root", "docker", DemoModes.Octal("775"), now.AddDays(-2)));
+		Text(api, "Dockerfile", "644", now.AddDays(-2), ApiDockerfile);
+		Text(api, "package.json", "644", now.AddDays(-2), "{\n  \"name\": \"shop-api\",\n  \"version\": \"2.4.2\"\n}\n");
 
 		DemoNode opt = tree.Child("opt") ?? tree.Add(DemoNode.NewDirectory("opt", "root", "root", DemoModes.Octal("755"), now.AddDays(-200)));
 		DemoNode monitoring = opt.Add(DemoNode.NewDirectory("monitoring", "root", "root", DemoModes.Octal("755"), now.AddDays(-15)));

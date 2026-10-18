@@ -1,6 +1,8 @@
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.FileSystem;
+using Mokaterm.Abstractions.Security;
+using Mokaterm.Modules.Ssh.Admin;
 using Mokaterm.Modules.Ssh.Elevation;
 
 namespace Mokaterm.Modules.Ssh.Docker;
@@ -8,6 +10,8 @@ namespace Mokaterm.Modules.Ssh.Docker;
 /// <summary>
 /// Docker commands through sudo, for an account the daemon's socket does not let in. The password goes on stdin, and
 /// the command and its names reach the script as positional arguments, as every elevated script in this module does.
+/// A call's own stdin follows the password line behind a marker the script waits for, and its live output starts after
+/// what sudo printed.
 /// </summary>
 internal sealed class SudoDockerShell : IDockerShell
 {
@@ -29,12 +33,16 @@ internal sealed class SudoDockerShell : IDockerShell
 		ArgumentNullException.ThrowIfNull(call);
 		string line = DockerCommandLine.Build(call);
 		(string script, IReadOnlyList<string> arguments) = DockerCommandLine.ForScript(call);
-		RemoteCommandRequest request = DockerShellRun.Request(call, line);
+		CommandOutputHandler? listener = call.OnOutput is { } heard ? new ElevatedOutputGate(heard).Write : null;
+		RemoteCommandRequest request = DockerShellRun.Request(call, line, listener);
+
+		// The script skips stdin up to the marker, so the input reaches docker whether or not sudo read a password line.
+		using SecretBuffer? input = call.Input is { } payload ? AdminScriptText.FrameInput(payload.Span) : null;
 		RemoteCommandOutcome outcome;
 		try
 		{
 			outcome = await DockerShellRun.WithTimeoutAsync(
-				token => _runner.ExecuteAsync(script, arguments, null, request, _time, token),
+				token => _runner.ExecuteAsync(script, arguments, input, request, _time, token),
 				call.Timeout,
 				cancellationToken);
 		}

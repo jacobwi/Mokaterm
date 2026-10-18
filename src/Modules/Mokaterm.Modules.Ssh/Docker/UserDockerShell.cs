@@ -3,7 +3,10 @@ using Mokaterm.Abstractions.Containers;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
-/// <summary>Docker commands as the login, one exec channel each, through the session's <see cref="IRemoteCommandFeature"/>.</summary>
+/// <summary>
+/// Docker commands as the login, one exec channel each, through the session's <see cref="IRemoteCommandFeature"/>. A
+/// call's stdin goes to docker as it is, since nothing else reads it first.
+/// </summary>
 internal sealed class UserDockerShell : IDockerShell
 {
 	private readonly IRemoteCommandFeature _commands;
@@ -20,7 +23,7 @@ internal sealed class UserDockerShell : IDockerShell
 	{
 		ArgumentNullException.ThrowIfNull(call);
 		string line = DockerCommandLine.Build(call);
-		RemoteCommandRequest request = DockerShellRun.Request(call, line);
+		RemoteCommandRequest request = DockerShellRun.Request(call, line, call.OnOutput) with { Input = call.Input };
 		RemoteCommandOutcome outcome = await DockerShellRun.WithTimeoutAsync(
 			token => _commands.RunAsync(request, token),
 			call.Timeout,

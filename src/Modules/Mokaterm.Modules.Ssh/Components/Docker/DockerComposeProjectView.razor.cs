@@ -25,6 +25,9 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
 
+	/// <summary>The tab a build's output shows in, there while the project has a build running or not yet dismissed.</summary>
+	private const string BuildTab = "build";
+
 	private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
 	private ComposeProject? _project;
 	private ComposeTarget? _target;
@@ -48,6 +51,12 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	public EventCallback OnFind { get; set; }
 
 	private ComposeTool? Tool => Feature?.Compose;
+
+	private string LiveOwner => DockerLivePlan.ComposeOwner(ProjectName);
+
+	/// <summary>The project's tabs, with the build's output among them while there is a build to show.</summary>
+	private IReadOnlyList<(string Id, string Text)> ShownTabs =>
+		LiveRuns?.Current is { } run && run.Owner == LiveOwner ? [.. Tabs, (BuildTab, run.IsRunning ? "Build (running)" : "Build")] : Tabs;
 
 	private ComposeProjectHealth Health => ComposeService.HealthOf(_services);
 
@@ -196,6 +205,20 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 		IReadOnlyList<string> names = [.. _services.Select(item => item.Name)];
 		if (ComposeActions.Plan(action, target, names, service, _build, _pullFirst) is not { } plan)
 		{
+			return;
+		}
+
+		if (plan.Live)
+		{
+			DockerLivePlan live = new(plan.Calls, plan.Title, plan.Confirm ?? plan.Title, plan.ConfirmText, LiveOwner, ErrorIsProgress: true)
+			{
+				Refreshes = [.. _services.Where(item => service is null || item.Name == service).Select(item => item.Image).Where(image => image.Length > 0)],
+			};
+			if (await StartLiveAsync(live) is not null)
+			{
+				_tab = BuildTab;
+			}
+
 			return;
 		}
 

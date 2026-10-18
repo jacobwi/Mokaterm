@@ -1,0 +1,97 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerManagerPageBase
+
+<div class="mt-dk-panel-head">
+	<span class="mt-dk-cell-name">@Reference</span>
+	<span class="mt-dk-spacer"></span>
+	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="OnClose" Label="Close the panel" Position="MokaTooltipPosition.BottomEnd" />
+</div>
+
+<div class="mt-dk-toolbar">
+	@if (Tagged)
+	{
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Push"
+					Disabled="IsWorking" OnClick="@(() => PushAsync(allTags: false))">
+			Push
+		</MokaButton>
+	}
+	<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Tag"
+				Disabled="IsWorking" OnClick="ToggleTag" aria-expanded="@(_tagging ? "true" : "false")">
+		Tag
+	</MokaButton>
+	@if (Navigation is { } navigation)
+	{
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play"
+					Disabled="IsWorking" OnClick="@(() => navigation.NewContainer(Reference))">
+			New container
+		</MokaButton>
+	}
+	@if (Tagged && RepositoryTags.Count > 1)
+	{
+		<Hint Text="@($"docker push --all-tags {Repository}: every local tag of the repository")">
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Push"
+						Disabled="IsWorking" OnClick="@(() => PushAsync(allTags: true))">
+				Push all @RepositoryTags.Count tags
+			</MokaButton>
+		</Hint>
+	}
+</div>
+
+@if (_tagging)
+{
+	<form class="mt-dk-form" @onsubmit="TagAsync" @onsubmit:preventDefault="true">
+		<div class="mt-dk-form-field">
+			<MokaTextField Value="@_tag"
+						   ValueChanged="OnTagChanged"
+						   ErrorText="@_tagError"
+						   Placeholder="registry.example.com/team/app:1.4"
+						   Disabled="IsWorking"
+						   Size="MokaSize.Sm"
+						   spellcheck="false"
+						   autocomplete="off"
+						   aria-label="New tag"
+						   data-autofocus />
+		</div>
+		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Tag" Disabled="IsWorking">Tag</MokaButton>
+	</form>
+}
+
+@ChangePanel
+
+<div class="mt-dk-scroll">
+	<div class="mt-dk-section">
+		<span class="mt-dk-label">Image</span>
+		@PathLine(ImageId, "Copy the image id")
+		<span class="mt-dk-note">@Details</span>
+	</div>
+
+	@if (Tagged)
+	{
+		<div class="mt-dk-section">
+			<div class="mt-dk-section-head">
+				<span class="mt-dk-label">Pushes to</span>
+				<span class="mt-dk-mono">@RegistryDisplay</span>
+				<span class="mt-dk-spacer"></span>
+				@if (Navigation is { } registries)
+				{
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry"
+								OnClick="@(() => registries.Navigate(DockerPageIds.Registries))">
+						Registries
+					</MokaButton>
+				}
+			</div>
+			@if (_configProblem is { } configProblem)
+			{
+				<span class="mt-dk-note">@configProblem</span>
+			}
+			else if (Feature?.ClientConfig is { } config)
+			{
+				<span class="mt-dk-note">@DockerRegistryWording.LoginState(config, Registry)</span>
+			}
+			else
+			{
+				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
+			}
+		</div>
+	}
+</div>

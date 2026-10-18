@@ -1,0 +1,67 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerManagerPageBase
+
+@* A build or a push while it runs and after: its state, the exact command, a way to stop it, and its output as it
+   arrives. The run belongs to the session, so this only draws it; leaving the page leaves it running. *@
+<div class="mt-dkl">
+	<div class="mt-dk-panel-head">
+		@if (OnBack.HasDelegate)
+		{
+			<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.ArrowLeft" OnClick="OnBack" Label="@BackLabel" />
+		}
+		@if (Run is { } run)
+		{
+			@if (run.IsRunning)
+			{
+				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
+			}
+			<span class="mt-dk-cell-name">@run.Title</span>
+			<MokaTag Text="@run.StateText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@StateColor(run.State)" />
+			@if (Elapsed(run) is { Length: > 0 } elapsed)
+			{
+				<span class="mt-dk-mono mt-dk-muted">@elapsed</span>
+			}
+			<span class="mt-dk-spacer"></span>
+			@if (run.IsRunning)
+			{
+				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="DockerIcons.Stop" OnClick="run.Cancel">Stop</MokaButton>
+			}
+			else
+			{
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="DismissAsync" Label="Dismiss" Position="MokaTooltipPosition.BottomEnd" />
+			}
+		}
+	</div>
+
+	@if (Run is { } current)
+	{
+		@foreach (string command in current.Shown)
+		{
+			<div class="mt-dkl-command">
+				<span class="mt-dk-change-command mt-dk-mono">$ @command</span>
+				<CopyButton Text="@command" Label="Copy the command" />
+			</div>
+		}
+
+		@if (current.Problem is { } problem)
+		{
+			<MokaAlert Severity="@(current.State == DockerLiveState.Stopped ? MokaToastSeverity.Warning : MokaToastSeverity.Error)" Dense>@problem</MokaAlert>
+		}
+
+		<LogView Tail="_tail"
+				 Label="@($"Output of {current.Title}")"
+				 EmptyText="@(current.IsRunning ? "Waiting for the first line." : "It printed nothing.")"
+				 SearchPlaceholder="Search the output">
+			<Status>
+				@if (current.Lines.Dropped > 0)
+				{
+					<span class="mt-dk-note">@DroppedText(current.Lines.Dropped)</span>
+				}
+			</Status>
+		</LogView>
+	}
+	else
+	{
+		<MokaEmptyState Icon="DockerIcons.Build" Title="Nothing running" Description="A build or a push shows its output here while it runs." />
+	}
+</div>

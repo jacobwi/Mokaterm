@@ -11,6 +11,19 @@
 				OnClick="TogglePull" aria-expanded="@(_pulling ? "true" : "false")">
 		Pull
 	</MokaButton>
+	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build"
+				Disabled="@(IsWorking || _view == BuildView)" OnClick="ShowBuild">
+		Build
+	</MokaButton>
+	@if (LiveRun is { } live && _view != LiveView)
+	{
+		<Hint Text="@($"{live.Title}: show its output")">
+			<MokaButton Variant="MokaVariant.Text" Color="@(live.IsRunning ? MokaColor.Warning : MokaColor.Surface)" Size="MokaSize.Xs"
+						StartIcon="@(live.IsRunning ? DockerIcons.Build : MokaIcons.File.FileText)" OnClick="ShowLive">
+				@(live.IsRunning ? "Running" : $"Last run: {live.StateText}")
+			</MokaButton>
+		</Hint>
+	}
 	<DockerUpdateCheck Session="Session" References="TaggedReferences" OnChecked="StateHasChanged" />
 	@if (Navigation is { } navigation)
 	{
@@ -46,7 +59,18 @@
 @LoadErrorPanel(RefreshAsync)
 @ChangePanel
 
-<div class="mt-dk-scroll">
+@if (_view == BuildView)
+{
+	<DockerBuildView Session="Session" Visible="Visible" OnStarted="ShowLive" OnCancel="ShowList" />
+}
+else if (_view == LiveView)
+{
+	<DockerLiveRunPanel Session="Session" Visible="Visible" Owner="@DockerLivePlan.ImagesOwner" OnBack="ShowList" BackLabel="Back to the images" />
+}
+else
+{
+<div class="@(SelectedImage is null ? "mt-dk-split" : "mt-dk-split mt-dk-split--open")">
+<div class="mt-dk-split-list">
 	@if (IsFirstLoad)
 	{
 		<div class="mt-dk-center"><MokaSpinner Label="Listing images" /></div>
@@ -61,8 +85,8 @@
 		@foreach (DockerImage image in Shown)
 		{
 			ImageUpdateResult? update = image.IsTagged ? Feature?.ImageUpdates.Find(image.Reference) : null;
-			<div class="mt-dk-row" role="listitem" @key="image.Reference + image.Id">
-				<div class="mt-dk-row-main mt-dk-row-static">
+			<div class="@(Key(image) == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="Key(image)">
+				<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(image))">
 					<span class="mt-dk-cell-name mt-dk-cell--w45" title="@image.Reference">@image.Reference</span>
 					<span class="mt-dk-cell--w12">
 						@if (image.IsDangling)
@@ -80,7 +104,7 @@
 					</span>
 					<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>
 					<span class="mt-dk-cell mt-dk-cell--size">@image.Size</span>
-				</div>
+				</button>
 				<span class="mt-dk-hover">
 					<CopyButton Text="@image.Reference" Label="Copy the reference" />
 					@if (Navigation is { } rowNavigation)
@@ -109,6 +133,7 @@
 							{
 								<MokaDropdownItem Text="New container from this image" Icon="MokatermIcons.Play" OnClick="@(() => menuNavigation.NewContainer(image.Reference))" />
 							}
+							<MokaDropdownItem Text="Tag or push" Icon="DockerIcons.Push" OnClick="@(() => Select(image))" />
 							<MokaDropdownItem Divider />
 							<MokaDropdownItem Text="Remove" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: false))" />
 							<MokaDropdownItem Text="Remove even if used (--force)" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: true))" />
@@ -121,3 +146,23 @@
 		}
 	</div>
 </div>
+	@if (SelectedImage is { } selected)
+	{
+		<div class="mt-dk-split-panel">
+			<DockerImagePanel @key="Key(selected)"
+							  Session="Session"
+							  Visible="Visible"
+							  Reference="@selected.Reference"
+							  ImageId="@selected.Id"
+							  Repository="@selected.Repository"
+							  Tagged="selected.IsTagged"
+							  TagSource="@selected.RemoveTarget"
+							  Details="@PanelDetails(selected)"
+							  RepositoryTags="RepositoryTags(selected)"
+							  OnClose="ClosePanel"
+							  OnChanged="RefreshAsync"
+							  OnPushStarted="ShowLive" />
+		</div>
+	}
+</div>
+}

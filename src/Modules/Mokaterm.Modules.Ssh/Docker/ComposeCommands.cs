@@ -73,6 +73,13 @@ internal static class ComposeCommands
 	public static DockerCall Pull(ComposeTarget target, string? service = null) =>
 		Compose(target, WithService("pull", service)).AsChange(DockerCall.LongTimeout);
 
+	/// <summary>
+	/// <c>build [SERVICE]</c>: the images of the services that have a build section, under the server's own time limit and
+	/// shown live. Compose picks plain progress itself when its output is not a terminal.
+	/// </summary>
+	public static DockerCall Build(ComposeTarget target, string? service = null) =>
+		DockerTimeLimit.Wrap(Compose(target, WithService("build", service)) with { OutputLimitBytes = DockerCall.LiveOutputBytes }, DockerCall.BuildTimeout);
+
 	/// <param name="service">One service, or null for all of them.</param>
 	/// <param name="since">The newest timestamp already shown, for following; the Python compose has no <c>--since</c>.</param>
 	public static DockerCall Logs(ComposeTarget target, string? service, int tail, string? since = null)

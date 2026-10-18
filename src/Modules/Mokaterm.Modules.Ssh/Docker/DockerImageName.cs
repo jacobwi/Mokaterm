@@ -86,6 +86,26 @@ internal sealed record DockerImageName
 		};
 	}
 
+	/// <summary>
+	/// Why <paramref name="reference"/> cannot name a new tag (what <c>docker build --tag</c> and <c>docker image tag</c>
+	/// write), or null when it can: it has to be a reference, not an image id, and pin no digest.
+	/// </summary>
+	public static string? TagProblem(string? reference)
+	{
+		string text = reference?.Trim() ?? "";
+		if (DockerNames.ImageProblem(text) is { } problem)
+		{
+			return problem;
+		}
+
+		if (DockerNames.IsId(text))
+		{
+			return "That reads as an image id. Name the image, such as app:1.4 or registry.example.com/team/app:1.4.";
+		}
+
+		return Parse(text) is { Digest: null } ? null : "A tag cannot pin a digest. Name the image, such as app:1.4.";
+	}
+
 	/// <summary>The canonical form of <paramref name="reference"/>, or the text as it is when it is no reference.</summary>
 	public static string Key(string reference)
 	{

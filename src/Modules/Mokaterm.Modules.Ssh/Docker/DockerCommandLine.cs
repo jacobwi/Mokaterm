@@ -46,25 +46,48 @@ internal static class DockerCommandLine
 		return equals < 0 || equals == argument.Length - 1 ? argument : argument[..(equals + 1)] + DockerInspectParser.Mask;
 	}
 
-	/// <summary>The script and its positional arguments for running <paramref name="call"/> through sudo.</summary>
+	/// <summary>
+	/// What goes in front of a script whose call reads stdin: sudo takes its password line only when it needs one, so the
+	/// call's input follows a marker line and everything before the marker is dropped (<see cref="Admin.AdminScriptText"/>).
+	/// </summary>
+	public static readonly string StdinReader = Admin.AdminScriptText.InputReader.ReplaceLineEndings("\n");
+
+	/// <summary>The start of a script of the module's own that runs in a folder given as <c>$1</c>.</summary>
+	private const string InDirectory = "cd -- \"$1\" || exit 1\nshift\n";
+
+	/// <summary>
+	/// The script and its positional arguments for running <paramref name="call"/> through sudo. A call with stdin gets
+	/// <see cref="StdinReader"/> first; its input then goes framed behind the marker.
+	/// </summary>
 	public static (string Script, IReadOnlyList<string> Arguments) ForScript(DockerCall call)
 	{
 		ArgumentNullException.ThrowIfNull(call);
+		string script;
+		List<string> arguments = [];
 		if (call.Program == DockerProgram.Shell)
 		{
 			// sudo already runs its own sh -c around a script, so a script of ours goes in as that script, $0 dropped.
-			return (call.Arguments[0], [.. call.Arguments.Skip(2)]);
-		}
+			script = call.WorkingDirectory is null ? call.Arguments[0] : InDirectory + call.Arguments[0];
+			if (call.WorkingDirectory is { } folder)
+			{
+				arguments.Add(folder);
+			}
 
-		List<string> arguments = [];
-		if (call.WorkingDirectory is { } directory)
+			arguments.AddRange(call.Arguments.Skip(2));
+		}
+		else
 		{
-			arguments.Add(directory);
+			if (call.WorkingDirectory is { } directory)
+			{
+				arguments.Add(directory);
+			}
+
+			arguments.AddRange(call.ProgramWords);
+			arguments.AddRange(call.Arguments);
+			script = call.WorkingDirectory is null ? ElevatedScript : ElevatedScriptInDirectory;
 		}
 
-		arguments.AddRange(call.ProgramWords);
-		arguments.AddRange(call.Arguments);
-		return (call.WorkingDirectory is null ? ElevatedScript : ElevatedScriptInDirectory, arguments);
+		return (call.Input is null ? script : StdinReader + script, arguments);
 	}
 
 	/// <summary>

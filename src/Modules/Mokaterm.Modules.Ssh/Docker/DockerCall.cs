@@ -1,5 +1,7 @@
 using System.Text;
+using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Containers;
+using Mokaterm.Abstractions.Security;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
@@ -18,6 +20,18 @@ internal sealed record DockerCall
 
 	/// <summary>What a pull or a build may take: images come over the network, builds run whatever the file says.</summary>
 	public static readonly TimeSpan LongTimeout = TimeSpan.FromMinutes(20);
+
+	/// <summary>
+	/// What an image build may take, on the server as well (<see cref="DockerHostScripts.Limited"/>): a build compiles
+	/// whatever the Dockerfile says, and a slow one can honestly take an hour.
+	/// </summary>
+	public static readonly TimeSpan BuildTimeout = TimeSpan.FromHours(2);
+
+	/// <summary>What a push may take, on the server as well: layers go up over whatever link the host has.</summary>
+	public static readonly TimeSpan PushTimeout = TimeSpan.FromHours(1);
+
+	/// <summary>How much of each stream a call shown live keeps: the view holds the lines, this only feeds the error message.</summary>
+	public const int LiveOutputBytes = 64 * 1024;
 
 	/// <summary>How much of each stream a listing keeps. A host with a thousand containers prints about 2 MB.</summary>
 	public const int ListingOutputBytes = 8 * 1024 * 1024;
@@ -56,6 +70,15 @@ internal sealed record DockerCall
 	/// </summary>
 	public IReadOnlySet<int> MaskedArguments { get; init; } = NoMasks;
 
+	/// <summary>
+	/// What the command reads on stdin, such as the password <c>docker login --password-stdin</c> takes. It never becomes
+	/// part of the line, so nothing that shows a call shows it. The caller keeps the buffer and disposes it after the run.
+	/// </summary>
+	public SecretBuffer? Input { get; init; }
+
+	/// <summary>Hears the output while the call runs, for a build or a push shown live; see <see cref="CommandOutputHandler"/>.</summary>
+	public CommandOutputHandler? OnOutput { get; init; }
+
 	/// <summary>The words that start the command: <c>docker</c>, <c>docker compose</c>, <c>docker-compose</c> or <c>sh -c</c>.</summary>
 	public IReadOnlyList<string> ProgramWords => Program switch
 	{
@@ -91,7 +114,11 @@ internal sealed record DockerCall
 	// A command typed into the run box, or an env file path, is part of the line, so the line itself is not printed.
 	private bool PrintMembers(StringBuilder builder)
 	{
-		builder.Append("Program = ").Append(Program).Append(", Arguments = ").Append(Arguments.Count).Append(", Timeout = ").Append(Timeout);
+		builder
+			.Append("Program = ").Append(Program)
+			.Append(", Arguments = ").Append(Arguments.Count)
+			.Append(", Timeout = ").Append(Timeout)
+			.Append(", Input = ").Append(Input is null ? "null" : "(set)");
 		return true;
 	}
 }

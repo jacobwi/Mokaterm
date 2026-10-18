@@ -45,7 +45,9 @@ internal sealed class FakeDockerShell : IDockerShell
 		DockerOutput answer = _answers.TryGetValue(line, out DockerOutput? found)
 			? found
 			: new DockerOutput { Command = line, ExitCode = DockerErrors.CommandNotFoundExitStatus, Error = $"sh: 1: {call.ProgramWords[0]}: not found" };
-		return Task.FromResult(answer);
+
+		// A call that asked for bytes gets them as the real shells hand them over: a fresh copy, never decoded.
+		return Task.FromResult(call.BinaryOutput ? answer with { Output = "", RawOutput = System.Text.Encoding.UTF8.GetBytes(answer.Output) } : answer);
 	}
 
 	public DockerClient Client(string host = "build-server") => new(this, host);

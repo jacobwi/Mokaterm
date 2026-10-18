@@ -18,4 +18,11 @@ public interface IFileBrowserDialog
 	/// which closes it. Transfers it queued carry on in the transfer queue either way.
 	/// </summary>
 	Task ShowAsync(FileBrowserRequest request, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Shows the browser with a "Use this folder" button under it and returns the folder the browser showed when that
+	/// was pressed, as an absolute path; null when it was closed without one, or when <paramref name="cancellationToken"/>
+	/// was cancelled. Everything else in the browser works as in <see cref="ShowAsync"/>.
+	/// </summary>
+	Task<string?> PickFolderAsync(FileBrowserRequest request, CancellationToken cancellationToken = default);
 }

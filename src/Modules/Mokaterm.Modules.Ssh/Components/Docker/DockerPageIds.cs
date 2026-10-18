@@ -21,4 +21,6 @@ internal static class DockerPageIds
 	public const string Networks = "networks";
 
 	public const string Cleanup = "cleanup";
+
+	public const string Registries = "registries";
 }
