@@ -26,7 +26,9 @@ internal static class RemoteOutput
 	/// <summary>
 	/// What a script printed after the marker when it went through, or the <see cref="RemoteFileSystemException"/> its exit
 	/// status and stderr describe. With <paramref name="allowPartialListing"/> a listing that exits 1 with entries still
-	/// counts, because find and the shell fallback both exit 1 after an entry they could not read.
+	/// counts, because find and the shell fallback both exit 1 after an entry they could not read. A listing always starts
+	/// with its format tag, so one that holds nothing past the tag is a folder that could not be read at all, which is
+	/// refused like any other failure rather than shown as an empty folder.
 	/// </summary>
 	/// <param name="error">stderr of the script itself, without anything a wrapper such as sudo printed first.</param>
 	public static ReadOnlyMemory<byte> Require(
@@ -38,12 +40,18 @@ internal static class RemoteOutput
 		bool allowPartialListing = false)
 	{
 		bool hasPayload = TryGetPayload(output, out ReadOnlyMemory<byte> payload);
-		if (exitStatus == 0 || (allowPartialListing && exitStatus == 1 && hasPayload && !payload.IsEmpty))
+		if (exitStatus == 0 || (allowPartialListing && exitStatus == 1 && hasPayload && HoldsMoreThanItsTag(payload.Span)))
 		{
 			return payload;
 		}
 
 		throw RemoteCommandErrors.ToException(exitStatus, error, path, destination);
+	}
+
+	private static bool HoldsMoreThanItsTag(ReadOnlySpan<byte> payload)
+	{
+		int tagEnd = payload.IndexOf((byte)0);
+		return tagEnd >= 0 && tagEnd + 1 < payload.Length;
 	}
 
 	/// <summary>Splits NUL-terminated UTF-8 fields. A trailing field without its terminator is incomplete and dropped.</summary>
