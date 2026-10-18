@@ -122,6 +122,55 @@ public sealed class SshIntegrationTests
 	}
 
 	[Fact]
+	public async Task Ssh_SearchesWithOneFindOnTheServer_AndFindsWhatTheWalkFinds()
+	{
+		LiveEndpoint server = RequireServer();
+		using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+		timeout.CancelAfter(TimeSpan.FromMinutes(2));
+		CancellationToken token = timeout.Token;
+
+		SshConnector connector = new(new FakeSettingsService());
+		IProtocolSession session = await new SshProtocolProvider(connector).ConnectAsync(CreateContext(server, SshProtocolIds.Ssh, FakeHostVerifier.Accepting()), token);
+		await using (session)
+		{
+			IRemoteFileSystem fileSystem = await (session.GetFeature<IFileSystemFeature>() ?? throw new InvalidOperationException("No file system.")).OpenAsync(token);
+			string folder = RemotePath.Combine(await fileSystem.GetHomeDirectoryAsync(token), $".mokaterm-search-{Guid.NewGuid():N}");
+			await fileSystem.CreateDirectoryAsync(folder, token);
+			try
+			{
+				await fileSystem.CreateDirectoryAsync(folder + "/sub dir", token);
+				foreach (string name in new[] { "a.log", "sub dir/b.log", "sub dir/c.txt" })
+				{
+					using MemoryStream content = new(Encoding.UTF8.GetBytes(name));
+					await fileSystem.UploadAsync(RemotePath.Combine(folder, name), content, UploadOptions.Default, null, token);
+				}
+
+				RemoteSearchQuery query = new() { Pattern = "*.LOG" };
+				List<RemoteFileEntry> walked = [];
+				await foreach (RemoteFileEntry entry in RemoteTreeWalker.SearchAsync(fileSystem, folder, query, null, token))
+				{
+					walked.Add(entry with { Owner = null, Group = null });
+				}
+
+				List<RemoteFileEntry> searched = [];
+				await foreach (RemoteFileEntry entry in fileSystem.SearchAsync(folder, query, null, token))
+				{
+					searched.Add(entry with { Owner = null, Group = null });
+				}
+
+				Assert.Equal(2, walked.Count);
+				Assert.Equal(walked.OrderBy(entry => entry.Path, StringComparer.Ordinal), searched.OrderBy(entry => entry.Path, StringComparer.Ordinal));
+			}
+			finally
+			{
+				await fileSystem.DeleteAsync(folder, recursive: true, CancellationToken.None);
+			}
+		}
+
+		await session.Completion;
+	}
+
+	[Fact]
 	public async Task Ssh_WrongPassword_FailsAsAuthenticationFailure()
 	{
 		LiveEndpoint server = RequireServer();

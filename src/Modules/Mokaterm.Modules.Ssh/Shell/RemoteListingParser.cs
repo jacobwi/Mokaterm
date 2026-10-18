@@ -54,10 +54,25 @@ internal static class RemoteListingParser
 	}
 
 	// type, size, mtime, mode, user, group, link target, target type, name
-	private static RemoteFileEntry? FromGnu(List<string> record, string path, bool isStat)
+	private static RemoteFileEntry? FromGnu(List<string> record, string path, bool isStat) =>
+		TryCreateLocation(record[8], path, isStat, out string name, out string entryPath)
+			? FromGnuFields(record, name, entryPath)
+			: null;
+
+	// "rawmode(hex) size mtime uid gid user group", link target, target type, name
+	private static RemoteFileEntry? FromPosix(List<string> record, string path, bool isStat) =>
+		TryCreateLocation(record[3], path, isStat, out string name, out string entryPath)
+			? FromPosixFields(record, name, entryPath)
+			: null;
+
+	/// <summary>
+	/// An entry from the first eight fields of the GNU form (type, size, mtime, mode, user, group, link target, target
+	/// type), placed at <paramref name="entryPath"/>; null when a field does not read. The search prints the same fields.
+	/// </summary>
+	internal static RemoteFileEntry? FromGnuFields(IReadOnlyList<string> record, string name, string entryPath)
 	{
-		if (!TryCreateLocation(record[8], path, isStat, out string name, out string entryPath)
-			|| !long.TryParse(record[1], NumberStyles.None, CultureInfo.InvariantCulture, out long size)
+		ArgumentNullException.ThrowIfNull(record);
+		if (!long.TryParse(record[1], NumberStyles.None, CultureInfo.InvariantCulture, out long size)
 			|| !TryParseOctal(record[3], out int modeBits))
 		{
 			return null;
@@ -87,12 +102,15 @@ internal static class RemoteListingParser
 		};
 	}
 
-	// "rawmode(hex) size mtime uid gid user group", link target, target type, name
-	private static RemoteFileEntry? FromPosix(List<string> record, string path, bool isStat)
+	/// <summary>
+	/// An entry from the first three fields of the shell form (<c>stat -c '%f %s %Y %u %g %U %G'</c>, link target, target
+	/// type), placed at <paramref name="entryPath"/>; null when a field does not read.
+	/// </summary>
+	internal static RemoteFileEntry? FromPosixFields(IReadOnlyList<string> record, string name, string entryPath)
 	{
+		ArgumentNullException.ThrowIfNull(record);
 		string[] info = record[0].Split(' ', StringSplitOptions.RemoveEmptyEntries);
 		if (info.Length < 7
-			|| !TryCreateLocation(record[3], path, isStat, out string name, out string entryPath)
 			|| !int.TryParse(info[0], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int rawMode)
 			|| !long.TryParse(info[1], NumberStyles.None, CultureInfo.InvariantCulture, out long size)
 			|| !long.TryParse(info[2], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long seconds))

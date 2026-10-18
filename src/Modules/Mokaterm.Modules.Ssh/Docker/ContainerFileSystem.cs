@@ -160,7 +160,7 @@ internal sealed class ContainerFileSystem : ScriptFileSystem
 		TimeSpan timeout = RemoteScripts.RunsLong(script) ? DockerCall.LongTimeout
 			: IsChange(script) ? DockerCall.ChangeTimeout
 			: DockerCall.DefaultTimeout;
-		int output = script == RemoteScripts.List ? ListingOutputBytes : DockerCall.ChangeOutputBytes;
+		int output = script == RemoteScripts.List || script == RemoteScripts.Search ? ListingOutputBytes : DockerCall.ChangeOutputBytes;
 		return DockerCommands.ExecScript(container, script, arguments) with { Timeout = timeout, OutputLimitBytes = output };
 	}
 

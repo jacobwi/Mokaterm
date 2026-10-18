@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Commands;
@@ -51,6 +52,7 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 	private bool _shellLinksUnavailable;
 	private int _checksumUnavailable;
 	private int _commandsUnavailable;
+	private int _searchUnavailable;
 	private int _closed;
 
 	/// <param name="shell">The session's connected SSH client when there is one; used to read link targets in one round trip.</param>
@@ -162,6 +164,26 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		}
 
 		return entries;
+	}
+
+	/// <summary>
+	/// One find on the session's SSH connection (<see cref="ServerSearch"/>), or the folder by folder walk over SFTP when
+	/// the account runs no commands or the server cannot run the search, which is then remembered for the session.
+	/// </summary>
+	public async IAsyncEnumerable<RemoteFileEntry> SearchAsync(
+		string root,
+		RemoteSearchQuery query,
+		IProgress<RemoteSearchProgress>? progress = null,
+		[EnumeratorCancellation] CancellationToken cancellationToken = default)
+	{
+		ThrowIfClosed();
+		string start = RemotePath.Normalize(root);
+		bool onServer = CanRunCommands && Volatile.Read(ref _searchUnavailable) == 0;
+		await foreach (RemoteFileEntry entry in ServerSearch.SearchAsync(
+			this, start, query, progress, onServer ? RunSearchAsync : null, MarkSearchUnavailable, wholeSeconds: true, cancellationToken))
+		{
+			yield return entry;
+		}
 	}
 
 	public async ValueTask<RemoteFileEntry?> StatAsync(string path, CancellationToken cancellationToken = default)
@@ -939,12 +961,35 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 
 	private bool CanRunCommands => Volatile.Read(ref _commandsUnavailable) == 0 && _shell() is not null;
 
+	private async Task<ReadOnlyMemory<byte>?> RunSearchAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+	{
+		try
+		{
+			return await RunScriptAsync(RemoteScripts.Search, [.. arguments], arguments[0], null, "searching on the server", cancellationToken);
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotSupported)
+		{
+			// The account runs no commands (the runner remembers that for copies too), or the server lacks a tool the
+			// search needs; neither changes while the session lives.
+			MarkSearchUnavailable();
+			return null;
+		}
+	}
+
+	private void MarkSearchUnavailable()
+	{
+		if (Interlocked.Exchange(ref _searchUnavailable, 1) == 0)
+		{
+			_logger.LogDebug("The server cannot run the search for this account; searches list folder by folder for this session");
+		}
+	}
+
 	/// <summary>
-	/// Runs one of <see cref="RemoteScripts"/> as the logged-in user on the session's SSH connection. A script that never
-	/// printed its marker ran nothing at all, which is an account that may only use SFTP, and that does not change while
-	/// the session lives.
+	/// Runs one of <see cref="RemoteScripts"/> as the logged-in user on the session's SSH connection and returns what it
+	/// printed after its marker. A script that never printed its marker ran nothing at all, which is an account that may
+	/// only use SFTP, and that does not change while the session lives.
 	/// </summary>
-	private async Task RunScriptAsync(string script, string[] arguments, string path, string? destination, string action, CancellationToken cancellationToken)
+	private async Task<ReadOnlyMemory<byte>> RunScriptAsync(string script, string[] arguments, string path, string? destination, string action, CancellationToken cancellationToken)
 	{
 		ThrowIfClosed();
 		if (!CanRunCommands || _shell() is not { } shell)
@@ -962,11 +1007,11 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 			throw mapped;
 		}
 
-		if (!RemoteOutput.TryGetPayload(result.Output, out _))
+		if (!RemoteOutput.TryGetPayload(result.Output, out ReadOnlyMemory<byte> payload))
 		{
 			if (Interlocked.Exchange(ref _commandsUnavailable, 1) == 0)
 			{
-				_logger.LogDebug("The account runs no commands; copies and archives are off for this session");
+				_logger.LogDebug("The account runs no commands; copies, archives and searches on the server are off for this session");
 			}
 
 			throw CommandsUnavailable(action, path);
@@ -976,6 +1021,8 @@ internal sealed class SftpFileSystem : IRemoteFileSystem
 		{
 			throw RemoteCommandErrors.ToException(result.ExitStatus, result.Error, path, destination);
 		}
+
+		return payload;
 	}
 
 	private static RemoteFileSystemException CommandsUnavailable(string action, string path) =>

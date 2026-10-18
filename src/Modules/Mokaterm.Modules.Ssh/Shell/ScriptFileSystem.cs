@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Mokaterm.Abstractions.FileSystem;
 
 namespace Mokaterm.Modules.Ssh.Shell;
@@ -23,6 +24,8 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 	protected const int PieceSlackBytes = 64 * 1024;
 
 	private const int TransferBufferSize = 128 * 1024;
+
+	private int _searchUnavailable;
 
 	public abstract RemoteFileSystemFeatures Features { get; }
 
@@ -97,6 +100,25 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 		string directory = Absolute(path);
 		ReadOnlyMemory<byte> payload = await RunScriptAsync(RemoteScripts.List, [directory, "list"], directory, cancellationToken, allowPartialListing: true);
 		return RemoteListingParser.Parse(payload.Span, directory, isStat: false);
+	}
+
+	/// <summary>
+	/// One find run the way every other script is (<see cref="ServerSearch"/>), or the folder by folder walk when this
+	/// server cannot run it, which is then remembered for as long as this file system lives.
+	/// </summary>
+	public async IAsyncEnumerable<RemoteFileEntry> SearchAsync(
+		string root,
+		RemoteSearchQuery query,
+		IProgress<RemoteSearchProgress>? progress = null,
+		[EnumeratorCancellation] CancellationToken cancellationToken = default)
+	{
+		string start = Absolute(root);
+		bool onServer = Volatile.Read(ref _searchUnavailable) == 0;
+		await foreach (RemoteFileEntry entry in ServerSearch.SearchAsync(
+			this, start, query, progress, onServer ? RunSearchAsync : null, MarkSearchUnavailable, wholeSeconds: false, cancellationToken))
+		{
+			yield return entry;
+		}
 	}
 
 	public async ValueTask<RemoteFileEntry?> StatAsync(string path, CancellationToken cancellationToken = default)
@@ -260,6 +282,22 @@ internal abstract class ScriptFileSystem : IRemoteFileSystem
 
 	/// <summary>The value a script reads as true: <c>1</c>, or empty for false.</summary>
 	protected static string Flag(bool value) => value ? "1" : "";
+
+	private async Task<ReadOnlyMemory<byte>?> RunSearchAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+	{
+		try
+		{
+			return await RunScriptAsync(RemoteScripts.Search, arguments, arguments[0], cancellationToken);
+		}
+		catch (RemoteFileSystemException ex) when (ex.Kind == RemoteFileErrorKind.NotSupported)
+		{
+			// A tool the search needs is missing, or find cannot print what it reads; neither changes while this lives.
+			MarkSearchUnavailable();
+			return null;
+		}
+	}
+
+	private void MarkSearchUnavailable() => Volatile.Write(ref _searchUnavailable, 1);
 
 	private Task<PieceReadStream> OpenPiecesAsync(string target, long start, CancellationToken cancellationToken) =>
 		PieceReadStream.OpenAsync((from, count, token) => ReadPieceAsync(target, from, count, token), target, start, cancellationToken);

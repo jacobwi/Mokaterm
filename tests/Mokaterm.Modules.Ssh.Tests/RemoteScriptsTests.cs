@@ -28,6 +28,7 @@ public sealed class RemoteScriptsTests
 		{ nameof(RemoteScripts.Identity), RemoteScripts.Identity },
 		{ nameof(RemoteScripts.ReadRange), RemoteScripts.ReadRange },
 		{ nameof(RemoteScripts.WriteInput), RemoteScripts.WriteInput },
+		{ nameof(RemoteScripts.Search), RemoteScripts.Search },
 	};
 
 	[Fact]

@@ -310,6 +310,115 @@ internal static class RemoteScripts
 		if [ -n "$5" ]; then TZ=UTC0 touch -t "$5" -- "$target" || exit 1; fi
 		""";
 
+	// One find over the tree, links never followed below the root (cd resolves the root itself, as a listing of it does).
+	// A find with -printf (GNU) prints every record itself; any other gets the names through xargs to a shell that stats
+	// what matches, which needs stat -c (GNU, BusyBox) and leaves the BSDs to the folder by folder walk. Folders always
+	// get a record, so the folder cap and the depth cap can be judged from the stream. tee hands a copy to a counter that
+	// sees every byte except NUL, D, M and the slash as x, so awk only ever reads plain lines: it exits past the folder
+	// cap, past the result cap (only when find's own match is exact, so a looser one cannot stop early), or past the byte
+	// cap, and the broken pipes then take tee and find down. find's stderr goes to an awk of its own that counts the
+	// folders it could not read and keeps find's exit status, both printed after everything else has stopped.
+	private const string SearchBody = """
+		root=$1
+		depth=$2
+		hidden=$3
+		kinds=$4
+		folders=$5
+		bytes=$6
+		seconds=$7
+		single=$8
+		single_results=$9
+		shift 9
+		names_results=$1
+		shift
+		if [ ! -e "$root" ]; then exit 101; fi
+		if [ ! -d "$root" ]; then exit 102; fi
+		if [ ! -r "$root" ] || [ ! -x "$root" ]; then printf '%s: Permission denied\n' "$root" >&2; exit 1; fi
+		cd -- "$root" || exit 1
+		for tool in find tee tr awk; do
+			if ! command -v "$tool" >/dev/null 2>&1; then
+				printf 'The server has no %s command, which searching needs.\n' "$tool" >&2
+				exit 105
+			fi
+		done
+		if find . -mindepth 0 -maxdepth 0 -name . -prune -o -xtype d -printf '' >/dev/null 2>&1; then
+			mode=G
+			fields=8
+			results=$names_results
+			n=$#
+			for p do
+				set -- "$@" -o -name "$p"
+			done
+			shift "$n"
+			if [ "$#" -gt 0 ]; then
+				shift
+				set -- \( "$@" \)
+			fi
+			case $kinds in
+			d) set -- "$@" -xtype d ;;
+			f) set -- "$@" ! -xtype d ;;
+			esac
+			set -- \( ! -type d -o -printf 'D%p\0' \) "$@" -printf 'M%y\0%s\0%T@\0%m\0%u\0%g\0%l\0%Y\0%p\0'
+		elif command -v xargs >/dev/null 2>&1 && stat -c '%f %s %Y %u %g %U %G' -- . >/dev/null 2>&1 \
+			&& [ "$(printf 'a\0' | xargs -0 printf %s 2>/dev/null)" = a ] \
+			&& find . -mindepth 0 -maxdepth 0 \( -type d -o -name x \) -print0 >/dev/null 2>&1; then
+			mode=P
+			fields=3
+			results=$single_results
+			set -- \( -type d -o -name "$single" \) -print0
+		else
+			printf '%s\n' 'The server has no find that can list what searching needs.' >&2
+			exit 105
+		fi
+		if [ "$hidden" != 1 ]; then
+			set -- -name '.*' -prune -o "$@"
+		fi
+		inner='pat=$1
+		kinds=$2
+		shift 2
+		for f do
+			if [ -d "$f" ] && [ ! -L "$f" ]; then printf "D%s\0" "$f"; fi
+			case ${f##*/} in
+			$pat) ;;
+			*) continue ;;
+			esac
+			case $kinds in
+			d) [ -d "$f" ] || continue ;;
+			f) if [ -d "$f" ]; then continue; fi ;;
+			esac
+			info=$(stat -c "%f %s %Y %u %g %U %G" -- "$f" 2>/dev/null) || continue
+			target=
+			kind=
+			if [ -L "$f" ]; then
+				target=$(readlink -- "$f" 2>/dev/null)
+				if [ -d "$f" ]; then kind=d; elif [ -e "$f" ]; then kind=f; else kind=N; fi
+			fi
+			printf "M%s\0%s\0%s\0%s\0" "$info" "$target" "$kind" "$f"
+		done'
+		mokaterm_entries() {
+			if [ "$mode" = P ]; then xargs -0 sh -c "$inner" sh "$single" "$kinds"; else cat; fi
+		}
+		printf '%s\0' "$mode"
+		exec 3>&1
+		summary=$(
+			exec 6>&1
+			{
+				{
+					{
+						mokaterm_limit "$seconds" find . -mindepth 1 -maxdepth "$depth" "$@" 6>&-
+						printf 'X%s\n' "$?" >&2
+					} 2>&1 >&5 5>&- | awk '/Permission denied/ { n++ } /^X[0-9]+$/ { c = substr($0, 2) } END { print n + 0, c }' >&6 5>&-
+				} 5>&1 3>&- 4>&- | mokaterm_entries 3>&- 4>&- 6>&- | tee /dev/fd/4 >&3 6>&-
+			} 4>&1 | tr -c '\000DM/' x | tr '\000' '\n' | awk -v f="$folders" -v r="$results" -v b="$bytes" -v d="$depth" -v s="$fields" '
+				{ t += length($0) + 1; if (t > b) exit }
+				k > 0 { k--; next }
+				/^M/ { k = s; if (r > 0 && ++m > r) exit; next }
+				/^D/ { if (gsub(/\//, "/") < d && ++e >= f) exit }
+			' >/dev/null 3>&- 6>&-
+		)
+		printf '\0U%s\0E%s\0' "${summary%% *}" "${summary#* }"
+		""";
+
 	/// <summary>Written first under sudo, ahead of the script itself.</summary>
 	public static readonly string ElevatedPreamble = Normalize(ElevatedPreambleText);
 
@@ -403,16 +512,31 @@ internal static class RemoteScripts
 	public static readonly string WriteInput = Normalize(Preamble + WriteInputBody);
 
 	/// <summary>
+	/// <c>$1</c> the folder, <c>$2</c> how many levels (<c>-maxdepth</c>), <c>$3</c> <c>1</c> to include hidden entries,
+	/// <c>$4</c> <c>a</c>, <c>f</c> or <c>d</c> for every kind, files or folders, <c>$5</c> the most folders entered, the
+	/// folder itself counted, <c>$6</c> the most bytes of records, <c>$7</c> the seconds <c>find</c> may run, <c>$8</c> the
+	/// one name pattern a find without <c>-printf</c> gets, <c>$9</c> the result count past which that find stops (0 never),
+	/// <c>$10</c> the same for a find with <c>-printf</c>, then that find's name patterns, any of which matches (none: every
+	/// name). Prints <c>G</c> or <c>P</c>, then NUL-terminated records in the order find walks: <c>D</c> and the folder's
+	/// <c>./</c> path for every folder it meets, and for every entry it matches <c>M</c> and the fields of
+	/// <see cref="List"/>'s two forms with the <c>./</c> path in place of the name. Last come an empty field, <c>U</c> with
+	/// the count of folders that could not be read and <c>E</c> with find's exit status. Exits with
+	/// <see cref="ExitUnsupported"/> when the server lacks a tool or a find that can print this.
+	/// </summary>
+	public static readonly string Search = Normalize(Preamble + ShellTimeout.Function + "\n" + SearchBody);
+
+	/// <summary>
 	/// Whether <paramref name="script"/> reads or writes file contents, which can take minutes on a big file or tree, so
 	/// its channel counts as long in <see cref="ExecChannelBudget"/>. A recursive delete or mode change walks a tree but
-	/// touches no contents, and counts as short.
+	/// touches no contents, and counts as short. A search reads no contents but can walk a whole disk.
 	/// </summary>
 	public static bool RunsLong(string script) =>
 		script == Copy
 		|| script == Compress
 		|| script == Extract
 		|| script == Checksum
-		|| script == PlaceUpload;
+		|| script == PlaceUpload
+		|| script == Search;
 
 	// Raw strings take the line endings of this source file, and a carriage return breaks sh.
 	private static string Normalize(string script) => script.ReplaceLineEndings("\n");

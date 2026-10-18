@@ -12,7 +12,8 @@ namespace Mokaterm.Modules.Ssh.Tests.Fakes;
 /// the way <c>sudo -S</c> does, refuses a wrong one, and refuses every password once <see cref="Refuse"/> was called.
 /// Every command is recorded with the input it was given.
 /// </summary>
-internal sealed class LocalSudoShell(string shell) : IDisposable
+/// <param name="firstOnPath">A folder searched before the system's own, for a stand-in tool such as a find of another kind.</param>
+internal sealed class LocalSudoShell(string shell, string? firstOnPath = null) : IDisposable
 {
 	/// <summary>The password this sudo takes, a value of the test's own.</summary>
 	public const string Password = "local-test-password";
@@ -53,7 +54,7 @@ internal sealed class LocalSudoShell(string shell) : IDisposable
 
 	// sudo -S -p '' -- sh -c SCRIPT sh ARG...: four words before the command. Without -S there is no password to read.
 	private string Prelude() => $$"""
-		PATH=/usr/bin:/bin:$PATH
+		PATH={{(firstOnPath is null ? "" : PosixShell.Quote(firstOnPath) + ":")}}/usr/bin:/bin:$PATH
 		export PATH
 		sudo() {
 			if [ "$1" != -S ]; then
