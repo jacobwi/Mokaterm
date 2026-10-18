@@ -618,7 +618,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 	private void UpdateTriggers()
 	{
 		TerminalTriggerSettings settings = SettingsService.Get<TerminalTriggerSettings>();
-		bool paused = Stream is not null && TriggerSwitch.IsPaused(Stream);
+		bool paused = Stream is not null && TriggerSwitch.IsPaused(SessionId, Stream);
 		if (ReferenceEquals(settings, _triggerSettings) && ReferenceEquals(Stream, _triggerStream) && paused == _triggersPaused)
 		{
 			return;
@@ -655,7 +655,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 			return ValueTask.CompletedTask;
 		}
 
-		TriggerSwitch.SetPaused(Stream, !_triggersPaused);
+		TriggerSwitch.SetPaused(SessionId, Stream, !_triggersPaused);
 		_options = BuildOptions(ThemeCatalog.Get(Settings.ThemeId));
 		StateHasChanged();
 		return ValueTask.CompletedTask;

@@ -152,17 +152,34 @@ public sealed class TerminalTriggerTests
 			TriggerEditorDialog.LengthError(new string('a', TerminalTriggerSettings.MaxPatternLength + 1)));
 
 	[Fact]
-	public void Switch_IsKeptPerStream()
+	public void Switch_WithoutASession_IsKeptPerStream()
 	{
 		TerminalTriggerSwitch triggers = new();
 		Fakes.RecordingTerminalStream first = new();
 		Fakes.RecordingTerminalStream second = new();
 
-		triggers.SetPaused(first, true);
+		triggers.SetPaused(null, first, true);
 
-		Assert.True(triggers.IsPaused(first));
-		Assert.False(triggers.IsPaused(second));
-		triggers.SetPaused(first, false);
-		Assert.False(triggers.IsPaused(first));
+		Assert.True(triggers.IsPaused(null, first));
+		Assert.False(triggers.IsPaused(null, second));
+		triggers.SetPaused(null, first, false);
+		Assert.False(triggers.IsPaused(null, first));
+	}
+
+	[Fact]
+	public void Switch_WithASession_FollowsTheSessionToANewStream()
+	{
+		// A tab moved to the other pane gets a new view and a new broadcast stream in front of the same session.
+		TerminalTriggerSwitch triggers = new();
+		Guid session = Guid.NewGuid();
+		Fakes.RecordingTerminalStream before = new();
+		Fakes.RecordingTerminalStream after = new();
+
+		triggers.SetPaused(session, before, true);
+
+		Assert.True(triggers.IsPaused(session, after));
+		Assert.False(triggers.IsPaused(Guid.NewGuid(), before));
+		triggers.SetPaused(session, after, false);
+		Assert.False(triggers.IsPaused(session, before));
 	}
 }
