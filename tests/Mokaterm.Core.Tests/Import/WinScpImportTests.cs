@@ -129,6 +129,34 @@ public sealed class WinScpImportTests
 		Assert.Equal("sftp", Assert.Single(preview.Entries).ProtocolId);
 	}
 
+	[Fact]
+	public async Task ReadAsync_DecodesAnSftpSitesKeyPath_ButNotAnFtpSites()
+	{
+		ImportPreview preview = await ReadAsync(
+			"""
+			[Sessions\keyed]
+			HostName=sftp.example.com
+			FSProtocol=2
+			PublicKeyFile=C:%5CUsers%5Cme%5C.ssh%5Cwork%20key.ppk
+
+			[Sessions\unicode]
+			HostName=sftp2.example.com
+			FSProtocol=1
+			PublicKeyFile=%EF%BB%BFC:%5Ck%C3%BCche.ppk
+
+			[Sessions\plain]
+			HostName=ftp.example.com
+			FSProtocol=5
+			PublicKeyFile=C:%5Ckeys%5Cnot-used.ppk
+			""");
+
+		ImportedEntry keyed = Assert.Single(preview.Entries, entry => entry.Name == "keyed");
+		Assert.Equal(@"C:\Users\me\.ssh\work key.ppk", keyed.IdentityFilePath);
+		Assert.Equal(IdentityPathStyle.Plain, keyed.IdentityPathStyle);
+		Assert.Equal("C:\\k\u00fcche.ppk", Assert.Single(preview.Entries, entry => entry.Name == "unicode").IdentityFilePath);
+		Assert.Null(Assert.Single(preview.Entries, entry => entry.Name == "plain").IdentityFilePath);
+	}
+
 	private static async Task<ImportPreview> ReadAsync(string ini)
 	{
 		WinScpImportSource source = new(static () => []);

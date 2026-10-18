@@ -29,11 +29,25 @@ public static class SessionsServiceCollectionExtensions
 		services.TryAddScoped<ISessionManager, SessionManager>();
 		services.TryAddScoped<ITransferQueue, TransferQueue>();
 		services.TryAddScoped<ISessionLogRecorder, SessionLogRecorder>();
+
+		// One per process: every window's recorder writes into the same folder, and only this one sees all of their files.
+		services.TryAddSingleton<SessionLogRetention>();
+
 		services.TryAddScoped<HostRunner>();
 
 		// One runner per scope serves both, so a survey and a command run share its list of runs to end with the scope.
 		services.TryAddScoped<ICommandRunner>(static provider => provider.GetRequiredService<HostRunner>());
 		services.TryAddScoped<IHostSurveyRunner>(static provider => provider.GetRequiredService<HostRunner>());
 		return services;
+	}
+
+	/// <summary>
+	/// Deletes old session logs in the background, by the rules in <see cref="Abstractions.Settings.SessionLogSettings"/>,
+	/// which keep every file until the user sets one. Hosts call it once they are up, so the start never waits on the disk.
+	/// </summary>
+	public static void StartSessionLogCleanup(this IServiceProvider services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+		services.GetService<SessionLogRetention>()?.ScheduleCleanup();
 	}
 }

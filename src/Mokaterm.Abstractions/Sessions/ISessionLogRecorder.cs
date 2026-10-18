@@ -25,8 +25,23 @@ public interface ISessionLogRecorder
 	/// </summary>
 	void SetRecording(Guid sessionId, bool record);
 
-	/// <summary>The files in <see cref="Folder"/>, newest first. Empty when the folder is missing or cannot be read.</summary>
+	/// <summary>
+	/// The files in <see cref="Folder"/> that a recording wrote, newest first. Anything else in the folder is the user's
+	/// and is left out. Empty when the folder is missing or cannot be read.
+	/// </summary>
 	IReadOnlyList<SessionLogFile> ListFiles();
+
+	/// <summary>What every file <see cref="ListFiles"/> would list takes together, past its limit too.</summary>
+	SessionLogUsage Usage();
+
+	/// <summary>
+	/// Deletes files <see cref="ListFiles"/> returned, by name, off the caller's thread. A file a recording is still
+	/// writing is left alone and counted, and a name that is not a recording's file is ignored.
+	/// </summary>
+	Task<SessionLogDeletion> DeleteAsync(IReadOnlyCollection<string> names, CancellationToken cancellationToken = default);
+
+	/// <summary>Deletes every file <see cref="ListFiles"/> would list, past its limit too, except the ones still being written.</summary>
+	Task<SessionLogDeletion> DeleteAllAsync(CancellationToken cancellationToken = default);
 
 	/// <summary>Opens one of the files <see cref="ListFiles"/> returned for reading, alongside a session still writing it.</summary>
 	/// <exception cref="ArgumentException"><paramref name="name"/> is not a plain log file name in that folder.</exception>

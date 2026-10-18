@@ -17,9 +17,6 @@ namespace Mokaterm.Sessions.Terminal;
 /// </summary>
 internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 {
-	/// <summary>Names tried before giving up, for two sessions to the same host inside one second.</summary>
-	private const int NameAttempts = 20;
-
 	/// <summary>The scratch buffer is let go past this, so one huge replay does not stay allocated for the whole session.</summary>
 	private const int KeptScratchBytes = 1024 * 1024;
 
@@ -33,6 +30,7 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 	private readonly SessionLogFormatter _formatter;
 	private readonly Func<TerminalSize> _terminalSize;
 	private readonly TimeProvider _time;
+	private readonly SessionLogRetention? _retention;
 	private readonly ILogger _logger;
 
 	// Output arrives one chunk at a time from the attachment's own delivery loop, but a stop comes from wherever the
@@ -44,6 +42,9 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 
 	private ArrayBufferWriter<byte> _scratch = new();
 	private FileStream? _file;
+
+	// Held from just before the file is created until it is closed, so no cleanup or delete can take it meanwhile.
+	private IDisposable? _writing;
 	private long _openedAt;
 	private string? _fileName;
 	private string? _message;
@@ -58,6 +59,7 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 	/// The terminal's size now. A sink never hears about a resize, so a format that records sizes asks before each chunk.
 	/// </param>
 	/// <param name="time">Times the chunks of a timed recording, from the moment its file opens.</param>
+	/// <param name="retention">Told which file this is writing, so cleanup leaves it alone; null in tests that need no cleanup.</param>
 	public SessionLogWriter(
 		string folder,
 		string endpoint,
@@ -65,8 +67,10 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 		SessionLogSettings settings,
 		Func<TerminalSize> terminalSize,
 		TimeProvider time,
-		ILogger logger)
+		ILogger logger,
+		SessionLogRetention? retention = null)
 	{
+		_retention = retention;
 		_folder = folder;
 		_endpoint = endpoint;
 		_startedAt = startedAt;
@@ -156,73 +160,12 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 		}
 		finally
 		{
+			ReleaseWriting();
+
 			// The semaphore is not disposed: a write that started before the detach would find it gone. It holds no
 			// wait handle, so there is nothing to release.
 			_gate.Release();
 		}
-	}
-
-	/// <summary>Turns a session into a name a human can find again: <c>web01-root-20260926-142530.log</c>.</summary>
-	/// <param name="extension">The format's extension, dot included.</param>
-	internal static string BuildFileName(string endpoint, DateTimeOffset startedAt, int attempt, string extension = ".log")
-	{
-		string user = "";
-		string host = endpoint;
-		int at = endpoint.IndexOf('@', StringComparison.Ordinal);
-		if (at >= 0)
-		{
-			user = endpoint[..at];
-			host = endpoint[(at + 1)..];
-		}
-
-		// The port goes: an IPv6 address is full of colons, and the one that matters is the last.
-		int colon = host.LastIndexOf(':');
-		if (colon > 0)
-		{
-			host = host[..colon];
-		}
-
-		StringBuilder name = new();
-		name.Append(Slug(host, 48));
-		if (Slug(user, 32) is { Length: > 0 } slug)
-		{
-			name.Append('-').Append(slug);
-		}
-
-		name.Append(CultureInfo.InvariantCulture, $"-{startedAt:yyyyMMdd-HHmmss}");
-		if (attempt > 0)
-		{
-			name.Append(CultureInfo.InvariantCulture, $"-{attempt}");
-		}
-
-		return name.Append(extension).ToString();
-	}
-
-	/// <summary>Keeps letters, digits, dots, dashes and underscores; every other run, an IPv6 colon included, becomes one underscore.</summary>
-	private static string Slug(string value, int maxLength)
-	{
-		StringBuilder slug = new(value.Length);
-		bool filler = false;
-		foreach (char character in value)
-		{
-			if (slug.Length >= maxLength)
-			{
-				break;
-			}
-
-			if (char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_')
-			{
-				slug.Append(character);
-				filler = false;
-			}
-			else if (!filler && slug.Length > 0)
-			{
-				slug.Append('_');
-				filler = true;
-			}
-		}
-
-		return slug.ToString().Trim('_', '.', '-');
 	}
 
 	private TerminalSize CurrentSize()
@@ -267,7 +210,7 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 
 		for (int attempt = 0; ; attempt++)
 		{
-			string name = BuildFileName(_endpoint, _startedAt, attempt, _formatter.Extension);
+			string name = SessionLogNames.Build(_endpoint, _startedAt, attempt, _formatter.Extension);
 			string path = Path.Combine(_folder, name);
 			FileStreamOptions options = OwnerOnlyFiles.Owned(new FileStreamOptions
 			{
@@ -281,17 +224,26 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 				BufferSize = 0,
 			});
 
+			// Marked before it exists, so there is no moment in which cleanup could see the new file as nobody's.
+			IDisposable? writing = _retention?.MarkWriting(path);
 			FileStream file;
 			try
 			{
 				file = new FileStream(path, options);
 			}
-			catch (IOException) when (attempt < NameAttempts && File.Exists(path))
+			catch (IOException) when (attempt < SessionLogNames.MaxAttempts && File.Exists(path))
 			{
+				writing?.Dispose();
 				continue;
+			}
+			catch
+			{
+				writing?.Dispose();
+				throw;
 			}
 
 			_file = file;
+			_writing = writing;
 			SetStatus(SessionLogState.Recording, message: null, name);
 
 			// A timed recording counts from here, so its first chunk lands at the start.
@@ -308,6 +260,7 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 		await file.WriteAsync(_formatter.LimitNotice(kilobytes, elapsed), cancellationToken);
 		_file = null;
 		await file.DisposeAsync();
+		ReleaseWriting();
 	}
 
 	private void Fail(Exception exception)
@@ -324,7 +277,11 @@ internal sealed class SessionLogWriter : ITerminalSink, IAsyncDisposable
 		{
 			// Already broken, and the state above is what the user sees.
 		}
+
+		ReleaseWriting();
 	}
+
+	private void ReleaseWriting() => Interlocked.Exchange(ref _writing, null)?.Dispose();
 
 	private void SetStatus(SessionLogState state, string? message, string? fileName)
 	{

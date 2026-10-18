@@ -5,7 +5,8 @@ namespace Mokaterm.Abstractions.Import;
 
 /// <summary>
 /// One host and login an import source found. Secrets are never part of this: sources read addresses, users and
-/// options only, and a key file is recorded as a path, not as key material.
+/// options only, and a key file is recorded as a path, not as key material. On the desktop the importer can copy that
+/// file into the keychain when the import runs (see <see cref="KeyFile"/>).
 /// </summary>
 public sealed record ImportedEntry
 {
@@ -31,10 +32,19 @@ public sealed record ImportedEntry
 	public ProtocolOptions Options { get; init; } = ProtocolOptions.Empty;
 
 	/// <summary>
-	/// Private key file the other client pointed at. Recorded so the user can attach the key later; the file is
-	/// never opened and never imported.
+	/// Private key file the other client pointed at, as it wrote it. Sources never open it. The desktop importer can
+	/// copy it into the keychain; otherwise, and always on the web host, the path goes into the host's notes.
 	/// </summary>
 	public string? IdentityFilePath { get; init; }
+
+	/// <summary>How <see cref="IdentityFilePath"/> is written, which decides how it turns into a file on this machine.</summary>
+	public IdentityPathStyle IdentityPathStyle { get; init; }
+
+	/// <summary>
+	/// What adding <see cref="IdentityFilePath"/> to the keychain would do, filled in by the importer's preview where
+	/// keys can be imported. Null when there is no key file, or on a host that never reads one.
+	/// </summary>
+	public ImportedKeyFile? KeyFile { get; init; }
 
 	/// <summary>Folders to create under the chosen destination, '/' separated. Null keeps the entry at the destination.</summary>
 	public string? FolderPath { get; init; }

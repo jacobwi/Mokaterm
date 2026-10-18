@@ -139,6 +139,28 @@
 	white-space: nowrap;
 }
 
+.mt-import-row__key {
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-import-row__key--problem {
+	color: var(--moka-color-warning);
+}
+
+.mt-import-keys {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxs);
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
 .mt-import-destination {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

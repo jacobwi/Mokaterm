@@ -36,6 +36,7 @@ public sealed class OpenSshConfigImportSourceTests
 		Assert.Equal("deploy", web1.Username);
 		Assert.Equal(2222, web1.Port);
 		Assert.Equal("~/.ssh/id_ed25519", web1.IdentityFilePath);
+		Assert.Equal(IdentityPathStyle.OpenSsh, web1.IdentityPathStyle);
 		Assert.Equal("ssh", web1.ProtocolId);
 
 		ImportedEntry db1 = preview.Entries[2];
@@ -185,6 +186,22 @@ public sealed class OpenSshConfigImportSourceTests
 	/// <summary>Runs the synchronous read on the pool, so a regression fails the test instead of hanging the run.</summary>
 	private static async Task<ImportPreview> ReadWithDeadlineAsync(string config) =>
 		await Task.Run(() => ReadAsync(config), Ct).WaitAsync(TimeSpan.FromSeconds(20), Ct);
+
+	[Fact]
+	public async Task ReadAsync_KeepsAQuotedKeyPathWhole_AndReadsNoneAsNoKey()
+	{
+		ImportPreview preview = await ReadAsync(
+			"""
+			Host spaced
+				IdentityFile "~/My Keys/id_work"
+
+			Host keyless
+				IdentityFile none
+			""");
+
+		Assert.Equal("~/My Keys/id_work", Assert.Single(preview.Entries, entry => entry.Name == "spaced").IdentityFilePath);
+		Assert.Null(Assert.Single(preview.Entries, entry => entry.Name == "keyless").IdentityFilePath);
+	}
 
 	private static async Task<ImportPreview> ReadAsync(string config)
 	{

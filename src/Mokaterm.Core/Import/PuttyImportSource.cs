@@ -128,8 +128,9 @@ internal sealed class PuttyImportSource : IConnectionImportSource
 			Port = ImportPorts.Normalize(session.Number("PortNumber"), defaultPort),
 			Username = session.Text("UserName"),
 
-			// PuTTY points at a .ppk file. The path is recorded so the user can attach the key; it is never opened.
+			// PuTTY points at a .ppk file. The source never opens it; the desktop importer may copy it into the keychain.
 			IdentityFilePath = session.Text("PublicKeyFile"),
+			IdentityPathStyle = IdentityPathStyle.Plain,
 		};
 
 		return true;

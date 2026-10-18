@@ -56,6 +56,7 @@ public sealed class PuttyImportTests
 		Assert.Equal("deploy", web.Username);
 		Assert.Equal("ssh", web.ProtocolId);
 		Assert.Equal(@"C:\keys\deploy.ppk", web.IdentityFilePath);
+		Assert.Equal(IdentityPathStyle.Plain, web.IdentityPathStyle);
 
 		// Telnet maps to our reserved id; whether it can be created is the importer's call, not the reader's.
 		ImportedEntry mail = Assert.Single(preview.Entries, entry => entry.Name == "mail");

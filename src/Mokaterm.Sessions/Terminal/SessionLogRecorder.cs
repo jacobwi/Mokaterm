@@ -23,12 +23,10 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 	/// <summary>Rows the settings page is given. A folder nobody ever emptied must not turn into a page that never renders.</summary>
 	internal const int MaxListedFiles = 200;
 
-	/// <summary>What the listing and <see cref="OpenRead"/> take: the text formats, then timed recordings.</summary>
-	private static readonly string[] Extensions = [".log", Asciicast.Extension];
-
 	private readonly ISessionManager _sessions;
 	private readonly ISettingsService _settings;
 	private readonly IAppEnvironment _environment;
+	private readonly SessionLogRetention _retention;
 	private readonly TimeProvider _time;
 	private readonly ILogger<SessionLogRecorder> _logger;
 	private readonly Lock _lock = new();
@@ -43,12 +41,14 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 		ISessionManager sessions,
 		ISettingsService settings,
 		IAppEnvironment environment,
+		SessionLogRetention retention,
 		TimeProvider timeProvider,
 		ILogger<SessionLogRecorder> logger)
 	{
 		_sessions = sessions;
 		_settings = settings;
 		_environment = environment;
+		_retention = retention;
 		_time = timeProvider;
 		_logger = logger;
 		_sessions.SessionsChanged += OnSessionsChanged;
@@ -100,30 +100,38 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 		}
 	}
 
-	public IReadOnlyList<SessionLogFile> ListFiles()
+	public IReadOnlyList<SessionLogFile> ListFiles() =>
+		[.. _retention.List()
+			.OrderByDescending(file => file.WrittenAt)
+			.ThenBy(file => file.Name, StringComparer.Ordinal)
+			.Take(MaxListedFiles)];
+
+	public SessionLogUsage Usage()
 	{
-		try
-		{
-			DirectoryInfo directory = new(Folder);
-			return directory.Exists
-				? [.. directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly)
-					.Where(file => IsLogName(file.Name))
-					.Select(Describe)
-					.OrderByDescending(file => file.WrittenAt)
-					.Take(MaxListedFiles)]
-				: [];
-		}
-		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-		{
-			_logger.LogWarning("Listing the session logs failed: {Failure}", LogSafe.Describe(ex));
-			return [];
-		}
+		IReadOnlyList<SessionLogFile> files = _retention.List();
+		return new SessionLogUsage(files.Count, files.Sum(file => file.Length));
+	}
+
+	public async Task<SessionLogDeletion> DeleteAsync(IReadOnlyCollection<string> names, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(names);
+		string[] copy = [.. names];
+		SessionLogDeletion deletion = await Task.Run(() => _retention.Delete(copy), cancellationToken);
+		Raise();
+		return deletion;
+	}
+
+	public async Task<SessionLogDeletion> DeleteAllAsync(CancellationToken cancellationToken = default)
+	{
+		SessionLogDeletion deletion = await Task.Run(_retention.DeleteAll, cancellationToken);
+		Raise();
+		return deletion;
 	}
 
 	public Stream OpenRead(string name)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(name);
-		if (name != Path.GetFileName(name) || !IsLogName(name))
+		if (name != Path.GetFileName(name) || !SessionLogNames.IsGenerated(name))
 		{
 			// Only a name the listing gave out: nothing that reads a file must be able to walk out of the folder.
 			throw new ArgumentException("That is not a session log file name.", nameof(name));
@@ -162,17 +170,12 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 			Detach(recording);
 			await recording.Writer.DisposeAsync();
 		}
+
+		if (recordings.Length > 0)
+		{
+			_retention.ScheduleCleanup();
+		}
 	}
-
-	private static bool IsLogName(string name) =>
-		Extensions.Any(extension => name.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
-
-	private static SessionLogFile Describe(FileInfo file) => new()
-	{
-		Name = file.Name,
-		Length = file.Length,
-		WrittenAt = file.LastWriteTimeUtc,
-	};
 
 	/// <summary>
 	/// The session as <c>user@host:port</c>, which names the file and heads it. A protocol without a port (a serial
@@ -254,7 +257,8 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 			settings,
 			() => stream.Size,
 			_time,
-			_logger);
+			_logger,
+			_retention);
 		writer.Changed += Raise;
 		_recordings[handle.Id] = new Recording(writer, stream.Attach(writer));
 		return true;
@@ -284,6 +288,9 @@ internal sealed class SessionLogRecorder : ISessionLogRecorder, IAsyncDisposable
 		{
 			_logger.LogWarning("Closing a session log failed: {Failure}", LogSafe.Describe(ex));
 		}
+
+		// A recording that closes is the moment the rules may have something new to do.
+		_retention.ScheduleCleanup();
 	}
 
 	private void Raise() => EventRaiser.Raise(Changed, _logger, nameof(Changed));

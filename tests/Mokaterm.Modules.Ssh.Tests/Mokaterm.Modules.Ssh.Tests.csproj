@@ -17,6 +17,11 @@
 		<Compile Include="..\Shared\SecurityKeys\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
+	<!-- PuTTY key files written from the published format, for want of puttygen; Argon2 comes with Core. -->
+	<ItemGroup>
+		<Compile Include="..\Shared\Keys\*.cs" LinkBase="Shared" />
+	</ItemGroup>
+
 	<!-- Eventually.AdvanceUntilAsync, for the page poller. -->
 	<ItemGroup>
 		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />

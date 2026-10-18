@@ -44,6 +44,9 @@ public static class CoreServiceCollectionExtensions
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IConnectionImportSource, WinScpImportSource>());
 		services.TryAddEnumerable(ServiceDescriptor.Singleton<IConnectionImportSource, ConnectionBundleImportSource>());
 
+		// Reads the key files imported logins name, and refuses to anywhere but the desktop (it checks the host's kind).
+		services.TryAddSingleton<IdentityFileReader>();
+
 		// Shared by every UI scope.
 		services.TryAddSingleton<IAppDataStore, FileAppDataStore>();
 		services.TryAddSingleton<SettingsService>();

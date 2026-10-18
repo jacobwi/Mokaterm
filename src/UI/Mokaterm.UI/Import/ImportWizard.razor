@@ -26,6 +26,11 @@
 								Only addresses, users, ports and protocol settings come across. PuTTY never stores a password, and
 								WinSCP stores one that anyone holding the file can turn back into plain text, so copying it would
 								only spread it further.
+								@if (Importer.CanImportKeys)
+								{
+									@: A private key file a login names can be copied into the keychain, where it is kept inside the
+									@: encrypted vault like a key you add by hand.
+								}
 							</MokaCallout>
 
 							@if (_probing)
@@ -106,10 +111,15 @@
 										<span class="mt-import-row__main">
 											<span class="mt-import-row__name">@EntryTitle(entry)</span>
 											<span class="mt-import-row__meta">@Endpoint(entry)</span>
+											@if (KeyLine(entry) is { } keyLine)
+											{
+												@* Visible text that may be cut off, so the whole of it is in the title. *@
+												<span class="@KeyLineClass(entry)" title="@keyLine">@keyLine</span>
+											}
 										</span>
 										@if (entry.IdentityFilePath is not null)
 										{
-											<MokaTag Text="Key file" Size="MokaSize.Xs" Icon="MokatermIcons.Key" />
+											<MokaTag Text="@KeyTagText(entry)" Size="MokaSize.Xs" Icon="MokatermIcons.Key" Color="KeyTagColor(entry)" />
 										}
 										@if (entry.AlreadyExists)
 										{
@@ -118,6 +128,19 @@
 									</div>
 								}
 							</div>
+
+							@if (OffersKeys)
+							{
+								<div class="mt-import-keys">
+									<MokaCheckbox Label="Add the keys these logins name to the keychain"
+												  @bind-Value="_importKeys"
+												  Disabled="_busy" />
+									<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">
+										Each key file is copied into the encrypted vault once, however many logins name it, and those
+										logins sign in with it. A key with a passphrase asks for it each time you connect.
+									</MokaText>
+								</div>
+							}
 
 							<div class="mt-import-destination">
 								<MokaSelect TValue="Guid?"
@@ -161,6 +184,16 @@
 								<div class="mt-import-skipped">
 									<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Medium">Not imported</MokaText>
 									@foreach (ImportSkip skip in _result.Skipped)
+									{
+										<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@skip.Name: @skip.Reason</MokaText>
+									}
+								</div>
+							}
+							@if (_result.KeysNotAdded.Count > 0)
+							{
+								<div class="mt-import-skipped">
+									<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Medium">Imported without their key</MokaText>
+									@foreach (ImportSkip skip in _result.KeysNotAdded)
 									{
 										<MokaText Element="span" Size="MokaSize.Xs" Style="@MutedStyle">@skip.Name: @skip.Reason</MokaText>
 									}

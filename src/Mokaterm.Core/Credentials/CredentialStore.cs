@@ -1,5 +1,6 @@
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Core.Keys;
 using Mokaterm.Core.Security;
 using Mokaterm.Core.Storage;
 using Mokaterm.Core.Validation;
@@ -216,9 +217,19 @@ internal sealed class CredentialStore : ICredentialStore, IDisposable
 			: RevealString(id, PassphraseField, existing?.Passphrase);
 
 		PrivateKeyInspection inspection = _inspector.Inspect(privateKey, passphrase);
-		return inspection.IsValid
-			? (inspection.Algorithm, inspection.Fingerprint)
-			: throw new CredentialValidationException(inspection.Status, ValidationMessage(inspection));
+		if (inspection.IsValid)
+		{
+			return (inspection.Algorithm, inspection.Fingerprint);
+		}
+
+		// Kept locked on request: the passphrase is asked when a login uses the key, and the public half, which neither
+		// OpenSSH nor PuTTY encrypts, still names it. A PEM key keeps its public half inside the encrypted part and has none.
+		if (inspection.Status == PrivateKeyStatus.PassphraseRequired && passphrase is null && secret?.AskPassphraseWhenUsed == true)
+		{
+			return KeyFilePublicHalf.Describe(privateKey);
+		}
+
+		throw new CredentialValidationException(inspection.Status, ValidationMessage(inspection));
 	}
 
 	private static bool HasValue(byte[]? stored, string? input) => input is null ? stored is not null : input.Length > 0;

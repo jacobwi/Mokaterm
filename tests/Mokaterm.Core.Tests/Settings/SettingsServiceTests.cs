@@ -291,13 +291,31 @@ public sealed class SettingsServiceTests
 	}
 
 	[Fact]
+	public async Task UpdateAsync_ClampsTheSessionLogCleanupRules()
+	{
+		(CoreTestContext context, _) = CreateInMemory();
+		await using (context)
+		{
+			ISettingsService settings = Settings(context);
+			Assert.False(settings.Get<SessionLogSettings>().DeletesOldLogs);
+
+			await settings.UpdateAsync<SessionLogSettings>(logs => logs with { DeleteAfterDays = -3, KeepAtMostMegabytes = int.MaxValue }, Ct);
+
+			SessionLogSettings saved = settings.Get<SessionLogSettings>();
+			Assert.Equal(SessionLogSettings.MinDeleteAfterDays, saved.DeleteAfterDays);
+			Assert.Equal(SessionLogSettings.MaxKeepAtMostMegabytes, saved.KeepAtMostMegabytes);
+			Assert.True(saved.DeletesOldLogs);
+		}
+	}
+
+	[Fact]
 	public async Task SessionLogSettings_RoundTripThroughTheFile()
 	{
 		await using CoreTestContext context = new();
 		ISettingsService settings = Settings(context);
 
 		await settings.UpdateAsync<SessionLogSettings>(
-			logs => logs with { RecordEverySession = true, SizeLimitKilobytes = 2048, Format = SessionLogFormat.Raw },
+			logs => logs with { RecordEverySession = true, SizeLimitKilobytes = 2048, Format = SessionLogFormat.Raw, DeleteAfterDays = 30, KeepAtMostMegabytes = 500 },
 			Ct);
 		await settings.FlushAsync(Ct);
 
@@ -310,6 +328,8 @@ public sealed class SettingsServiceTests
 		Assert.True(logSettings.RecordEverySession);
 		Assert.Equal(2048, logSettings.SizeLimitKilobytes);
 		Assert.Equal(SessionLogFormat.Raw, logSettings.Format);
+		Assert.Equal(30, logSettings.DeleteAfterDays);
+		Assert.Equal(500, logSettings.KeepAtMostMegabytes);
 	}
 
 	[Fact]

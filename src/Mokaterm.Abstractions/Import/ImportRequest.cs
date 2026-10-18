@@ -10,4 +10,10 @@ public sealed record ImportRequest
 
 	/// <summary>Name of a folder to create under <see cref="FolderId"/> first. Blank uses <see cref="FolderId"/> as it is.</summary>
 	public string? NewFolderName { get; init; }
+
+	/// <summary>
+	/// Copy the key file each entry names into the keychain and set its login to key authentication. Ignored where
+	/// <see cref="IConnectionImporter.CanImportKeys"/> is false.
+	/// </summary>
+	public bool ImportKeys { get; init; }
 }

@@ -50,6 +50,29 @@
 		</SettingsRow>
 	</SettingsSection>
 
+	<SettingsSection Title="Cleanup">
+		<SettingsRow Label="Delete logs older than"
+					 Description="Files last written longer ago than this are deleted when the app starts and whenever a recording closes. 0 keeps them for good.">
+			<NumberSetting TValue="int"
+						   Value="settings.DeleteAfterDays"
+						   ValueChanged="value => UpdateAsync(s => s with { DeleteAfterDays = value })"
+						   Min="SessionLogSettings.MinDeleteAfterDays"
+						   Max="SessionLogSettings.MaxDeleteAfterDays"
+						   Suffix="days"
+						   AriaLabel="Delete session logs older than this many days" />
+		</SettingsRow>
+		<SettingsRow Label="Keep at most"
+					 Description="When the logs together take more than this, the oldest go until the rest fit. 0 sets no cap. A file a session is still writing is never deleted, and neither is anything in the folder that is not a session log.">
+			<NumberSetting TValue="int"
+						   Value="settings.KeepAtMostMegabytes"
+						   ValueChanged="value => UpdateAsync(s => s with { KeepAtMostMegabytes = value })"
+						   Min="SessionLogSettings.MinKeepAtMostMegabytes"
+						   Max="SessionLogSettings.MaxKeepAtMostMegabytes"
+						   Suffix="MB"
+						   AriaLabel="Keep at most this many megabytes of session logs" />
+		</SettingsRow>
+	</SettingsSection>
+
 	<SettingsSection Title="Files" Description="@FilesDescription" Flush>
 		<Actions>
 			<MokaButton Variant="MokaVariant.Text"
@@ -58,6 +81,14 @@
 						StartIcon="MokaIcons.Action.Refresh"
 						OnClick="Reload">
 				Refresh
+			</MokaButton>
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Error"
+						Size="MokaSize.Sm"
+						StartIcon="MokaIcons.Action.Delete"
+						Disabled="@(_busy || _usage.Files == 0)"
+						OnClick="DeleteAllAsync">
+				Delete all logs
 			</MokaButton>
 		</Actions>
 		<ChildContent>
@@ -70,8 +101,10 @@
 					   ShowPagination="false"
 					   SortColumn="Written"
 					   SortDirection="MokaSortDirection.Descending"
+					   Selectable
+					   @bind-SelectedItems="_selected"
 					   ActionsColumnTitle=""
-					   ActionsColumnWidth="72px">
+					   ActionsColumnWidth="104px">
 				<ChildContent>
 					<MokaColumn Title="File" Field="file => file.Name">
 						<CellTemplate Context="file">
@@ -91,6 +124,16 @@
 						</CellTemplate>
 					</MokaColumn>
 				</ChildContent>
+				<SelectionActions Context="selection">
+					<MokaButton Variant="MokaVariant.Text"
+								Color="MokaColor.Error"
+								Size="MokaSize.Sm"
+								StartIcon="MokaIcons.Action.Delete"
+								Disabled="_busy"
+								OnClick="() => DeleteFilesAsync(selection)">
+						Delete
+					</MokaButton>
+				</SelectionActions>
 				<RowActions Context="file">
 					<IconButton Size="MokaSize.Xs"
 								Icon="MokatermIcons.Play"
@@ -106,9 +149,16 @@
 									Disabled="_busy"
 									OnClick="() => SaveAsync(file)"
 									Label="Save a copy"
-									AriaLabel="@($"Save a copy of {file.Name}")"
-									Position="MokaTooltipPosition.BottomEnd" />
+									AriaLabel="@($"Save a copy of {file.Name}")" />
 					}
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Action.Delete"
+								Color="MokaColor.Error"
+								Disabled="_busy"
+								OnClick="() => DeleteFilesAsync([file])"
+								Label="Delete"
+								AriaLabel="@($"Delete {file.Name}")"
+								Position="MokaTooltipPosition.BottomEnd" />
 				</RowActions>
 				<EmptyContent>
 					<MokaEmptyState Icon="MokatermIcons.Record"

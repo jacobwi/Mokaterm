@@ -114,13 +114,9 @@ internal static class SettingsSanitizer
 	private static SessionLogSettings Sanitize(SessionLogSettings settings)
 	{
 		SessionLogSettings defaults = new();
-		return settings with
+		return settings.Clamped() with
 		{
 			Folder = SessionLogSettings.NormalizeFolder(settings.Folder),
-			SizeLimitKilobytes = Math.Clamp(
-				settings.SizeLimitKilobytes,
-				SessionLogSettings.MinSizeLimitKilobytes,
-				SessionLogSettings.MaxSizeLimitKilobytes),
 			Format = Defined(settings.Format, defaults.Format),
 		};
 	}

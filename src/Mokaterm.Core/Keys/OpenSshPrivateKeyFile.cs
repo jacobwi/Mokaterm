@@ -142,6 +142,37 @@ internal static class OpenSshPrivateKeyFile
 	}
 
 	/// <summary>
+	/// Reads the header of a file holding one key from its bytes: the public key and whether a passphrase protects the
+	/// rest. The body is decoded into pinned memory, since an unencrypted one is secret.
+	/// </summary>
+	public static bool TryReadHeader(ReadOnlySpan<byte> text, out byte[] publicBlob, out bool encrypted)
+	{
+		publicBlob = [];
+		encrypted = false;
+		using PinnedBytes? body = DecodeBody(text);
+		if (body is null || !body.Span.StartsWith(Magic))
+		{
+			return false;
+		}
+
+		SshWireReader reader = new(body.Span[Magic.Length..]);
+		if (!reader.TryReadString(out ReadOnlySpan<byte> cipher)
+			|| !reader.TryReadString(out _)
+			|| !reader.TryReadString(out _)
+			|| !reader.TryReadUInt32(out uint keyCount)
+			|| keyCount != 1
+			|| !reader.TryReadString(out ReadOnlySpan<byte> publicKey)
+			|| publicKey.IsEmpty)
+		{
+			return false;
+		}
+
+		publicBlob = publicKey.ToArray();
+		encrypted = !cipher.SequenceEqual("none"u8);
+		return true;
+	}
+
+	/// <summary>
 	/// Opens a file holding one key and decrypts its private section, which comes back as it is stored: the two check
 	/// words, the key's fields, the comment and the padding. The caller disposes <paramref name="section"/>.
 	/// </summary>
@@ -425,25 +456,13 @@ internal static class OpenSshPrivateKeyFile
 	{
 		public void Decrypt(ReadOnlySpan<byte> key, ReadOnlySpan<byte> iv, Span<byte> data)
 		{
-			if (!Cbc)
+			if (Cbc)
+			{
+				AesCbc.Decrypt(key, iv, data);
+			}
+			else
 			{
 				AesCtr.Transform(key, iv, data);
-				return;
-			}
-
-			using Aes aes = Aes.Create();
-			byte[] keyCopy = key.ToArray();
-			using PinnedBytes plain = new(data.Length);
-			try
-			{
-				aes.Key = keyCopy;
-				aes.DecryptCbc(data, iv, plain.Span, PaddingMode.None);
-				plain.Span.CopyTo(data);
-			}
-			finally
-			{
-				CryptographicOperations.ZeroMemory(keyCopy);
-				aes.Clear();
 			}
 		}
 	}

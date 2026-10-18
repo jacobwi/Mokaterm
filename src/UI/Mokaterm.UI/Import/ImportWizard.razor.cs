@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moka.Red.Core.Enums;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Import;
 using Mokaterm.Abstractions.Interaction;
@@ -18,7 +19,8 @@ namespace Mokaterm.UI.Import;
 
 /// <summary>
 /// Brings saved hosts over from another client: pick a source, tick what to keep, choose where it lands. Nothing is
-/// written until the last step, and no secret ever crosses.
+/// written until the last step, and no password ever crosses. In the desktop app the key files logins name can come
+/// along into the keychain.
 /// </summary>
 public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 {
@@ -39,6 +41,7 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 	private string? _error;
 	private bool _probing;
 	private bool _busy;
+	private bool _importKeys;
 
 	[Inject]
 	private IConnectionImporter Importer { get; set; } = default!;
@@ -65,6 +68,10 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 			? row.Info.DisplayName
 			: "The picked file";
 
+	/// <summary>True when a listed login names a key file and this host can copy one into the keychain.</summary>
+	private bool OffersKeys =>
+		Importer.CanImportKeys && _preview is { } preview && preview.Entries.Any(entry => entry.KeyFile is not null);
+
 	private string ImportLabel => _selected.Count switch
 	{
 		0 => "Import",
@@ -85,6 +92,7 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 		_selected.Clear();
 		_newFolderName = "";
 		_sources = [];
+		_importKeys = false;
 	}
 
 	protected override async Task LoadAsync(ImportEditorRequest request)
@@ -112,6 +120,16 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 	private static string ResultDetail(ImportResult result)
 	{
 		List<string> parts = [];
+		if (result.KeysAdded > 0)
+		{
+			parts.Add(result.KeysAdded == 1 ? "1 key added to the keychain" : string.Create(CultureInfo.CurrentCulture, $"{result.KeysAdded} keys added to the keychain"));
+		}
+
+		if (result.LoginsWithKeys > 0)
+		{
+			parts.Add(result.LoginsWithKeys == 1 ? "1 login signs in with a key" : string.Create(CultureInfo.CurrentCulture, $"{result.LoginsWithKeys} logins sign in with a key"));
+		}
+
 		if (result.HostsCreated > 0)
 		{
 			parts.Add(result.HostsCreated == 1 ? "1 new host" : string.Create(CultureInfo.CurrentCulture, $"{result.HostsCreated} new hosts"));
@@ -127,10 +145,18 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 			parts.Add(result.FoldersCreated == 1 ? "1 new folder" : string.Create(CultureInfo.CurrentCulture, $"{result.FoldersCreated} new folders"));
 		}
 
-		return parts.Count == 0
-			? "Nothing new reached the connections panel."
-			: string.Join(", ", parts) + ". Passwords and keys were not imported, so each login asks the first time you connect.";
+		if (parts.Count == 0)
+		{
+			return "Nothing new reached the connections panel.";
+		}
+
+		return string.Join(", ", parts) + (result.LoginsWithKeys > 0
+			? ". Passwords were not imported, so a login without a key asks the first time you connect."
+			: ". Passwords and keys were not imported, so each login asks the first time you connect.");
 	}
+
+	private static string KeyFileName(ImportedEntry entry) =>
+		Path.GetFileName(entry.KeyFile?.Path ?? entry.IdentityFilePath ?? "") is { Length: > 0 } name ? name : "The key file";
 
 	private static string SourceDetail(ImportSourceRow row)
 	{
@@ -151,6 +177,50 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 		string endpoint = port > 0 ? EndpointFormat.Format(entry.Username, entry.Address, port) : entry.Address;
 		return $"{endpoint} ({Protocols.DisplayName(entry.ProtocolId)})";
 	}
+
+	/// <summary>What happens to the login's key, under its address; null when it names none.</summary>
+	private string? KeyLine(ImportedEntry entry)
+	{
+		if (entry.KeyFile is not { } key)
+		{
+			return null;
+		}
+
+		if (!_importKeys)
+		{
+			return $"Key file {entry.IdentityFilePath}: kept in the host's notes.";
+		}
+
+		string algorithm = key.Algorithm is { Length: > 0 } type ? $" ({type})" : "";
+		return key.Status switch
+		{
+			ImportedKeyStatus.Ready when key.NeedsPassphrase =>
+				$"{KeyFileName(entry)}{algorithm} goes into the keychain. Its passphrase is asked when you connect.",
+			ImportedKeyStatus.Ready => $"{KeyFileName(entry)}{algorithm} goes into the keychain.",
+			ImportedKeyStatus.InKeychain => $"Uses {key.KeychainName}, already in the keychain with the same key as {KeyFileName(entry)}.",
+			_ => key.Reason ?? "The key file cannot be used.",
+		};
+	}
+
+	private string KeyLineClass(ImportedEntry entry) =>
+		_importKeys && entry.KeyFile is { IsUsable: false }
+			? "mt-import-row__key mt-import-row__key--problem"
+			: "mt-import-row__key";
+
+	private string KeyTagText(ImportedEntry entry) => !_importKeys || entry.KeyFile is not { } key
+		? "Key file"
+		: key.Status switch
+		{
+			ImportedKeyStatus.Ready => "Key",
+			ImportedKeyStatus.InKeychain => "In keychain",
+			ImportedKeyStatus.Missing => "Key missing",
+			ImportedKeyStatus.Unsupported => "Key not supported",
+			_ => "Key unreadable",
+		};
+
+	private MokaColor KeyTagColor(ImportedEntry entry) => !_importKeys || entry.KeyFile is not { } key
+		? MokaColor.Surface
+		: key.IsUsable ? MokaColor.Success : MokaColor.Warning;
 
 	private string FolderLabel(Guid? folderId) =>
 		folderId is { } id && _folderPaths.TryGetValue(id, out string? path) ? path : "Top level";
@@ -199,6 +269,9 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 		_preview = preview;
 		_error = null;
 		_selected.Clear();
+
+		// On by default only where some key can actually come across.
+		_importKeys = Importer.CanImportKeys && preview.Entries.Any(entry => entry.KeyFile is { IsUsable: true });
 
 		// Entries that already match a saved login start unticked, so a second import adds nothing by accident.
 		foreach (ImportedEntry entry in preview.Entries.Where(entry => !entry.AlreadyExists))
@@ -315,6 +388,7 @@ public sealed partial class ImportWizard : ShellEditorBase<ImportEditorRequest>
 				Entries = [.. preview.Entries.Where(entry => _selected.Contains(entry.Key))],
 				FolderId = _folderId,
 				NewFolderName = _newFolderName,
+				ImportKeys = _importKeys && Importer.CanImportKeys,
 			});
 
 			_step = ImportStep.Done;

@@ -179,9 +179,13 @@ internal sealed class OpenSshConfigImportSource : IConnectionImportSource
 					? ImportPorts.Normalize(parsedPort, DefaultSshPort)
 					: null;
 
+			// IdentityFile takes one argument, which the parser has already unquoted, so a path with spaces stays whole.
+			// "none" is OpenSSH's way of saying no key file at all, the default ones included.
 			string? identity = settings.TryGetValue("identityfile", out string? identityFile)
-				? FirstArgument(identityFile)
-				: null;
+				&& identityFile.Trim() is { Length: > 0 } keyPath
+				&& !keyPath.Equals("none", StringComparison.OrdinalIgnoreCase)
+					? keyPath
+					: null;
 
 			entries.Add(new ImportedEntry
 			{
@@ -192,6 +196,7 @@ internal sealed class OpenSshConfigImportSource : IConnectionImportSource
 				Port = port,
 				Username = settings.TryGetValue("user", out string? user) ? user : null,
 				IdentityFilePath = identity,
+				IdentityPathStyle = IdentityPathStyle.OpenSsh,
 				Notes = BuildNotes(settings),
 			});
 		}
@@ -238,14 +243,6 @@ internal sealed class OpenSshConfigImportSource : IConnectionImportSource
 
 	private static StringBuilder Separate(StringBuilder builder) =>
 		builder.Length == 0 ? builder : builder.Append(' ');
-
-	private static string? FirstArgument(string value)
-	{
-		string trimmed = value.Trim();
-		int space = trimmed.IndexOf(' ', StringComparison.Ordinal);
-		string first = space < 0 ? trimmed : trimmed[..space];
-		return first.Length == 0 ? null : first;
-	}
 
 	/// <summary>
 	/// Turns an <c>Include</c> argument into files. Relative paths start at the config's own directory, which is

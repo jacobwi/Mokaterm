@@ -13,9 +13,6 @@ namespace Mokaterm.Core.Keys;
 /// </summary>
 internal sealed class SshKeyGenerator : ISshKeyGenerator
 {
-	private const string Ed25519Algorithm = "ssh-ed25519";
-	private const string RsaAlgorithm = "ssh-rsa";
-
 	private readonly ISecurityKeyAuthenticator? _authenticator;
 
 	/// <param name="authenticator">The desktop host's security key access; null where there is none.</param>
@@ -40,8 +37,7 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 
 	public SshPublicKey? ReadPublicKey(string privateKey)
 	{
-		if (string.IsNullOrWhiteSpace(privateKey)
-			|| !OpenSshPrivateKeyFile.TryReadPublicPart(privateKey, out byte[] blob, out string comment))
+		if (string.IsNullOrWhiteSpace(privateKey) || !KeyFilePublicHalf.TryRead(privateKey, out byte[] blob, out string comment))
 		{
 			return null;
 		}
@@ -86,18 +82,10 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 		Ed25519.GeneratePublicKey(seed.Array, 0, publicKey, 0);
 
 		using PinnedBufferWriter publicWriter = new(128);
-		SshWire.WriteString(publicWriter, Ed25519Algorithm);
-		SshWire.WriteString(publicWriter, publicKey);
-
-		// OpenSSH stores the seed and the public key together as the 64 byte "secret key".
-		using PinnedBytes secret = new(Ed25519.SecretKeySize + Ed25519.PublicKeySize);
-		seed.Span.CopyTo(secret.Span);
-		publicKey.CopyTo(secret.Span[Ed25519.SecretKeySize..]);
+		SshKeyBlobs.WriteEd25519Public(publicWriter, publicKey);
 
 		using PinnedBufferWriter privateWriter = new(256);
-		SshWire.WriteString(privateWriter, Ed25519Algorithm);
-		SshWire.WriteString(privateWriter, publicKey);
-		SshWire.WriteString(privateWriter, secret.Span);
+		SshKeyBlobs.WriteEd25519Private(privateWriter, publicKey, seed.Span);
 
 		return Build("id_ed25519", publicWriter.WrittenSpan, privateWriter.WrittenSpan, comment, passphrase);
 	}
@@ -109,19 +97,17 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 		try
 		{
 			using PinnedBufferWriter publicWriter = new(1024);
-			SshWire.WriteString(publicWriter, RsaAlgorithm);
-			SshWire.WriteMpInt(publicWriter, Field(parameters.Exponent));
-			SshWire.WriteMpInt(publicWriter, Field(parameters.Modulus));
+			SshKeyBlobs.WriteRsaPublic(publicWriter, Field(parameters.Exponent), Field(parameters.Modulus));
 
-			// OpenSSH writes the private half as n, e, d, iqmp, p, q, which is not the order of the public half.
 			using PinnedBufferWriter privateWriter = new(4096);
-			SshWire.WriteString(privateWriter, RsaAlgorithm);
-			SshWire.WriteMpInt(privateWriter, Field(parameters.Modulus));
-			SshWire.WriteMpInt(privateWriter, Field(parameters.Exponent));
-			SshWire.WriteMpInt(privateWriter, Field(parameters.D));
-			SshWire.WriteMpInt(privateWriter, Field(parameters.InverseQ));
-			SshWire.WriteMpInt(privateWriter, Field(parameters.P));
-			SshWire.WriteMpInt(privateWriter, Field(parameters.Q));
+			SshKeyBlobs.WriteRsaPrivate(
+				privateWriter,
+				Field(parameters.Modulus),
+				Field(parameters.Exponent),
+				Field(parameters.D),
+				Field(parameters.InverseQ),
+				Field(parameters.P),
+				Field(parameters.Q));
 
 			return Build("id_rsa", publicWriter.WrittenSpan, privateWriter.WrittenSpan, comment, passphrase);
 		}
@@ -139,7 +125,7 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 	private static byte[] Field(byte[]? value) =>
 		value ?? throw new CryptographicException("The generated key is missing a parameter.");
 
-	private static void Wipe(byte[]? value)
+	internal static void Wipe(byte[]? value)
 	{
 		if (value is not null)
 		{
@@ -160,7 +146,8 @@ internal sealed class SshKeyGenerator : ISshKeyGenerator
 			SuggestedFileName = fileName,
 		};
 
-	private static SshPublicKey Describe(ReadOnlySpan<byte> publicBlob, string comment)
+	/// <summary>The public half as the keychain shows it: algorithm, <c>authorized_keys</c> line and the OpenSSH fingerprint.</summary>
+	internal static SshPublicKey Describe(ReadOnlySpan<byte> publicBlob, string comment)
 	{
 		SshWireReader reader = new(publicBlob);
 		string algorithm = reader.TryReadString(out ReadOnlySpan<byte> name) ? Encoding.UTF8.GetString(name) : "";

@@ -95,6 +95,7 @@ app.MapRazorComponents<App>()
 
 // Listening with its plugins loaded, so the next start may load them again (see PluginCatalog).
 app.Lifetime.ApplicationStarted.Register(plugins.ConfirmStarted);
+app.Lifetime.ApplicationStarted.Register(app.Services.StartSessionLogCleanup);
 
 app.Lifetime.ApplicationStopping.Register(() =>
 {

@@ -162,6 +162,11 @@ internal sealed class WinScpImportSource : IConnectionImportSource
 			Options = options,
 			FolderPath = folder,
 			Notes = protocol == ProtocolScp ? "WinSCP used SCP for this site; Mokaterm connects over SFTP." : null,
+
+			// WinSCP percent-encodes its string values the way it does session names (a backslash is %5C), and only SSH
+			// sites sign in with a key. The source never opens the file; the desktop importer may copy it into the keychain.
+			IdentityFilePath = ftp || session.Text("PublicKeyFile") is not { } keyFile ? null : SessionNameCodec.Decode(keyFile),
+			IdentityPathStyle = IdentityPathStyle.Plain,
 		};
 
 		return true;

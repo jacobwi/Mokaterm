@@ -289,6 +289,59 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	}
 
 	[Fact]
+	public async Task DeleteAllAsync_LeavesTheFileARecordingIsWriting_AndTheRecordingGoesOn()
+	{
+		CreateRecorder(new SessionLogSettings { RecordEverySession = true, Folder = LogFolder });
+		(ISessionHandle handle, FakeTerminalChannel channel) = await OpenConnectedAsync();
+		channel.Emit("first\r\n");
+		_ = await WaitForLogAsync(LogName, "first");
+		File.WriteAllText(Path.Combine(LogFolder, "old-root-20200101-000000.log"), "old\r\n");
+		File.WriteAllText(Path.Combine(LogFolder, "notes.log"), "mine\r\n");
+
+		SessionLogDeletion deletion = await Recorder.DeleteAllAsync(Ct);
+
+		Assert.Equal(new SessionLogDeletion { Deleted = 1, InUse = 1 }, deletion);
+		Assert.True(File.Exists(Path.Combine(LogFolder, "notes.log")));
+		channel.Emit("second\r\n");
+		_ = await WaitForLogAsync(LogName, "second");
+		Assert.Equal(SessionLogState.Recording, Recorder.StatusFor(handle.Id).State);
+		Assert.Equal(new SessionLogUsage(1, new FileInfo(Path.Combine(LogFolder, LogName)).Length), Recorder.Usage());
+	}
+
+	[Fact]
+	public async Task ClosingARecording_RunsTheCleanup()
+	{
+		CreateRecorder(new SessionLogSettings { RecordEverySession = true, Folder = LogFolder, KeepAtMostMegabytes = 1 });
+		(ISessionHandle handle, FakeTerminalChannel channel) = await OpenConnectedAsync();
+		channel.Emit("bye\r\n");
+		_ = await WaitForLogAsync(LogName, "bye");
+		string big = Path.Combine(LogFolder, "old-root-20200101-000000.log");
+		File.WriteAllBytes(big, new byte[2 * 1024 * 1024]);
+		File.SetLastWriteTimeUtc(big, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+		// Nothing runs the rules while every recording is still open.
+		await Eventually.StaysTrueAsync(() => File.Exists(big), "the cleanup waits for a recording to close");
+
+		await _manager.CloseAsync(handle.Id);
+
+		await Eventually.TrueAsync(() => !File.Exists(big), "the oldest file goes once the logs are over the cap");
+		Assert.True(File.Exists(Path.Combine(LogFolder, LogName)));
+	}
+
+	[Fact]
+	public void ListFiles_LeavesOutFilesARecordingDidNotWrite()
+	{
+		SessionLogRecorder recorder = CreateRecorder(new SessionLogSettings { Folder = LogFolder });
+		Directory.CreateDirectory(LogFolder);
+		File.WriteAllText(Path.Combine(LogFolder, "notes.log"), "mine\r\n");
+		File.WriteAllText(Path.Combine(LogFolder, LogName), "ours\r\n");
+
+		Assert.Equal(LogName, Assert.Single(recorder.ListFiles()).Name);
+		Assert.Equal(1, recorder.Usage().Files);
+		_ = Assert.Throws<ArgumentException>(() => recorder.OpenRead("notes.log"));
+	}
+
+	[Fact]
 	public async Task DisposeAsync_ClosesEveryFile()
 	{
 		CreateRecorder(new SessionLogSettings { RecordEverySession = true, Folder = LogFolder });
@@ -340,11 +393,11 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	[InlineData("root@[fe80::1]:22", "fe80_1-root-20260926-142530.log")]
 	[InlineData("admin/domain@some host.example.com:2222", "some_host.example.com-admin_domain-20260926-142530.log")]
 	public void BuildFileName_KeepsTheSessionReadableAndTheNameUsable(string endpoint, string expected) =>
-		Assert.Equal(expected, SessionLogWriter.BuildFileName(endpoint, new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), attempt: 0));
+		Assert.Equal(expected, SessionLogNames.Build(endpoint, new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), attempt: 0));
 
 	[Fact]
 	public void BuildFileName_TakesTheFormatsExtension() =>
-		Assert.Equal(CastName, SessionLogWriter.BuildFileName("abc@10.0.0.5:22", new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), 0, ".cast"));
+		Assert.Equal(CastName, SessionLogNames.Build("abc@10.0.0.5:22", new DateTimeOffset(2026, 9, 26, 14, 25, 30, TimeSpan.Zero), 0, ".cast"));
 
 	public async ValueTask DisposeAsync()
 	{
@@ -381,7 +434,14 @@ public sealed class SessionLogRecorderTests : IAsyncDisposable
 	private SessionLogRecorder CreateRecorder(SessionLogSettings settings)
 	{
 		_settings.Set(settings);
-		_recorder = new SessionLogRecorder(_manager, _settings, new FakeAppEnvironment(_dataDirectory.Path), _time, _logger);
+		FakeAppEnvironment environment = new(_dataDirectory.Path);
+		_recorder = new SessionLogRecorder(
+			_manager,
+			_settings,
+			environment,
+			new SessionLogRetention(_settings, environment, _time, new ListLogger<SessionLogRetention>()),
+			_time,
+			_logger);
 		return _recorder;
 	}
 

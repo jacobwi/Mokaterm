@@ -44,6 +44,19 @@ public sealed class SessionLogSettingsPageTests
 	}
 
 	[Fact]
+	public async Task Render_OffersCleanup_AndSaysWhatTheLogsTake()
+	{
+		string html = await RenderAsync(new SessionLogSettings(), withFileAccess: false, Written);
+
+		Assert.Contains("Delete logs older than", html, StringComparison.Ordinal);
+		Assert.Contains("Keep at most", html, StringComparison.Ordinal);
+		Assert.Contains("0 keeps them for good", html, StringComparison.Ordinal);
+		Assert.Contains("One file takes 2 KB", html, StringComparison.Ordinal);
+		Assert.Contains("Delete all logs", html, StringComparison.Ordinal);
+		Assert.Contains($"Delete {Written.Name}", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
 	public async Task Render_WithoutALocalFileAccess_StillPlays()
 	{
 		string html = await RenderAsync(new SessionLogSettings(), withFileAccess: false, Written);
@@ -104,6 +117,13 @@ public sealed class SessionLogSettingsPageTests
 		}
 
 		public IReadOnlyList<SessionLogFile> ListFiles() => files;
+
+		public SessionLogUsage Usage() => new(files.Length, files.Sum(file => file.Length));
+
+		public Task<SessionLogDeletion> DeleteAsync(IReadOnlyCollection<string> names, CancellationToken cancellationToken = default) =>
+			throw new NotSupportedException();
+
+		public Task<SessionLogDeletion> DeleteAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
 		public Stream OpenRead(string name) => throw new NotSupportedException();
 	}

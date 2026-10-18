@@ -183,6 +183,13 @@ public sealed partial class SettingsSearchIndexTests
 
 		public IReadOnlyList<SessionLogFile> ListFiles() => [];
 
+		public SessionLogUsage Usage() => SessionLogUsage.Empty;
+
+		public Task<SessionLogDeletion> DeleteAsync(IReadOnlyCollection<string> names, CancellationToken cancellationToken = default) =>
+			throw new NotSupportedException();
+
+		public Task<SessionLogDeletion> DeleteAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
 		public Stream OpenRead(string name) => throw new NotSupportedException();
 	}
 }

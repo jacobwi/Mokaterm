@@ -13,8 +13,9 @@ public interface ISshKeyGenerator
 	Task<GeneratedSshKey> GenerateAsync(SshKeyRequest request, CancellationToken cancellationToken = default);
 
 	/// <summary>
-	/// Reads the public key out of an OpenSSH private key. The public half of the file is not encrypted, so this
-	/// works without the passphrase, and the comment then stays empty. Null when the text is not an OpenSSH key.
+	/// Reads the public key out of an OpenSSH or PuTTY private key. The public half of either file is not encrypted, so
+	/// this works without the passphrase; an OpenSSH file then gives no comment, since it keeps that in the encrypted part.
+	/// Null when the text is neither.
 	/// </summary>
 	SshPublicKey? ReadPublicKey(string privateKey);
 }
