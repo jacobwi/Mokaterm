@@ -21,6 +21,19 @@ public sealed record TerminalTriggerSettings : ISettingsSection
 	/// <summary>In the order they run. A later rule's color wins where two highlight the same text.</summary>
 	public IReadOnlyList<TerminalTrigger> Rules { get; init; } = [];
 
+	/// <summary>
+	/// Where the host can, a rule's notice also goes to the operating system while the window holding the sessions is
+	/// minimized or behind another one, so it does not expire unseen. A desktop setting: the web host has nothing to show
+	/// it with.
+	/// </summary>
+	public bool SystemNotifications { get; init; } = true;
+
+	/// <summary>
+	/// Whether that notification carries the matched line. Off by default: the operating system keeps notifications in a
+	/// store of its own, and a line from a server can hold a token.
+	/// </summary>
+	public bool SystemNotificationShowsLine { get; init; }
+
 	/// <summary>The rules a terminal runs: enabled, with something to do.</summary>
 	public IEnumerable<TerminalTrigger> Active => (Rules ?? []).Where(rule => rule is { Enabled: true, HasAction: true });
 

@@ -1,10 +1,12 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Interop;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Terminal.Triggers;
 
 namespace Mokaterm.UI.Settings.Pages.Triggers;
@@ -33,9 +35,18 @@ public sealed partial class TriggerSettingsPage : SettingsSectionBase<TerminalTr
 	[Inject]
 	private ILogger<TriggerSettingsPage> Logger { get; set; } = default!;
 
+	[Inject]
+	private IServiceProvider Services { get; set; } = default!;
+
 	private static string RulesDescription => string.Create(
 		CultureInfo.CurrentCulture,
 		$"Each rule runs on every line a terminal prints, top to bottom, and where two color the same text the lower one wins. Up to {TerminalTriggerSettings.MaxRules} rules; a terminal's right-click menu pauses them for its session.");
+
+	private static string BackgroundDescription => string.Create(
+		CultureInfo.CurrentCulture,
+		$"When a rule that shows a notice matches while Mokaterm is minimized or behind another window, Windows shows it as well, at most once every {TerminalTriggerSettings.NotifyIntervalSeconds} seconds for each rule and session. Clicking it brings that session's tab to the front.");
+
+	private bool HasSystemNotifications => Services.GetService<ISystemNotifications>() is not null;
 
 	/// <summary>What a rule does, in a few words: <c>Colors it red, shows a notice, any case</c>.</summary>
 	internal static string Describe(TerminalTrigger rule)

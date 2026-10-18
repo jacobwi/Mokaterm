@@ -41,5 +41,10 @@ public partial class App : Application
 	{
 		_toolWindows.CloseEverything();
 		_sessions.ShutDownAsync().Wait();
+
+#if WINDOWS
+		// On the thread that registered, as the Windows App SDK asks: a click after this starts the app again.
+		Platforms.Windows.AppNotificationRegistration.Unregister();
+#endif
 	}
 }

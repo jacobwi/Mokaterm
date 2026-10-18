@@ -4,6 +4,8 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap rescap">
 
   <!--
@@ -45,6 +47,26 @@
         <uap:DefaultTile Square71x71Logo="$placeholder$.png" Wide310x150Logo="$placeholder$.png" Square310x310Logo="$placeholder$.png" />
         <uap:SplashScreen Image="$placeholder$.png" />
       </uap:VisualElements>
+
+      <!--
+        A click on one of the app's notifications (trigger notices while the window is out of sight) activates this class,
+        which AppNotificationRegistration registers when the app starts: Windows starts the app with the argument below
+        when it is not running. The Executable is the project's exe name written out, because MAUI only fills its own
+        placeholders into the Application element. The id is this app's alone and must not change, or clicks on the
+        notifications already shown would start nothing.
+      -->
+      <Extensions>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="09DED979-CF57-4A50-9265-3492E36CC5E7" />
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="Mokaterm.Maui.exe" DisplayName="Mokaterm" Arguments="----AppNotificationActivated:">
+              <com:Class Id="09DED979-CF57-4A50-9265-3492E36CC5E7" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

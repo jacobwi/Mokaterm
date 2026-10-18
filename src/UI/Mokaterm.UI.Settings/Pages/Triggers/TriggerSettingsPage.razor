@@ -126,6 +126,26 @@
 			}
 		</SettingsRow>
 	</SettingsSection>
+
+	@* Only where the host can show one, which is the desktop: a browser keeps its toasts and nothing else. *@
+	@if (HasSystemNotifications)
+	{
+		<SettingsSection Title="Windows notifications"
+						 Description="For a rule that shows a notice, while you are working in another window.">
+			<SettingsRow Label="Show a Windows notification in the background" Description="@BackgroundDescription">
+				<MokaSwitch Value="Settings.SystemNotifications"
+							ValueChanged="value => UpdateAsync(settings => settings with { SystemNotifications = value })"
+							aria-label="Show a Windows notification when a trigger fires while Mokaterm is in the background" />
+			</SettingsRow>
+			<SettingsRow Label="Include the matched line"
+						 Description="Off, a notification names only the session and the rule. Windows keeps its notifications in a list of its own after Mokaterm closes, and a line from a server can hold a password or a token.">
+				<MokaSwitch Value="Settings.SystemNotificationShowsLine"
+							Disabled="!Settings.SystemNotifications"
+							ValueChanged="value => UpdateAsync(settings => settings with { SystemNotificationShowsLine = value })"
+							aria-label="Include the matched line in Windows notifications" />
+			</SettingsRow>
+		</SettingsSection>
+	}
 </SettingsPage>
 
 <TriggerEditorDialog @bind-Open="_editorOpen" Rule="_editing" OnSave="SaveRuleAsync" />

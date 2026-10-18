@@ -15,6 +15,7 @@ public static class TerminalServiceCollectionExtensions
 		services.AddMokatermUiCommon();
 		services.TryAddScoped<TerminalInterop>();
 		services.TryAddScoped<TerminalTriggerSwitch>();
+		services.TryAddScoped<TriggerSystemNotices>();
 		services.TryAddScoped<TerminalTriggerTester>();
 		return services;
 	}

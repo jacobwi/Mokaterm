@@ -74,6 +74,14 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 	[Parameter, EditorRequired]
 	public ITerminalStream Stream { get; set; } = default!;
 
+	/// <summary>
+	/// The session the stream belongs to, which a trigger's notice names and a system notification brings back to the
+	/// front. Needed wherever the view gets a stream that wraps the session's own; without it the view looks the session
+	/// up by its stream.
+	/// </summary>
+	[Parameter]
+	public Guid? SessionId { get; set; }
+
 	/// <summary>Effective settings: the global terminal settings with the connection's overrides applied.</summary>
 	[Parameter, EditorRequired]
 	public TerminalSettings Settings { get; set; } = new();
@@ -170,6 +178,9 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 	[Inject]
 	private TerminalTriggerSwitch TriggerSwitch { get; set; } = default!;
+
+	[Inject]
+	private TriggerSystemNotices SystemNotices { get; set; } = default!;
 
 	[Inject]
 	private IServiceProvider Services { get; set; } = default!;
@@ -503,7 +514,14 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		}
 
 		TerminalTrigger trigger = _triggerRules[rule];
-		Interaction.Notify(TriggerNotice.Severity(trigger.Highlight), TriggerNotice.Line(line), TriggerNotice.Title(SessionTitle()));
+		ISessionHandle? session = FindSession();
+		Interaction.Notify(TriggerNotice.Severity(trigger.Highlight), TriggerNotice.Line(line), TriggerNotice.Title(session?.Title));
+
+		// The toast shows in the window whatever happens; when nobody is looking at the window, the system says it too.
+		if (session is not null)
+		{
+			_ = SystemNotices.Raise(TriggerSource.From(session), trigger, line);
+		}
 	}
 
 	/// <summary>A rule took too long on one line, and terminal.js stopped running it in this view.</summary>
@@ -514,7 +532,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 			return;
 		}
 
-		Interaction.Notify(NoticeSeverity.Warning, TriggerNotice.Slow(_triggerRules[rule].Pattern), TriggerNotice.Title(SessionTitle()));
+		Interaction.Notify(NoticeSeverity.Warning, TriggerNotice.Slow(_triggerRules[rule].Pattern), TriggerNotice.Title(FindSession()?.Title));
 	}
 
 	/// <summary>
@@ -644,13 +662,24 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 	}
 
 	/// <summary>
-	/// The title of the session this view shows, for a notice that may pop up while another tab is in front. Looked up
-	/// rather than passed in, because the view only knows its stream; null where there is no session manager.
+	/// The session this view shows, for a notice that may pop up while another tab is in front: by <see cref="SessionId"/>
+	/// where the parent passed one, else by the stream; null where there is no session manager.
 	/// </summary>
-	private string? SessionTitle()
+	private ISessionHandle? FindSession()
 	{
+		IReadOnlyList<ISessionHandle>? sessions = Services.GetService<ISessionManager>()?.Sessions;
+		if (sessions is null)
+		{
+			return null;
+		}
+
+		if (SessionId is { } id)
+		{
+			return sessions.FirstOrDefault(session => session.Id == id);
+		}
+
 		ITerminalStream? stream = _attachedStream ?? Stream;
-		return Services.GetService<ISessionManager>()?.Sessions.FirstOrDefault(session => ReferenceEquals(session.Terminal, stream))?.Title;
+		return sessions.FirstOrDefault(session => ReferenceEquals(session.Terminal, stream));
 	}
 
 	private async Task ApplyPendingChangesAsync()

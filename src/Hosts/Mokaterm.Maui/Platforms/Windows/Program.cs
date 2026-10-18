@@ -17,8 +17,11 @@ public static class Program
 	private static int Main()
 	{
 		// First and exactly once, as Velopack requires. An install, update or uninstall hook runs in here and ends the
-		// process before the app does anything else.
-		VelopackApp.Build().Run();
+		// process before the app does anything else. Uninstalling deletes the exe that the notification registration names,
+		// so that registration goes first.
+		VelopackApp.Build()
+			.OnBeforeUninstallFastCallback(_ => AppNotificationRegistration.RemoveForUninstall())
+			.Run();
 
 		// A restart starts this copy before the old one has gone; it holds the key and the lock checked below.
 		DesktopRestarter.WaitForPreviousRun(Environment.GetCommandLineArgs());
@@ -31,6 +34,13 @@ public static class Program
 			return 1;
 		}
 
+		// A click on a notification can start this copy while another one runs, and the handover below reads the click from
+		// the activation, which the Windows App SDK only has once this process registered for notifications.
+		if (AppNotificationRegistration.StartedByNotification(Environment.GetCommandLineArgs()))
+		{
+			AppNotificationRegistration.Register();
+		}
+
 		// Both checks guard against a rare mistake; one that cannot be made is no reason not to start, so a failure is only
 		// written down once the crash log is set up.
 		Exception? handOverFailure = null;
@@ -38,6 +48,7 @@ public static class Program
 		{
 			if (SingleInstance.HandOver(DesktopPaths.Root))
 			{
+				AppNotificationRegistration.Unregister();
 				return 0;
 			}
 		}
@@ -59,6 +70,7 @@ public static class Program
 
 		if (!folderFree)
 		{
+			AppNotificationRegistration.Unregister();
 			NativeMessageBox.ShowError(
 				"Another copy of Mokaterm is already running with this data folder, started from a different place. " +
 				"Close it before starting this one.");
@@ -74,6 +86,14 @@ public static class Program
 		if (lockFailure is not null)
 		{
 			CrashLog.Write("SingleInstance.LockDataFolder", lockFailure, terminating: false);
+		}
+
+		// Before the window, so a click that started the app finds the class it activates. The app runs without system
+		// notifications when this fails.
+		AppNotificationRegistration.Register();
+		if (AppNotificationRegistration.Failure is { } notificationFailure)
+		{
+			CrashLog.Write("AppNotificationManager.Register", notificationFailure, terminating: false);
 		}
 
 		global::Microsoft.UI.Xaml.Application.Start(parameters =>

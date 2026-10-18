@@ -35,6 +35,14 @@
 	</ItemGroup>
 
 	<!--
+		NotificationClick: the ids a Windows notification carries back to the desktop host, and the session a click selects.
+		Plain data with no Windows call, compiled in here so what reaches the system's notification store is checked.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Services\NotificationClick.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!--
 		WebAuthnInterop: the desktop host's webauthn.dll structures and HRESULT grouping. Plain data with no Windows call,
 		here so their layout is checked against webauthn.h without a security key.
 	-->

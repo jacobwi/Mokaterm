@@ -36,6 +36,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IAppEnvironment, MauiAppEnvironment>();
 		builder.Services.AddSingleton<DesktopDropCoordinator>();
 		builder.Services.AddSingleton<DesktopSessions>();
+		builder.Services.AddSingleton<NotificationClicks>();
 		builder.Services.AddScoped<ILocalFileAccess, MauiLocalFileAccess>();
 
 		// Tools in windows of their own. Each window's page borrows the services of the window that opened it, which the
@@ -127,6 +128,17 @@ public static class MauiProgram
 		// Plugin changes apply at the next start, which the Plugins page can start from here.
 		builder.Services.AddSingleton<IAppRestarter, Platforms.Windows.DesktopRestarter>();
 
+		// Trigger notices as Windows notifications while the window is out of sight. Program.Main registered the process
+		// before this runs; when that failed the contract stays out, so the Triggers page offers nothing that cannot work.
+		builder.Services.AddSingleton<Platforms.Windows.WindowsNotifications>();
+		if (Platforms.Windows.AppNotificationRegistration.IsRegistered)
+		{
+			builder.Services.AddSingleton<ISystemNotifications>(services => services.GetRequiredService<Platforms.Windows.WindowsNotifications>());
+		}
+
+		// A copied secret is cleared through Windows when no page can: at shutdown, or while the page waits for focus.
+		builder.Services.AddSingleton<ISystemClipboard, Platforms.Windows.WindowsSystemClipboard>();
+
 		// The main window's chrome: the shell's top bar becomes its title bar. Tool windows each make their own
 		// (ToolWindowChrome above), which their pages find in place of this one.
 		builder.Services.AddSingleton<Platforms.Windows.WindowChrome>();
@@ -147,6 +159,9 @@ public static class MauiProgram
 			IServiceProvider? services = window.GetWindow()?.Handler?.MauiContext?.Services;
 			services?.GetService<Platforms.Windows.WindowChrome>()?.Attach(window);
 			services?.GetService<Platforms.Windows.NativeFileDrop>()?.Attach(window);
+
+			// Created here rather than on first use, so a click on a notification has somewhere to go from the start.
+			services?.GetService<Platforms.Windows.WindowsNotifications>()?.Attach(window);
 		})));
 #endif
 	}

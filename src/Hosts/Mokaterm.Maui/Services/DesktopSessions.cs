@@ -1,6 +1,7 @@
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Transfers;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Maui.Services;
 
@@ -18,6 +19,9 @@ public sealed class DesktopSessions
 
 	private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
+	// Inside the shutdown deadline: another program may hold the clipboard open for a moment.
+	private static readonly TimeSpan ClipboardTimeout = TimeSpan.FromSeconds(2);
+
 	private readonly Lock _lock = new();
 	private readonly List<Registration> _registrations = [];
 	private readonly ISettingsService _settings;
@@ -28,9 +32,14 @@ public sealed class DesktopSessions
 	/// <param name="sessions">The page's sessions, closed at shutdown.</param>
 	/// <param name="transfers">The page's transfers, cancelled at shutdown.</param>
 	/// <param name="flushPage">Writes the page's own state, such as where its tool windows were, at shutdown.</param>
-	public IDisposable Track(ISessionManager sessions, ITransferQueue transfers, Func<Task>? flushPage = null)
+	/// <param name="clipboard">The clear the page's window still owes a copied secret, settled at shutdown.</param>
+	public IDisposable Track(
+		ISessionManager sessions,
+		ITransferQueue transfers,
+		Func<Task>? flushPage = null,
+		IPendingClipboardClear? clipboard = null)
 	{
-		Registration registration = new(this, sessions, transfers, flushPage);
+		Registration registration = new(this, sessions, transfers, flushPage, clipboard);
 		lock (_lock)
 		{
 			_registrations.Add(registration);
@@ -52,7 +61,8 @@ public sealed class DesktopSessions
 		Task stop = Report(StopAllAsync);
 		Task flush = Report(() => _settings.FlushAsync());
 		Task pages = Report(FlushPagesAsync);
-		_ = await Task.WhenAny(Task.WhenAll(stop, flush, pages), Task.Delay(ShutdownTimeout));
+		Task clipboard = Report(ClearClipboardsAsync);
+		_ = await Task.WhenAny(Task.WhenAll(stop, flush, pages, clipboard), Task.Delay(ShutdownTimeout));
 	});
 
 	/// <summary>
@@ -98,6 +108,24 @@ public sealed class DesktopSessions
 		return Task.WhenAll(registrations.Select(registration => registration.FlushPage?.Invoke() ?? Task.CompletedTask));
 	}
 
+	/// <summary>
+	/// A secret copied shortly before closing would outlive the process: the page that was to clear it goes with it. It
+	/// is cleared now, but only if nothing has written the clipboard since (<see cref="IPendingClipboardClear"/>).
+	/// </summary>
+	private Task ClearClipboardsAsync()
+	{
+		Registration[] registrations;
+		lock (_lock)
+		{
+			registrations = [.. _registrations];
+		}
+
+		return Task.WhenAll(registrations
+			.Select(registration => registration.Clipboard)
+			.OfType<IPendingClipboardClear>()
+			.Select(clipboard => Task.Run(() => clipboard.ClearNow(ClipboardTimeout))));
+	}
+
 	private static async Task Report(Func<Task> work)
 	{
 		try
@@ -123,12 +151,18 @@ public sealed class DesktopSessions
 	{
 		private readonly DesktopSessions _owner;
 
-		public Registration(DesktopSessions owner, ISessionManager sessions, ITransferQueue transfers, Func<Task>? flushPage)
+		public Registration(
+			DesktopSessions owner,
+			ISessionManager sessions,
+			ITransferQueue transfers,
+			Func<Task>? flushPage,
+			IPendingClipboardClear? clipboard)
 		{
 			_owner = owner;
 			Sessions = sessions;
 			Transfers = transfers;
 			FlushPage = flushPage;
+			Clipboard = clipboard;
 		}
 
 		public ISessionManager Sessions { get; }
@@ -136,6 +170,8 @@ public sealed class DesktopSessions
 		public ITransferQueue Transfers { get; }
 
 		public Func<Task>? FlushPage { get; }
+
+		public IPendingClipboardClear? Clipboard { get; }
 
 		public void Dispose() => _owner.Forget(this);
 	}

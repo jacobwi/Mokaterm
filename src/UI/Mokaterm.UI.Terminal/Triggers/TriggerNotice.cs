@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.UI.Terminal.Triggers;
 
@@ -32,6 +33,45 @@ internal static class TriggerNotice
 	/// </summary>
 	public static string Line(string? line)
 	{
+		string text = OneLine(line);
+		return text.Length == 0 ? "(an empty line)" : Cut(text, MaxLineLength);
+	}
+
+	/// <summary>Names the rule that matched by its pattern, which is the only name a rule has.</summary>
+	public static string Rule(string? pattern)
+	{
+		string text = OneLine(pattern);
+		return text.Length == 0 ? "Matched a trigger" : string.Create(CultureInfo.CurrentCulture, $"Matched \"{Cut(text, MaxPatternLength)}\"");
+	}
+
+	/// <summary>
+	/// The system notification for a match: the session and the rule, and the line only when the user asked for it,
+	/// because the system keeps its notifications after the app has gone and a server's line can hold a token. A click on
+	/// it comes back with the ids alone.
+	/// </summary>
+	public static SystemNotification ForSystem(TriggerSource source, TerminalTrigger rule, string? line, bool showLine)
+	{
+		ArgumentNullException.ThrowIfNull(source);
+		ArgumentNullException.ThrowIfNull(rule);
+		return new SystemNotification
+		{
+			Title = Title(source.Label),
+			Message = Rule(rule.Pattern),
+			Detail = showLine ? Line(line) : null,
+			SessionId = source.SessionId,
+			ConnectionId = source.ConnectionId,
+		};
+	}
+
+	/// <summary>Why a rule stopped running in one terminal, and where to fix it.</summary>
+	public static string Slow(string pattern) => string.Create(
+		CultureInfo.CurrentCulture,
+		$"\"{Cut(pattern, MaxPatternLength)}\" took too long on one line, so it is off in this terminal. Simplify it on the Triggers settings page.");
+
+	// Control characters (escape sequences included) and the bidirectional controls that would reorder how it reads are
+	// dropped, and runs of blanks shrink to one.
+	private static string OneLine(string? line)
+	{
 		// The page sends a few hundred characters at most; this bounds the work if it ever sends more.
 		ReadOnlySpan<char> source = (line ?? "").AsSpan();
 		source = source[..Math.Min(source.Length, MaxLineLength * 4)];
@@ -54,13 +94,8 @@ internal static class TriggerNotice
 			text.Append(character);
 		}
 
-		return text.Length == 0 ? "(an empty line)" : Cut(text.ToString(), MaxLineLength);
+		return text.ToString();
 	}
-
-	/// <summary>Why a rule stopped running in one terminal, and where to fix it.</summary>
-	public static string Slow(string pattern) => string.Create(
-		CultureInfo.CurrentCulture,
-		$"\"{Cut(pattern, MaxPatternLength)}\" took too long on one line, so it is off in this terminal. Simplify it on the Triggers settings page.");
 
 	private static string Cut(string text, int length)
 	{

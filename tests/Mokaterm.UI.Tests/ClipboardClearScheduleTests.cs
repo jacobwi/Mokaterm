@@ -257,13 +257,328 @@ public sealed class ClipboardClearScheduleTests
 		await Eventually.TrueAsync(() => toolPage.Module.Calls.SequenceEqual([("clearClipboard", 1L)]), "the tool window clears");
 	}
 
+	[Fact]
+	public void ASecretCopy_IsPending_WithTheClipboardsNumberFromRightAfterTheCopy()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		Assert.Null(schedule.Pending);
+		schedule.SecretCopied(main);
+
+		Assert.Equal(new PendingClipboardClear(1, 41, WaitsForFocus: false), schedule.Pending);
+	}
+
+	[Fact]
+	public void AtExit_TheSecret_IsClearedThroughTheSystem_WhenNothingWroteSince()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+
+		Assert.Equal(SystemClipboardClear.Cleared, schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(1, system.Empties);
+		Assert.Null(schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+	}
+
+	[Fact]
+	public void AtExit_AnotherProgramsCopy_IsLeftOnTheClipboard()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+		system.WrittenElsewhere();
+
+		Assert.Equal(SystemClipboardClear.Changed, schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(0, system.Empties);
+		Assert.Null(schedule.Pending);
+	}
+
+	[Fact]
+	public void AtExit_APlainCopyOfOurs_LeavesNothingToClear()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+		schedule.TextCopied();
+
+		Assert.Null(schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(0, system.Empties);
+	}
+
+	[Fact]
+	public async Task AtExit_AClearAPageAlreadyMade_LeavesNothingToClear()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+		_time.Advance(ClearTime);
+		await Eventually.TrueAsync(() => main.Clears.SequenceEqual([1L]), "the main window clears");
+
+		Assert.Null(schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(0, system.Empties);
+	}
+
+	[Fact]
+	public void AtExit_WithClearSecondsAtZero_TheSecretStays()
+	{
+		_settings.Set(new SecuritySettings { ClipboardClearSeconds = 0 });
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+
+		Assert.Null(schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(0, system.Empties);
+	}
+
+	// Without a number from right after the copy, nothing could say the clipboard still holds our secret.
+	[Fact]
+	public void AtExit_AClipboardWhoseNumberCouldNotBeRead_IsLeftAlone()
+	{
+		FakeSystemClipboard system = new();
+		system.Unreadable();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+
+		Assert.Equal(new PendingClipboardClear(1, null, WaitsForFocus: false), schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(0, system.Empties);
+	}
+
+	[Fact]
+	public void AtExit_WithoutASystemClipboard_NothingCanBeCleared()
+	{
+		using ClipboardClearSchedule schedule = Schedule();
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+
+		Assert.Equal(new PendingClipboardClear(1, null, WaitsForFocus: false), schedule.Pending);
+		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
+	}
+
+	[Fact]
+	public void AtExit_ASecondSecret_IsTheOneCompared()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main);
+		system.WrittenElsewhere();
+		schedule.SecretCopied(main);
+
+		Assert.Equal(new PendingClipboardClear(2, 42, WaitsForFocus: false), schedule.Pending);
+		Assert.Equal(SystemClipboardClear.Cleared, schedule.ClearNow(TimeSpan.FromSeconds(1)));
+	}
+
+	// The user copied a password to paste it into another window, which is exactly when the page may not write.
+	[Fact]
+	public async Task APageWaitingForFocus_LeavesTheClearToTheSystem_AndDropsItsWait()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage { WaitsForFocus = true });
+
+		schedule.SecretCopied(main);
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(() => system.Empties == 1, "the system clipboard is cleared at the deadline");
+		await Eventually.TrueAsync(() => main.Forgets.SequenceEqual([2L]), "the page drops the clear it was holding");
+		Assert.Equal([1L], main.Clears);
+		Assert.Null(schedule.Pending);
+	}
+
+	[Fact]
+	public async Task APageWaitingForFocus_WithoutASystemClipboard_KeepsTheClearDue()
+	{
+		using ClipboardClearSchedule schedule = Schedule();
+		FakePage main = Open(schedule, new FakePage());
+		FakePage tool = Open(schedule, new FakePage { WaitsForFocus = true });
+
+		schedule.SecretCopied(tool);
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(
+			() => schedule.Pending == new PendingClipboardClear(1, null, WaitsForFocus: true),
+			"the clear waits in the tool window");
+		Assert.Empty(main.Clears);
+	}
+
+	// Its wait for focus goes with the page, so the clear is handed to a page that stays.
+	[Fact]
+	public async Task APageWaitingForFocus_ThatCloses_HandsTheClearOn()
+	{
+		using ClipboardClearSchedule schedule = Schedule();
+		FakePage main = Open(schedule, new FakePage());
+		FakePage tool = Open(schedule, new FakePage { WaitsForFocus = true });
+
+		schedule.SecretCopied(tool);
+		_time.Advance(ClearTime);
+		await Eventually.TrueAsync(() => schedule.Pending is { WaitsForFocus: true }, "the clear waits in the tool window");
+
+		schedule.Unregister(tool);
+
+		await Eventually.TrueAsync(() => main.Clears.SequenceEqual([1L]), "the main window clears");
+		Assert.Null(schedule.Pending);
+	}
+
+	[Fact]
+	public async Task WithNoPageLeft_TheSystemClipboardClears()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage tool = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(tool);
+		schedule.Unregister(tool);
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(() => system.Empties == 1, "the system clipboard is cleared");
+		Assert.Null(schedule.Pending);
+	}
+
+	[Fact]
+	public async Task WithNoPageLeft_AnotherProgramsCopy_IsLeftOnTheClipboard()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage tool = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(tool);
+		schedule.Unregister(tool);
+		system.WrittenElsewhere();
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(() => schedule.Pending is null, "the clear is over");
+		Assert.Equal(0, system.Empties);
+	}
+
+	// Another program holding the clipboard open the whole time is no reason to give up: the window's close tries again.
+	[Fact]
+	public async Task ABusySystemClipboard_KeepsTheClearDue_ForTheWindowsClose()
+	{
+		FakeSystemClipboard system = new();
+		system.Answer(SystemClipboardClear.Busy);
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage tool = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(tool);
+		schedule.Unregister(tool);
+		_time.Advance(ClearTime);
+		await Eventually.StaysTrueAsync(() => schedule.Pending is not null, "the clear stays due");
+
+		system.Answer(null);
+
+		Assert.Equal(SystemClipboardClear.Cleared, schedule.ClearNow(TimeSpan.FromSeconds(1)));
+		Assert.Equal(1, system.Empties);
+	}
+
 	private static FakePage Open(ClipboardClearSchedule schedule, FakePage page)
 	{
 		schedule.Register(page);
 		return page;
 	}
 
-	private ClipboardClearSchedule Schedule() => new(_time, _settings, NullLoggerFactory.Instance);
+	private ClipboardClearSchedule Schedule(ISystemClipboard? system = null) => new(_time, _settings, NullLoggerFactory.Instance, system);
+
+	/// <summary>
+	/// The operating system's clipboard as a number that moves on every write, the way Windows' sequence number does. A
+	/// clear compares, empties and moves it, or answers what the test forces.
+	/// </summary>
+	private sealed class FakeSystemClipboard : ISystemClipboard
+	{
+		private readonly Lock _lock = new();
+		private uint _number = 41;
+		private int _empties;
+		private SystemClipboardClear? _forced;
+		private bool _readable = true;
+
+		public int Empties
+		{
+			get
+			{
+				lock (_lock)
+				{
+					return _empties;
+				}
+			}
+		}
+
+		public uint? ContentNumber
+		{
+			get
+			{
+				lock (_lock)
+				{
+					return _readable ? _number : null;
+				}
+			}
+		}
+
+		/// <summary>Another program wrote the clipboard.</summary>
+		public void WrittenElsewhere()
+		{
+			lock (_lock)
+			{
+				_number++;
+			}
+		}
+
+		public void Unreadable()
+		{
+			lock (_lock)
+			{
+				_readable = false;
+			}
+		}
+
+		/// <summary>Every clear answers <paramref name="answer"/> until it is set back to null.</summary>
+		public void Answer(SystemClipboardClear? answer)
+		{
+			lock (_lock)
+			{
+				_forced = answer;
+			}
+		}
+
+		public SystemClipboardClear EmptyIfUnchanged(uint contentNumber, TimeSpan timeout)
+		{
+			lock (_lock)
+			{
+				if (_forced is { } forced)
+				{
+					return forced;
+				}
+
+				if (contentNumber != _number)
+				{
+					return SystemClipboardClear.Changed;
+				}
+
+				_empties++;
+				_number++;
+				return SystemClipboardClear.Cleared;
+			}
+		}
+	}
 
 	/// <summary>A page that records what the schedule asked of it, and can fail or never answer.</summary>
 	private sealed class FakePage : IClipboardClearer
@@ -276,6 +591,9 @@ public sealed class ClipboardClearScheduleTests
 		public Exception? Failure { get; init; }
 
 		public bool Hangs { get; init; }
+
+		/// <summary>The page is in the background, so its script holds the clear until it is focused again.</summary>
+		public bool WaitsForFocus { get; init; }
 
 		public long[] Clears
 		{
@@ -301,7 +619,7 @@ public sealed class ClipboardClearScheduleTests
 
 		public int GaveUp => Volatile.Read(ref _gaveUp);
 
-		public async ValueTask ClearAsync(long copy, CancellationToken cancellationToken)
+		public async ValueTask<bool> ClearAsync(long copy, CancellationToken cancellationToken)
 		{
 			lock (_lock)
 			{
@@ -324,6 +642,8 @@ public sealed class ClipboardClearScheduleTests
 					_ = Interlocked.Increment(ref _gaveUp);
 				}
 			}
+
+			return !WaitsForFocus;
 		}
 
 		public ValueTask ForgetClearsBeforeAsync(long copy, CancellationToken cancellationToken)
@@ -408,7 +728,8 @@ public sealed class ClipboardClearScheduleTests
 				_calls.Add((identifier, (long)args![0]!));
 			}
 
-			return ValueTask.FromResult(default(TValue)!);
+			// clearClipboard answers whether it cleared at once, which a focused page does.
+			return ValueTask.FromResult(typeof(TValue) == typeof(bool) ? (TValue)(object)true : default(TValue)!);
 		}
 
 		public ValueTask DisposeAsync() => ValueTask.CompletedTask;

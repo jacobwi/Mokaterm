@@ -33,19 +33,24 @@ function waitForFocus(copy) {
 	window.addEventListener('focus', listener, { once: true });
 }
 
+// Resolves to false while the clear waits for focus, so .NET knows the secret is still there and can clear it another
+// way if the app goes away first; true once there is nothing of this copy left to clear.
 export function clearClipboard(copy) {
 	if (copy < newestCopy) {
-		return Promise.resolve();
+		return Promise.resolve(true);
 	}
 
 	newestCopy = copy;
 	stopWaiting();
 	if (document.hasFocus()) {
-		return navigator.clipboard.writeText('').catch(() => waitForFocus(copy));
+		return navigator.clipboard.writeText('').then(() => true, () => {
+			waitForFocus(copy);
+			return false;
+		});
 	}
 
 	waitForFocus(copy);
-	return Promise.resolve();
+	return Promise.resolve(false);
 }
 
 export function forgetClearsBefore(copy) {

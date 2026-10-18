@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.UI.Dispatching;
 using Microsoft.Windows.AppLifecycle;
+using Microsoft.Windows.AppNotifications;
 using MauiApplication = Microsoft.Maui.Controls.Application;
 
 namespace Mokaterm.Maui.Platforms.Windows;
@@ -96,8 +97,30 @@ internal static class SingleInstance
 		return "Mokaterm-" + Convert.ToHexString(hash, 0, 16);
 	}
 
-	// Raised on a thread pool thread.
-	private static void OnActivated(object? sender, AppActivationArguments args) => _ = _uiQueue?.TryEnqueue(BringToFront);
+	// Raised on a thread pool thread. A click on a notification that started a second copy before this one could take it
+	// arrives here too, and selects its session like a click this process took itself.
+	private static void OnActivated(object? sender, AppActivationArguments args)
+	{
+		if (args.Kind == ExtendedActivationKind.AppNotification && TryDeliver(args))
+		{
+			return;
+		}
+
+		_ = _uiQueue?.TryEnqueue(BringToFront);
+	}
+
+	private static bool TryDeliver(AppActivationArguments args)
+	{
+		try
+		{
+			return args.Data is AppNotificationActivatedEventArgs click && AppNotificationRegistration.Deliver(click.Arguments);
+		}
+		catch (Exception)
+		{
+			// The arguments come from the other process, which may be gone by now; the window still comes forward.
+			return false;
+		}
+	}
 
 	private static void BringToFront()
 	{

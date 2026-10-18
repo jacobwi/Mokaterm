@@ -8,6 +8,7 @@ using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.Core.Plugins;
 using Mokaterm.Maui.Services;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Maui.Components;
 
@@ -15,6 +16,7 @@ namespace Mokaterm.Maui.Components;
 public sealed partial class DesktopRoot : ComponentBase, IDisposable
 {
 	private IDisposable? _registration;
+	private IDisposable? _notificationClicks;
 
 	[Inject]
 	private ISessionManager Sessions { get; set; } = default!;
@@ -32,13 +34,30 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 	private IUserInteraction Interaction { get; set; } = default!;
 
 	[Inject]
+	private IPendingClipboardClear PendingClipboardClear { get; set; } = default!;
+
+	[Inject]
+	private ISessionTabs SessionTabs { get; set; } = default!;
+
+	[Inject]
+	private NotificationClicks NotificationClicks { get; set; } = default!;
+
+	[Inject]
 	private ILogger<DesktopRoot> Logger { get; set; } = default!;
 
-	public void Dispose() => _registration?.Dispose();
+	public void Dispose()
+	{
+		_notificationClicks?.Dispose();
+		_registration?.Dispose();
+	}
 
-	// The page's own state too: the tool windows that close with the main window report where they were just before.
-	protected override void OnInitialized() =>
-		_registration = Registry.Track(Sessions, Transfers, () => UI.Shell.ShellPersistence.FlushAsync(Services));
+	// The page's own state too: the tool windows that close with the main window report where they were just before, and
+	// a secret copied just before is cleared rather than left on the clipboard when the process ends.
+	protected override void OnInitialized()
+	{
+		_registration = Registry.Track(Sessions, Transfers, () => UI.Shell.ShellPersistence.FlushAsync(Services), PendingClipboardClear);
+		_notificationClicks = NotificationClicks.Attach(click => InvokeAsync(() => ShowSession(click)));
+	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
@@ -47,6 +66,18 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 			// The window is up with its plugins loaded, so the next start may load them again (see PluginCatalog).
 			Services.GetService<PluginCatalog>()?.ConfirmStarted();
 			await CheckForUpdatesAsync();
+		}
+	}
+
+	/// <summary>
+	/// A click on a system notification about a session: its tab comes to the front, through the shell's own way of showing
+	/// a session. The window is already in front by now.
+	/// </summary>
+	private void ShowSession(NotificationClick click)
+	{
+		if (click.SessionToShow(Sessions.Sessions) is { } sessionId)
+		{
+			SessionTabs.Show(sessionId);
 		}
 	}
 

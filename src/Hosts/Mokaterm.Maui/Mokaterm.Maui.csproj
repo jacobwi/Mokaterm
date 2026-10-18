@@ -68,6 +68,14 @@
 		<RuntimeIdentifier>$(RuntimeIdentifierOverride)</RuntimeIdentifier>
 	</PropertyGroup>
 
+	<!--
+		The icon Windows notifications show beside the app's name in the unpackaged build (AppNotificationRegistration).
+		Without a file of its own the Windows App SDK extracts the exe's 16 px icon. The Store build shows the package's.
+	-->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' and '$(WindowsPackageType)' != 'MSIX'">
+		<None Update="Platforms\Windows\mokaterm.ico" Link="mokaterm.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#060608" />
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#060608" BaseSize="128,128" />

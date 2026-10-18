@@ -3,6 +3,7 @@ using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Extensions;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Settings.Pages.Triggers;
 using Mokaterm.UI.Terminal.Triggers;
 using Mokaterm.UI.Tests.Fakes;
@@ -50,7 +51,26 @@ public sealed class TriggerSettingsPageTests
 		Assert.Contains("No triggers yet", html, StringComparison.Ordinal);
 	}
 
-	private static Task<string> RenderAsync(TerminalTriggerSettings settings) =>
+	[Fact]
+	public async Task Render_WhereTheHostHasSystemNotifications_OffersThem()
+	{
+		string html = await RenderAsync(new TerminalTriggerSettings { SystemNotifications = false }, new NoWindow());
+
+		Assert.Contains("Show a Windows notification in the background", html, StringComparison.Ordinal);
+		Assert.Contains("Include the matched line", html, StringComparison.Ordinal);
+		Assert.Contains("at most once every 5 seconds", html, StringComparison.Ordinal);
+	}
+
+	// The web host and the DevHost register none, and a row there would change nothing.
+	[Fact]
+	public async Task Render_WithoutSystemNotifications_LeavesThemOut()
+	{
+		string html = await RenderAsync(new TerminalTriggerSettings());
+
+		Assert.DoesNotContain("Windows notification", html, StringComparison.Ordinal);
+	}
+
+	private static Task<string> RenderAsync(TerminalTriggerSettings settings, ISystemNotifications? notifications = null) =>
 		StaticRender.RenderAsync<TriggerSettingsPage>(
 			services =>
 			{
@@ -59,7 +79,18 @@ public sealed class TriggerSettingsPageTests
 				services.AddScoped<TerminalTriggerTester>();
 				services.AddSingleton<ISettingsService>(new FixedSettings(settings));
 				services.AddSingleton<IUserInteraction>(new DismissingInteraction());
+				if (notifications is not null)
+				{
+					services.AddSingleton(notifications);
+				}
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal))
 			.WaitAsync(TimeSpan.FromSeconds(5), Ct);
+
+	private sealed class NoWindow : ISystemNotifications
+	{
+		public bool IsSessionWindowInForeground => true;
+
+		public bool Show(SystemNotification notification) => false;
+	}
 }
