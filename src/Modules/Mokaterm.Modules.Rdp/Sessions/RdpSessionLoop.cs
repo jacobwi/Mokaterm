@@ -54,6 +54,7 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 	private int _height;
 	private volatile bool _viewOnly;
 	private string? _closeReason;
+	private RdpLogonNotice? _logon;
 	private int _disposed;
 
 	/// <param name="wire">The connection. The loop closes it when the session ends, but the caller disposes it.</param>
@@ -82,6 +83,12 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 
 	/// <summary>Why the server ended the session, once it has. Null while it runs and after a drop.</summary>
 	public string? CloseReason => Volatile.Read(ref _closeReason);
+
+	/// <summary>The last thing Windows said about signing in, or null while it has said nothing.</summary>
+	public RdpLogonNotice? Logon => Volatile.Read(ref _logon);
+
+	/// <summary>Raised on the reading thread for every sign-in notice, before IronRDP gets the message.</summary>
+	public event Action<RdpLogonNotice>? LogonNoticed;
 
 	public int Width => Volatile.Read(ref _width);
 
@@ -267,6 +274,7 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 			while (true)
 			{
 				(Action action, byte[] payload) = await _wire.Reader.ReadPduAsync(_stopping.Token);
+				NoteLogon(payload);
 				RdpServerEnd? end;
 				using (action)
 				{
@@ -416,9 +424,14 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 					}
 				}
 
-				if (input is not null && RdpServerEnd.Read(input, _ioChannelId) is { } end)
+				if (input is not null)
 				{
-					return end;
+					if (RdpServerEnd.Read(input, _ioChannelId) is { } end)
+					{
+						return end;
+					}
+
+					NoteLogon(input);
 				}
 
 				byte[] reply = activation.Step(input);
@@ -453,6 +466,19 @@ internal sealed class RdpSessionLoop : IAsyncDisposable
 			_stage.ApplyInput(operation, outputs);
 			await HandleOutputsAsync(outputs, reactivate: false, cancellationToken);
 		}
+	}
+
+	/// <summary>Keeps what Windows said about signing in. The message still goes to IronRDP, which reads and drops it.</summary>
+	private void NoteLogon(byte[] message)
+	{
+		if (RdpLogonNotice.Read(message, _ioChannelId) is not { } notice)
+		{
+			return;
+		}
+
+		_logger.LogInformation("The RDP server sent a sign-in notice ({Code}).", notice.Code);
+		Volatile.Write(ref _logon, notice);
+		LogonNoticed?.Invoke(notice);
 	}
 
 	/// <summary>The server ended the session on purpose and said why.</summary>

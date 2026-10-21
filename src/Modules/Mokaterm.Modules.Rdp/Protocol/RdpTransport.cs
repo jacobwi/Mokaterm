@@ -20,7 +20,8 @@ internal sealed class RdpTransport : IRdpWire, IAsyncDisposable
 		RdpFrameReader reader,
 		int width,
 		int height,
-		bool networkLevelAuthentication,
+		RdpSecurityProtocols protocol,
+		bool signedIn,
 		HostIdentity? identity,
 		bool identityVerified)
 	{
@@ -32,7 +33,8 @@ internal sealed class RdpTransport : IRdpWire, IAsyncDisposable
 		Reader = reader;
 		Width = width;
 		Height = height;
-		NetworkLevelAuthentication = networkLevelAuthentication;
+		Protocol = protocol;
+		SignedIn = signedIn;
 		Identity = identity;
 		IdentityVerified = identityVerified;
 	}
@@ -52,8 +54,17 @@ internal sealed class RdpTransport : IRdpWire, IAsyncDisposable
 
 	public int Height { get; }
 
+	/// <summary>The security protocol the server picked in the negotiation.</summary>
+	public RdpSecurityProtocols Protocol { get; }
+
 	/// <summary>True when the login was checked with CredSSP before the desktop started.</summary>
-	public bool NetworkLevelAuthentication { get; }
+	public bool NetworkLevelAuthentication => Protocol is RdpSecurityProtocols.Hybrid or RdpSecurityProtocols.HybridEx;
+
+	/// <summary>
+	/// True when the login's name and password went to the server, by CredSSP or in the Client Info PDU flagged
+	/// INFO_AUTOLOGON; false when the server's own sign-in screen asks for them.
+	/// </summary>
+	public bool SignedIn { get; }
 
 	/// <summary>The server's certificate, or null when it presented none.</summary>
 	public HostIdentity? Identity { get; }
@@ -73,8 +84,8 @@ internal sealed class RdpTransport : IRdpWire, IAsyncDisposable
 		Width = Width,
 		Height = Height,
 		IsEncrypted = true,
-		Security = NetworkLevelAuthentication
-			? "TLS with network level authentication"
+		Security = NetworkLevelAuthentication ? "TLS with network level authentication"
+			: SignedIn ? "TLS, signed in with this login's name and password"
 			: "TLS, with the login left to the server's own screen",
 		IdentityVerified = IdentityVerified,
 		CertificateSubject = Identity?.Subject,

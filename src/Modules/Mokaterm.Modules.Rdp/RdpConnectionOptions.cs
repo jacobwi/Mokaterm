@@ -7,6 +7,8 @@ public sealed record RdpConnectionOptions
 {
 	public const string NetworkLevelAuthenticationKey = "rdp.nla";
 
+	public const string AutologonKey = "rdp.autologon";
+
 	public const string DomainKey = "rdp.domain";
 
 	public const string DesktopSizeKey = "rdp.desktopSize";
@@ -42,10 +44,18 @@ public sealed record RdpConnectionOptions
 	public static RdpConnectionOptions Default { get; } = new();
 
 	/// <summary>
-	/// CredSSP: the login is checked before the desktop starts. Off sends no credentials at all, so the server
-	/// shows its own login screen, which is the only way in when the account cannot be checked up front.
+	/// CredSSP: the login is checked before the desktop starts. Off leaves the login to Windows' own sign-in, which
+	/// <see cref="Autologon"/> fills in, and is the only way in for a Microsoft Entra ID account from a PC that is not
+	/// joined to Entra ID.
 	/// </summary>
 	public bool NetworkLevelAuthentication { get; init; } = true;
+
+	/// <summary>
+	/// With network level authentication off, sends the login's name and password in the Client Info PDU, inside TLS and
+	/// after the certificate check, so Windows signs in without its sign-in screen. Off leaves that screen up, to pick
+	/// another user. Ignored while network level authentication is on.
+	/// </summary>
+	public bool Autologon { get; init; } = true;
 
 	/// <summary>The Windows domain or the machine name, empty for a local account or a name that already carries one.</summary>
 	public string Domain { get; init; } = "";
@@ -75,6 +85,7 @@ public sealed record RdpConnectionOptions
 		return new RdpConnectionOptions
 		{
 			NetworkLevelAuthentication = options.GetBoolean(NetworkLevelAuthenticationKey, true),
+			Autologon = options.GetBoolean(AutologonKey, true),
 			Domain = options.GetString(DomainKey, ""),
 			DesktopSize = options.GetEnum(DesktopSizeKey, RdpDesktopSizeMode.Automatic),
 			Width = ClampSize(options.GetInt32(WidthKey, DefaultWidth)),
@@ -101,6 +112,7 @@ public sealed record RdpConnectionOptions
 		// Keys equal to the default are removed so a saved connection only carries what was actually changed.
 		return options
 			.With(NetworkLevelAuthenticationKey, NetworkLevelAuthentication ? null : "false")
+			.With(AutologonKey, Autologon ? null : "false")
 			.With(DomainKey, Domain.Trim())
 			.WithEnum<RdpDesktopSizeMode>(DesktopSizeKey, DesktopSize)
 			.With(WidthKey, ClampSize(Width))

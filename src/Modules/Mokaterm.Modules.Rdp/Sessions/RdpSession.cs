@@ -47,6 +47,16 @@ internal sealed class RdpSession : IProtocolSession, IRdpConnection
 
 	public string? CloseReason => _loop.CloseReason;
 
+	/// <inheritdoc cref="RdpSessionLoop.Logon"/>
+	public RdpLogonNotice? Logon => _loop.Logon;
+
+	/// <inheritdoc cref="RdpSessionLoop.LogonNoticed"/>
+	public event Action<RdpLogonNotice>? LogonNoticed
+	{
+		add => _loop.LogonNoticed += value;
+		remove => _loop.LogonNoticed -= value;
+	}
+
 	public TFeature? GetFeature<TFeature>() where TFeature : class =>
 		typeof(TFeature) == typeof(IRdpConnection) ? (TFeature)(object)this : null;
 

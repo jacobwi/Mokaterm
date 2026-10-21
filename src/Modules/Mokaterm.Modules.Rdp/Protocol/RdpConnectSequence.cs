@@ -23,9 +23,9 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// (https://github.com/Devolutions/IronRDP, <c>ffi/dotnet</c>, MIT or Apache-2.0) at commit 632ad86f, the one
 /// Devolutions.IronRdp 2025.12.4 was built from: X.224 negotiation until the connector asks for TLS, the TLS upgrade,
 /// CredSSP with the server's public key when the server chose it, then connector steps until it is done. What differs:
-/// the certificate is checked before CredSSP sends the login rather than after the whole connect, and the Kerberos
-/// requests go through <see cref="RdpKerberosClient"/>. Recheck this class against those files after any update of
-/// the package.
+/// the certificate is checked before CredSSP sends the login rather than after the whole connect, the Kerberos
+/// requests go through <see cref="RdpKerberosClient"/>, and the server's answer to the RDP request is read here first
+/// (<see cref="RdpNegotiation"/>). Recheck this class against those files after any update of the package.
 /// </remarks>
 internal sealed class RdpConnectSequence : IAsyncDisposable
 {
@@ -64,10 +64,20 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 	/// <summary>CredSSP messages sent so far. The second one carries the answer to the server's NTLM challenge.</summary>
 	public int LoginMessagesSent { get; private set; }
 
+	/// <summary>The security protocol the server picked, once it answered the RDP request with one this attempt asked for.</summary>
+	public RdpSecurityProtocols? Negotiated { get; private set; }
+
 	/// <summary>Runs the attempt. Everything it opened is closed by <see cref="DisposeAsync"/> unless it went into the transport.</summary>
 	/// <param name="config">Read once, when the connector is built; the caller keeps it.</param>
+	/// <param name="route">How <paramref name="config"/> signs in, which decides the protocols the server may pick.</param>
 	/// <param name="dialBudget">How long the dial may take in all, shared out among the addresses the name resolves to.</param>
-	public async Task<RdpTransport> RunAsync(Config config, TimeSpan dialBudget, CancellationToken cancellationToken)
+	/// <remarks>
+	/// The Client Info PDU, which carries the password on every route but <see cref="RdpSignInRoute.SignInScreen"/>, is
+	/// a connector step in the session stage below, so it only ever goes out inside TLS and after the certificate was
+	/// accepted. IronRDP never builds a request that offers Standard RDP Security, and a server that picks it anyway is
+	/// refused by <see cref="CheckAnswer"/>, before the TLS handshake.
+	/// </remarks>
+	public async Task<RdpTransport> RunAsync(Config config, RdpSignInRoute route, TimeSpan dialBudget, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(config);
 		string host = _progress.Host;
@@ -89,9 +99,10 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 		_connector.WithDynamicChannelDisplayControl();
 		_buffer = WriteBuf.New();
 		_reader = new RdpFrameReader(_network);
+		RdpSecurityProtocols requested = RdpNegotiation.Requested(route == RdpSignInRoute.NetworkLevelAuthentication);
 		while (!_connector.ShouldPerformSecurityUpgrade())
 		{
-			await StepAsync(_network, cancellationToken);
+			await StepAsync(_network, cancellationToken, input => CheckAnswer(input, requested, route));
 		}
 
 		if (_reader.Buffered > 0)
@@ -109,6 +120,13 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 		_connector.MarkSecurityUpgradeAsDone();
 
 		using X509Certificate2? certificate = TlsHostIdentity.Read(_tls);
+		if (certificate is null && route != RdpSignInRoute.SignInScreen)
+		{
+			throw new ProtocolConnectException(
+				ConnectFailure.ProtocolError,
+				$"{_progress.Endpoint} presented no certificate, so nothing proves which machine would get the login, and it was not sent.");
+		}
+
 		(HostIdentity? identity, bool verified) = await CheckCertificateAsync(certificate, cancellationToken);
 
 		bool credssp = _connector.ShouldPerformCredssp();
@@ -139,7 +157,7 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 			await StepAsync(_tls, cancellationToken);
 		}
 
-		return TakeTransport(credssp, identity, verified);
+		return TakeTransport(route != RdpSignInRoute.SignInScreen, identity, verified);
 	}
 
 	public async ValueTask DisposeAsync()
@@ -249,8 +267,34 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 		return (identity, verified);
 	}
 
+	/// <summary>
+	/// Reads the server's answer to the RDP request before IronRDP does. A refusal is worded by its code, and a pick
+	/// that is not exactly one of the protocols asked for stops the attempt before anything else is sent. Anything that
+	/// is not an answer at all is left to IronRDP, which says it is not RDP.
+	/// </summary>
+	private void CheckAnswer(byte[] input, RdpSecurityProtocols requested, RdpSignInRoute route)
+	{
+		if (RdpNegotiation.Read(input) is not { } answer)
+		{
+			return;
+		}
+
+		if (answer.FailureCode is uint code)
+		{
+			throw new ProtocolConnectException(ConnectFailure.ProtocolError, RdpConnectErrors.NegotiationRefused(code, _progress, route));
+		}
+
+		if (!answer.Picked(requested))
+		{
+			throw new ProtocolConnectException(ConnectFailure.ProtocolError, RdpConnectErrors.UnrequestedProtocol(answer.Selected, _progress));
+		}
+
+		Negotiated = answer.Selected;
+	}
+
 	/// <summary>One connector step: the message it waits for, if any, then whatever it answers.</summary>
-	private async Task StepAsync(Stream stream, CancellationToken cancellationToken)
+	/// <param name="inspect">Sees the message before IronRDP does, and refuses it by throwing.</param>
+	private async Task StepAsync(Stream stream, CancellationToken cancellationToken, Action<byte[]>? inspect = null)
 	{
 		ClientConnector connector = _connector!;
 		byte[]? input = null;
@@ -262,6 +306,11 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 			{
 				input = await _reader!.ReadByHintAsync(hint, cancellationToken);
 			}
+		}
+
+		if (input is not null)
+		{
+			inspect?.Invoke(input);
 		}
 
 		_buffer!.Clear();
@@ -421,7 +470,8 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 		}
 	}
 
-	private RdpTransport TakeTransport(bool credssp, HostIdentity? identity, bool verified)
+	/// <param name="signedIn">True when the login went to the server, by CredSSP or in the Client Info PDU.</param>
+	private RdpTransport TakeTransport(bool signedIn, HostIdentity? identity, bool verified)
 	{
 		ConnectionResult result;
 		using (ClientConnectorState final = _connector!.ConsumeAndCastToClientConnectorState())
@@ -452,7 +502,7 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 				throw new ProtocolConnectException(ConnectFailure.ProtocolError, RdpDesktopBounds.DescribeRefusal(width, height));
 			}
 
-			RdpTransport transport = new(result, _tls!, _reader!, width, height, credssp, identity, verified);
+			RdpTransport transport = new(result, _tls!, _reader!, width, height, Negotiated ?? RdpSecurityProtocols.Ssl, signedIn, identity, verified);
 			_tls = null;
 			_network = null;
 			_socket = null;

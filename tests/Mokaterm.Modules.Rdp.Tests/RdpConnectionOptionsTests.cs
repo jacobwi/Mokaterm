@@ -11,6 +11,7 @@ public sealed class RdpConnectionOptionsTests
 
 		Assert.Equal(RdpConnectionOptions.Default, options);
 		Assert.True(options.NetworkLevelAuthentication);
+		Assert.True(options.Autologon);
 		Assert.Equal("", options.Domain);
 		Assert.Equal(RdpDesktopSizeMode.Automatic, options.DesktopSize);
 		Assert.Equal(RdpScalingMode.Fit, options.Scaling);
@@ -25,6 +26,7 @@ public sealed class RdpConnectionOptionsTests
 		ProtocolOptions written = RdpConnectionOptions.Default.ApplyTo(ProtocolOptions.Empty);
 
 		Assert.False(written.ContainsKey(RdpConnectionOptions.NetworkLevelAuthenticationKey));
+		Assert.False(written.ContainsKey(RdpConnectionOptions.AutologonKey));
 		Assert.False(written.ContainsKey(RdpConnectionOptions.DomainKey));
 		Assert.False(written.ContainsKey(RdpConnectionOptions.ViewOnlyKey));
 		Assert.False(written.ContainsKey(RdpConnectionOptions.KeyboardLayoutKey));
@@ -38,6 +40,7 @@ public sealed class RdpConnectionOptionsTests
 		RdpConnectionOptions options = new()
 		{
 			NetworkLevelAuthentication = false,
+			Autologon = false,
 			Domain = "CORP",
 			DesktopSize = RdpDesktopSizeMode.Fixed,
 			Width = 1280,
@@ -49,6 +52,19 @@ public sealed class RdpConnectionOptionsTests
 		};
 
 		Assert.Equal(options, RdpConnectionOptions.From(options.ApplyTo(ProtocolOptions.Empty)));
+	}
+
+	[Fact]
+	public void Autologon_IsStoredOnlyWhenTurnedOff()
+	{
+		ProtocolOptions written = (RdpConnectionOptions.Default with { NetworkLevelAuthentication = false, Autologon = false })
+			.ApplyTo(ProtocolOptions.Empty);
+
+		Assert.Equal("false", written.GetString(RdpConnectionOptions.AutologonKey));
+		Assert.False(RdpConnectionOptions.From(written).Autologon);
+
+		// Turning it back on removes the key, so a saved connection only carries what was changed.
+		Assert.False((RdpConnectionOptions.Default with { Autologon = true }).ApplyTo(written).ContainsKey(RdpConnectionOptions.AutologonKey));
 	}
 
 	[Fact]

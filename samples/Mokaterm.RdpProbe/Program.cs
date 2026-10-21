@@ -44,6 +44,7 @@ internal static class Program
 			{
 				Domain = arguments.Domain ?? "",
 				NetworkLevelAuthentication = arguments.NetworkLevelAuthentication,
+				Autologon = arguments.Autologon,
 			},
 			TimeSpan.FromSeconds(arguments.TimeoutSeconds),
 			new ConsoleCertificateCheck(output, arguments.AcceptCertificate));
@@ -66,20 +67,48 @@ internal static class Program
 			Console.WriteLine(string.Create(
 				CultureInfo.InvariantCulture,
 				$"FAILED after {output.Elapsed.TotalSeconds:0.0} s, in the step: {output.LastStep ?? "before connecting"}"));
+			PrintRoute(connector);
 			PrintFailure(ex);
 			return 1;
 		}
 
 		RdpConnectionInfo info = transport.Describe();
 		output.Event(string.Create(CultureInfo.InvariantCulture, $"Connected: {info.Width} x {info.Height}, {info.Security}"));
+		PrintRoute(connector);
 		if (arguments.ConnectOnly)
 		{
 			await transport.DisposeAsync();
 			return 0;
 		}
 
-		return await WaitForPictureAsync(transport, output, stop.Token);
+		return await WaitForPictureAsync(transport, output, TimeSpan.FromSeconds(arguments.SignInWaitSeconds), stop.Token);
 	}
+
+	/// <summary>The security protocol the server picked and how the login went to it, for the attempt just made.</summary>
+	private static void PrintRoute(RdpConnector connector)
+	{
+		RdpSecurityProtocols? picked = connector.LastNegotiated;
+		Console.WriteLine("Negotiated:  " + (picked is { } protocol
+			? RdpNegotiation.Name(protocol) + " " + DescribeProtocol(protocol)
+			: "none (no answer to the RDP request that picked a protocol this client asked for)"));
+		Console.WriteLine("Sign-in:     " + connector.LastRoute switch
+		{
+			RdpSignInRoute.NetworkLevelAuthentication when picked == RdpSecurityProtocols.Ssl =>
+				"network level authentication was asked for, but the server picked TLS alone, so the name and password go in the Client Info PDU, flagged INFO_AUTOLOGON",
+			RdpSignInRoute.NetworkLevelAuthentication => "network level authentication (CredSSP)",
+			RdpSignInRoute.Automatic => "the name and password in the Client Info PDU, flagged INFO_AUTOLOGON",
+			RdpSignInRoute.SignInScreen => "no password; the server's own sign-in screen asks",
+			_ => "not decided",
+		});
+	}
+
+	private static string DescribeProtocol(RdpSecurityProtocols protocol) => protocol switch
+	{
+		RdpSecurityProtocols.Ssl => "(TLS, the login checked by Windows' own sign-in)",
+		RdpSecurityProtocols.Hybrid => "(TLS and CredSSP)",
+		RdpSecurityProtocols.HybridEx => "(TLS and CredSSP, with the Early User Authorization Result)",
+		_ => "",
+	};
 
 	private static void PrintHeader(ProbeArguments arguments)
 	{
@@ -88,7 +117,10 @@ internal static class Program
 		bool login = arguments.User is not null;
 		string who = login ? "user " + arguments.User : "no login";
 		string domain = string.IsNullOrEmpty(arguments.Domain) ? "" : ", domain " + arguments.Domain;
-		string nla = arguments.NetworkLevelAuthentication && login ? "on" : "off";
+		string nla = !login ? "off"
+			: arguments.NetworkLevelAuthentication ? "on"
+			: arguments.Autologon ? "off, signing in with the Client Info PDU"
+			: "off, stopping at the server's sign-in screen";
 		Console.WriteLine(string.Create(
 			CultureInfo.InvariantCulture,
 			$"Target {HostEndpoint.Format(arguments.Host, arguments.Port)}, {who}{domain}, network level authentication {nla}, timeout {arguments.TimeoutSeconds} s"));
@@ -106,15 +138,21 @@ internal static class Program
 			Username = user,
 			Method = AuthenticationMethod.Password,
 
-			// Without network level authentication no password is sent, so none is asked for.
-			Password = arguments.NetworkLevelAuthentication ? PasswordPrompt.Read(user) : null,
+			// A password that will not be sent is not asked for.
+			Password = arguments.SendsPassword ? PasswordPrompt.Read(user) : null,
 		};
 	}
 
-	/// <summary>Runs the session the way the app's view does and waits for the first region the server draws.</summary>
-	private static async Task<int> WaitForPictureAsync(RdpTransport transport, ProbeOutput output, CancellationToken cancellationToken)
+	/// <summary>
+	/// Runs the session the way the app's view does, waits for the first region the server draws, and then for what
+	/// Windows says about signing in.
+	/// </summary>
+	private static async Task<int> WaitForPictureAsync(RdpTransport transport, ProbeOutput output, TimeSpan signInWait, CancellationToken cancellationToken)
 	{
 		await using RdpSession session = new(transport, new RdpSettings(), null, NullLogger.Instance);
+		SignInWatch signIn = new(output);
+		session.LogonNoticed += signIn.Notice;
+		signIn.Catch(session.Logon);
 		FirstPictureSink sink = new();
 		await using IRdpChannel channel = await session.AttachAsync(sink, cancellationToken);
 		await channel.StartAsync(cancellationToken);
@@ -122,7 +160,9 @@ internal static class Program
 		if (finished == sink.FirstFrame)
 		{
 			int bytes = await sink.FirstFrame;
-			output.Event(string.Create(CultureInfo.InvariantCulture, $"First picture: {bytes} bytes. Disconnecting."));
+			output.Event(string.Create(CultureInfo.InvariantCulture, $"First picture: {bytes} bytes."));
+			await signIn.WaitAsync(session.Completion, signInWait, cancellationToken);
+			output.Event("Disconnecting.");
 			return 0;
 		}
 

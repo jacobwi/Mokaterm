@@ -12,6 +12,12 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// </summary>
 internal static class RdpConnectErrors
 {
+	// Standard RDP Security's keys come from the server's own proprietary certificate or a self-signed one, which no
+	// known hosts check covers, and it would carry an automatic sign-in's password.
+	private const string StandardSecurity =
+		"whose RC4 encryption proves nothing about the server, so this client sent nothing more. On that PC, set \"Require " +
+		"use of specific security layer for remote (RDP) connections\" to Negotiate or SSL.";
+
 	private static readonly SocketFailureHints Hints = new()
 	{
 		Refused = "Remote Desktop listens on 3389 and has to be turned on for the account.",
@@ -83,12 +89,68 @@ internal static class RdpConnectErrors
 		string message = exception is IronRdpException ironRdp
 			? $"{progress.Endpoint} refused the login: {Describe(ironRdp)}"
 			: $"{progress.Endpoint} closed the connection once it had the login, which usually means the user name or the password is wrong.";
+		if (login.CloudAccountAdvice is { } advice)
+		{
+			return message + " " + advice;
+		}
+
 		// The CredSSP library sends you@example.com as the account "you" in the domain "example.com", which a
 		// Microsoft account does not answer to; the PC's own name for the account does.
 		return login.IsBarePrincipalName
 			? message + " If that PC signs in with a Microsoft account, run whoami on it and use the name it prints (such as " +
 				"DESKTOP-ABC\\name) with the Microsoft account's password, not its PIN."
 			: message;
+	}
+
+	/// <summary>
+	/// What the user is told when the server refuses the RDP request, by RDP_NEG_FAILURE's code (MS-RDPBCGR 2.2.1.2.2).
+	/// <paramref name="route"/> says what was asked for: CredSSP and TLS for network level authentication, TLS alone
+	/// otherwise.
+	/// </summary>
+	public static string NegotiationRefused(uint code, RdpConnectProgress progress, RdpSignInRoute route)
+	{
+		ArgumentNullException.ThrowIfNull(progress);
+		string endpoint = progress.Endpoint;
+		string name = RdpNegotiation.FailureName(code);
+		bool nla = route == RdpSignInRoute.NetworkLevelAuthentication;
+		return code switch
+		{
+			RdpNegotiation.HybridRequiredByServer when route == RdpSignInRoute.Automatic =>
+				$"{endpoint} requires network level authentication ({name}), which is off for this login. Turn \"Network " +
+				"level authentication\" back on in this login's RDP options, or turn off \"Require devices to use Network " +
+				"Level Authentication to connect\" on that PC (Settings > System > Remote Desktop).",
+			RdpNegotiation.HybridRequiredByServer when !nla =>
+				$"{endpoint} requires network level authentication ({name}), which checks the login's name and password " +
+				"before the session starts. Set the authentication to Password and turn \"Network level authentication\" on " +
+				"in this login's RDP options, or turn off \"Require devices to use Network Level Authentication to connect\" " +
+				"on that PC (Settings > System > Remote Desktop).",
+			RdpNegotiation.SslRequiredByServer when nla =>
+				$"{endpoint} only accepts TLS without network level authentication ({name}). Turn \"Network level " +
+				"authentication\" off in this login's RDP options.",
+			RdpNegotiation.SslRequiredByServer =>
+				$"{endpoint} said it requires TLS ({name}), which is what this client asked for. Check the security layer " +
+				"Remote Desktop is set to use on that PC.",
+			RdpNegotiation.SslNotAllowedByServer =>
+				$"{endpoint} only allows Standard RDP Security ({name}), {StandardSecurity}",
+			RdpNegotiation.SslCertNotOnServer =>
+				$"{endpoint} has no certificate for Remote Desktop ({name}), so it cannot start TLS. Restarting the Remote " +
+				"Desktop Services service on that PC usually makes it create a new one.",
+			RdpNegotiation.SslWithUserAuthRequiredByServer =>
+				$"{endpoint} wants a client certificate ({name}), which this client cannot send.",
+			_ => $"{endpoint} refused the RDP request ({name}).",
+		};
+	}
+
+	/// <summary>
+	/// What the user is told when the server picked a security protocol the request did not offer, which stops the
+	/// attempt before the TLS handshake and so before any login is sent.
+	/// </summary>
+	public static string UnrequestedProtocol(RdpSecurityProtocols selected, RdpConnectProgress progress)
+	{
+		ArgumentNullException.ThrowIfNull(progress);
+		return selected == RdpSecurityProtocols.Rdp
+			? $"{progress.Endpoint} offered only Standard RDP Security, {StandardSecurity}"
+			: $"{progress.Endpoint} picked {RdpNegotiation.Name(selected)}, which this client did not ask for, so it sent nothing more.";
 	}
 
 	/// <summary>
@@ -219,11 +281,9 @@ internal static class RdpConnectErrors
 					exception);
 			}
 
-			// The server's own refusal, such as one that needs network level authentication when it was turned off.
-			string hint = detail.Contains("CredSSP", StringComparison.OrdinalIgnoreCase)
-				? " Turn network level authentication on for this connection."
-				: "";
-			return new ProtocolConnectException(ConnectFailure.ProtocolError, $"{endpoint} refused the RDP request: {detail}.{hint}", exception);
+			// The server's answer was read before IronRDP saw it (RdpConnectSequence.CheckAnswer), and refusals are
+			// worded by their code there, so what reaches this point is IronRDP's own objection.
+			return new ProtocolConnectException(ConnectFailure.ProtocolError, $"{endpoint} refused the RDP request: {detail}.", exception);
 		}
 
 		return progress.Stage switch

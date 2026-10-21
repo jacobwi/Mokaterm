@@ -197,8 +197,86 @@ public sealed class RdpConnectErrorsTests
 		Assert.Contains("run whoami", bare, StringComparison.Ordinal);
 		Assert.Contains("not its PIN", bare, StringComparison.Ordinal);
 		Assert.DoesNotContain("whoami", local, StringComparison.Ordinal);
-		Assert.DoesNotContain("whoami", written, StringComparison.Ordinal);
 		Assert.StartsWith("term01:3389 closed the connection once it had the login", local, StringComparison.Ordinal);
+
+		// Written with its domain, a Microsoft account gets the whole advice instead: network level authentication off.
+		Assert.Contains("Require devices to use Network Level Authentication to connect", written, StringComparison.Ordinal);
+		Assert.Contains("not its PIN", written, StringComparison.Ordinal);
+	}
+
+	// sspi-rs can send MicrosoftAccount\name and AzureAD\name without an @, and Windows turns both down.
+	[Theory]
+	[InlineData("MicrosoftAccount\\you", "Network level authentication from this client does not work for a Microsoft account.")]
+	[InlineData("AzureAD\\you", "A Microsoft Entra ID account cannot pass network level authentication")]
+	public void LoginRefused_ACloudAccountDomain_SaysToTurnNlaOff(string username, string advice)
+	{
+		string message = RdpConnectErrors.LoginRefused(new EndOfStreamException(), Progress(RdpConnectStage.Login), RdpLogin.Parse(username, null, null));
+
+		Assert.StartsWith("term01:3389 closed the connection once it had the login", message, StringComparison.Ordinal);
+		Assert.Contains(advice, message, StringComparison.Ordinal);
+		Assert.EndsWith("The login then signs in by itself.", message.Split(" Or keep")[0], StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void NegotiationRefused_NlaRequiredWhileItIsOff_SaysHowToTurnItBackOnHereOrOffThere()
+	{
+		string message = RdpConnectErrors.NegotiationRefused(
+			RdpNegotiation.HybridRequiredByServer,
+			Progress(RdpConnectStage.Negotiating),
+			RdpSignInRoute.Automatic);
+
+		Assert.Equal(
+			"term01:3389 requires network level authentication (HYBRID_REQUIRED_BY_SERVER), which is off for this login. Turn " +
+			"\"Network level authentication\" back on in this login's RDP options, or turn off \"Require devices to use Network " +
+			"Level Authentication to connect\" on that PC (Settings > System > Remote Desktop).",
+			message);
+	}
+
+	[Fact]
+	public void NegotiationRefused_NlaRequiredWithoutALogin_SaysANameAndPasswordAreNeeded()
+	{
+		string message = RdpConnectErrors.NegotiationRefused(
+			RdpNegotiation.HybridRequiredByServer,
+			Progress(RdpConnectStage.Negotiating),
+			RdpSignInRoute.SignInScreen);
+
+		Assert.StartsWith(
+			"term01:3389 requires network level authentication (HYBRID_REQUIRED_BY_SERVER), which checks the login's name and " +
+			"password before the session starts. Set the authentication to Password",
+			message,
+			StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData(RdpNegotiation.SslRequiredByServer, (int)RdpSignInRoute.NetworkLevelAuthentication,
+		"term01:3389 only accepts TLS without network level authentication (SSL_REQUIRED_BY_SERVER). Turn \"Network level authentication\" off in this login's RDP options.")]
+	[InlineData(RdpNegotiation.SslRequiredByServer, (int)RdpSignInRoute.Automatic,
+		"term01:3389 said it requires TLS (SSL_REQUIRED_BY_SERVER), which is what this client asked for. Check the security layer Remote Desktop is set to use on that PC.")]
+	[InlineData(RdpNegotiation.SslCertNotOnServer, (int)RdpSignInRoute.Automatic,
+		"term01:3389 has no certificate for Remote Desktop (SSL_CERT_NOT_ON_SERVER), so it cannot start TLS. Restarting the Remote Desktop Services service on that PC usually makes it create a new one.")]
+	[InlineData(RdpNegotiation.SslNotAllowedByServer, (int)RdpSignInRoute.NetworkLevelAuthentication,
+		"term01:3389 only allows Standard RDP Security (SSL_NOT_ALLOWED_BY_SERVER), whose RC4 encryption proves nothing about the server, so this client sent nothing more. On that PC, set \"Require use of specific security layer for remote (RDP) connections\" to Negotiate or SSL.")]
+	[InlineData(RdpNegotiation.SslWithUserAuthRequiredByServer, (int)RdpSignInRoute.NetworkLevelAuthentication,
+		"term01:3389 wants a client certificate (SSL_WITH_USER_AUTH_REQUIRED_BY_SERVER), which this client cannot send.")]
+	[InlineData(RdpNegotiation.InconsistentFlags, (int)RdpSignInRoute.Automatic,
+		"term01:3389 refused the RDP request (INCONSISTENT_FLAGS).")]
+	[InlineData(0x99u, (int)RdpSignInRoute.Automatic,
+		"term01:3389 refused the RDP request (0x00000099).")]
+	public void NegotiationRefused_WordsEachCode(uint code, int route, string expected) =>
+		Assert.Equal(expected, RdpConnectErrors.NegotiationRefused(code, Progress(RdpConnectStage.Negotiating), (RdpSignInRoute)route));
+
+	[Fact]
+	public void UnrequestedProtocol_NamesWhatTheServerPicked()
+	{
+		RdpConnectProgress progress = Progress(RdpConnectStage.Negotiating);
+
+		Assert.StartsWith(
+			"term01:3389 offered only Standard RDP Security, whose RC4 encryption",
+			RdpConnectErrors.UnrequestedProtocol(RdpSecurityProtocols.Rdp, progress),
+			StringComparison.Ordinal);
+		Assert.Equal(
+			"term01:3389 picked PROTOCOL_HYBRID, which this client did not ask for, so it sent nothing more.",
+			RdpConnectErrors.UnrequestedProtocol(RdpSecurityProtocols.Hybrid, progress));
 	}
 
 	private static RdpConnectProgress Progress(RdpConnectStage stage, string? detail = null, string host = "term01")

@@ -85,4 +85,94 @@ internal static class RdpPdus
 	/// <summary>A Save Session Info PDU (pduType2 0x26), something IronRDP reads and the session goes on after.</summary>
 	public static byte[] SaveSessionInfo(int channel = FakeStage.DefaultIoChannel) =>
 		SendDataIndication(channel, ShareData(0x26, [0, 0, 0, 0]));
+
+	/// <summary>A Save Session Info PDU carrying <paramref name="infoType"/> and whatever follows it, as Windows pads it.</summary>
+	public static byte[] SaveSessionInfo(uint infoType, ReadOnlySpan<byte> infoData, int channel = FakeStage.DefaultIoChannel)
+	{
+		byte[] body = new byte[4 + infoData.Length];
+		BinaryPrimitives.WriteUInt32LittleEndian(body, infoType);
+		infoData.CopyTo(body.AsSpan(4));
+		return SendDataIndication(channel, ShareData(0x26, body));
+	}
+
+	/// <summary>
+	/// TS_LOGON_INFO_EXTENDED (2.2.10.1.1.4) with logon errors, and an auto-reconnect cookie before them when asked for,
+	/// then the 570 bytes of padding.
+	/// </summary>
+	public static byte[] LogonErrors(uint type, uint data, bool withCookie = false, int channel = FakeStage.DefaultIoChannel)
+	{
+		List<byte> fields = [];
+		uint present = 0x2;
+		if (withCookie)
+		{
+			present |= 0x1;
+
+			// cbFieldData, then ARC_SC_PRIVATE_PACKET: cbLen 28, Version 1, LogonId, ArcRandomBits.
+			fields.AddRange(UInt32(28));
+			fields.AddRange(UInt32(28));
+			fields.AddRange(UInt32(1));
+			fields.AddRange(UInt32(2));
+			fields.AddRange(new byte[16]);
+		}
+
+		fields.AddRange(UInt32(8));
+		fields.AddRange(UInt32(type));
+		fields.AddRange(UInt32(data));
+
+		byte[] extended = new byte[6 + fields.Count + 570];
+		BinaryPrimitives.WriteUInt16LittleEndian(extended, (ushort)(6 + fields.Count));
+		BinaryPrimitives.WriteUInt32LittleEndian(extended.AsSpan(2), present);
+		fields.CopyTo(extended, 6);
+		return SaveSessionInfo(3, extended, channel);
+	}
+
+	/// <summary>
+	/// A Server MCS Connect Response (2.2.1.4) that IronRDP accepts for a TLS connection: BER around a GCC Conference
+	/// Create Response whose user data holds the core block (with RNS_UD_SC_SKIP_CHANNELJOIN_SUPPORTED, so no channel
+	/// joins follow), the network block (I/O channel 1003, no others) and a security block that encrypts nothing.
+	/// </summary>
+	/// <remarks>The fixed bytes are IronRDP's own test vectors (ironrdp-testsuite-core, mcs.rs and conference_create.rs).</remarks>
+	public static byte[] ServerConnectResponse()
+	{
+		byte[] blocks =
+		[
+			0x01, 0x0C, 0x10, 0x00, 0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+			0x03, 0x0C, 0x08, 0x00, 0xEB, 0x03, 0x00, 0x00,
+			0x02, 0x0C, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		];
+		byte[] response = [0x14, 0x76, 0x0A, 0x01, 0x01, 0x00, 0x01, 0xC0, 0x00, 0x4D, 0x63, 0x44, 0x6E];
+		List<byte> conference = [0x00, 0x05, 0x00, 0x14, 0x7C, 0x00, 0x01];
+		conference.AddRange(PerLength(response.Length + 2 + blocks.Length));
+		conference.AddRange(response);
+		conference.AddRange(PerLength(blocks.Length));
+		conference.AddRange(blocks);
+
+		byte[] parameters =
+		[
+			0x30, 0x1A, 0x02, 0x01, 0x22, 0x02, 0x01, 0x03, 0x02, 0x01, 0x00, 0x02, 0x01, 0x01, 0x02, 0x01, 0x00,
+			0x02, 0x01, 0x01, 0x02, 0x03, 0x00, 0xFF, 0xF8, 0x02, 0x01, 0x02,
+		];
+		List<byte> content = [0x0A, 0x01, 0x00, 0x02, 0x01, 0x00, .. parameters, 0x04];
+		content.AddRange(BerLength(conference.Count));
+		content.AddRange(conference);
+
+		List<byte> mcs = [0x7F, 0x66];
+		mcs.AddRange(BerLength(content.Count));
+		mcs.AddRange(content);
+		return X224([.. mcs]);
+	}
+
+	/// <summary>An MCS Attach User Confirm (2.2.1.7) that makes the client user 1007.</summary>
+	public static byte[] AttachUserConfirm() => X224([0x2E, 0x00, 0x00, 0x06]);
+
+	private static byte[] UInt32(uint value)
+	{
+		byte[] bytes = new byte[4];
+		BinaryPrimitives.WriteUInt32LittleEndian(bytes, value);
+		return bytes;
+	}
+
+	private static byte[] PerLength(int length) => [(byte)(0x80 | (length >> 8)), (byte)length];
+
+	private static byte[] BerLength(int length) => [0x82, (byte)(length >> 8), (byte)length];
 }

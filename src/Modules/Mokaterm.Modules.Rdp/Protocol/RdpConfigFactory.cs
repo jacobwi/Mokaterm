@@ -14,11 +14,11 @@ internal static class RdpConfigFactory
 	/// </summary>
 	public const uint ClientBuild = 7601;
 
-	/// <param name="credssp">
-	/// False turns network level authentication off, which sends no credentials at all and leaves the login to the
-	/// server's own screen.
+	/// <param name="login">
+	/// The names and the password exactly as they go out: CredSSP reads them, and IronRDP writes them into the Client
+	/// Info PDU on every route. The password is empty for <see cref="RdpSignInRoute.SignInScreen"/>.
 	/// </param>
-	public static Config Build(RdpConnectionOptions options, RdpLogin login, int width, int height, bool credssp)
+	public static Config Build(RdpConnectionOptions options, RdpLogin login, int width, int height, RdpSignInRoute route)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 		ConfigBuilder builder = ConfigBuilder.New();
@@ -30,9 +30,14 @@ internal static class RdpConfigFactory
 			builder.SetClientName(ClientName);
 			builder.SetClientDir("C:\\");
 			builder.SetClientBuild(ClientBuild);
+
+			// IronRDP asks for PROTOCOL_SSL, plus PROTOCOL_HYBRID and PROTOCOL_HYBRID_EX with CredSSP on, and refuses to
+			// build a request without TLS: Standard RDP Security is never offered (RdpNegotiation.Requested).
 			builder.SetEnableTls(true);
-			builder.SetEnableCredssp(credssp);
-			builder.SetAutologon(credssp);
+			builder.SetEnableCredssp(route == RdpSignInRoute.NetworkLevelAuthentication);
+
+			// INFO_AUTOLOGON tells Windows to sign in with the Client Info PDU's name and password instead of its screen.
+			builder.SetAutologon(route != RdpSignInRoute.SignInScreen);
 
 			// The server sends pointer shapes, which the view turns into a real cursor. Software rendering would
 			// instead burn the pointer into the picture, and it would lag one frame behind the mouse.
@@ -53,7 +58,7 @@ internal static class RdpConfigFactory
 			}
 
 			// Build refuses a config with no credentials at all, even when nothing will be sent.
-			builder.WithUsernameAndPassword(login.Username, login.Password);
+			builder.WithUsernameAndPassword(login.Username, route == RdpSignInRoute.SignInScreen ? "" : login.Password);
 
 			PerformanceFlags flags = BuildPerformanceFlags(options.Performance);
 			try

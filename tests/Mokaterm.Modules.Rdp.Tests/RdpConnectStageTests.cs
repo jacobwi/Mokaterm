@@ -171,7 +171,34 @@ public sealed class RdpConnectStageTests
 		Assert.Equal(0, server.Accepted);
 	}
 
-	// Without network level authentication the name only fills the server's own login screen, so nothing refuses it.
+	// An Entra ID account cannot pass CredSSP from here in any form, and no other name typed into a password prompt
+	// would change that, so it is refused before dialing without asking again.
+	[Theory(Timeout = RdpHarness.TestTimeoutMilliseconds)]
+	[InlineData("AzureAD\\you@company.com", "")]
+	[InlineData("you@company.com", "AzureAD")]
+	[InlineData("AzureAD\\you", "")]
+	public async Task Connect_AnEntraIdAccountWithNla_IsRefusedBeforeDialingWithWhatWorks(string username, string domain)
+	{
+		CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+		await using FakeRdpServer server = new FakeRdpServer(FakeRdpServer.ProtocolHybrid).Start();
+		using LoginCredentials credentials = Login(username);
+		RdpConnector connector = new(
+			"127.0.0.1",
+			server.Port,
+			RdpConnectionOptions.Default with { Domain = domain },
+			Short,
+			FakeHostVerifier.Accepting());
+
+		ProtocolConnectException error = await Assert.ThrowsAsync<ProtocolConnectException>(
+			() => connector.ConnectAsync(credentials, null, cancellationToken));
+
+		Assert.Equal(ConnectFailure.AuthenticationFailed, error.Failure);
+		Assert.Contains("Require devices to use Network Level Authentication to connect", error.Message, StringComparison.Ordinal);
+		Assert.Equal(0, server.Accepted);
+	}
+
+	// Without network level authentication the name goes to Windows as written, in the Client Info PDU, so nothing here
+	// refuses it (RdpSignInTests reads what it carries).
 	[Fact(Timeout = RdpHarness.TestTimeoutMilliseconds)]
 	public async Task Connect_AMicrosoftAccountNameWithoutCredssp_IsLeftToTheServer()
 	{

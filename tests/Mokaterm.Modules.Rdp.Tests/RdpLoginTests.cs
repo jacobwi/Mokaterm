@@ -64,14 +64,68 @@ public sealed class RdpLoginTests
 	[Theory]
 	[InlineData("MicrosoftAccount\\you@example.com", null)]
 	[InlineData("you@example.com", "MicrosoftAccount")]
-	[InlineData("AzureAD\\you@contoso.com", null)]
-	public void CredsspRefusal_AMicrosoftAccountName_SaysWhichNameToUseInstead(string username, string? domain)
+	[InlineData("microsoftaccount\\you@example.com", null)]
+	public void CredsspRefusal_AMicrosoftAccount_SaysBothWaysThatWork(string username, string? domain)
 	{
 		string? refusal = RdpLogin.Parse(username, domain, "secret").CredsspRefusal;
 
+		Assert.Equal(
+			"Network level authentication from this client does not work for a Microsoft account. To sign in with it, turn off " +
+			"\"Require devices to use Network Level Authentication to connect\" on that PC (Settings > System > Remote Desktop) " +
+			"and \"Network level authentication\" in this login's RDP options. The login then signs in by itself. Or keep " +
+			"network level authentication, run whoami on that PC and use the name it prints (such as DESKTOP-ABC\\name). " +
+			"Either way, use the account's password, not its PIN.",
+			refusal);
+	}
+
+	[Theory]
+	[InlineData("AzureAD\\you@company.com", null)]
+	[InlineData("you@company.com", "AzureAD")]
+	[InlineData("azuread\\you@company.com", "CORP")]
+	public void CredsspRefusal_AnEntraIdAccount_SaysToTurnNlaOffOnThePcAndHere(string username, string? domain)
+	{
+		RdpLogin login = RdpLogin.Parse(username, domain, "secret");
+
+		Assert.True(login.IsEntraId);
+		Assert.Equal(
+			"A Microsoft Entra ID account cannot pass network level authentication from a PC that is not joined to Entra ID. " +
+			"To sign in with it, turn off \"Require devices to use Network Level Authentication to connect\" on that PC " +
+			"(Settings > System > Remote Desktop) and \"Network level authentication\" in this login's RDP options. The login " +
+			"then signs in by itself.",
+			login.CredsspRefusal);
+	}
+
+	// Entra ID signs in with the whole work email, which a short name does not carry.
+	[Fact]
+	public void CredsspRefusal_AnEntraIdAccountWithoutItsEmail_SaysToWriteItWhole()
+	{
+		string? refusal = RdpLogin.Parse("AzureAD\\you", null, "secret").CredsspRefusal;
+
 		Assert.NotNull(refusal);
-		Assert.Contains("run whoami", refusal, StringComparison.Ordinal);
-		Assert.Contains("not its PIN", refusal, StringComparison.Ordinal);
+		Assert.Contains("It also signs in with its full work email, written AzureAD\\you@company.com.", refusal, StringComparison.Ordinal);
+		Assert.Contains("Require devices to use Network Level Authentication to connect", refusal, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void CredsspRefusal_ADomainBesideAPrincipalName_SaysToLeaveOneOut()
+	{
+		string? refusal = RdpLogin.Parse("alice@corp.example", "CORP", "secret").CredsspRefusal;
+
+		Assert.Equal(
+			"Network level authentication in this client cannot send CORP\\alice@corp.example: it has no form for a domain " +
+			"together with an @ in the name. Leave the domain empty for a name with an @ in it, or write it as DOMAIN\\name.",
+			refusal);
+	}
+
+	[Theory]
+	[InlineData("alice", null)]
+	[InlineData("CORP\\alice", null)]
+	[InlineData("MicrosoftAccount\\you", null)]
+	public void CloudAccountAdvice_IsOnlyForEntraIdAndMicrosoftAccounts(string username, string? domain)
+	{
+		RdpLogin login = RdpLogin.Parse(username, domain, null);
+
+		Assert.Equal(login.IsMicrosoftAccount, login.CloudAccountAdvice is not null);
 	}
 
 	[Fact]

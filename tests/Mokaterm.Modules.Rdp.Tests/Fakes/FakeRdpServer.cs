@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
@@ -9,11 +10,15 @@ namespace Mokaterm.Modules.Rdp.Tests.Fakes;
 /// <summary>
 /// A loopback server that plays the first steps of an RDP server and then stops at the one a test is about: it answers
 /// the X.224 request with a chosen protocol, runs the TLS handshake with a self-signed certificate, and after that
-/// holds the connection, hangs up, or reads one message and hangs up. Nothing past TLS is RDP, which is enough to see
-/// which step a client reports and that it closes what it opened.
+/// holds the connection, hangs up, reads one message and hangs up, refuses an NTLM login, or plays the MCS steps up to
+/// the Client Info PDU and reads that. Nothing past those is RDP, which is enough to see which step a client reports,
+/// what it sent and that it closes what it opened.
 /// </summary>
 internal sealed class FakeRdpServer : IAsyncDisposable
 {
+	/// <summary>RDP_NEG_RSP's selectedProtocol for Standard RDP Security.</summary>
+	public const int ProtocolRdp = 0;
+
 	/// <summary>RDP_NEG_RSP's selectedProtocol for TLS alone.</summary>
 	public const int ProtocolSsl = 1;
 
@@ -27,6 +32,7 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 	private readonly TaskCompletionSource _clientClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 	private Task? _accepting;
 	private int _accepted;
+	private int _tlsHandshakes;
 	private long _bytesAfterTls;
 
 	public FakeRdpServer(int? selectedProtocol, bool startTls = true)
@@ -45,12 +51,30 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 	/// <summary>What each connection does once TLS is up, by its number from 1.</summary>
 	public Func<int, AfterTls> Then { get; init; } = static _ => AfterTls.Hold;
 
+	/// <summary>The X.224 answer to send instead of an RDP_NEG_RSP for <see cref="SelectedProtocol"/>.</summary>
+	public byte[]? Confirm { get; init; }
+
+	/// <summary>
+	/// What happened on the server's side, in order: "tls" once a handshake finished and "client info" once a Client Info
+	/// PDU was read. A test can hand in a queue its certificate check writes to as well.
+	/// </summary>
+	public ConcurrentQueue<string> Events { get; init; } = new();
+
 	public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
 	public int Accepted => Volatile.Read(ref _accepted);
 
+	/// <summary>TLS handshakes that finished.</summary>
+	public int TlsHandshakes => Volatile.Read(ref _tlsHandshakes);
+
+	/// <summary>RDP_NEG_REQ's requestedProtocols from each X.224 Connection Request.</summary>
+	public ConcurrentQueue<uint> RequestedProtocols { get; } = new();
+
 	/// <summary>The domain and user each <see cref="AfterTls.RefuseLogin"/> connection received, as NTLM carried them.</summary>
 	public ConcurrentQueue<(string Domain, string User)> Logins { get; } = new();
+
+	/// <summary>What each <see cref="AfterTls.PlaySession"/> connection read in the Client Info PDU.</summary>
+	public ConcurrentQueue<FakeClientInfo> ClientInfos { get; } = new();
 
 	/// <summary>Bytes the clients sent over TLS, which is where CredSSP would carry a login.</summary>
 	public long BytesAfterTls => Interlocked.Read(ref _bytesAfterTls);
@@ -87,6 +111,21 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 		0x02, 0x00, 0x08, 0x00, (byte)protocol, 0x00, 0x00, 0x00,
 	];
 
+	/// <summary>The X.224 connection confirm with an RDP_NEG_FAILURE carrying <paramref name="code"/>.</summary>
+	public static byte[] NegotiationFailure(int code) =>
+	[
+		0x03, 0x00, 0x00, 0x13,
+		0x0E, 0xD0, 0x00, 0x00, 0x12, 0x34, 0x00,
+		0x03, 0x00, 0x08, 0x00, (byte)code, 0x00, 0x00, 0x00,
+	];
+
+	/// <summary>The X.224 connection confirm of a server from before RDP 5.2, with no negotiation in it at all.</summary>
+	public static byte[] ConfirmWithoutNegotiation() =>
+	[
+		0x03, 0x00, 0x00, 0x0B,
+		0x06, 0xD0, 0x00, 0x00, 0x12, 0x34, 0x00,
+	];
+
 	private async Task AcceptAsync()
 	{
 		try
@@ -111,15 +150,24 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 		try
 		{
 			NetworkStream network = client.GetStream();
-			await ReadTpktAsync(network, stopping);
-			if (SelectedProtocol is not int protocol)
+			byte[] request = await ReadTpktAsync(network, stopping);
+
+			// RDP_NEG_REQ is the last eight bytes of the request, after the routing cookie.
+			if (request.Length >= 8 + 11 && request[^8] == 0x01)
+			{
+				RequestedProtocols.Enqueue(BinaryPrimitives.ReadUInt32LittleEndian(request.AsSpan(request.Length - 4)));
+			}
+
+			byte[]? confirm = Confirm ?? (SelectedProtocol is int protocol ? ConnectionConfirm(protocol) : null);
+			if (confirm is null)
 			{
 				await HoldAsync(network, stopping);
 				return;
 			}
 
-			await network.WriteAsync(ConnectionConfirm(protocol), stopping);
-			if (!StartTls)
+			await network.WriteAsync(confirm, stopping);
+			bool refused = confirm.Length > 11 && confirm[11] == 0x03;
+			if (!StartTls || refused)
 			{
 				await HoldAsync(network, stopping);
 				return;
@@ -127,6 +175,8 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 
 			await using SslStream tls = new(network, leaveInnerStreamOpen: true);
 			await tls.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificate = _certificate }, stopping);
+			Interlocked.Increment(ref _tlsHandshakes);
+			Events.Enqueue("tls");
 			switch (Then(number))
 			{
 				case AfterTls.HangUp:
@@ -134,6 +184,9 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 				case AfterTls.RefuseLogin:
 					Logins.Enqueue(await FakeNtlmLogin.RefuseAsync(tls, stopping));
 					await HoldAsync(tls, stopping);
+					return;
+				case AfterTls.PlaySession:
+					await PlaySessionAsync(tls, stopping);
 					return;
 				case AfterTls.ReadOnceThenHangUp:
 					byte[] buffer = new byte[16 * 1024];
@@ -176,13 +229,33 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 		}
 	}
 
-	private static async Task ReadTpktAsync(Stream stream, CancellationToken cancellationToken)
+	/// <summary>
+	/// Answers the MCS steps of a TLS connection the way Windows does, up to the Client Info PDU: the Connect Response,
+	/// then the Attach User Confirm after the client's Erect Domain and Attach User requests. Channel joins are skipped,
+	/// which the Connect Response offers. It reads the Client Info PDU and hangs up.
+	/// </summary>
+	private async Task PlaySessionAsync(SslStream tls, CancellationToken cancellationToken)
+	{
+		await ReadTpktAsync(tls, cancellationToken);
+		await tls.WriteAsync(RdpPdus.ServerConnectResponse(), cancellationToken);
+		await ReadTpktAsync(tls, cancellationToken);
+		await ReadTpktAsync(tls, cancellationToken);
+		await tls.WriteAsync(RdpPdus.AttachUserConfirm(), cancellationToken);
+		byte[] info = await ReadTpktAsync(tls, cancellationToken);
+		ClientInfos.Enqueue(FakeClientInfo.Read(info));
+		Events.Enqueue("client info");
+	}
+
+	/// <summary>Reads one whole TPKT message, header included.</summary>
+	private static async Task<byte[]> ReadTpktAsync(Stream stream, CancellationToken cancellationToken)
 	{
 		byte[] header = new byte[4];
 		await stream.ReadExactlyAsync(header, cancellationToken);
-		int length = (header[2] << 8) | header[3];
-		byte[] body = new byte[Math.Max(0, length - 4)];
-		await stream.ReadExactlyAsync(body, cancellationToken);
+		int length = Math.Max(4, (header[2] << 8) | header[3]);
+		byte[] message = new byte[length];
+		header.CopyTo(message, 0);
+		await stream.ReadExactlyAsync(message.AsMemory(4), cancellationToken);
+		return message;
 	}
 
 	public enum AfterTls
@@ -198,5 +271,8 @@ internal sealed class FakeRdpServer : IAsyncDisposable
 
 		/// <summary>Runs NTLM up to the login and turns it down with STATUS_LOGON_FAILURE, as Windows does for a wrong password.</summary>
 		RefuseLogin,
+
+		/// <summary>Plays the MCS steps up to the Client Info PDU, reads it into <see cref="ClientInfos"/> and closes.</summary>
+		PlaySession,
 	}
 }

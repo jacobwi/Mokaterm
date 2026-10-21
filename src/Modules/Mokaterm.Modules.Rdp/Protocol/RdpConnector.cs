@@ -43,18 +43,52 @@ internal sealed class RdpConnector
 		? (Options.Width, Options.Height)
 		: (RdpConnectionOptions.DefaultWidth, RdpConnectionOptions.DefaultHeight);
 
+	/// <summary>
+	/// How the last attempt signed in, or was going to, and the security protocol the server picked in it, null until a
+	/// server answered the RDP request. The probe prints both, whether the attempt worked or not.
+	/// </summary>
+	public RdpSignInRoute? LastRoute { get; private set; }
+
+	/// <inheritdoc cref="LastRoute"/>
+	public RdpSecurityProtocols? LastNegotiated { get; private set; }
+
+	/// <summary>
+	/// How <paramref name="credentials"/> sign in with <paramref name="options"/>. A login with no password, or none at
+	/// all, never sends one: the server's own sign-in screen asks for it instead.
+	/// </summary>
+	public static RdpSignInRoute RouteFor(RdpConnectionOptions options, LoginCredentials? credentials)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+		if (credentials is null || credentials.Method == AuthenticationMethod.Anonymous)
+		{
+			return RdpSignInRoute.SignInScreen;
+		}
+
+		if (options.NetworkLevelAuthentication)
+		{
+			return RdpSignInRoute.NetworkLevelAuthentication;
+		}
+
+		return options.Autologon && credentials.Password is { Length: > 0 } ? RdpSignInRoute.Automatic : RdpSignInRoute.SignInScreen;
+	}
+
 	/// <exception cref="ProtocolConnectException">Connecting failed in a way the user should see.</exception>
 	/// <exception cref="RdpAuthenticationException">The server refused the login and another password may work.</exception>
 	public async Task<RdpTransport> ConnectAsync(LoginCredentials? credentials, IProgress<string>? status, CancellationToken cancellationToken)
 	{
-		bool credssp = Options.NetworkLevelAuthentication && credentials?.Method != AuthenticationMethod.Anonymous;
+		RdpSignInRoute route = RouteFor(Options, credentials);
+		LastRoute = route;
+		LastNegotiated = null;
 
 		// The names only, for the messages: the password stays in the credentials until the config is built.
 		RdpLogin names = RdpLogin.Parse(credentials?.Username, Options.Domain, null);
-		if (credssp && names.CredsspRefusal is { } refusal)
+		if (route == RdpSignInRoute.NetworkLevelAuthentication && names.CredsspRefusal is { } refusal)
 		{
-			// Refused before anything is dialed, so the prompt that follows can take a name that works.
-			throw new RdpAuthenticationException(refusal);
+			// Refused before anything is dialed, so the prompt that follows can take a name that works. An Entra ID
+			// account needs network level authentication turned off, which no other name in that prompt would change.
+			throw names.IsEntraId
+				? new ProtocolConnectException(ConnectFailure.AuthenticationFailed, refusal)
+				: new RdpAuthenticationException(refusal);
 		}
 
 		for (int attempt = 1; ; attempt++)
@@ -68,8 +102,8 @@ internal sealed class RdpConnector
 				_dial);
 			try
 			{
-				using Config config = BuildConfig(credentials, credssp);
-				return await sequence.RunAsync(config, Timeout, deadline.Token);
+				using Config config = BuildConfig(credentials, route);
+				return await sequence.RunAsync(config, route, Timeout, deadline.Token);
 			}
 			catch (Exception ex) when (attempt == 1 && ServerGaveUpDuringPrompt(ex, sequence, progress, deadline, cancellationToken))
 			{
@@ -81,7 +115,11 @@ internal sealed class RdpConnector
 			{
 				// Whatever a step threw on its way out of a cancel by the user, the attempt was cancelled, not failed.
 				cancellationToken.ThrowIfCancellationRequested();
-				throw await DescribeAsync(ex, progress, sequence, names, credssp, deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested);
+				throw await DescribeAsync(ex, progress, sequence, names, route, deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested);
+			}
+			finally
+			{
+				LastNegotiated = sequence.Negotiated;
 			}
 		}
 	}
@@ -104,10 +142,13 @@ internal sealed class RdpConnector
 		RdpConnectProgress progress,
 		RdpConnectSequence sequence,
 		RdpLogin names,
-		bool credssp,
+		RdpSignInRoute route,
 		bool timedOut)
 	{
-		if (!timedOut && credssp && progress.Stage == RdpConnectStage.Login && RdpConnectErrors.IsLoginRefused(exception, sequence.LoginMessagesSent))
+		if (!timedOut
+			&& route == RdpSignInRoute.NetworkLevelAuthentication
+			&& progress.Stage == RdpConnectStage.Login
+			&& RdpConnectErrors.IsLoginRefused(exception, sequence.LoginMessagesSent))
 		{
 			return exception as RdpAuthenticationException
 				?? new RdpAuthenticationException(RdpConnectErrors.LoginRefused(exception, progress, names), exception);
@@ -116,13 +157,14 @@ internal sealed class RdpConnector
 		return await RdpConnectErrors.DescribeAsync(exception, progress, timedOut, CancellationToken.None);
 	}
 
-	private Config BuildConfig(LoginCredentials? credentials, bool credssp)
+	private Config BuildConfig(LoginCredentials? credentials, RdpSignInRoute route)
 	{
 		(int width, int height) = DesktopSize;
 
-		// The password only exists as a string for as long as the builder needs it; nothing else keeps a copy.
-		string password = credssp ? credentials?.Password?.RevealString() ?? "" : "";
+		// The password only exists as a string for as long as the builder needs it; nothing else keeps a copy. IronRDP
+		// keeps its own in the connection's config for the session's life, on both routes that send one.
+		string password = route == RdpSignInRoute.SignInScreen ? "" : credentials?.Password?.RevealString() ?? "";
 		RdpLogin login = RdpLogin.Parse(credentials?.Username, Options.Domain, password);
-		return RdpConfigFactory.Build(Options, login, width, height, credssp);
+		return RdpConfigFactory.Build(Options, login, width, height, route);
 	}
 }

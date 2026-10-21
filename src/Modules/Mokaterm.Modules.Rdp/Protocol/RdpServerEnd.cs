@@ -21,25 +21,7 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 /// <param name="Code">Which message and code it was, for the log. Never holds a host or user name.</param>
 internal sealed record RdpServerEnd(string Reason, bool Reconnects, string Code)
 {
-	private const byte TpktVersion = 3;
-	private const byte X224DataLengthIndicator = 2;
-	private const byte X224DataCode = 0xF0;
-
-	// The first byte of an MCS domain PDU holds the CHOICE index in its top six bits (T.125, PER aligned).
-	private const int McsDisconnectProviderUltimatum = 8;
-	private const int McsSendDataIndication = 26;
-
-	private const int ShareControlTypeMask = 0x0F;
-	private const int ShareControlTypeData = 0x7;
 	private const byte SetErrorInfoType = 0x2F;
-	private const byte PacketCompressed = 0x20;
-
-	// TS_SHARECONTROLHEADER (totalLength, pduType, pduSource), then the rest of TS_SHAREDATAHEADER (shareId, pad1,
-	// streamId, uncompressedLength, pduType2, compressedType, compressedLength), then the four byte errorInfo.
-	private const int PduType2Offset = 14;
-	private const int CompressedTypeOffset = 15;
-	private const int ErrorInfoOffset = 18;
-	private const int SetErrorInfoLength = ErrorInfoOffset + 4;
 
 	/// <summary>IronRDP ended the session itself, which leaves no reason this side can read.</summary>
 	public static RdpServerEnd Terminated { get; } = new("The server ended the remote session.", Reconnects: false, "IronRDP terminate");
@@ -53,60 +35,19 @@ internal sealed record RdpServerEnd(string Reason, bool Reconnects, string Code)
 	/// <param name="ioChannelId">The MCS I/O channel the server sends the session's own PDUs on.</param>
 	public static RdpServerEnd? Read(ReadOnlySpan<byte> message, int ioChannelId)
 	{
-		// A TPKT header and an X.224 Data TPDU, then the MCS PDU. Fast-path messages never carry either of these.
-		if (message.Length < 9 || message[0] != TpktVersion || message[4] != X224DataLengthIndicator || message[5] != X224DataCode)
+		if (RdpIoChannel.Ultimatum(message) is int reason)
 		{
-			return null;
-		}
-
-		ReadOnlySpan<byte> mcs = message[7..];
-		int choice = mcs[0] >> 2;
-		if (choice == McsDisconnectProviderUltimatum)
-		{
-			// The reason is a three bit enumeration that straddles the first two bytes.
-			int reason = ((mcs[0] & 0x03) << 1) | (mcs[1] >> 7);
 			return FromUltimatum(reason);
 		}
 
-		if (choice != McsSendDataIndication || mcs.Length < 7)
+		if (!RdpIoChannel.TryReadShareData(message, ioChannelId, out byte pduType2, out ReadOnlySpan<byte> data)
+			|| pduType2 != SetErrorInfoType
+			|| data.Length < 4)
 		{
 			return null;
 		}
 
-		// initiator (2 bytes), channelId (2, an offset from 0), dataPriority and segmentation (1), then a PER length.
-		int channel = BinaryPrimitives.ReadUInt16BigEndian(mcs[3..]);
-		if (channel != ioChannelId)
-		{
-			return null;
-		}
-
-		int at = 6;
-		int length = mcs[at++];
-		if ((length & 0x80) != 0)
-		{
-			if (mcs.Length <= at)
-			{
-				return null;
-			}
-
-			length = ((length & 0x7F) << 8) | mcs[at++];
-		}
-
-		if (length < SetErrorInfoLength || mcs.Length - at < length)
-		{
-			return null;
-		}
-
-		ReadOnlySpan<byte> share = mcs.Slice(at, length);
-		int pduType = BinaryPrimitives.ReadUInt16LittleEndian(share[2..]);
-		if ((pduType & ShareControlTypeMask) != ShareControlTypeData
-			|| share[PduType2Offset] != SetErrorInfoType
-			|| (share[CompressedTypeOffset] & PacketCompressed) != 0)
-		{
-			return null;
-		}
-
-		uint code = BinaryPrimitives.ReadUInt32LittleEndian(share[ErrorInfoOffset..]);
+		uint code = BinaryPrimitives.ReadUInt32LittleEndian(data);
 		return code == RdpErrorInfo.None ? null : FromErrorInfo(code);
 	}
 

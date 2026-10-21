@@ -76,22 +76,26 @@ public sealed class RdpOperationHandleTests
 		Assert.Equal(32 * 16 * PngWriter.BytesPerPixel, (int)data.GetSize());
 	}
 
-	[Fact]
-	public void ConfigFactory_BuildsAConfigForALoginAndForNoLoginAtAll()
+	// What each route puts on the wire is read by a fake server in RdpSignInTests; this is that IronRDP takes them all.
+	[Theory]
+	[InlineData((int)RdpSignInRoute.NetworkLevelAuthentication)]
+	[InlineData((int)RdpSignInRoute.Automatic)]
+	[InlineData((int)RdpSignInRoute.SignInScreen)]
+	public void ConfigFactory_BuildsAConfigForEveryRoute(int route)
 	{
 		using Config withLogin = RdpConfigFactory.Build(
 			RdpConnectionOptions.Default,
 			new RdpLogin("CORP", "alice", "secret"),
 			1280,
 			800,
-			credssp: true);
+			(RdpSignInRoute)route);
 
 		using Config withoutLogin = RdpConfigFactory.Build(
 			RdpConnectionOptions.Default with { KeyboardLayout = 0x0409 },
 			new RdpLogin("", "", ""),
 			1920,
 			1080,
-			credssp: false);
+			(RdpSignInRoute)route);
 
 		Assert.NotNull(withLogin);
 		Assert.NotNull(withoutLogin);
@@ -100,7 +104,7 @@ public sealed class RdpOperationHandleTests
 	[Fact]
 	public void ConfigFactory_ClampsADesktopSizeOutsideWhatRdpNegotiates()
 	{
-		using Config config = RdpConfigFactory.Build(RdpConnectionOptions.Default, new RdpLogin("", "a", "b"), 0, 999_999, credssp: false);
+		using Config config = RdpConfigFactory.Build(RdpConnectionOptions.Default, new RdpLogin("", "a", "b"), 0, 999_999, RdpSignInRoute.SignInScreen);
 
 		Assert.NotNull(config);
 	}
@@ -123,7 +127,7 @@ public sealed class RdpOperationHandleTests
 					},
 				};
 
-				using Config config = RdpConfigFactory.Build(options, new RdpLogin("", "a", "b"), 800, 600, credssp: true);
+				using Config config = RdpConfigFactory.Build(options, new RdpLogin("", "a", "b"), 800, 600, RdpSignInRoute.NetworkLevelAuthentication);
 				Assert.NotNull(config);
 			}
 		}

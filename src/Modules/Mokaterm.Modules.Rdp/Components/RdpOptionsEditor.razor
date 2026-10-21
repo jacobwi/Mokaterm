@@ -16,6 +16,15 @@
 					   Disabled="Disabled" />
 	</MokaGrid>
 
+	@if (!Current.NetworkLevelAuthentication)
+	{
+		<MokaSwitch Label="Sign in with this login's name and password"
+					Value="@Current.Autologon"
+					ValueChanged="OnAutologonChangedAsync"
+					HelperText="@AutologonHelp"
+					Disabled="Disabled" />
+	}
+
 	<MokaFieldWrapper Label="Desktop size" HelperText="@DesktopSizeHelp" Disabled="Disabled">
 		<MokaSegmentedControl AriaLabel="Desktop size" Value="@Current.DesktopSize.ToString()" ValueChanged="OnDesktopSizeChangedAsync" Disabled="Disabled" FullWidth>
 			<MokaSegment Value="@nameof(RdpDesktopSizeMode.Automatic)" Text="From the view" Disabled="Disabled" />
@@ -92,8 +101,10 @@
 		</MokaGrid>
 	</MokaFieldWrapper>
 
-	<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+	<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
 		Set the authentication above to Password for a normal login, and to No password when the server should ask
-		for the account itself on its own login screen, which also turns network level authentication off.
+		for the account itself on its own sign-in screen, which also turns network level authentication off. A
+		Microsoft Entra ID account (AzureAD\you@company.com) signs in from here only with network level authentication
+		off, on that PC and in this login.
 	</MokaText>
 </MokaFlexbox>

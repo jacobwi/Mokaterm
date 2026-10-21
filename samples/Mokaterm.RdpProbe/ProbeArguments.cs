@@ -19,7 +19,20 @@ internal sealed record ProbeArguments
 	/// <summary>False sends no login over CredSSP, as the connection option "Network level authentication" off does.</summary>
 	public bool NetworkLevelAuthentication { get; init; } = true;
 
+	/// <summary>
+	/// With network level authentication off, sends the name and password in the Client Info PDU so Windows signs in by
+	/// itself, as the connection option "Sign in with this login's name and password" does. False leaves its sign-in
+	/// screen up and asks for no password.
+	/// </summary>
+	public bool Autologon { get; init; } = true;
+
 	public int TimeoutSeconds { get; init; } = 20;
+
+	/// <summary>How long to wait after the first picture for Windows to say whether it signed in.</summary>
+	public int SignInWaitSeconds { get; init; } = 30;
+
+	/// <summary>True when the password goes to the server, so the probe has to ask for it.</summary>
+	public bool SendsPassword => User is not null && (NetworkLevelAuthentication || Autologon);
 
 	/// <summary>Accepts the server's certificate without asking.</summary>
 	public bool AcceptCertificate { get; init; }
@@ -31,15 +44,21 @@ internal sealed record ProbeArguments
 		"""
 		Usage: Mokaterm.RdpProbe host[:port] [user] [domain] [options]
 
-		  host[:port]     the PC to connect to; 3389 unless a port is given ([::1]:3390 for IPv6)
-		  user            DOMAIN\name, PCNAME\name, name or name@domain; leave it out to connect without a login
-		  domain          a domain for a user name that carries none
+		  host[:port]       the PC to connect to; 3389 unless a port is given ([::1]:3390 for IPv6)
+		  user              DOMAIN\name, PCNAME\name, name, name@domain, AzureAD\you@company.com or
+		                    MicrosoftAccount\you@outlook.com; leave it out to connect without a login
+		  domain            a domain for a user name that carries none
 
 		Options:
-		  --no-nla        send no login over CredSSP and leave it to the server's own screen
-		  --timeout N     seconds for the whole connect (default 20); a certificate question does not count
-		  --yes           accept the server's certificate without asking
-		  --connect-only  stop once connected instead of waiting for the first picture
+		  --no-nla          skip network level authentication (CredSSP): the name and password go in the
+		                    Client Info PDU, inside TLS and after the certificate check, and Windows signs in
+		                    by itself, as mstsc does when the PC has network level authentication off
+		  --no-autologon    with --no-nla, send no password and stop at the server's own sign-in screen
+		  --timeout N       seconds for the whole connect (default 20); a certificate question does not count
+		  --sign-in-wait N  seconds to wait after the first picture for Windows to say whether it signed in
+		                    (default 30)
+		  --yes             accept the server's certificate without asking
+		  --connect-only    stop once connected instead of waiting for the first picture
 
 		The password comes from MOKATERM_RDP_PASSWORD, or is asked for without echo. It is never printed.
 		""";
@@ -50,15 +69,20 @@ internal sealed record ProbeArguments
 		error = null;
 		List<string> positional = [];
 		bool nla = true;
+		bool autologon = true;
 		bool yes = false;
 		bool connectOnly = false;
 		int timeout = 20;
+		int signInWait = 30;
 		for (int i = 0; i < args.Count; i++)
 		{
 			switch (args[i])
 			{
 				case "--no-nla":
 					nla = false;
+					break;
+				case "--no-autologon":
+					autologon = false;
 					break;
 				case "--yes":
 					yes = true;
@@ -67,9 +91,18 @@ internal sealed record ProbeArguments
 					connectOnly = true;
 					break;
 				case "--timeout":
-					if (i + 1 >= args.Count || !int.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out timeout) || timeout is < 1 or > 300)
+					if (!TryReadSeconds(args, i, out timeout))
 					{
 						error = "--timeout takes a number of seconds from 1 to 300.";
+						return null;
+					}
+
+					i++;
+					break;
+				case "--sign-in-wait":
+					if (!TryReadSeconds(args, i, out signInWait))
+					{
+						error = "--sign-in-wait takes a number of seconds from 1 to 300.";
 						return null;
 					}
 
@@ -108,10 +141,20 @@ internal sealed record ProbeArguments
 			User = positional.Count > 1 ? positional[1] : null,
 			Domain = positional.Count > 2 ? positional[2] : null,
 			NetworkLevelAuthentication = nla,
+			Autologon = autologon,
 			TimeoutSeconds = timeout,
+			SignInWaitSeconds = signInWait,
 			AcceptCertificate = yes,
 			ConnectOnly = connectOnly,
 		};
+	}
+
+	private static bool TryReadSeconds(IReadOnlyList<string> args, int at, out int seconds)
+	{
+		seconds = 0;
+		return at + 1 < args.Count
+			&& int.TryParse(args[at + 1], NumberStyles.None, CultureInfo.InvariantCulture, out seconds)
+			&& seconds is >= 1 and <= 300;
 	}
 
 	private static bool TryReadEndpoint(string value, out string host, out int port)

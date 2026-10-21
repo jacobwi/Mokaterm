@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using Mokaterm.Modules.Rdp.Protocol;
@@ -116,6 +117,22 @@ public sealed class RdpSessionLoopTests
 
 		await Eventually.TrueAsync(() => harness.Stage.Processed.Count == 1, "the stage got the message");
 		await Eventually.StaysTrueAsync(() => !harness.Loop.Completion.IsCompleted, "the session runs on");
+	}
+
+	[Fact]
+	public async Task WhatWindowsSaysAboutSigningIn_IsKeptAndRaisedAndStillGoesToIronRdp()
+	{
+		await using Harness harness = Harness.Start();
+		ConcurrentQueue<RdpLogonNotice> raised = new();
+		harness.Loop.LogonNoticed += raised.Enqueue;
+
+		await harness.Wire.SendAsync(RdpPdus.LogonErrors(0xFFFF_FFFE, 2));
+		await harness.Wire.SendAsync(RdpPdus.SaveSessionInfo(1, new byte[576]));
+
+		await Eventually.TrueAsync(() => harness.Stage.Processed.Count == 2, "the stage got both messages");
+		Assert.Equal<RdpLogonNoticeKind>([RdpLogonNoticeKind.Continuing, RdpLogonNoticeKind.SignedIn], [.. raised.Select(notice => notice.Kind)]);
+		Assert.Equal(RdpLogonNoticeKind.SignedIn, harness.Loop.Logon?.Kind);
+		Assert.False(harness.Loop.Completion.IsCompleted);
 	}
 
 	[Fact]

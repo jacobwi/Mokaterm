@@ -16,9 +16,19 @@ public partial class RdpOptionsEditor : ConnectionOptionsEditorBase<RdpConnectio
 	/// <summary>The list entry for the stored layout id, or one named after the id when the list has none.</summary>
 	private RdpKeyboardLayout Layout => RdpKeyboardLayout.For(Current.KeyboardLayout);
 
+	private const string AutologonOnHelp =
+		"The name and password go to the PC encrypted inside TLS, only after its certificate passed the check, and Windows " +
+		"signs in without showing its sign-in screen.";
+
+	private const string AutologonOffHelp =
+		"Nothing is sent: Windows shows its own sign-in screen, where any user can sign in.";
+
 	private string NlaHelp => Current.NetworkLevelAuthentication
 		? "The login is checked before the desktop starts, which is what every current Windows server expects."
-		: "No credentials are sent and the server shows its own login screen. Older servers and some gateways need this.";
+		: "The login is not checked up front, and Windows signs in itself. The PC has to allow this, and a Microsoft " +
+			"Entra ID account needs it.";
+
+	private string AutologonHelp => Current.Autologon ? AutologonOnHelp : AutologonOffHelp;
 
 	private string DesktopSizeHelp => Current.DesktopSize == RdpDesktopSizeMode.Fixed
 		? "Always asks for this size, whatever the view measures."
@@ -36,6 +46,8 @@ public partial class RdpOptionsEditor : ConnectionOptionsEditorBase<RdpConnectio
 	protected override ProtocolOptions ApplyTo(RdpConnectionOptions current, ProtocolOptions options) => current.ApplyTo(options);
 
 	private Task OnNlaChangedAsync(bool value) => ChangeAsync(Current with { NetworkLevelAuthentication = value });
+
+	private Task OnAutologonChangedAsync(bool value) => ChangeAsync(Current with { Autologon = value });
 
 	private Task OnDomainChangedAsync(string value) => ChangeAsync(Current with { Domain = value ?? "" });
 
