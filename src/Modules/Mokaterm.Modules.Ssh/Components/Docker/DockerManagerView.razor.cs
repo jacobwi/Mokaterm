@@ -18,7 +18,7 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// it cannot be used (offering sudo when the socket refuses the account), and otherwise shows its pages beside a
 /// navigation that folds to icons when the dialog is narrow. The pages are the registered
 /// <see cref="DockerPageDescriptor"/>s, this module's and any other's, opened by id. While it is open it also watches the
-/// host's containers and says when one turns unhealthy, stops or is restarted on its own.
+/// host's containers and says when one turns unhealthy, stops, is restarted on its own or keeps restarting.
 /// </summary>
 public sealed partial class DockerManagerView : SessionViewBase, IDisposable
 {
@@ -152,7 +152,7 @@ public sealed partial class DockerManagerView : SessionViewBase, IDisposable
 		_feature = session?.GetFeature<DockerSessionFeature>();
 		_status = _feature?.Status;
 		_elevationError = null;
-		_watch = new DockerHealthWatch();
+		_watch = new DockerHealthWatch(_feature?.RestartLoops);
 		if (_feature is { } feature)
 		{
 			feature.Changed += OnFeatureChanged;

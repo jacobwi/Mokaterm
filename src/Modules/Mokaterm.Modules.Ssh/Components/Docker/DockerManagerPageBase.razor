@@ -11,4 +11,13 @@
 			</Hint>
 		}
 	</text>;
+
+	private protected static RenderFragment LoopChip(DockerRestartRecord? loop) => @<text>
+		@if (loop is { IsLooping: true })
+		{
+			<Hint Text="@DockerRestartWording.Summary(loop)">
+				<MokaTag Text="RESTART LOOP" Size="MokaSize.Xs" Color="MokaColor.Error" />
+			</Hint>
+		}
+	</text>;
 }

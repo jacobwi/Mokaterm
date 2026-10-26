@@ -3,6 +3,9 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
 		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+		<!-- The Docker manager's pages are rendered for real with Blazor's static HtmlRenderer. -->
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+		<PackageReference Include="Microsoft.Extensions.Logging" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -25,6 +28,7 @@
 	<!-- Eventually.AdvanceUntilAsync, for the page poller. -->
 	<ItemGroup>
 		<Compile Include="..\Shared\FakeTime\*.cs" LinkBase="Shared" />
+		<Compile Include="..\Shared\Rendering\*.cs" LinkBase="Shared" />
 	</ItemGroup>
 
 	<!--

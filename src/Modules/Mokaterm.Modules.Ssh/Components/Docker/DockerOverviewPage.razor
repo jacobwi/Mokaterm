@@ -12,6 +12,20 @@
 </div>
 
 @LoadErrorPanel(RefreshAsync)
+@if (RestartLoops?.Looping is { Count: > 0 } loops)
+{
+	<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+		<div class="mt-dk-alert-line">
+			<span>@DockerRestartWording.Count(loops.Count)</span>
+			@if (Navigation is { } navigation)
+			{
+				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="DockerIcons.Container" OnClick="navigation.ShowRestartLoops">
+					Show @(loops.Count == 1 ? "it" : "them")
+				</MokaButton>
+			}
+		</div>
+	</MokaAlert>
+}
 
 <div class="mt-dk-scroll">
 	@if (Feature?.Status is { } status)

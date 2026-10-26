@@ -142,6 +142,7 @@
 							<span class="mt-dk-label mt-dk-cell--w12">@(service.Health == DockerHealth.None ? "" : DockerStateDisplay.HealthLabel(service.Health))</span>
 						}
 						<span class="mt-dk-cell mt-dk-cell--grow" title="@service.Image">@service.Image</span>
+						@LoopChip(ServiceLoop(service))
 						@UpdateChip(service.Image)
 						<span class="mt-dk-cell mt-dk-cell--optional">@string.Join(", ", service.Ports)</span>
 						<Hint Text="Containers running, of all of them" Class="mt-dk-cell mt-dk-cell--count">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</Hint>
@@ -175,6 +176,11 @@
 									<MokaDropdownItem Text="Build its image" Icon="DockerIcons.Build" Disabled="@(!_target.HasFiles || IsWorking)" OnClick="@(() => RunAsync("build", service.Name))" />
 									<MokaDropdownItem Text="Update this service (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update", service.Name))" />
 									<MokaDropdownItem Divider />
+									@if (ServiceLoop(service) is { } loop && Navigation is { } navigation)
+									{
+										<MokaDropdownItem Text="Why it keeps restarting" Icon="DockerIcons.Container"
+														  OnClick="@(() => navigation.ShowContainer(loop.Id, DockerContainerPanel.RestartsTab))" />
+									}
 									<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => ShowLogs(service.Name))" />
 									<MokaDropdownItem Text="Browse files"
 													  Icon="MokatermIcons.FolderOpen"

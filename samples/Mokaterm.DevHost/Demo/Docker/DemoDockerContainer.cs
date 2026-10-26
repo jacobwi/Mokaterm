@@ -39,7 +39,13 @@ internal sealed class DemoDockerContainer
 
 	public IReadOnlyList<string> Networks { get; init; } = [];
 
-	public string RestartPolicy { get; init; } = "no";
+	public string RestartPolicy { get; set; } = "no";
+
+	public bool OomKilled { get; set; }
+
+	public string Error { get; set; } = "";
+
+	public DemoCrashLoop? Loop { get; init; }
 
 	/// <summary>What the container's log says, one entry per line, repeated as time passes.</summary>
 	public IReadOnlyList<string> LogLines { get; init; } = ["ready"];

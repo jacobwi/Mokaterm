@@ -7,8 +7,8 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <summary>
 /// What every page of the Docker manager gets from the manager, cascaded: how to open another page, and for a page from
 /// another module the session's docker client behind <see cref="IDockerPageContext"/>. The manager's own pages also
-/// use it for "New container" from an image, where a request for the page being opened waits here until that page
-/// takes it, once.
+/// use it for "New container" from an image, and for the containers page opened on its restart loops or on one
+/// container, where a request for the page being opened waits here until that page takes it, once.
 /// </summary>
 internal sealed class DockerPageContext : IDockerPageContext
 {
@@ -16,6 +16,8 @@ internal sealed class DockerPageContext : IDockerPageContext
 	private readonly Func<DockerSessionFeature?> _feature;
 	private string? _newContainerImage;
 	private bool _buildImage;
+	private bool _restartLoops;
+	private (string Id, string Tab)? _container;
 
 	/// <param name="show">Shows a page by its id.</param>
 	/// <param name="feature">The session's manager state at the moment of asking, which changes on a reconnect.</param>
@@ -70,6 +72,34 @@ internal sealed class DockerPageContext : IDockerPageContext
 		string? image = _newContainerImage;
 		_newContainerImage = null;
 		return image;
+	}
+
+	public void ShowRestartLoops()
+	{
+		_restartLoops = true;
+		_show(DockerPageIds.Containers);
+	}
+
+	public bool TakeRestartLoops()
+	{
+		bool asked = _restartLoops;
+		_restartLoops = false;
+		return asked;
+	}
+
+	public void ShowContainer(string id, string tab)
+	{
+		ArgumentNullException.ThrowIfNull(id);
+		ArgumentNullException.ThrowIfNull(tab);
+		_container = (id, tab);
+		_show(DockerPageIds.Containers);
+	}
+
+	public (string Id, string Tab)? TakeContainer()
+	{
+		(string Id, string Tab)? container = _container;
+		_container = null;
+		return container;
 	}
 
 	public string Display(DockerCommand command)

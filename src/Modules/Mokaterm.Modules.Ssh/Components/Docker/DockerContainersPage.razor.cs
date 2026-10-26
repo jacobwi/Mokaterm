@@ -7,14 +7,15 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
 /// Every container on the host, grouped under its compose project with the rest in a group of their own, one line
-/// each: state, name, health, image and whether the session's update check found a newer one, ports. The common
-/// actions show on hover, everything else is in the row's menu, and a row opens its panel under the list (beside it on
-/// a wide page). "New container" swaps the list for the docker run form. The list refreshes every few seconds while it
-/// shows.
+/// each: state, name, health, image, whether it is in a restart loop and whether the session's update check found a
+/// newer one, ports. The common actions show on hover, everything else is in the row's menu, and a row opens its panel
+/// under the list (beside it on a wide page). "New container" swaps the list for the docker run form. The list
+/// refreshes every few seconds while it shows.
 /// </summary>
 public sealed partial class DockerContainersPage : DockerManagerPageBase
 {
 	private const string StandaloneKey = "";
+	private const string LoopsFilter = "loops";
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
 
 	private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
@@ -34,6 +35,8 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 
 	private int RunningCount => _containers.Count(container => container.IsAlive);
 
+	private int LoopingCount => _containers.Count(IsLooping);
+
 	private IReadOnlyCollection<string> TakenNames => [.. _containers.Select(container => container.Name)];
 
 	protected override async Task OnInitializedAsync()
@@ -43,7 +46,20 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 			_newImage = image;
 		}
 
+		if (Navigation?.TakeRestartLoops() == true)
+		{
+			_filter = LoopsFilter;
+		}
+
+		(string Id, string Tab)? asked = Navigation?.TakeContainer();
 		await RefreshAsync();
+		if (asked is { } show && _containers.FirstOrDefault(container => container.Id == show.Id) is { } shown)
+		{
+			_collapsed.Remove(shown.ComposeProject ?? StandaloneKey);
+			Select(shown, show.Tab);
+		}
+
+		FollowRestartLoops(ApplyFilter);
 		StartPolling(RefreshInterval, () => _newImage is null ? RefreshAsync() : Task.CompletedTask);
 	}
 
@@ -60,9 +76,13 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 		return string.Join(", ", ports.Count > 0 ? ports : container.Ports.Select(port => port.Display));
 	}
 
-	/// <summary>Running containers first, then by name, whatever docker's own order was.</summary>
-	private static int Rank(DockerContainer container) => container.State switch
+	/// <summary>
+	/// Running containers first, then by name, whatever docker's own order was. One in a restart loop keeps the place of a
+	/// restarting one while it runs, so its row does not jump at every read.
+	/// </summary>
+	private int Rank(DockerContainer container) => container.State switch
 	{
+		"running" when IsLooping(container) => 1,
 		"running" => 0,
 		"restarting" or "paused" => 1,
 		"created" => 3,
@@ -87,6 +107,7 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 			{
 				"running" => container.IsAlive,
 				"stopped" => !container.IsAlive,
+				LoopsFilter => IsLooping(container),
 				_ => true,
 			})
 			.Where(container => container.Matches(_query));
@@ -120,6 +141,10 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 			_collapsed.Add(key);
 		}
 	}
+
+	private bool IsLooping(DockerContainer container) => LoopOf(container.Id, container.Name) is not null;
+
+	private string FirstTab(DockerContainer container) => IsLooping(container) ? DockerContainerPanel.RestartsTab : "logs";
 
 	private void Select(DockerContainer container, string tab)
 	{
@@ -159,7 +184,7 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 	private async Task UpdateAsync(DockerContainer container)
 	{
 		bool updated;
-		if (ComposeUpdate(container) is { } plan)
+		if (ComposePlan("update", container, _containers) is { } plan)
 		{
 			updated = await RunChangesAsync(plan.Calls, plan.Title, plan.Confirm, plan.ConfirmText, RefreshAsync) is { Count: > 0 } outputs
 				&& outputs.All(output => output.Succeeded);
@@ -180,21 +205,6 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 		{
 			Feature?.ImageUpdates.Forget([container.Image]);
 		}
-	}
-
-	/// <summary>The update of the compose service <paramref name="container"/> belongs to, when its project's files can be found.</summary>
-	private ComposeActionPlan? ComposeUpdate(DockerContainer container)
-	{
-		if (container.ComposeService is not { } service
-			|| Feature?.Compose is not { } tool
-			|| ComposeProject.Parse(null, _containers).FirstOrDefault(project => project.Name == container.ComposeProject) is not { } project)
-		{
-			return null;
-		}
-
-		ComposeTarget target = ComposeTarget.For(tool, project);
-		IReadOnlyList<string> services = [.. project.Containers.Select(member => member.ComposeService).OfType<string>().Distinct(StringComparer.Ordinal)];
-		return target.HasFiles ? ComposeActions.Plan("update", target, services, service) : null;
 	}
 
 	private async Task StartAsync(DockerContainer container) => await RunPlanAsync(DockerContainerActions.Plan("start", container.Name, container.IsAlive)!, RefreshAsync);

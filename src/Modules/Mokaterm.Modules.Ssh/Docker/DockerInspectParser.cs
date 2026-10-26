@@ -124,7 +124,7 @@ internal static class DockerInspectParser
 		}
 	}
 
-	private static string RestartPolicy(JsonElement policy)
+	internal static string RestartPolicy(JsonElement policy)
 	{
 		string name = DockerJson.Text(policy, "Name");
 		int retries = DockerJson.Int(policy, "MaximumRetryCount") ?? 0;

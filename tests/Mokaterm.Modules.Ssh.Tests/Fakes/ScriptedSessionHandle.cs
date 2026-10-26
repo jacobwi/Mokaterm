@@ -12,10 +12,11 @@ internal sealed class ScriptedSessionHandle : ISessionHandle
 	private ConnectFailure? _failure;
 	private string? _status;
 
-	public ScriptedSessionHandle()
+	public ScriptedSessionHandle(IProtocolSession? session = null)
 	{
 		Host = new HostProfile { Id = Guid.NewGuid(), Address = "web1.example.com" };
 		Connection = new ConnectionProfile { Id = Guid.NewGuid(), HostId = Host.Id, ProtocolId = "ssh", Username = "alice" };
+		Session = session;
 	}
 
 	public event Action? Changed;
@@ -50,7 +51,7 @@ internal sealed class ScriptedSessionHandle : ISessionHandle
 
 	public ITerminalStream? Terminal => null;
 
-	public IProtocolSession? Session => null;
+	public IProtocolSession? Session { get; }
 
 	public void Move(SessionState state, ConnectFailure? failure = null, string? status = null)
 	{

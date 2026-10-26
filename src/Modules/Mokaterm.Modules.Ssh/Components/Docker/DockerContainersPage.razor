@@ -9,6 +9,10 @@
 		<MokaSegment Value="all" Text="@($"All {_containers.Count.ToString(CultureInfo.CurrentCulture)}")" />
 		<MokaSegment Value="running" Text="@($"Up {RunningCount.ToString(CultureInfo.CurrentCulture)}")" />
 		<MokaSegment Value="stopped" Text="@($"Down {(_containers.Count - RunningCount).ToString(CultureInfo.CurrentCulture)}")" />
+		@if (LoopingCount > 0 || _filter == LoopsFilter)
+		{
+			<MokaSegment Value="@LoopsFilter" Text="@($"Looping {LoopingCount.ToString(CultureInfo.CurrentCulture)}")" />
+		}
 	</MokaSegmentedControl>
 	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add"
 				Disabled="@(IsBusy || _newImage is not null)" OnClick="@(() => NewContainer(""))">
@@ -67,7 +71,7 @@ else
 					@foreach (DockerContainer container in group.Containers)
 					{
 						<div class="@(container.Id == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="container.Id">
-							<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(container, "logs"))" aria-description="@container.Status">
+							<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(container, FirstTab(container)))" aria-description="@container.Status">
 								<Hint Text="@container.Status" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
 									<MokaStatusDot Size="MokaSize.Xs"
 												   Color="@DockerStateDisplay.Color(container.State, container.Health)"
@@ -76,6 +80,7 @@ else
 								<span class="mt-dk-cell-name mt-dk-cell--w30">@ShortName(container)</span>
 								<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-label mt-dk-cell--w12 mt-dk-cell--error" : "mt-dk-label mt-dk-cell--w12")">@DockerStateDisplay.HealthLabel(container.Health)</span>
 								<span class="mt-dk-cell mt-dk-cell--grow" title="@container.Image">@container.Image</span>
+								@LoopChip(LoopOf(container.Id, container.Name))
 								@UpdateChip(container.Image)
 								<span class="mt-dk-cell mt-dk-cell--optional" title="@Ports(container)">@Ports(container)</span>
 							</button>

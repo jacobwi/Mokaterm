@@ -18,6 +18,8 @@ internal static class DockerCommands
 	/// <summary>The most lines a log tail asks for.</summary>
 	public const int MaxTail = 10_000;
 
+	public const int RestartLogLines = 200;
+
 	public static DockerCall Version() => Docker(["version", "--format", JsonLines]);
 
 	public static DockerCall Info() => Docker(["info", "--format", JsonLines]);
@@ -57,8 +59,9 @@ internal static class DockerCommands
 	public static DockerCall PruneBuildCache() => Docker(["builder", "prune", "--all", "--force"]).AsChange(DockerCall.LongTimeout);
 
 	/// <summary>
-	/// One line per container: id, restart count, state, exit code, health (<c>-</c> without a check), name and compose
-	/// project. One exec channel for the whole host, through the same shell as every docker command.
+	/// One JSON object per container: id, name, restart count, state, how the last run ended, when it started and
+	/// stopped, health, restart policy and compose project. One exec channel for the whole host, through the same shell
+	/// as every docker command.
 	/// </summary>
 	public static DockerCall ContainerStates() => DockerCall.Script(ContainerStatesScript, [ContainerStatesFormat]);
 
@@ -159,6 +162,9 @@ internal static class DockerCommands
 	public static DockerCall Unpause(string container) => Docker(["unpause", Container(container)]).AsChange();
 
 	public static DockerCall Kill(string container) => Docker(["kill", Container(container)]).AsChange();
+
+	// Takes effect at the next exit: a container that is running or waiting to restart is left as it is until then.
+	public static DockerCall StopRestarting(string container) => Docker(["update", "--restart=no", Container(container)]).AsChange();
 
 	/// <param name="removeVolumes">Also removes the anonymous volumes it created (<c>--volumes</c>); named volumes always stay.</param>
 	/// <param name="force">Kills it first when it is running (<c>--force</c>).</param>
@@ -291,9 +297,12 @@ internal static class DockerCommands
 		return Docker(["network", "rm", .. names.Select(name => Existing(name, "network"))]).AsChange();
 	}
 
-	/// <summary>The template for <see cref="ContainerStates"/>, passed as an argument so its quotes never meet the script's.</summary>
+	/// <summary>
+	/// The template for <see cref="ContainerStates"/>, passed as an argument so its quotes never meet the script's. Every
+	/// value goes through <c>json</c>, so docker's error text, which may hold anything, stays inside its own string.
+	/// </summary>
 	internal const string ContainerStatesFormat =
-		"{{.Id}} {{.RestartCount}} {{.State.Status}} {{.State.ExitCode}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}} {{.Name}} {{with .Config.Labels}}{{index . \"com.docker.compose.project\"}}{{end}}";
+		"""{"Id":{{json .Id}},"Name":{{json .Name}},"RestartCount":{{json .RestartCount}},"State":{{json .State.Status}},"ExitCode":{{json .State.ExitCode}},"OOMKilled":{{json .State.OOMKilled}},"Error":{{json .State.Error}},"StartedAt":{{json .State.StartedAt}},"FinishedAt":{{json .State.FinishedAt}},"Health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}""{{end}},"RestartPolicy":{{json .HostConfig.RestartPolicy}},"Project":{{with .Config.Labels}}{{json (index . "com.docker.compose.project")}}{{else}}""{{end}}}""";
 
 	/// <summary>
 	/// Lists every container and inspects them all with the template in <c>$1</c>. A container removed between the two

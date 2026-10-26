@@ -115,7 +115,7 @@ internal static class DemoDockerFiles
 
 		DemoNode opt = tree.Child("opt") ?? tree.Add(DemoNode.NewDirectory("opt", "root", "root", DemoModes.Octal("755"), now.AddDays(-200)));
 		DemoNode monitoring = opt.Add(DemoNode.NewDirectory("monitoring", "root", "root", DemoModes.Octal("755"), now.AddDays(-15)));
-		Text(monitoring, "docker-compose.yml", "644", now.AddDays(-15), "services:\n  grafana:\n    image: grafana/grafana:11.2.0\n");
+		Text(monitoring, "docker-compose.yml", "644", now.AddDays(-15), "services:\n  grafana:\n    image: grafana/grafana:11.2.0\n  prometheus:\n    image: prom/prometheus:v2.54.1\n    restart: always\n    mem_limit: 512m\n");
 
 		DemoNode var = tree.Child("var") ?? tree.Add(DemoNode.NewDirectory("var", "root", "root", DemoModes.Octal("755"), now.AddDays(-200)));
 		DemoNode lib = var.Child("lib") ?? var.Add(DemoNode.NewDirectory("lib", "root", "root", DemoModes.Octal("755"), now.AddDays(-200)));

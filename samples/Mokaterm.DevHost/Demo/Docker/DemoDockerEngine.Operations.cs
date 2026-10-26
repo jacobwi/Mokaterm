@@ -7,7 +7,8 @@ namespace Mokaterm.DevHost.Demo.Docker;
 /// The Docker manager's operations: registry digests for the update check, the verbose disk usage and the cleanups,
 /// <c>docker run</c>, and the per-container states the health watch reads. Three containers misbehave on a clock so the
 /// watch has something to say: shop-api-1's health check fails for a while every few minutes, queue-worker crashes
-/// and is restarted by its policy, and nightly-report exits with an error a while after it starts.
+/// and is restarted by its policy, and nightly-report exits with an error a while after it starts. Two more crash in a
+/// loop (see the Loops part).
 /// </summary>
 internal sealed partial class DemoDockerEngine
 {
@@ -121,7 +122,12 @@ internal sealed partial class DemoDockerEngine
 	private void Advance()
 	{
 		DateTimeOffset now = _time.GetUtcNow();
-		foreach (DemoDockerContainer container in _containers.Where(container => container.State == "running"))
+		foreach (DemoDockerContainer container in _containers.Where(container => container.Loop is not null && container.State is "running" or "restarting"))
+		{
+			MoveLoop(container, now);
+		}
+
+		foreach (DemoDockerContainer container in _containers.Where(container => container.Loop is null && container.State == "running"))
 		{
 			TimeSpan up = now - container.StartedAt;
 			switch (container.Name)
@@ -130,7 +136,7 @@ internal sealed partial class DemoDockerEngine
 					container.Health = up < TimeSpan.FromSeconds(25) ? "starting"
 						: (up.TotalSeconds - 25) % 180 < 140 ? "healthy" : "unhealthy";
 					break;
-				case QueueWorker when up >= CrashEvery && container.RestartCount < 10:
+				case QueueWorker when up >= CrashEvery && container.RestartCount < 10 && container.RestartPolicy != "no":
 					container.RestartCount++;
 					container.StartedAt = now;
 					break;
@@ -145,9 +151,21 @@ internal sealed partial class DemoDockerEngine
 	}
 
 	/// <summary>The template the health watch sends is fixed, so the demo answers its fields without reading it.</summary>
-	private DemoDockerResult ContainerStates() => DemoDockerResult.Ok(string.Concat(_containers.Select(container => string.Create(
-		CultureInfo.InvariantCulture,
-		$"{container.Id} {container.RestartCount} {container.State} {container.ExitCode} {(container.Health.Length > 0 ? container.Health : "-")} /{container.Name} {container.Project}\n"))));
+	private DemoDockerResult ContainerStates() => DemoDockerResult.Ok(string.Concat(_containers.Select(container => Line(new Dictionary<string, object?>
+	{
+		["Id"] = container.Id,
+		["Name"] = "/" + container.Name,
+		["RestartCount"] = container.RestartCount,
+		["State"] = container.State,
+		["ExitCode"] = container.ExitCode,
+		["OOMKilled"] = container.OomKilled,
+		["Error"] = container.Error,
+		["StartedAt"] = container.StartedAt.ToString("o", CultureInfo.InvariantCulture),
+		["FinishedAt"] = FinishedText(container),
+		["Health"] = container.Health,
+		["RestartPolicy"] = PolicyOf(container),
+		["Project"] = container.Project ?? "",
+	}) + "\n")));
 
 	private DemoDockerResult InspectImages(string[] references)
 	{

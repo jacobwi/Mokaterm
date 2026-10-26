@@ -73,6 +73,7 @@ internal sealed partial class DemoDockerEngine
 			Environment = ["S3_BUCKET=acme-backups", "S3_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCY"],
 		});
 		SeedOperations(now);
+		SeedLoops(now);
 	}
 
 	/// <summary>Runs one docker command line and answers the way docker would.</summary>
@@ -120,6 +121,7 @@ internal sealed partial class DemoDockerEngine
 		_images.Add(("alpine", "3.20", "sha256:" + HexId("alpine"), 7_800_000, now.AddDays(-60)));
 		_images.Add(("grafana/grafana", "11.2.0", "sha256:" + HexId("grafana"), 474_000_000, now.AddDays(-15)));
 		_images.Add(("busybox", "latest", "sha256:" + HexId("busybox"), 4_260_000, now.AddDays(-90)));
+		_images.Add(("prom/prometheus", "v2.54.1", "sha256:" + HexId("prometheus-image"), 288_000_000, now.AddDays(-15)));
 		_images.Add(("<none>", "<none>", "sha256:" + HexId("dangling"), 198_000_000, now.AddDays(-9)));
 	}
 

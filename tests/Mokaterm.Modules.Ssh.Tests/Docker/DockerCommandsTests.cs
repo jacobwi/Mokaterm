@@ -1,4 +1,5 @@
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.Modules.Ssh.Tests.Fakes;
 
 namespace Mokaterm.Modules.Ssh.Tests.Docker;
 
@@ -148,6 +149,46 @@ public sealed class DockerCommandsTests
 		Assert.Equal(DockerCommands.ContainerStatesFormat, call.Arguments[^1]);
 		Assert.StartsWith("sh -c 'ids=$(docker ps --all --quiet --no-trunc)", call.Display, StringComparison.Ordinal);
 		Assert.DoesNotContain("{{", call.Arguments[0], StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void ContainerStates_PrintsOneJsonObject_WithHowTheLastRunEnded()
+	{
+		string format = DockerCommands.ContainerStatesFormat;
+
+		Assert.StartsWith("{\"Id\":{{json .Id}},", format, StringComparison.Ordinal);
+		Assert.EndsWith("}", format, StringComparison.Ordinal);
+		foreach (string field in new[] { "{{json .State.OOMKilled}}", "{{json .State.Error}}", "{{json .State.StartedAt}}", "{{json .State.FinishedAt}}", "{{json .HostConfig.RestartPolicy}}" })
+		{
+			Assert.Contains(field, format, StringComparison.Ordinal);
+		}
+	}
+
+	[Fact]
+	public void StopRestarting_SetsThePolicyToNo_AsTheLoginOrThroughSudo()
+	{
+		DockerCall call = DockerCommands.StopRestarting("shop-api-1");
+
+		Assert.Equal("docker update --restart=no shop-api-1", call.Display);
+		Assert.Equal(DockerCall.ChangeTimeout, call.Timeout);
+		Assert.Equal(["docker update --restart=no shop-api-1"], DockerSessionFeature.Shown(new FakeDockerShell().Client(), [call]));
+		Assert.Equal(["sudo docker update --restart=no shop-api-1"], DockerSessionFeature.Shown(new FakeDockerShell { IsElevated = true }.Client(), [call]));
+		(string script, IReadOnlyList<string> arguments) = DockerCommandLine.ForScript(call);
+		Assert.Equal(DockerCommandLine.ElevatedScript, script);
+		Assert.Equal(["docker", "update", "--restart=no", "shop-api-1"], arguments);
+		Assert.Equal("shop-api-1", Assert.Single(DockerChangeScope.Of(call).Containers));
+		Assert.ThrowsAny<ArgumentException>(() => DockerCommands.StopRestarting("-rm"));
+	}
+
+	[Fact]
+	public void RestartLogs_AreTheTailWithTimes_AsTheLoginOrThroughSudo()
+	{
+		DockerCall call = DockerCommands.Logs("worker", DockerCommands.RestartLogLines, since: null);
+
+		Assert.Equal("docker logs --timestamps --tail 200 worker", call.Display);
+		Assert.Equal(["sudo docker logs --timestamps --tail 200 worker"], DockerSessionFeature.Shown(new FakeDockerShell { IsElevated = true }.Client(), [call]));
+		(_, IReadOnlyList<string> arguments) = DockerCommandLine.ForScript(call);
+		Assert.Equal(["docker", "logs", "--timestamps", "--tail", "200", "worker"], arguments);
 	}
 
 	[Fact]

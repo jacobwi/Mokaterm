@@ -8,10 +8,13 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
 /// One container under the list: a header with its state, the two actions used most and the menu with the rest, then
-/// its logs, inspect output, stats, environment, mounts and a command box, one tab at a time.
+/// its logs, inspect output, stats, environment, mounts and a command box, one tab at a time, with why it keeps
+/// restarting first while it is in a restart loop.
 /// </summary>
 public sealed partial class DockerContainerPanel : DockerManagerPageBase
 {
+	internal const string RestartsTab = "restarts";
+
 	private static readonly IReadOnlyList<(string Id, string Text)> Tabs =
 	[
 		("logs", "Logs"),
@@ -48,7 +51,15 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 
 	private string Name => _details?.Name is { Length: > 0 } name ? name : ContainerId;
 
-	protected override Task OnInitializedAsync() => LoadDetailsAsync();
+	// The tab stays while it is open, so a loop that ends under the user does not take the page away.
+	private IReadOnlyList<(string Id, string Text)> ShownTabs =>
+		Tab == RestartsTab || LoopOf(ContainerId, _details?.Name) is not null ? [(RestartsTab, "Restarts"), .. Tabs] : Tabs;
+
+	protected override Task OnInitializedAsync()
+	{
+		FollowRestartLoops();
+		return LoadDetailsAsync();
+	}
 
 	private static DockerHealth HealthOf(DockerContainerDetails details) => details.Health?.Status ?? DockerHealth.None;
 

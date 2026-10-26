@@ -1,0 +1,102 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerManagerPageBase
+
+<div class="mt-dk-section-head">
+	<span class="mt-dk-label">@(IsLooping ? "Why it keeps restarting" : "Restarts")</span>
+	<span class="mt-dk-spacer"></span>
+	<IconButton Size="MokaSize.Xs"
+				Icon="MokaIcons.Action.Refresh"
+				Disabled="IsLoading"
+				OnClick="RefreshAsync"
+				Label="Read it and its log again"
+				AriaLabel="Refresh"
+				Position="MokaTooltipPosition.BottomEnd" />
+</div>
+
+@LoadErrorPanel(RefreshAsync)
+
+@if (_details is { } details)
+{
+	@if (!IsLooping)
+	{
+		<span class="mt-dk-note">Docker has not restarted it in a loop lately. This is what it knows about its restarts.</span>
+	}
+
+	<dl class="mt-dk-facts">
+		<dt>Restarts</dt>
+		<dd>@RestartsText(details)</dd>
+		<dt>Policy</dt>
+		<dd>@DockerRestartWording.Policy(details.RestartPolicy)</dd>
+		<dt>Last exit</dt>
+		<dd>@ExitText(LastExit(details))</dd>
+		@if (LastExit(details) is { } exit)
+		{
+			<dt>Out of memory</dt>
+			<dd>@(exit.OomKilled ? "yes: the kernel killed it at its memory limit" : "no")</dd>
+			@if (exit.Error.Length > 0)
+			{
+				<dt>Docker said</dt>
+				<dd>@exit.Error</dd>
+			}
+		}
+		<dt>Last started</dt>
+		<dd>@When(details.StartedAt)</dd>
+		<dt>Last stopped</dt>
+		<dd>@When(details.FinishedAt ?? LastExit(details)?.FinishedAt)</dd>
+		<dt>Runs last</dt>
+		<dd>@RunsText(details)</dd>
+	</dl>
+
+	<div class="mt-dk-toolbar">
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Error"
+					Size="MokaSize.Xs"
+					StartIcon="DockerIcons.StopRestarting"
+					Disabled="@(IsBusy || !DockerRestartLoop.WillRestart(details.RestartPolicy))"
+					OnClick="StopRestartingAsync">
+			Stop restarting
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined"
+					Color="MokaColor.Surface"
+					Size="MokaSize.Xs"
+					StartIcon="DockerIcons.Stop"
+					Disabled="@(IsBusy || !IsAlive(details))"
+					OnClick="StopAsync">
+			Stop
+		</MokaButton>
+		@if (Container?.ComposeService is { } service)
+		{
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="DockerIcons.Stop"
+						Disabled="IsBusy"
+						OnClick="@(() => ComposeAsync("stop"))">
+				Stop @service
+			</MokaButton>
+			<MokaButton Variant="MokaVariant.Outlined"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="MokatermIcons.Reconnect"
+						Disabled="@(IsBusy || !CanRecreate)"
+						OnClick="@(() => ComposeAsync("recreate"))">
+				Recreate @service
+			</MokaButton>
+		}
+	</div>
+
+	@ChangePanel
+
+	<div class="mt-dk-section">
+		<span class="mt-dk-label">Last logs before it stopped</span>
+		@if (_logNote is { } note)
+		{
+			<span class="mt-dk-note">@note</span>
+		}
+	</div>
+	<LogView Tail="_tail" Label="Last logs before it stopped" EmptyText="@LogEmptyText" Fill="false" />
+}
+else if (IsFirstLoad)
+{
+	<div class="mt-dk-center"><MokaSpinner Label="Reading its restarts" /></div>
+}

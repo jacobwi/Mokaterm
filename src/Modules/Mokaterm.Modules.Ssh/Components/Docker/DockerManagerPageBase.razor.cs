@@ -19,6 +19,9 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// </summary>
 public abstract partial class DockerManagerPageBase : DockerPageBase
 {
+	private DockerRestartLoops? _followedLoops;
+	private Action? _onLoopsChanged;
+
 	[Inject]
 	private ISessionManager Sessions { get; set; } = default!;
 
@@ -49,6 +52,52 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 
 	/// <summary>True while a change of this page or a build or push of the session runs.</summary>
 	private protected bool IsWorking => IsBusy || LiveRuns?.IsRunning == true;
+
+	private protected DockerRestartLoops? RestartLoops => Feature?.RestartLoops;
+
+	private protected DockerRestartRecord? LoopOf(string id, string? name = null) => RestartLoops?.FindLooping(id, name);
+
+	// The health watch reads every ten seconds whatever the page does, so a page that shows loops draws again when one
+	// starts or ends rather than waiting for its own refresh.
+	private protected void FollowRestartLoops(Action? changed = null)
+	{
+		if (_followedLoops is not null || RestartLoops is not { } loops)
+		{
+			return;
+		}
+
+		_followedLoops = loops;
+		_onLoopsChanged = changed;
+		loops.Changed += OnRestartLoopsChanged;
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing && _followedLoops is { } loops)
+		{
+			loops.Changed -= OnRestartLoopsChanged;
+			_followedLoops = null;
+		}
+
+		base.Dispose(disposing);
+	}
+
+	private protected ComposeActionPlan? ComposePlan(string action, DockerContainer container, IReadOnlyList<DockerContainer> containers)
+	{
+		ArgumentNullException.ThrowIfNull(container);
+		ArgumentNullException.ThrowIfNull(containers);
+		if (container.ComposeService is not { } service
+			|| Feature?.Compose is not { } tool
+			|| ComposeProject.Parse(null, containers).FirstOrDefault(project => project.Name == container.ComposeProject) is not { } project)
+		{
+			return null;
+		}
+
+		ComposeTarget target = ComposeTarget.For(tool, project);
+		IReadOnlyList<string> services = [.. project.Containers.Select(member => member.ComposeService).OfType<string>().Distinct(StringComparer.Ordinal)];
+		bool needsFiles = action is not ("stop" or "start" or "restart");
+		return needsFiles && !target.HasFiles ? null : ComposeActions.Plan(action, target, services, service);
+	}
 
 	/// <summary>
 	/// Asks first, showing every command exactly as it runs (masked values aside), then starts a build or a push in the
@@ -99,6 +148,17 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 			return null;
 		}
 	}
+
+	private void OnRestartLoopsChanged() => _ = InvokeAsync(() =>
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+
+		_onLoopsChanged?.Invoke();
+		StateHasChanged();
+	});
 
 	/// <summary>Runs a load with the session's client; nothing at all while the session has none.</summary>
 	private protected Task LoadAsync(Func<DockerClient, CancellationToken, Task> load)

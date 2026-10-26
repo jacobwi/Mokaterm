@@ -11,4 +11,6 @@ internal enum DockerHealthEvent
 
 	/// <summary>The daemon restarted a container under its restart policy.</summary>
 	Restarted,
+
+	RestartLoop,
 }

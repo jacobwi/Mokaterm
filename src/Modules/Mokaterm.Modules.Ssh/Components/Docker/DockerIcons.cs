@@ -32,6 +32,9 @@ internal static class DockerIcons
 	/// <summary>A filled square's outline, for stop.</summary>
 	public static readonly MokaIconDefinition Stop = new("mt-docker-stop", "M6 6h12v12H6z");
 
+	public static readonly MokaIconDefinition StopRestarting = new("mt-docker-stop-restarting",
+		"M20 12a8 8 0 1 1-2.34-5.66 M20 3.5V8h-4.5 M4 4l16 16");
+
 	/// <summary>A bolt, for kill.</summary>
 	public static readonly MokaIconDefinition Kill = new("mt-docker-kill", "M13 2L4 14h7l-1 8 9-12h-7z");
 

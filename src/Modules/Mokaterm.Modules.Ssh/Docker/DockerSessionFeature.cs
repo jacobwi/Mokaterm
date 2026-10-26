@@ -83,6 +83,8 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 	/// <summary>The changes the user ran this session, so the health watch never reports them.</summary>
 	internal DockerChangeLog Changes { get; }
 
+	internal DockerRestartLoops RestartLoops { get; } = new();
+
 	/// <summary>The session's builds and pushes, which run on whatever page is shown.</summary>
 	internal DockerLiveRuns LiveRuns { get; }
 

@@ -5,14 +5,19 @@ using Mokaterm.UI.Common.Formatting;
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The engine at a glance: versions, what the daemon runs on, counts, and one line per kind of what <c>docker system
-/// df</c> counts, with the way to the cleanup page, which is where anything is removed.
+/// The engine at a glance: how many containers keep restarting, versions, what the daemon runs on, counts, and one
+/// line per kind of what <c>docker system df</c> counts, with the way to the cleanup page, which is where anything is
+/// removed.
 /// </summary>
 public sealed partial class DockerOverviewPage : DockerManagerPageBase
 {
 	private IReadOnlyList<DockerDiskUsage> _usage = [];
 
-	protected override Task OnInitializedAsync() => RefreshAsync();
+	protected override Task OnInitializedAsync()
+	{
+		FollowRestartLoops();
+		return RefreshAsync();
+	}
 
 	private static string Count(int? value) => value?.ToString("N0", CultureInfo.CurrentCulture) ?? "-";
 

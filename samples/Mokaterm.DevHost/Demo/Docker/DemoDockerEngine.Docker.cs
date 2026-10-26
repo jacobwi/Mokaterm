@@ -35,6 +35,8 @@ internal sealed partial class DemoDockerEngine
 		["stop", var name] => Change(name, container => Stop(container, 0)),
 		["kill", var name] => Change(name, container => Stop(container, 137)),
 		["pause", var name] => Change(name, container => container.State = "paused"),
+		["update", var restart, var name] when restart.StartsWith(RestartFlag, StringComparison.Ordinal) =>
+			Change(name, container => SetRestartPolicy(container, restart[RestartFlag.Length..])),
 		["rm", .. var rest] => Remove(rest),
 		["run", .. var run] => RunContainer(run),
 		["image", "ls", ..] => DemoDockerResult.Ok(string.Concat(_images.Select(image => Line(ImageRow(image)) + "\n"))),
@@ -144,12 +146,12 @@ internal sealed partial class DemoDockerEngine
 					Status = container.State,
 					Running = container.State == "running",
 					Paused = container.State == "paused",
-					OOMKilled = false,
-					Pid = container.IsAlive ? 4000 + (container.Name.Length * 37) : 0,
+					OOMKilled = container.OomKilled,
+					Pid = container.State is "running" or "paused" ? 4000 + (container.Name.Length * 37) : 0,
 					ExitCode = container.ExitCode,
-					Error = "",
+					Error = container.Error,
 					StartedAt = container.StartedAt.ToString("o", CultureInfo.InvariantCulture),
-					FinishedAt = container.IsAlive ? "0001-01-01T00:00:00Z" : container.FinishedAt.ToString("o", CultureInfo.InvariantCulture),
+					FinishedAt = FinishedText(container),
 					Health = container.Health.Length == 0 ? null : new
 					{
 						Status = container.Health,
@@ -164,11 +166,7 @@ internal sealed partial class DemoDockerEngine
 				{
 					NetworkMode = container.Networks.Count > 0 ? container.Networks[0] : "default",
 					Privileged = false,
-					RestartPolicy = new
-					{
-						Name = container.RestartPolicy.Split(':')[0],
-						MaximumRetryCount = container.RestartPolicy.Contains(':', StringComparison.Ordinal) ? int.Parse(container.RestartPolicy.Split(':')[1], CultureInfo.InvariantCulture) : 0,
-					},
+					RestartPolicy = PolicyOf(container),
 				},
 				Mounts = container.Volumes.Select(volume => new
 				{
@@ -282,6 +280,11 @@ internal sealed partial class DemoDockerEngine
 			return DemoDockerResult.Fail(1, $"Error response from daemon: No such container: {name}");
 		}
 
+		if (container.Loop is not null)
+		{
+			return LoopLogs(container, tail, since);
+		}
+
 		DateTimeOffset end = container.IsAlive ? _time.GetUtcNow() : container.FinishedAt;
 		long last = end.ToUnixTimeSeconds() / 2;
 		long first = Math.Max(last - tail + 1, container.Created.ToUnixTimeSeconds() / 2);
@@ -326,7 +329,9 @@ internal sealed partial class DemoDockerEngine
 	{
 		container.State = "running";
 		container.ExitCode = 0;
+		container.OomKilled = false;
 		container.StartedAt = _time.GetUtcNow();
+		StartLoop(container);
 		if (container.Health.Length > 0)
 		{
 			container.Health = "starting";
@@ -339,6 +344,7 @@ internal sealed partial class DemoDockerEngine
 		{
 			container.State = "exited";
 			container.ExitCode = exitCode;
+			container.OomKilled = false;
 			container.FinishedAt = _time.GetUtcNow();
 		}
 	}

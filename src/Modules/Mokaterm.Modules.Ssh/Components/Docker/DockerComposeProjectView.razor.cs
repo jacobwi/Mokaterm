@@ -73,6 +73,7 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 
 	protected override async Task OnInitializedAsync()
 	{
+		FollowRestartLoops();
 		await RefreshAsync();
 		StartPolling(RefreshInterval, RefreshAsync);
 	}
@@ -180,6 +181,9 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	private void ToggleBuild() => _build = !_build;
 
 	private void TogglePullFirst() => _pullFirst = !_pullFirst;
+
+	private DockerRestartRecord? ServiceLoop(ComposeService service) =>
+		service.Containers.Select(container => LoopOf(container.Id, container.Name)).FirstOrDefault(loop => loop is not null);
 
 	/// <summary>The service's container a shell or the file browser goes to: the first one that runs.</summary>
 	private static ComposeContainer? RunningContainer(ComposeService service) =>

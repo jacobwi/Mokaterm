@@ -8,7 +8,7 @@ namespace Mokaterm.Modules.Ssh.Docker;
 /// </summary>
 internal sealed record DockerChangeScope
 {
-	private static readonly HashSet<string> ContainerCommands = new(StringComparer.Ordinal) { "start", "stop", "restart", "kill", "pause", "unpause", "rm" };
+	private static readonly HashSet<string> ContainerCommands = new(StringComparer.Ordinal) { "start", "stop", "restart", "kill", "pause", "unpause", "rm", "update" };
 
 	private static readonly HashSet<string> TouchesNone = new(StringComparer.Ordinal)
 	{

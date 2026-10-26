@@ -1,10 +1,11 @@
-using System.Globalization;
+using System.Text.Json;
+using Mokaterm.Abstractions.Containers;
 
 namespace Mokaterm.Modules.Ssh.Docker;
 
 /// <summary>
 /// One container as the health watch reads it, from a line <see cref="DockerCommands.ContainerStates"/> printed: what
-/// <c>docker ps</c> cannot say (the restart count) beside what it can.
+/// <c>docker ps</c> cannot say (the restart count, how the last run ended, the restart policy) beside what it can.
 /// </summary>
 internal sealed record DockerContainerState
 {
@@ -20,6 +21,16 @@ internal sealed record DockerContainerState
 
 	public int ExitCode { get; init; }
 
+	public bool OomKilled { get; init; }
+
+	public string Error { get; init; } = "";
+
+	public DateTimeOffset? StartedAt { get; init; }
+
+	public DateTimeOffset? FinishedAt { get; init; }
+
+	public string RestartPolicy { get; init; } = "no";
+
 	public DockerHealth Health { get; init; }
 
 	public string? ComposeProject { get; init; }
@@ -30,32 +41,35 @@ internal sealed record DockerContainerState
 	public static IReadOnlyList<DockerContainerState> Parse(string? output)
 	{
 		List<DockerContainerState> states = [];
-		foreach (string raw in (output ?? "").Split('\n'))
+		foreach (JsonElement item in DockerJsonOutput.ReadObjects(output))
 		{
-			string[] parts = raw.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length < 6
-				|| !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int restarts)
-				|| !int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int exit)
-				|| !parts[5].StartsWith('/'))
+			string id = DockerJson.Text(item, "Id");
+			string name = DockerJson.Text(item, "Name").TrimStart('/');
+			if (id.Length == 0 || name.Length == 0)
 			{
 				continue;
 			}
 
 			states.Add(new DockerContainerState
 			{
-				Id = parts[0],
-				RestartCount = restarts,
-				State = parts[2].ToLowerInvariant(),
-				ExitCode = exit,
-				Health = parts[4] switch
+				Id = id,
+				Name = name,
+				RestartCount = DockerJson.Int(item, "RestartCount") ?? 0,
+				State = DockerJson.Text(item, "State").Trim().ToLowerInvariant(),
+				ExitCode = DockerJson.Int(item, "ExitCode") ?? 0,
+				OomKilled = DockerJson.Bool(item, "OOMKilled"),
+				Error = DockerJson.Text(item, "Error"),
+				StartedAt = DockerJson.Time(item, "StartedAt"),
+				FinishedAt = DockerJson.Time(item, "FinishedAt"),
+				RestartPolicy = DockerInspectParser.RestartPolicy(DockerJson.Get(item, "RestartPolicy")),
+				Health = DockerJson.Text(item, "Health") switch
 				{
 					"healthy" => DockerHealth.Healthy,
 					"unhealthy" => DockerHealth.Unhealthy,
 					"starting" => DockerHealth.Starting,
 					_ => DockerHealth.None,
 				},
-				Name = parts[5].TrimStart('/'),
-				ComposeProject = parts.Length > 6 ? parts[6] : null,
+				ComposeProject = DockerJson.Text(item, "Project") is { Length: > 0 } project ? project : null,
 			});
 		}
 
