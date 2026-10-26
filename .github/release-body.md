@@ -1,3 +1,27 @@
+## What's new in 0.2.4
+
+**Remote desktop (RDP)**
+
+- A login with a short domain name, such as `CORP\you`, signs in quickly: Mokaterm finds the domain's full name the way
+  Windows' own Remote Desktop does, so Kerberos works instead of waiting out a long lookup.
+- With network level authentication off, RDP signs in by itself with the saved name and password, sent encrypted after
+  the PC's certificate is checked. That is how Microsoft Entra ID (`AzureAD\you@company.com`) and Microsoft accounts
+  get in from a PC that is not joined to Entra. A switch keeps Windows' own sign-in screen instead.
+- A refused connection says what to change on the PC or in the login, and the security the PC picks is checked before
+  the login goes out.
+
+**Docker**
+
+- The Docker manager spots containers stuck in a restart loop: a red Restart loop tag on the container and its compose
+  service, a count on the Overview and one notice. Its Restarts tab says why (the exit code in plain words, out of
+  memory, how long runs last and the log before the crash), with Stop restarting one click away.
+
+**Desktop**
+
+- Dialogs open below the title bar, so their close and header buttons are no longer covered by the window's minimize,
+  maximize and close buttons.
+- The Microsoft Store version shows its version as 0.2.4, like the GitHub version, instead of 0.2.4.0.
+
 ## What's new in 0.2.3
 
 **Sessions and terminals**
