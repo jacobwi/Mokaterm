@@ -325,7 +325,7 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 	/// Sends what the last step put in the buffer, straight to the stream. IronRDP's <c>Framed&lt;T&gt;.Write</c> holds
 	/// a <see cref="Mutex"/> across its await, and releasing it from the thread the write resumed on throws.
 	/// </summary>
-	private async Task WriteAsync(Stream stream, CancellationToken cancellationToken)
+	private async Task<byte[]> WriteAsync(Stream stream, CancellationToken cancellationToken)
 	{
 		byte[] bytes;
 		using (VecU8 filled = _buffer!.GetFilled())
@@ -336,11 +336,12 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 
 		if (bytes.Length == 0)
 		{
-			return;
+			return bytes;
 		}
 
 		await stream.WriteAsync(bytes, cancellationToken);
 		await stream.FlushAsync(cancellationToken);
+		return bytes;
 	}
 
 	/// <summary>
@@ -352,10 +353,12 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 		_credsspInit = CredsspSequence.Init(_connector!, _progress.Host, publicKey, null);
 		_credssp = _credsspInit.GetCredsspSequence();
 		TsRequest? request = _credsspInit.GetTsRequest();
+		int answers = 0;
 		try
 		{
 			while (request is not null)
 			{
+				_progress.Trace(RdpCredsspTrace.Preparing(LoginMessagesSent + 1));
 				using (ClientState state = await ProcessAsync(request, cancellationToken))
 				{
 					request.Dispose();
@@ -364,8 +367,9 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 					using Written written = _credssp.HandleProcessResult(state, _buffer);
 					if (written.GetWrittenType() == WrittenType.Size)
 					{
-						await WriteAsync(_tls!, cancellationToken);
+						byte[] sent = await WriteAsync(_tls!, cancellationToken);
 						LoginMessagesSent++;
+						_progress.Trace(RdpCredsspTrace.Sent(LoginMessagesSent, sent));
 					}
 				}
 
@@ -377,7 +381,9 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 						break;
 					}
 
+					_progress.Trace(RdpCredsspTrace.Waiting);
 					message = await _reader!.ReadByHintAsync(hint, cancellationToken);
+					_progress.Trace(RdpCredsspTrace.Answered(++answers, message.Length));
 				}
 
 				request = _credssp.DecodeServerMessage(message);

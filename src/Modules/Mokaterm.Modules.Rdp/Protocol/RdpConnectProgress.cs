@@ -9,14 +9,16 @@ namespace Mokaterm.Modules.Rdp.Protocol;
 internal sealed class RdpConnectProgress
 {
 	private readonly IProgress<string>? _status;
+	private readonly IProgress<string>? _trace;
 	private volatile StageState _current = new(RdpConnectStage.Dialing, null);
 
-	public RdpConnectProgress(string host, int port, IProgress<string>? status)
+	public RdpConnectProgress(string host, int port, IProgress<string>? status, IProgress<string>? trace = null)
 	{
 		Host = host;
 		Port = port;
 		Endpoint = HostEndpoint.Format(host, port);
 		_status = status;
+		_trace = trace;
 	}
 
 	public string Host { get; }
@@ -43,6 +45,9 @@ internal sealed class RdpConnectProgress
 
 	/// <summary>Records what the current step is doing without a new status line.</summary>
 	public void Note(string? detail) => _current = _current with { Detail = detail };
+
+	// Finer than a status line, so only the probe asks for it: the session tab would flicker through every message.
+	public void Trace(string text) => _trace?.Report(text);
 
 	/// <summary>The status line for a step, as the session tab and the probe show it.</summary>
 	public string StatusText(RdpConnectStage stage, string? detail) => stage switch

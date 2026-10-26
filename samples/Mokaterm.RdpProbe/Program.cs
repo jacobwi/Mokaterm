@@ -47,7 +47,10 @@ internal static class Program
 				Autologon = arguments.Autologon,
 			},
 			TimeSpan.FromSeconds(arguments.TimeoutSeconds),
-			new ConsoleCertificateCheck(output, arguments.AcceptCertificate));
+			new ConsoleCertificateCheck(output, arguments.AcceptCertificate))
+		{
+			Trace = new TraceLines(output),
+		};
 
 		using CancellationTokenSource stop = new();
 		Console.CancelKeyPress += (_, e) =>

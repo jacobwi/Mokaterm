@@ -15,9 +15,17 @@ internal sealed class RdpConnector
 {
 	private readonly IHostIdentityVerifier _verifier;
 	private readonly RdpDial? _dial;
+	private readonly RdpRealmFinder _realms;
 
 	/// <param name="dial">Opens the TCP connection, <see cref="RdpDialer.ConnectAsync"/> unless a test says otherwise.</param>
-	public RdpConnector(string host, int port, RdpConnectionOptions options, TimeSpan timeout, IHostIdentityVerifier verifier, RdpDial? dial = null)
+	public RdpConnector(
+		string host,
+		int port,
+		RdpConnectionOptions options,
+		TimeSpan timeout,
+		IHostIdentityVerifier verifier,
+		RdpDial? dial = null,
+		RdpRealmFinder? realms = null)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 		ArgumentNullException.ThrowIfNull(verifier);
@@ -27,6 +35,7 @@ internal sealed class RdpConnector
 		Timeout = timeout;
 		_verifier = verifier;
 		_dial = dial;
+		_realms = realms ?? RdpKerberosRealm.FindAsync;
 	}
 
 	public string Host { get; }
@@ -37,6 +46,8 @@ internal sealed class RdpConnector
 
 	/// <summary>Covers one attempt from the dial to the session, but not the time a certificate prompt is on screen.</summary>
 	public TimeSpan Timeout { get; }
+
+	public IProgress<string>? Trace { get; init; }
 
 	/// <summary>The desktop size asked for at connect time, before any resize.</summary>
 	public (int Width, int Height) DesktopSize => Options.DesktopSize == RdpDesktopSizeMode.Fixed
@@ -91,9 +102,19 @@ internal sealed class RdpConnector
 				: new RdpAuthenticationException(refusal);
 		}
 
+		RdpRealm? realm = null;
+		if (route == RdpSignInRoute.NetworkLevelAuthentication)
+		{
+			realm = await _realms(names.Domain, Host, cancellationToken);
+			if (realm is not null)
+			{
+				Trace?.Report($"Domain {names.Domain} is {realm.DnsName}, from {realm.Source}");
+			}
+		}
+
 		for (int attempt = 1; ; attempt++)
 		{
-			RdpConnectProgress progress = new(Host, Port, status);
+			RdpConnectProgress progress = new(Host, Port, status, Trace);
 			using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			deadline.CancelAfter(Timeout);
 			await using RdpConnectSequence sequence = new(
@@ -102,7 +123,7 @@ internal sealed class RdpConnector
 				_dial);
 			try
 			{
-				using Config config = BuildConfig(credentials, route);
+				using Config config = BuildConfig(credentials, route, realm);
 				return await sequence.RunAsync(config, route, Timeout, deadline.Token);
 			}
 			catch (Exception ex) when (attempt == 1 && ServerGaveUpDuringPrompt(ex, sequence, progress, deadline, cancellationToken))
@@ -115,7 +136,7 @@ internal sealed class RdpConnector
 			{
 				// Whatever a step threw on its way out of a cancel by the user, the attempt was cancelled, not failed.
 				cancellationToken.ThrowIfCancellationRequested();
-				throw await DescribeAsync(ex, progress, sequence, names, route, deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested);
+				throw await DescribeAsync(ex, progress, sequence, names, route, realm, deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested);
 			}
 			finally
 			{
@@ -143,6 +164,7 @@ internal sealed class RdpConnector
 		RdpConnectSequence sequence,
 		RdpLogin names,
 		RdpSignInRoute route,
+		RdpRealm? realm,
 		bool timedOut)
 	{
 		if (!timedOut
@@ -154,10 +176,23 @@ internal sealed class RdpConnector
 				?? new RdpAuthenticationException(RdpConnectErrors.LoginRefused(exception, progress, names), exception);
 		}
 
-		return await RdpConnectErrors.DescribeAsync(exception, progress, timedOut, CancellationToken.None);
+		Exception described = await RdpConnectErrors.DescribeAsync(exception, progress, timedOut, CancellationToken.None);
+		return timedOut
+			&& route == RdpSignInRoute.NetworkLevelAuthentication
+			&& progress.Stage is RdpConnectStage.Login or RdpConnectStage.Kerberos
+			&& realm is null
+			&& RdpKerberosRealm.IsShortDomain(names.Domain, progress.Host)
+			&& described is ProtocolConnectException connect
+			? new ProtocolConnectException(connect.Failure, connect.Message + " " + ShortDomainHint(names), connect.InnerException)
+			: described;
 	}
 
-	private Config BuildConfig(LoginCredentials? credentials, RdpSignInRoute route)
+	private static string ShortDomainHint(RdpLogin names) =>
+		$"{names.Domain} is the domain's short name, which no Kerberos server could be found by. Write the login as " +
+		$"{names.Username}@ and the domain's full name, the end of the PC's full name (for pc.corp.example.com that is " +
+		$"{names.Username}@corp.example.com).";
+
+	private Config BuildConfig(LoginCredentials? credentials, RdpSignInRoute route, RdpRealm? realm)
 	{
 		(int width, int height) = DesktopSize;
 
@@ -165,6 +200,11 @@ internal sealed class RdpConnector
 		// keeps its own in the connection's config for the session's life, on both routes that send one.
 		string password = route == RdpSignInRoute.SignInScreen ? "" : credentials?.Password?.RevealString() ?? "";
 		RdpLogin login = RdpLogin.Parse(credentials?.Username, Options.Domain, password);
+		if (realm is not null)
+		{
+			login = login with { Domain = realm.DnsName };
+		}
+
 		return RdpConfigFactory.Build(Options, login, width, height, route);
 	}
 }

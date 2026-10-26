@@ -51,7 +51,9 @@ internal sealed class SignInWatch
 	/// <summary>Waits for a notice that settles it, the session's end or <paramref name="wait"/>, and prints the outcome.</summary>
 	public async Task WaitAsync(Task session, TimeSpan wait, CancellationToken cancellationToken)
 	{
-		Task finished = await Task.WhenAny(_settled.Task, session, Task.Delay(wait, cancellationToken));
+		long started = System.Diagnostics.Stopwatch.GetTimestamp();
+		Task delay = Task.Delay(wait, cancellationToken);
+		Task finished = await Task.WhenAny(_settled.Task, session, delay);
 		if (finished == _settled.Task)
 		{
 			RdpLogonNotice notice = await _settled.Task;
@@ -61,6 +63,14 @@ internal sealed class SignInWatch
 				RdpLogonNoticeKind.SignInFailed => "Stopped at the sign-in screen: " + notice.Description,
 				_ => "Stopped at a Windows dialog: " + notice.Description,
 			});
+			return;
+		}
+
+		if (finished == delay && delay.IsCanceled)
+		{
+			_output.Event(string.Create(
+				CultureInfo.InvariantCulture,
+				$"Stopped waiting for a sign-in notice after {System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds:0.0} s: the probe was cancelled (Ctrl+C)."));
 			return;
 		}
 

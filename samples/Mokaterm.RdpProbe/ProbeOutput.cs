@@ -40,5 +40,14 @@ internal sealed class ProbeOutput : IProgress<string>
 	/// <summary>A line of its own, with the time.</summary>
 	public void Event(string text) => Report(text);
 
+	// Timed like a step, but never taken as the step a failure happened in.
+	public void Trace(string text)
+	{
+		lock (_gate)
+		{
+			Console.WriteLine($"[{Stamp()}]   {text}");
+		}
+	}
+
 	private string Stamp() => string.Create(CultureInfo.InvariantCulture, $"{_clock.Elapsed.TotalSeconds,8:0.000} s");
 }
