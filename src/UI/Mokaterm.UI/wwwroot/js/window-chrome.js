@@ -13,6 +13,11 @@ const interactive = [
 	'[data-mt-no-drag]',
 ].join(',');
 
+// What floats over the bar from elsewhere in the page: an open dialog, a panel undocked from its dock. The stretch under
+// one is not empty, or the window would take the clicks meant for it. Dialogs keep below the bar on the desktop
+// (mokaterm.css); a floating panel can be dragged up to the top of the window.
+const overBar = ['[aria-modal="true"]', '.moka-dock-panel--floating'].join(',');
+
 // A narrower gap between two controls stays with the page.
 const minimumWidth = 8;
 
@@ -58,15 +63,22 @@ function measure(root) {
 	}
 
 	const taken = [];
-	for (const element of root.querySelectorAll(interactive)) {
-		if (!shown(element)) {
-			continue;
-		}
-
-		const field = element.closest('.moka-field');
-		const rect = (field && root.contains(field) ? field : element).getBoundingClientRect();
+	const take = (rect) => {
 		if (rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom) {
 			taken.push([Math.max(left, Math.floor(rect.left)), Math.min(right, Math.ceil(rect.right))]);
+		}
+	};
+
+	for (const element of root.querySelectorAll(interactive)) {
+		if (shown(element)) {
+			const field = element.closest('.moka-field');
+			take((field && root.contains(field) ? field : element).getBoundingClientRect());
+		}
+	}
+
+	for (const element of document.querySelectorAll(overBar)) {
+		if (!root.contains(element) && shown(element)) {
+			take(element.getBoundingClientRect());
 		}
 	}
 
@@ -148,6 +160,11 @@ export function attach(root, dotNetRef) {
 	};
 
 	mutationObserver.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+
+	// A dialog opening or closing elsewhere in the page changes nothing in the bar, but it moves focus, and a floating
+	// panel lands where a pointer lets go of it.
+	document.addEventListener('focusin', schedule, true);
+	document.addEventListener('pointerup', schedule, true);
 	window.addEventListener('resize', schedule);
 	document.fonts?.addEventListener('loadingdone', schedule);
 	watchResolution();
@@ -164,6 +181,8 @@ export function attach(root, dotNetRef) {
 
 			resizeObserver.disconnect();
 			mutationObserver.disconnect();
+			document.removeEventListener('focusin', schedule, true);
+			document.removeEventListener('pointerup', schedule, true);
 			window.removeEventListener('resize', schedule);
 			document.fonts?.removeEventListener('loadingdone', schedule);
 			resolution?.removeEventListener('change', onResolutionChange);

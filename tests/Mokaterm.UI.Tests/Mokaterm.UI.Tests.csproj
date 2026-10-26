@@ -35,6 +35,16 @@
 	</ItemGroup>
 
 	<!--
+		CaptionRegions: how the desktop host turns the page's title bar into the window's caption button insets and
+		caption rectangles. Plain numbers again, here so they are checked at every scale and never reach under a control
+		or the window's own buttons.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Platforms\Windows\CaptionRect.cs" LinkBase="Shared" />
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Platforms\Windows\CaptionRegions.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!--
 		NotificationClick: the ids a Windows notification carries back to the desktop host, and the session a click selects.
 		Plain data with no Windows call, compiled in here so what reaches the system's notification store is checked.
 	-->

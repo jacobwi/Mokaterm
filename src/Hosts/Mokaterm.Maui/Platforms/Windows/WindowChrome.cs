@@ -49,7 +49,7 @@ internal sealed class WindowChrome : IWindowChrome
 
 	// Null while the page shows no top bar; empty while it has one with nothing to drag.
 	private WindowDragRegion[]? _pageRegions;
-	private RectInt32[] _caption = [];
+	private CaptionRect[] _caption = [];
 	private WindowChromeInsets _insets;
 
 	public WindowChrome(ISettingsService settings) => _settings = settings;
@@ -60,7 +60,7 @@ internal sealed class WindowChrome : IWindowChrome
 
 	public void SetDragRegions(IReadOnlyList<WindowDragRegion> regions)
 	{
-		WindowDragRegion[] copy = [.. regions.Where(IsUsable)];
+		WindowDragRegion[] copy = [.. regions];
 		RunOnWindowThread(() =>
 		{
 			_pageRegions = copy;
@@ -97,11 +97,6 @@ internal sealed class WindowChrome : IWindowChrome
 		}
 	}
 
-	// The page's numbers come from script; a rectangle that is not a real one is dropped rather than trusted.
-	private static bool IsUsable(WindowDragRegion region) =>
-		double.IsFinite(region.X) && double.IsFinite(region.Y) && double.IsFinite(region.Width) && double.IsFinite(region.Height)
-		&& region.Width > 0 && region.Height > 0;
-
 	private static WinColor? FromHex(string value)
 	{
 		// The palette entries used here are #rrggbb; anything else leaves the system colour in place.
@@ -114,23 +109,11 @@ internal sealed class WindowChrome : IWindowChrome
 		return null;
 	}
 
-	private static bool SameRects(RectInt32[] left, RectInt32[] right)
-	{
-		if (left.Length != right.Length)
-		{
-			return false;
-		}
+	private static CaptionRect[] FromWindow(RectInt32[] rects) =>
+		[.. rects.Select(rect => new CaptionRect(rect.X, rect.Y, rect.Width, rect.Height))];
 
-		for (int i = 0; i < left.Length; i++)
-		{
-			if (left[i].X != right[i].X || left[i].Y != right[i].Y || left[i].Width != right[i].Width || left[i].Height != right[i].Height)
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
+	private static RectInt32[] ToWindow(CaptionRect[] rects) =>
+		[.. rects.Select(rect => new RectInt32(rect.X, rect.Y, rect.Width, rect.Height))];
 
 	private void Connect(WinUIWindow window)
 	{
@@ -194,9 +177,8 @@ internal sealed class WindowChrome : IWindowChrome
 			return;
 		}
 
-		double scale = Scale;
 		AppWindowTitleBar bar = _appWindow.TitleBar;
-		WindowChromeInsets insets = new(bar.LeftInset / scale, bar.RightInset / scale, bar.Height / scale);
+		WindowChromeInsets insets = CaptionRegions.Insets(bar.LeftInset, bar.RightInset, bar.Height, Scale);
 		if (insets != _insets)
 		{
 			_insets = insets;
@@ -211,8 +193,20 @@ internal sealed class WindowChrome : IWindowChrome
 			return;
 		}
 
-		RectInt32[] caption = _pageRegions is null ? DefaultCaption() : PageCaption(_pageRegions);
-		if (!force && SameRects(caption, _caption))
+		AppWindowTitleBar bar = _appWindow.TitleBar;
+		int clientWidth = _appWindow.ClientSize.Width;
+		CaptionRect[] caption;
+		if (_pageRegions is null)
+		{
+			caption = CaptionRegions.Default(clientWidth, bar.LeftInset, bar.RightInset, bar.Height);
+		}
+		else
+		{
+			WinPoint origin = WebViewLayout.Origin(_webView);
+			caption = CaptionRegions.FromPage(_pageRegions, Scale, origin.X, origin.Y, clientWidth, bar.LeftInset, bar.RightInset);
+		}
+
+		if (!force && caption.AsSpan().SequenceEqual(_caption))
 		{
 			return;
 		}
@@ -224,41 +218,8 @@ internal sealed class WindowChrome : IWindowChrome
 		}
 		else
 		{
-			_pointerSource.SetRegionRects(NonClientRegionKind.Caption, caption);
+			_pointerSource.SetRegionRects(NonClientRegionKind.Caption, ToWindow(caption));
 		}
-	}
-
-	// No top bar on the page (starting, locked): the strip a system title bar would take, between the window's buttons.
-	private RectInt32[] DefaultCaption()
-	{
-		AppWindowTitleBar bar = _appWindow!.TitleBar;
-		int width = _appWindow.ClientSize.Width - bar.LeftInset - bar.RightInset;
-		return width > 0 && bar.Height > 0 ? [new RectInt32(bar.LeftInset, 0, width, bar.Height)] : [];
-	}
-
-	private RectInt32[] PageCaption(WindowDragRegion[] regions)
-	{
-		double scale = Scale;
-		WinPoint origin = WebViewLayout.Origin(_webView);
-		AppWindowTitleBar bar = _appWindow!.TitleBar;
-		int minimumLeft = bar.LeftInset;
-		int maximumRight = _appWindow.ClientSize.Width - bar.RightInset;
-
-		List<RectInt32> rects = new(regions.Length);
-		foreach (WindowDragRegion region in regions)
-		{
-			// Rounded inwards: one pixel too many would take a click meant for the control beside it.
-			int left = Math.Max(minimumLeft, (int)Math.Ceiling((origin.X + region.X) * scale));
-			int top = Math.Max(0, (int)Math.Ceiling((origin.Y + region.Y) * scale));
-			int right = Math.Min(maximumRight, (int)Math.Floor((origin.X + region.X + region.Width) * scale));
-			int bottom = (int)Math.Floor((origin.Y + region.Y + region.Height) * scale);
-			if (right > left && bottom > top)
-			{
-				rects.Add(new RectInt32(left, top, right - left, bottom - top));
-			}
-		}
-
-		return [.. rects];
 	}
 
 	private void ApplyColors()
@@ -365,7 +326,7 @@ internal sealed class WindowChrome : IWindowChrome
 	{
 		if (_caption.Length > 0
 			&& args.ChangedRegions.Contains(NonClientRegionKind.Caption)
-			&& !SameRects(sender.GetRegionRects(NonClientRegionKind.Caption), _caption))
+			&& !FromWindow(sender.GetRegionRects(NonClientRegionKind.Caption)).AsSpan().SequenceEqual(_caption))
 		{
 			_ = _queue?.TryEnqueue(() => ApplyCaption(force: true));
 		}
