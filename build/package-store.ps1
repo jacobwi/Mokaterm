@@ -86,6 +86,8 @@ Get-ChildItem (Join-Path $repo 'src\Hosts\Mokaterm.Maui\obj') -Recurse -Filter '
 # ApplicationVersion is forced to 0 because MAUI's WinUI targets build the four-part version as
 # ApplicationDisplayVersion plus ApplicationVersion, and the csproj sets the latter to 1. Partner Center owns the last
 # part and refuses a package that sets it, so a default build produced 0.1.1.1 and would have been rejected.
+# InformationalVersion stays three parts because it is what the app shows (DisplayVersion): the four-part Version the
+# package needs would otherwise put v0.2.3.0 in the Store build's status bar where the GitHub build says v0.2.3.
 #
 # SelfContained carries the .NET runtime inside the package. A runtime identifier alone no longer implies it, and no
 # Store package installs the .NET 10 runtime, so 0.1.4 went out depending on one: certification flagged it under
@@ -105,7 +107,8 @@ Write-Host "Publishing $packageVersion for the Store..."
 	-p:AppxPackageDir="$outputDir\" `
 	-p:ApplicationDisplayVersion=$Version `
 	-p:ApplicationVersion=0 `
-	-p:Version=$packageVersion
+	-p:Version=$packageVersion `
+	-p:InformationalVersion=$Version
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
 
 $upload = Get-ChildItem $outputDir -Recurse -Filter *.msixupload -ErrorAction SilentlyContinue | Select-Object -First 1
