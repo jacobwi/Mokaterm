@@ -640,7 +640,7 @@ public partial class RemoteFileBrowser
 		IReadOnlyList<LocalFileItem> items;
 		try
 		{
-			items = await LocalFiles.PickFilesAsync(multiple: true, ConnectionToken);
+			items = await LocalFiles.PickFilesAsync(multiple: true, cancellationToken: ConnectionToken);
 		}
 		catch (Exception ex)
 		{

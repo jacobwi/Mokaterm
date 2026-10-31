@@ -197,10 +197,14 @@ internal sealed class PluginManager : IPluginManager, IDisposable
 		List<PluginRecord> plugins = [];
 		foreach (PluginRecord record in _catalog.Records)
 		{
+			PluginPendingChange pending = PendingFor(record);
 			plugins.Add(record with
 			{
 				IsEnabled = CanInstall ? _state.Plugins.TryGetValue(record.Id, out PluginStateEntry? entry) && entry.Enabled : record.IsEnabled,
-				Pending = PendingFor(record),
+				Pending = pending,
+				PendingVersion = pending is PluginPendingChange.Install or PluginPendingChange.Update
+					? PendingFolderVersion(record.Id)
+					: null,
 			});
 		}
 
@@ -227,6 +231,7 @@ internal sealed class PluginManager : IPluginManager, IDisposable
 					Status = PluginStatus.Disabled,
 					IsEnabled = _state.Plugins.TryGetValue(id, out PluginStateEntry? entry) && entry.Enabled,
 					Pending = PluginPendingChange.Install,
+					PendingVersion = manifest.Version,
 				});
 			}
 		}
@@ -262,6 +267,12 @@ internal sealed class PluginManager : IPluginManager, IDisposable
 			_ => PluginPendingChange.None,
 		};
 	}
+
+	/// <summary>The version waiting in the pending folder, or null when no folder or manifest is there to read.</summary>
+	private string? PendingFolderVersion(string id) =>
+		PluginManifestReader.IsValidId(id) && ReadManifest(Path.Combine(PendingDirectory, id)) is { } manifest
+			? manifest.Version
+			: null;
 
 	private string? InstalledVersion(string id) =>
 		_plugins.FirstOrDefault(plugin => plugin.Id == id && plugin.Pending != PluginPendingChange.Remove)?.Version is { Length: > 0 } version

@@ -1,13 +1,28 @@
-# Next release (0.2.0)
+# Next release (0.2.5)
 
-What we planned for the release after 0.1.9. Released as 0.2.0 with the plugin system, the gallery, plugin settings, the
-SDK packages and template, and automatic updates (items 2 and 15); the rest moves to the next release.
+## Plugin system
 
-## Carried over
+1. **A plugin can no longer shadow a built-in id.** A plugin whose app tool, session tool, System page, Docker page or
+   settings page registers under an id Mokaterm or another plugin already uses is refused at load, with everything it
+   registered taken back out, the way a plugin with a stolen settings name already was. Session tools clash per
+   protocol, since tools on different protocols share a command on purpose. Descriptors now say what they are through
+   `IContributionIdentity` in Abstractions, which is what the loader checks.
+2. **A page that throws no longer takes its tool with it.** Every System page, Docker page and app tool sits in a
+   `ViewBoundary` of its own, so "Try again" reloads the page and the tool's other pages carry on. The boundary moved
+   from the shell into `Mokaterm.UI.Common`, which is what lets the System and Docker views use it.
+3. **The install picker offers `.mokaplugin` files only** (`ILocalFileAccess.PickFilesAsync` takes the extensions to
+   offer; MAUI filters in its dialog, the browser through `accept`).
+4. **A waiting install says which version it brings.** The record carries the pending folder's version, so a row reads
+   "1.1.0 is installed. It loads at the next start." and a gallery card "1.1.0 waits for restart" instead of a
+   versionless "Waits for restart".
+5. **A gallery download belongs to the window, not the page.** Leaving the Plugins page no longer cancels it: the
+   download runs as the window's `IPluginGallery.Download`, coming back shows how far it is, and a package that
+   finished in the meantime opens its install dialog on return.
 
-- The fleet survey's local shell test no longer depends on the test machine's own docker. CI on main failed on it for
-  0.1.9 because the GitHub runner's `docker ps` took longer than the survey part's 8 s limit. Fixed in the working
-  tree, not committed yet.
+## Older plans
+
+The notes below are what earlier releases were planned from, kept for the history. The "Carried over" item about the
+fleet survey's local shell test landed in 705dd7b (the test puts a fake `docker` first on PATH).
 
 ## Reliability and shipping
 

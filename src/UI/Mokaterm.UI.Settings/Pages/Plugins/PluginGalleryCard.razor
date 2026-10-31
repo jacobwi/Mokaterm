@@ -90,10 +90,10 @@
 				</span>
 				break;
 			case PluginGalleryOfferKind.Waiting:
-				<Hint Text="Installed. It loads at the next start.">
+				<Hint Text="@(Offer.WaitingVersion is { } waiting ? $"{waiting} loads at the next start." : "Installed. It loads at the next start.")">
 					<span class="plugin-card__state">
 						<MokaIcon Icon="MokaIcons.Status.Clock" SizeValue="12px" />
-						Waits for restart
+						@(Offer.WaitingVersion is { } waiting ? $"{waiting} waits for restart" : "Waits for restart")
 					</span>
 				</Hint>
 				break;

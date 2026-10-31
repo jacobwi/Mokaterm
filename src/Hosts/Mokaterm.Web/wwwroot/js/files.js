@@ -17,11 +17,15 @@ function newPickId() {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function pickFiles(multiple, directory) {
+export function pickFiles(multiple, directory, accept) {
 	return new Promise(resolve => {
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.multiple = multiple || directory;
+		if (accept) {
+			input.accept = accept;
+		}
+
 		if (directory) {
 			input.webkitdirectory = true;
 		}

@@ -74,10 +74,11 @@ internal static class PluginDisplay
 		ArgumentNullException.ThrowIfNull(plugin);
 		return plugin.Pending switch
 		{
-			PluginPendingChange.Install => plugin.IsEnabled
-				? "Installed. It loads at the next start."
-				: "Installed turned off. It loads once it is turned on.",
-			PluginPendingChange.Update => "Updated. The new version loads at the next start.",
+			PluginPendingChange.Install => (plugin.PendingVersion is { } version ? $"{version} is installed. " : null)
+				+ (plugin.IsEnabled ? "It loads at the next start." : "It loads once it is turned on."),
+			PluginPendingChange.Update => plugin.PendingVersion is { } newVersion
+				? $"Updated to {newVersion}. It loads at the next start."
+				: "Updated. The new version loads at the next start.",
 			PluginPendingChange.Remove => "Removed at the next start.",
 			PluginPendingChange.Enable => "Turns on at the next start.",
 			PluginPendingChange.Disable => "Turns off at the next start.",

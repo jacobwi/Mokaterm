@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.UI.Common.Contributions;
@@ -8,7 +9,7 @@ namespace Mokaterm.UI.Common.Contributions;
 /// shows while at least one is registered, and as a palette command, and opens it in a dialog or, on the desktop, in a
 /// window of its own.
 /// </summary>
-public sealed record AppToolDescriptor
+public sealed record AppToolDescriptor : IContributionIdentity
 {
 	/// <summary>
 	/// The stable name its palette command (<c>mokaterm.app-tool.</c> and the id), a shortcut bound to it and its window's
@@ -36,4 +37,8 @@ public sealed record AppToolDescriptor
 
 	/// <summary>The size of the dialog the tool opens in, and the first size of its window.</summary>
 	public SessionToolSize Size { get; init; }
+
+	string IContributionIdentity.Kind => "app tool";
+	string IContributionIdentity.Id => Id;
+	string? IContributionIdentity.Scope => null;
 }

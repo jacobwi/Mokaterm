@@ -118,15 +118,18 @@
 			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _rootError = null)">@rootError</MokaAlert>
 		}
 
-		<ToolNavigation Entries="NavEntries(profile)" Current="@_page" CurrentChanged="Show" Label="System pages">
-			<div class="mta-main">
-				<CascadingValue Value="_context" IsFixed="false">
-					@if (CurrentPage is { } page)
-					{
-						<DynamicComponent @key="(profile, page.Id)" Type="page.Component" />
-					}
-				</CascadingValue>
-			</div>
+			<ToolNavigation Entries="NavEntries(profile)" Current="@_page" CurrentChanged="Show" Label="System pages">
+				<div class="mta-main">
+					<CascadingValue Value="_context" IsFixed="false">
+						@if (CurrentPage is { } page)
+						{
+							// A page that throws says so itself; the rest of the view, and the other pages, carry on.
+							<ViewBoundary @key="(profile, page.Id)" Name="@(page.Title)" Fill>
+								<DynamicComponent @key="(profile, page.Id)" Type="page.Component" />
+							</ViewBoundary>
+						}
+					</CascadingValue>
+				</div>
 
 			@if (_review is { } review)
 			{

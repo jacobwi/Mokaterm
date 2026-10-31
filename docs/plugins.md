@@ -297,19 +297,16 @@ review and a low rate limit. It could later list unreviewed plugins behind a cle
 
 ## Known gaps
 
-- Settings are held to the plugin's own names, but other ids are not: a plugin's session tool, System or Docker page or
-  app tool with the id of a built-in one replaces it, since the last registration with an id wins.
-
 - No unloading: every change to a plugin means a restart.
 - The `mta-*` row and chip classes a System page uses come from `SystemAdminView.razor.css`, which reaches any page drawn
   in the System view; plugin pages rely on that without a declared contract.
-- A plugin page that throws trips the whole tool's error boundary, so "Try again" restarts the tool, not the page.
-- The file picker offers every file type, not only `.mokaplugin`.
-- The gallery has not read a real index yet: the production one does not exist, so the client is covered by tests with
-  indexes signed by test keys and was tried in the DevHost against its demo gallery and against the production address
-  (a 404). Downloads follow GitHub's redirect to its storage host, which no test has done for real. Switching away from
-  the Plugins page cancels a download that is still running, and an update that waits for the next start shows as
-  "Waits for restart" with no version, because the pending folder's version is not on the record.
+- The gallery's production index exists (the four first-party plugins were released on it), but the app has not read it
+  outside the DevHost and its tests: downloads follow GitHub's redirect to its storage host, which no test has done for
+  real.
 - Installing a real package through the page's file picker has not been run in an app yet. The manager's install is
   covered by tests with the sample package, the dialog was tried against a fake manager, and the DevHost's picker hands
   back canned files; the DevHost shows installed plugins when their folder and `plugins.json` are put in place.
+
+Fixed in 0.2.5: a plugin registering a built-in's tool or page id is refused at load; a page that throws trips only its
+own error boundary; the install picker offers `.mokaplugin` files; a waiting install names the version it brings; and a
+gallery download belongs to the window, so leaving the Plugins page neither stops it nor loses the package.

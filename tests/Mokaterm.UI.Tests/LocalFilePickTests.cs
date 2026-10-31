@@ -14,11 +14,37 @@ public sealed class LocalFilePickTests
 	private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
 	[Fact]
+	public async Task ReadStreamAsync_Extensions_ReachThePickersOffer()
+	{
+		FakeFileAccess files = new(Text("{}"), length: null);
+
+		await LocalFilePick.ReadStreamAsync(
+			files,
+			100,
+			"a plugin package",
+			(stream, token) => Task.FromResult(Array.Empty<byte>()),
+			[".mokaplugin"],
+			cancellationToken: Ct);
+
+		Assert.Equal([".mokaplugin"], files.OfferedExtensions);
+	}
+
+	[Fact]
+	public async Task ReadTextAsync_WithoutExtensions_PicksWithNoFilter()
+	{
+		FakeFileAccess files = new(Text("theme"), length: null);
+
+		await LocalFilePick.ReadTextAsync(files, 100, "a color scheme", cancellationToken: Ct);
+
+		Assert.Null(files.OfferedExtensions);
+	}
+
+	[Fact]
 	public async Task ReadTextAsync_AFileOverTheCap_IsRefusedAndNotCut()
 	{
 		FakeFileAccess files = new(Text(new string('x', 200)), length: null);
 
-		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a color scheme", Ct);
+		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a color scheme", cancellationToken: Ct);
 
 		Assert.False(picked.WasRead);
 		Assert.Null(picked.Content);
@@ -31,7 +57,7 @@ public sealed class LocalFilePickTests
 	{
 		FakeFileAccess files = new(Text(new string('x', 200)), length: 200);
 
-		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a private key", Ct);
+		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a private key", cancellationToken: Ct);
 
 		Assert.Equal("That file is too large to be a private key.", picked.Error);
 		Assert.Equal(0, files.Opened);
@@ -44,7 +70,7 @@ public sealed class LocalFilePickTests
 		string content = new('k', 100);
 		FakeFileAccess files = new(Text(content), length: 100);
 
-		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a private key", Ct);
+		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a private key", cancellationToken: Ct);
 
 		Assert.True(picked.WasRead);
 		Assert.Equal(content, picked.Content);
@@ -58,14 +84,14 @@ public sealed class LocalFilePickTests
 		byte[] content = new byte[300_000];
 		Random.Shared.NextBytes(content);
 
-		PickedFile<byte[]> whole = await LocalFilePick.ReadBytesAsync(new FakeFileAccess(content, length: null), content.Length, "a list", Ct);
+		PickedFile<byte[]> whole = await LocalFilePick.ReadBytesAsync(new FakeFileAccess(content, length: null), content.Length, "a list", cancellationToken: Ct);
 		Assert.Equal(content, whole.Content);
 
 		PickedFile<byte[]> refused = await LocalFilePick.ReadBytesAsync(
 			new FakeFileAccess(content, length: null),
 			content.Length - 1,
 			"a list",
-			Ct);
+			cancellationToken: Ct);
 		Assert.Null(refused.Content);
 		Assert.Equal("That file is too large to be a list.", refused.Error);
 	}
@@ -75,7 +101,7 @@ public sealed class LocalFilePickTests
 	{
 		FakeFileAccess files = new(content: null, length: null);
 
-		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a color scheme", Ct);
+		PickedFile<string> picked = await LocalFilePick.ReadTextAsync(files, 100, "a color scheme", cancellationToken: Ct);
 
 		Assert.False(picked.WasRead);
 		Assert.Null(picked.Error);
@@ -87,7 +113,7 @@ public sealed class LocalFilePickTests
 	{
 		FakeFileAccess files = new(Text("anything"), length: null, failOnOpen: true);
 
-		await Assert.ThrowsAsync<IOException>(() => LocalFilePick.ReadTextAsync(files, 100, "a color scheme", Ct));
+		await Assert.ThrowsAsync<IOException>(() => LocalFilePick.ReadTextAsync(files, 100, "a color scheme", cancellationToken: Ct));
 
 		Assert.Equal(1, files.Released);
 	}
@@ -99,7 +125,7 @@ public sealed class LocalFilePickTests
 		Random.Shared.NextBytes(content);
 		FakeFileAccess files = new(content, length: null);
 
-		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, content.Length, "a plugin package", CopyAsync, Ct);
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, content.Length, "a plugin package", CopyAsync, cancellationToken: Ct);
 
 		Assert.True(picked.WasRead);
 		Assert.Equal(content, picked.Content);
@@ -127,7 +153,7 @@ public sealed class LocalFilePickTests
 					throw new InvalidDataException("Not a zip file.", ex);
 				}
 			},
-			Ct);
+			cancellationToken: Ct);
 
 		Assert.False(picked.WasRead);
 		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
@@ -158,7 +184,7 @@ public sealed class LocalFilePickTests
 				made = new Disposable();
 				return made;
 			},
-			Ct);
+			cancellationToken: Ct);
 
 		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
 		Assert.NotNull(made);
@@ -180,7 +206,7 @@ public sealed class LocalFilePickTests
 				read = true;
 				return CopyAsync(stream, token);
 			},
-			Ct);
+			cancellationToken: Ct);
 
 		Assert.Equal("That file is too large to be a plugin package.", picked.Error);
 		Assert.False(read);
@@ -197,7 +223,7 @@ public sealed class LocalFilePickTests
 			100,
 			"a plugin package",
 			(_, _) => throw new InvalidDataException("plugin.json is missing."),
-			Ct));
+			cancellationToken: Ct));
 
 		Assert.Equal("plugin.json is missing.", refused.Message);
 		Assert.Equal(1, files.Released);
@@ -208,7 +234,7 @@ public sealed class LocalFilePickTests
 	{
 		FakeFileAccess files = new(content: null, length: null);
 
-		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, 100, "a plugin package", CopyAsync, Ct);
+		PickedFile<byte[]> picked = await LocalFilePick.ReadStreamAsync(files, 100, "a plugin package", CopyAsync, cancellationToken: Ct);
 
 		Assert.False(picked.WasRead);
 		Assert.Null(picked.Error);
@@ -237,10 +263,14 @@ public sealed class LocalFilePickTests
 
 		public int Released { get; private set; }
 
+		/// <summary>What the last pick asked the picker to offer, when a pick has run.</summary>
+		public IReadOnlyList<string>? OfferedExtensions { get; private set; }
+
 		public bool CanPickFolders => false;
 
-		public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default)
+		public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default)
 		{
+			OfferedExtensions = extensions;
 			if (content is null)
 			{
 				return ValueTask.FromResult<IReadOnlyList<LocalFileItem>>([]);

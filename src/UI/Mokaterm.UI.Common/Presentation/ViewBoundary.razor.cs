@@ -2,12 +2,13 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Interaction;
 
-namespace Mokaterm.UI.Presentation;
+namespace Mokaterm.UI.Common.Presentation;
 
 /// <summary>
 /// Keeps an exception inside the view it came from. Without one, an exception in any component ends the Blazor Server
 /// circuit with every session in it, and takes the desktop app down; with one, the view says what went wrong and can
-/// be loaded again.
+/// be loaded again. In UI.Common so a tool can give each page a boundary of its own, which keeps a page that throws
+/// from taking the whole tool down with it.
 /// </summary>
 public sealed partial class ViewBoundary : ErrorBoundaryBase
 {

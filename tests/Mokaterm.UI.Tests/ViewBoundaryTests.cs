@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moka.Red.Extensions;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.UI.Interaction;
-using Mokaterm.UI.Presentation;
+using Mokaterm.UI.Common.Presentation;
 using Mokaterm.UI.Tests.Fakes;
 
 namespace Mokaterm.UI.Tests;

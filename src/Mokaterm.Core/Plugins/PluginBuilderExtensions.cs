@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Plugins;
 using Mokaterm.Abstractions.Settings;
@@ -43,6 +44,7 @@ public static class PluginBuilderExtensions
 			// What the module registers is checked after the fact, because only then is it known; a plugin that breaks a
 			// rule has what it added taken out again before anything was built from it.
 			Dictionary<string, Type> sectionsInUse = SectionsIn(builder.Services, 0, builder.Services.Count);
+			HashSet<PluginContributionRules.ContributionKey> contributionsInUse = ContributionsIn(builder.Services, 0, builder.Services.Count);
 			int before = builder.Services.Count;
 			builder.AddModule(plugin.Module);
 			List<ServiceDescriptor> added = [.. builder.Services.Skip(before)];
@@ -51,6 +53,9 @@ public static class PluginBuilderExtensions
 				added.Select(descriptor => descriptor.ImplementationInstance).OfType<SettingsSectionType>(),
 				added.Select(descriptor => descriptor.ImplementationInstance).OfType<SettingsPageName>().Select(page => page.Id),
 				sectionsInUse);
+			problem ??= PluginContributionRules.Problem(
+				added.Select(descriptor => descriptor.ImplementationInstance).OfType<IContributionIdentity>(),
+				contributionsInUse);
 			if (problem is not null)
 			{
 				for (int index = builder.Services.Count - 1; index >= before; index--)
@@ -61,6 +66,15 @@ public static class PluginBuilderExtensions
 				moduleIds.Remove(moduleId);
 				catalog.Reject(plugin.Info.Id, problem);
 				continue;
+			}
+
+			// What it registered is its own now, so a plugin added after it cannot take the same names.
+			foreach (ServiceDescriptor descriptor in added)
+			{
+				if (descriptor.ImplementationInstance is IContributionIdentity contribution)
+				{
+					contributionsInUse.Add(new PluginContributionRules.ContributionKey(contribution.Kind, contribution.Scope, contribution.Id));
+				}
 			}
 
 			builder.Services.AddSingleton(plugin.Info);
@@ -84,6 +98,20 @@ public static class PluginBuilderExtensions
 		}
 
 		return sections;
+	}
+
+	private static HashSet<PluginContributionRules.ContributionKey> ContributionsIn(IServiceCollection services, int from, int to)
+	{
+		HashSet<PluginContributionRules.ContributionKey> contributions = [];
+		for (int index = from; index < to; index++)
+		{
+			if (services[index].ImplementationInstance is IContributionIdentity contribution)
+			{
+				contributions.Add(new PluginContributionRules.ContributionKey(contribution.Kind, contribution.Scope, contribution.Id));
+			}
+		}
+
+		return contributions;
 	}
 
 	private static string? ModuleId(LoadedPlugin plugin)

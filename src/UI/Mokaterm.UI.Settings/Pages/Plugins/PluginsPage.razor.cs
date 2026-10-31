@@ -32,7 +32,6 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	private IPluginPackage? _package;
 	private string _tab = InstalledTab;
 	private bool _browseOpened;
-	private string? _downloading;
 	private bool _installOpen;
 	private bool _picking;
 	private bool _changing;
@@ -61,6 +60,10 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	private bool _restarting;
 
 	private bool CanInstall => Plugins.CanInstall && Files is not null;
+
+	// A download belongs to the window, so one that began before the page was left keeps the busy state and its result
+	// opens here once it is back.
+	private string? _downloading => _gallery?.Download is { Done: false } running ? running.PluginId : null;
 
 	private bool Busy => _picking || _changing || _downloading is not null;
 
@@ -113,6 +116,13 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 		if (_gallery is not null)
 		{
 			_gallery.Changed += OnPluginsChanged;
+
+			// A download that finished while the Plugins page was somewhere else still opens its dialog here.
+			if (_gallery.Download?.Package is not null)
+			{
+				_package = _gallery.TakeDownload();
+				_installOpen = _package is not null;
+			}
 		}
 	}
 
@@ -153,37 +163,27 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 			return;
 		}
 
-		_downloading = plugin.Id;
-		try
+		// The download runs as the window's, not the page's: leaving here neither stops it nor drops the package.
+		await gallery.BeginDownloadAsync(plugin, version);
+		if (_disposed)
 		{
-			IPluginPackage package = await gallery.DownloadAsync(plugin, version, _lifetime.Token);
-			if (_disposed)
-			{
-				package.Dispose();
-				return;
-			}
+			gallery.TakeDownload()?.Dispose();
+			return;
+		}
 
-			// The same dialog a picked file opens, which owns the package from here and disposes it when it closes.
+		PluginGalleryDownload? download = gallery.Download;
+		if (download?.Problem is { } problem)
+		{
+			Logger.LogWarning("Downloading {Plugin} from the gallery failed: {Failure}", plugin.Id, problem);
+			Interaction.Notify(NoticeSeverity.Error, problem, $"{plugin.Name} could not be downloaded");
+			return;
+		}
+
+		// The same dialog a picked file opens, which owns the package from here and disposes it when it closes.
+		if (gallery.TakeDownload() is { } package)
+		{
 			_package = package;
 			_installOpen = true;
-		}
-		catch (OperationCanceledException) when (_disposed)
-		{
-			// The page went away while the package was downloading.
-		}
-		catch (PluginGalleryException ex)
-		{
-			Logger.LogWarning("Downloading a plugin from the gallery failed: {Failure}", LogSafe.Describe(ex));
-			Interaction.Notify(NoticeSeverity.Error, ex.Message, $"{plugin.Name} could not be downloaded");
-		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			Logger.LogError(ex, "Downloading a plugin from the gallery failed");
-			Interaction.Notify(NoticeSeverity.Error, "Try again in a moment.", $"{plugin.Name} could not be downloaded");
-		}
-		finally
-		{
-			_downloading = null;
 		}
 	}
 
@@ -194,15 +194,16 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 			return;
 		}
 
-		_picking = true;
-		try
-		{
-			PickedFile<IPluginPackage> picked = await LocalFilePick.ReadStreamAsync(
-				files,
-				MaxPackageBytes,
-				"a plugin package",
-				(stream, token) => Plugins.ReadPackageAsync(stream, origin: null, token),
-				_lifetime.Token);
+			_picking = true;
+			try
+			{
+				PickedFile<IPluginPackage> picked = await LocalFilePick.ReadStreamAsync(
+					files,
+					MaxPackageBytes,
+					"a plugin package",
+					(stream, token) => Plugins.ReadPackageAsync(stream, origin: null, token),
+					[".mokaplugin"],
+					_lifetime.Token);
 
 			if (picked.Error is { } refusal)
 			{

@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 
 namespace Mokaterm.UI.Common.Contributions;
 
@@ -17,7 +18,7 @@ public enum SettingsPageGroup
 /// A page in Settings. The shell registers its own pages this way too, so the settings screen is built
 /// entirely from descriptors.
 /// </summary>
-public sealed record SettingsPageDescriptor
+public sealed record SettingsPageDescriptor : IContributionIdentity
 {
 	/// <summary>Stable id used in navigation, for example <c>terminal</c> or <c>ssh</c>.</summary>
 	public required string Id { get; init; }
@@ -37,4 +38,8 @@ public sealed record SettingsPageDescriptor
 
 	/// <summary>Extra words the settings search matches, for example "font cursor scrollback".</summary>
 	public string? Keywords { get; init; }
+
+	string IContributionIdentity.Kind => "settings page";
+	string IContributionIdentity.Id => Id;
+	string? IContributionIdentity.Scope => null;
 }

@@ -14,7 +14,9 @@ internal sealed class PluginGallery : IPluginGallery, IDisposable
 	private readonly IPluginManager _plugins;
 	private readonly string _hostName;
 	private readonly SemaphoreSlim _gate = new(1, 1);
+	private readonly object _downloadLock = new();
 	private PluginGalleryIndex? _current;
+	private PluginGalleryDownload? _download;
 
 	public PluginGallery(PluginGalleryClient client, IPluginManager plugins, IAppEnvironment environment)
 	{
@@ -32,7 +34,26 @@ internal sealed class PluginGallery : IPluginGallery, IDisposable
 
 	public PluginGalleryIndex? Current => Volatile.Read(ref _current);
 
-	public void Dispose() => _gate.Dispose();
+	public PluginGalleryDownload? Download
+	{
+		get
+		{
+			lock (_downloadLock)
+			{
+				return _download;
+			}
+		}
+	}
+
+	public void Dispose()
+	{
+		_gate.Dispose();
+		lock (_downloadLock)
+		{
+			(_download?.Package as IDisposable)?.Dispose();
+			_download = null;
+		}
+	}
 
 	public async Task<PluginGalleryIndex> ReadIndexAsync(bool refresh, CancellationToken cancellationToken)
 	{
@@ -87,6 +108,67 @@ internal sealed class PluginGallery : IPluginGallery, IDisposable
 		}
 
 		return package;
+	}
+
+	public async Task BeginDownloadAsync(PluginGalleryEntry plugin, PluginGalleryVersion version)
+	{
+		ArgumentNullException.ThrowIfNull(plugin);
+		ArgumentNullException.ThrowIfNull(version);
+		lock (_downloadLock)
+		{
+			if (_download is { Done: false })
+			{
+				// A download is already running; the page's busy state should have kept a second start out.
+				return;
+			}
+
+			// A package nobody took from the last download goes; the new one replaces what the window shows.
+			(_download?.Package as IDisposable)?.Dispose();
+			_download = new PluginGalleryDownload
+			{
+				PluginId = plugin.Id,
+				PluginName = plugin.Name,
+				Version = version.Version,
+			};
+		}
+
+		Changed?.Invoke(this, EventArgs.Empty);
+		try
+		{
+			IPluginPackage package = await DownloadAsync(plugin, version, CancellationToken.None);
+			lock (_downloadLock)
+			{
+				_download = _download is null ? null : _download with { Done = true, Package = package };
+			}
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			lock (_downloadLock)
+			{
+				_download = _download is null ? null : _download with
+				{
+					Done = true,
+					Problem = ex is PluginGalleryException gallery ? gallery.Message : "Try again in a moment.",
+				};
+			}
+		}
+
+		Changed?.Invoke(this, EventArgs.Empty);
+	}
+
+	public IPluginPackage? TakeDownload()
+	{
+		lock (_downloadLock)
+		{
+			// A download still running, or one that failed, has nothing to take and keeps its place.
+			if (_download?.Package is not { } package)
+			{
+				return null;
+			}
+
+			_download = null;
+			return package;
+		}
 	}
 
 	// The list is what the user chose from, so a package that says it is something else is refused even though its hash

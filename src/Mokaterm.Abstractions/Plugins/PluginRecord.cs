@@ -32,4 +32,10 @@ public sealed record PluginRecord
 
 	/// <summary>A change waits for the next start: an install, an update, a removal or a switch on or off.</summary>
 	public PluginPendingChange Pending { get; init; }
+
+	/// <summary>
+	/// The version the next start loads, when a waiting install or update brings one. The record's own
+	/// <see cref="Version"/> says what this start loaded, which is not it.
+	/// </summary>
+	public string? PendingVersion { get; init; }
 }

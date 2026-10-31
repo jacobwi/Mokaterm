@@ -26,8 +26,11 @@ public interface ILocalFileAccess
 {
 	bool CanPickFolders { get; }
 
-	/// <summary>Returns the picked files, or an empty list when cancelled.</summary>
-	ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default);
+	/// <summary>
+	/// Returns the picked files, or an empty list when cancelled. <paramref name="extensions"/>, when given, is what
+	/// the picker offers, such as <c>[".mokaplugin"]</c>; a host that cannot filter still returns what the user picked.
+	/// </summary>
+	ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default);
 
 	/// <summary>Returns the picked folder followed by everything inside it, directories before their contents.</summary>
 	ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default);
