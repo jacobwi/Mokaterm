@@ -43,11 +43,41 @@
 			<ViewTabs Tabs="Tabs" Active="@_tab" ActiveChanged="ShowTab" Label="Plugin views" IdPrefix="plugins-tab" />
 		}
 
+		@if (UpdateCount is { } updates)
+		{
+			@* What the startup check or a Browse read already knows, said once above the rows: the cards install it. *@
+			<MokaCallout Type="MokaCalloutType.Note" Title="@(updates == 1 ? "1 plugin has an update" : $"{updates} plugins have updates")">
+				@(updates == 1 ? "Its card in Browse installs it; nothing downloads on its own." : "Their cards in Browse install them; nothing downloads on its own.")
+				@if (ShowsBrowse)
+				{
+					<MokaFlexbox Direction="MokaDirection.Row" Style="margin-top: var(--moka-spacing-xs)">
+						<MokaButton Variant="MokaVariant.Outlined"
+									Size="MokaSize.Sm"
+									StartIcon="MokatermIcons.Plugin"
+									OnClick="@(() => ShowTab(BrowseTab))">
+							Browse updates
+						</MokaButton>
+					</MokaFlexbox>
+				}
+			</MokaCallout>
+		}
+
 		@if (_tab == InstalledTab)
 		{
 			<div class="plugins-views__panel" role="@(ShowsBrowse ? "tabpanel" : null)" aria-labelledby="@(ShowsBrowse ? "plugins-tab-" + InstalledTab : null)">
 				<SettingsSection Title="Installed" Description="@InstalledDescription">
 					<Actions>
+						@if (_gallery is not null)
+						{
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Sm"
+										StartIcon="MokaIcons.Action.Refresh"
+										Loading="_checkingUpdates"
+										Disabled="Busy"
+										OnClick="CheckForUpdatesAsync">
+								Check for updates
+							</MokaButton>
+						}
 						@if (CanInstall)
 						{
 							<MokaButton Variant="MokaVariant.Outlined"

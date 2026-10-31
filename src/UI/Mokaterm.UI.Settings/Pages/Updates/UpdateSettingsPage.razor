@@ -82,5 +82,11 @@
 						ValueChanged="value => UpdateAsync(s => s with { CheckAtStartup = value })"
 						aria-label="Check for updates at startup" />
 		</SettingsRow>
+		<SettingsRow Label="Check for plugin updates"
+					 Description="While checking, also read the plugin gallery's signed list once, and show a notice when an installed plugin has a newer version. Nothing is installed without you; the web host never checks.">
+			<MokaSwitch Value="settings.CheckPluginsAtStartup"
+						ValueChanged="value => UpdateAsync(s => s with { CheckPluginsAtStartup = value })"
+						aria-label="Check for plugin updates at startup" />
+		</SettingsRow>
 	</SettingsSection>
 </SettingsPage>

@@ -238,7 +238,10 @@ failing. Our own plugins are signed the same way and show as verified.
 **In the app.** A Browse tab on the Plugins page, beside Installed. Only the desktop host registers the gallery
 (`AddPluginGallery`), so the web host, whose operator copies files by hand, has no tab and asks nothing of GitHub.
 
-- The index is fetched only when the tab is opened, never in the background, so nothing leaves the machine unasked. The
+- The index is fetched only when asked: when the tab is opened, when the page's Check for updates is pressed, or by
+  the desktop's startup check ("Check for plugin updates", Settings, Updates, on by default), which reads it once
+  beside the app's own update check and shows a notice for what it finds. The web host never checks. Whatever read it,
+  every window of the run sees the same trusted list, so the Installed rows show their update chips without asking. The
   tab says which host it asks. A window keeps what it read until Refresh; nothing is kept across starts.
 - Plugins by category and search, each on a card with its publisher, license, the verified badge, CODE or DATA, the
   hosts, a link to the source and Install, Update or Installed.

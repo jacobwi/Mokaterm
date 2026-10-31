@@ -4,9 +4,11 @@ using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
+using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.Core.Plugins;
+using Mokaterm.Core.Plugins.Gallery;
 using Mokaterm.Maui.Services;
 using Mokaterm.Sessions.Extensions;
 using Mokaterm.UI.Common.Platform;
@@ -113,6 +115,45 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 				NoticeSeverity.Info,
 				$"Mokaterm {state.AvailableVersion} is out. Settings, then Updates, installs it.",
 				"Update available");
+		}
+
+		await CheckForPluginUpdatesAsync();
+	}
+
+	/// <summary>
+	/// The plugin half of the startup check: one read of the gallery's signed list behind its own setting, and a notice
+	/// when an installed plugin has a newer version there. Nothing is downloaded or installed; the Plugins page, whose
+	/// cards already know the list, is where an update happens. Only this host has the gallery, so the web host never
+	/// asks anything.
+	/// </summary>
+	private async Task CheckForPluginUpdatesAsync()
+	{
+		if (Services.GetService<PluginUpdateChecker>() is not { } checker
+			|| Services.GetService<ISettingsService>() is not { } settings
+			|| !settings.Get<UpdateSettings>().CheckPluginsAtStartup)
+		{
+			return;
+		}
+
+		IReadOnlyList<PluginUpdateOffer>? offers;
+		try
+		{
+			offers = await checker.CheckAsync(CancellationToken.None);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			// The checker reports its own failures as "no check"; this covers what it does not.
+			Logger.LogWarning("The plugin update check at startup failed: {Failure}", LogSafe.Describe(ex));
+			return;
+		}
+
+		if (offers is { Count: > 0 })
+		{
+			string names = string.Join(", ", offers.Select(offer => $"{offer.Name} {offer.NewVersion}"));
+			Interaction.Notify(
+				NoticeSeverity.Info,
+				$"{names} {(offers.Count == 1 ? "is" : "are")} out. Settings, then Plugins, Browse, installs {(offers.Count == 1 ? "it" : "them")}.",
+				"Plugin updates available");
 		}
 	}
 }

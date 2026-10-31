@@ -26,6 +26,13 @@ public sealed record UpdateSettings : ISettingsSection
 	public bool CheckAtStartup { get; init; } = true;
 
 	/// <summary>
+	/// Look for plugin updates in the same startup check: one read of the gallery's signed index, the same host the
+	/// Browse tab asks, and nothing but a notice when something is newer. Installing stays in Settings, Plugins.
+	/// Only a host with the gallery (the desktop) reads this.
+	/// </summary>
+	public bool CheckPluginsAtStartup { get; init; } = true;
+
+	/// <summary>
 	/// <paramref name="value"/> trimmed when it is an absolute http or https address or a fully qualified path,
 	/// otherwise empty. The one rule for a feed: the settings page refuses what this drops, and a hand-edited
 	/// settings.json falls back to updates being off instead of to a location nobody meant.

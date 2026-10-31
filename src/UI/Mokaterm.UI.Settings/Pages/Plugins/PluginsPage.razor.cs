@@ -58,6 +58,7 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	private IEnumerable<PluginInfo> Loaded { get; set; } = default!;
 
 	private bool _restarting;
+	private bool _checkingUpdates;
 
 	private bool CanInstall => Plugins.CanInstall && Files is not null;
 
@@ -147,6 +148,60 @@ public sealed partial class PluginsPage : ComponentBase, IDisposable
 	}
 
 	/// <summary>A newer version the gallery offers for an installed plugin, once this window read the gallery's list.</summary>
+	/// <summary>How many installed plugins the gallery offers an update for, once a list is known; null before that.</summary>
+	private int? UpdateCount
+	{
+		get
+		{
+			if (_gallery?.Current is null)
+			{
+				return null;
+			}
+
+			int count = 0;
+			foreach (PluginRecord plugin in Plugins.Plugins)
+			{
+				if (UpdateOf(plugin) is not null)
+				{
+					count++;
+				}
+			}
+
+			return count;
+		}
+	}
+
+	/// <summary>
+	/// Reads the gallery's list again now. The startup check may have brought one (its chips already show); this asks
+	/// for a fresh read — one request, signed, and only on a host with the gallery.
+	/// </summary>
+	private async Task CheckForUpdatesAsync()
+	{
+		if (Busy || _checkingUpdates || _gallery is not { } gallery)
+		{
+			return;
+		}
+
+		_checkingUpdates = true;
+		try
+		{
+			await gallery.ReadIndexAsync(refresh: true, _lifetime.Token);
+		}
+		catch (PluginGalleryException ex)
+		{
+			Interaction.Notify(NoticeSeverity.Error, ex.Message, "The plugin list could not be read");
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogWarning("Reading the plugin list failed: {Failure}", LogSafe.Describe(ex));
+			Interaction.Notify(NoticeSeverity.Error, "Try again in a moment.", "The plugin list could not be read");
+		}
+		finally
+		{
+			_checkingUpdates = false;
+		}
+	}
+
 	private PluginGalleryVersion? UpdateOf(PluginRecord plugin) =>
 		_gallery?.Current?.Find(plugin.Id) is { } entry && PluginGalleryOffer.For(entry, plugin) is { Kind: PluginGalleryOfferKind.Update } offer
 			? offer.Version
