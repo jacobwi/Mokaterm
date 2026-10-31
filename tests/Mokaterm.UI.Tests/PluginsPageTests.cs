@@ -335,6 +335,46 @@ public sealed partial class PluginsPageTests
 		IsEnabled = enabled,
 	};
 
+	// The banner the startup check or a Browse read earns: said once above the rows, pointing at the cards that install.
+	[Fact]
+	public async Task Render_WithAKnownUpdate_BannersItBesideTheRowChip()
+	{
+		PluginGalleryVersion update = new()
+		{
+			Version = "1.1.0",
+			Sdk = "0.2",
+			Url = new Uri("https://downloads.test/acme.themes-1.1.0.mokaplugin"),
+			Sha256 = Sha,
+			Size = 10,
+			Commit = "9f2c4e1a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
+			Published = DateTimeOffset.UtcNow,
+		};
+		PluginGalleryEntry entry = new()
+		{
+			Id = "acme.themes",
+			Name = "Night themes",
+			Description = "A theme pack.",
+			Publisher = "Acme",
+			Verified = false,
+			Categories = ["themes"],
+			Source = new Uri("https://github.com/acme/mokaterm-tests"),
+			License = "MIT",
+			HasCode = false,
+			Hosts = [PluginHosts.Desktop, PluginHosts.Web],
+			Versions = [update],
+			Offered = [update],
+		};
+		FakePluginGallery gallery = new() { Current = new PluginGalleryIndex { Generated = DateTimeOffset.UtcNow, Plugins = [entry] } };
+
+		string html = await RenderPageAsync(
+			new FakePluginManager { Plugins = [Plugin("acme.themes", "Night themes", PluginStatus.Enabled, hasCode: false, enabled: true) with { Version = "1.0.0" }] },
+			extra: services => services.AddSingleton<IPluginGallery>(gallery));
+
+		Assert.Contains("1 plugin has an update", html, StringComparison.Ordinal);
+		Assert.Contains("Update available: 1.1.0", html, StringComparison.Ordinal);
+		Assert.Contains("Check for updates", html, StringComparison.Ordinal);
+	}
+
 	private static Task<string> RenderPageAsync(FakePluginManager plugins, bool withPicker = true, Action<IServiceCollection>? extra = null) =>
 		StaticRender.RenderAsync<PluginsPage>(
 			services =>

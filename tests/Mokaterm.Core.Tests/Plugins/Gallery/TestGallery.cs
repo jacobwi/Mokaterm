@@ -67,8 +67,9 @@ internal sealed class TestGallery
 		new(new PluginGalleryOptions { Index = IndexAddress, TrustedKeys = keys ?? [PublicKey] }, Server);
 
 	/// <summary>The gallery a window gets, over a real plugin manager.</summary>
+	/// <summary>Each gallery gets a cache of its own, the way a window's scope would.</summary>
 	public PluginGallery Gallery(PluginManager manager, HostKind host = HostKind.Desktop) =>
-		new(Client(), manager, new FakeAppEnvironment(Path.GetTempPath()) { Kind = host });
+		new(Client(), manager, new FakeAppEnvironment(Path.GetTempPath()) { Kind = host }, new PluginIndexCache());
 
 	public static JsonObject Index(params JsonObject[] plugins) => new()
 	{

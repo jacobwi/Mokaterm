@@ -12,19 +12,22 @@ internal sealed class PluginGallery : IPluginGallery, IDisposable
 {
 	private readonly PluginGalleryClient _client;
 	private readonly IPluginManager _plugins;
+	private readonly PluginIndexCache _cache;
 	private readonly string _hostName;
 	private readonly SemaphoreSlim _gate = new(1, 1);
 	private readonly object _downloadLock = new();
 	private PluginGalleryIndex? _current;
 	private PluginGalleryDownload? _download;
 
-	public PluginGallery(PluginGalleryClient client, IPluginManager plugins, IAppEnvironment environment)
+	public PluginGallery(PluginGalleryClient client, IPluginManager plugins, IAppEnvironment environment, PluginIndexCache cache)
 	{
 		ArgumentNullException.ThrowIfNull(client);
 		ArgumentNullException.ThrowIfNull(plugins);
 		ArgumentNullException.ThrowIfNull(environment);
+		ArgumentNullException.ThrowIfNull(cache);
 		_client = client;
 		_plugins = plugins;
+		_cache = cache;
 		_hostName = PluginHosts.For(environment.Kind);
 	}
 
@@ -32,7 +35,11 @@ internal sealed class PluginGallery : IPluginGallery, IDisposable
 
 	public Uri Index => _client.Index;
 
-	public PluginGalleryIndex? Current => Volatile.Read(ref _current);
+	/// <summary>
+	/// The list read in this window, or the one another part of this app run read (the startup check, a Check for
+	/// updates): a list this run already trusted, so update chips show without the tab asking again.
+	/// </summary>
+	public PluginGalleryIndex? Current => Volatile.Read(ref _current) ?? _cache.Latest;
 
 	public PluginGalleryDownload? Download
 	{

@@ -20,12 +20,14 @@ internal sealed class PluginGalleryClient : IDisposable
 
 	private readonly HttpClient _http;
 	private readonly byte[][] _keys;
+	private readonly PluginIndexCache? _cache;
 
 	/// <param name="options">The list's address and the keys it must be signed with.</param>
 	/// <param name="handler">Where requests go, or null for the network. Tests and the DevHost's demo gallery pass their own.</param>
 	/// <exception cref="ArgumentException">The address is not https, or a key is not an Ed25519 public key.</exception>
-	public PluginGalleryClient(PluginGalleryOptions options, HttpMessageHandler? handler = null)
+	public PluginGalleryClient(PluginGalleryOptions options, HttpMessageHandler? handler = null, PluginIndexCache? cache = null)
 	{
+		_cache = cache;
 		ArgumentNullException.ThrowIfNull(options);
 		Index = CheckIndex(options.Index);
 		Signature = new UriBuilder(Index) { Path = Index.AbsolutePath + ".sig" }.Uri;
@@ -64,7 +66,9 @@ internal sealed class PluginGalleryClient : IDisposable
 				+ "changed on the way, or Mokaterm needs an update.");
 		}
 
-		return PluginIndexReader.Read(index, hostName);
+		PluginGalleryIndex read = PluginIndexReader.Read(index, hostName);
+		_cache?.Keep(read);
+		return read;
 	}
 
 	/// <summary>Downloads a package and checks its size and SHA-256 against the list before anything reads it.</summary>

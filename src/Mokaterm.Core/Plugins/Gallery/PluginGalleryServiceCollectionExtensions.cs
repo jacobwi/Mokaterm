@@ -26,7 +26,9 @@ public static class PluginGalleryServiceCollectionExtensions
 		PluginGalleryClient.CheckIndex(options.Index);
 		PluginIndexSignature.ReadKeys(options.TrustedKeys);
 
-		services.TryAddSingleton(_ => new PluginGalleryClient(options, handler?.Invoke()));
+		services.TryAddSingleton<PluginIndexCache>();
+		services.TryAddSingleton<PluginUpdateChecker>();
+		services.AddSingleton(sp => new PluginGalleryClient(options, handler?.Invoke(), sp.GetService<PluginIndexCache>()));
 		services.TryAddScoped<IPluginGallery, PluginGallery>();
 		return services;
 	}

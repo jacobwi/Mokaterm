@@ -12,6 +12,8 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Mokaterm.Core.Tests" />
+		<!-- The desktop host runs the plugin update check at startup; Core.Types.For turns its records into notices. -->
+		<InternalsVisibleTo Include="Mokaterm.Maui" />
 	</ItemGroup>
 
 	<ItemGroup>
