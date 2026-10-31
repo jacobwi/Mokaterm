@@ -1,4 +1,8 @@
-# Next release (0.2.6)
+# Next release (0.2.7)
+
+To be planned. The carried items below still stand.
+
+# Released: 0.2.6
 
 ## A general pass on the app's UI
 
