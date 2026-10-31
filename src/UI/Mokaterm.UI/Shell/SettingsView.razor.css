@@ -87,3 +87,12 @@
 	max-width: 960px;
 	margin-bottom: var(--moka-spacing-lg);
 }
+
+/* A word the query matched, tinted rather than boxed so the label keeps its shape. */
+.mt-settings-hit {
+	padding: 0 1px;
+	border-radius: var(--moka-radius-xs, 2px);
+	background: color-mix(in srgb, var(--moka-color-primary) 14%, transparent);
+	color: var(--moka-color-primary);
+	font-weight: var(--moka-font-weight-medium);
+}

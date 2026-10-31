@@ -43,7 +43,13 @@
 											  OnClick="() => Open(position)"
 											  tabindex="-1">
 									<span class="mt-settings-result">
-										<span class="mt-settings-result-label">@row.Label</span>
+										<span class="mt-settings-result-label">
+											@* Where each word landed, so a row's label shows why it matched. *@
+											@foreach ((string piece, bool hit) in SettingsSearch.Mark(row.Label, _query))
+											{
+												<span class="@(hit ? "mt-settings-hit" : null)">@piece</span>
+											}
+										</span>
 										@* A label such as Style or Status needs its section to say where it is when nothing else does. *@
 										@if ((row.Description ?? row.Section) is { } detail)
 										{

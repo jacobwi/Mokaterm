@@ -12,7 +12,7 @@ namespace Mokaterm.UI.Common.Components;
 public sealed partial class NumberSetting<TValue> : DraftSettingBase<TValue>
 	where TValue : struct, INumber<TValue>
 {
-	private const string DefaultWidthStyle = "width:88px";
+	private const string DefaultWidthStyle = "width:" + SettingWidths.Narrow;
 
 	private static readonly bool IsWholeNumber = typeof(TValue).GetInterfaces()
 		.Any(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IBinaryInteger<>));

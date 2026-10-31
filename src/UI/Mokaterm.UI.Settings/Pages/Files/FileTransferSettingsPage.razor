@@ -86,7 +86,7 @@
 						ValueChanged="value => SaveAsync(s => s with { ResumeTransfers = value })"
 						aria-label="Resume interrupted transfers" />
 		</SettingsRow>
-		<SettingsRow Label="Parallel transfers" Description="How many files move at the same time." ControlWidth="240px">
+		<SettingsRow Label="Parallel transfers" Description="How many files move at the same time." ControlWidth="@SettingWidths.Standard">
 			<MokaSlider Value="settings.MaxConcurrentTransfers"
 						ValueChanged="SetMaxConcurrentTransfersAsync"
 						Min="FileTransferSettings.MinParallelTransfers"
@@ -99,7 +99,7 @@
 		{
 			<SettingsRow Label="Download folder"
 						 Description="Where downloads are saved. Leave empty to choose a location for every download."
-						 ControlWidth="340px">
+						 ControlWidth="@SettingWidths.Wide">
 				<TextSetting Value="@(settings.DownloadDirectory ?? "")"
 							 ValueChanged="SetDownloadDirectoryAsync"
 							 AllowEmpty

@@ -49,7 +49,7 @@
 		}
 		@if (state is { Stage: UpdateStage.Downloading })
 		{
-			<SettingsRow Label="Download" Description="Downloading the new version." ControlWidth="260px">
+			<SettingsRow Label="Download" Description="Downloading the new version." ControlWidth="@SettingWidths.Standard">
 				<MokaProgress Value="state.DownloadPercent" ShowValue />
 			</SettingsRow>
 		}
@@ -69,7 +69,7 @@
 	<SettingsSection Title="Feed">
 		<SettingsRow Label="Feed location"
 					 Description="Mokaterm's GitHub releases by default. Also takes another https address or a full path to a folder with the release files. Leave it empty to turn updates off; Reset to defaults brings GitHub back."
-					 ControlWidth="340px">
+					 ControlWidth="@SettingWidths.Wide">
 			<TextSetting Value="@settings.Feed"
 						 ValueChanged="SetFeedAsync"
 						 AllowEmpty

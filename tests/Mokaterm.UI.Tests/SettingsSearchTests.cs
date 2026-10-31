@@ -88,6 +88,37 @@ public sealed class SettingsSearchTests
 	[InlineData("Auto-lock", "auto lock")]
 	public void Fold_TurnsPunctuationIntoSpaces(string text, string expected) => Assert.Equal(expected, SettingsSearch.Fold(text));
 
+	// Where each word landed, so a result row can show why it matched.
+	[Fact]
+	public void Mark_AWordInsideALabel_IsTheMarkedPiece()
+	{
+		IReadOnlyList<(string Text, bool Matched)> pieces = SettingsSearch.Mark("Font family", "family");
+
+		Assert.Equal([("Font ", false), ("family", true)], pieces);
+	}
+
+	[Fact]
+	public void Mark_PunctuationTakesTheStateOfTheLetterBeforeIt()
+	{
+		IReadOnlyList<(string Text, bool Matched)> pieces = SettingsSearch.Mark("Right-click", "click");
+
+		Assert.Equal([("Right-", false), ("click", true)], pieces);
+	}
+
+	[Fact]
+	public void Mark_SeveralWords_MarkEveryLanding()
+	{
+		IReadOnlyList<(string Text, bool Matched)> pieces = SettingsSearch.Mark("Keepalive interval", "keep interval");
+
+		Assert.Equal([("Keep", true), ("alive ", false), ("interval", true)], pieces);
+	}
+
+	[Fact]
+	public void Mark_NothingTyped_LeavesTheLabelAlone()
+	{
+		Assert.Equal([("Font family", false)], SettingsSearch.Mark("Font family", " "));
+	}
+
 	private static int IndexOf(IReadOnlyList<SettingsSearchResult> results, Func<SettingsSearchResult, bool> match)
 	{
 		for (int index = 0; index < results.Count; index++)
