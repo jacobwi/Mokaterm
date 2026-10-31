@@ -1,0 +1,211 @@
+@using System.Globalization
+@using System.Text
+@using Microsoft.AspNetCore.Components
+@using Moka.Red.Primitives.Button
+@using Mokaterm.Abstractions.Interaction
+@using Mokaterm.Abstractions.Platform
+@using Mokaterm.Abstractions.Settings
+@using Mokaterm.UI.Common.Icons
+@using Mokaterm.UI.Common.Platform
+@using Moka.Red.Icons
+
+@* One result: text (PEM, a dump, a token) with copy and save, or a binary file with save. A secret stays hidden until
+   asked for and is copied through the host's secret copy, which clears the clipboard again. *@
+<section class="mt-pui-output" aria-label="@Title">
+	<div class="mt-pui-output-head">
+		<span class="mt-pui-output-title">@Title</span>
+		@if (Secret)
+		{
+			<span class="mt-pui-output-tag">secret</span>
+		}
+		@if (Detail is { Length: > 0 } detail)
+		{
+			<span class="mt-pui-output-detail" title="@detail">@detail</span>
+		}
+		<span class="mt-pui-output-gap"></span>
+		@Actions
+		@if (Secret && Text is not null)
+		{
+			<MokaButton Variant="MokaVariant.Text"
+						Color="MokaColor.Surface"
+						Size="MokaSize.Xs"
+						StartIcon="@(_shown ? MokaIcons.Toggle.EyeOff : MokaIcons.Toggle.Eye)"
+						OnClick="ToggleShown">
+				@(_shown ? "Hide" : "Show")
+			</MokaButton>
+		}
+		@if (Text is { } text)
+		{
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Xs"
+						StartIcon="MokaIcons.Content.Copy"
+						OnClick="() => CopyAsync(text)">
+				Copy
+			</MokaButton>
+			@if (FileName is { } name)
+			{
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Xs"
+							StartIcon="MokatermIcons.Download"
+							OnClick="() => SaveTextAsync(name, text)">
+					Save
+				</MokaButton>
+			}
+		}
+		@if (Bytes is { } bytes && BytesFileName is { } bytesName)
+		{
+			<MokaButton Variant="MokaVariant.Outlined"
+						Size="MokaSize.Xs"
+						StartIcon="MokatermIcons.Download"
+						OnClick="() => SaveAsync(bytesName, bytes)">
+				@BytesLabel
+			</MokaButton>
+		}
+	</div>
+
+	@if (Text is { } body)
+	{
+		@if (Secret && !_shown)
+		{
+			<div class="mt-pui-output-hidden">Hidden. Copy it, save it, or show it here.</div>
+		}
+		else
+		{
+			<pre class="@(Wrap ? "mt-pui-output-text" : "mt-pui-output-text mt-pui-output-text--nowrap")">@Shown(body)</pre>
+			@if (body.Length > Shown(body).Length)
+			{
+				<span class="mt-pui-output-cut">
+					Showing the first @Size(Shown(body).Length) of @Size(body.Length). Copy and Save take all of it.
+				</span>
+			}
+		}
+	}
+
+	@ChildContent
+</section>
+
+@code {
+	private bool _shown;
+
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
+
+	[Inject]
+	private ILocalFileAccess Files { get; set; } = default!;
+
+	[Inject]
+	private IUserInteraction Interaction { get; set; } = default!;
+
+	[Inject]
+	private ISettingsService Settings { get; set; } = default!;
+
+	[Parameter, EditorRequired]
+	public string Title { get; set; } = "";
+
+	/// <summary>A short note beside the title, such as "3 certificates" or "RSA 2048".</summary>
+	[Parameter]
+	public string? Detail { get; set; }
+
+	[Parameter]
+	public string? Text { get; set; }
+
+	/// <summary>The name "Save" offers for the text; null shows no Save.</summary>
+	[Parameter]
+	public string? FileName { get; set; }
+
+	/// <summary>A binary form to save, such as DER or PFX; needs <see cref="BytesFileName"/>.</summary>
+	[Parameter]
+	public byte[]? Bytes { get; set; }
+
+	[Parameter]
+	public string? BytesFileName { get; set; }
+
+	[Parameter]
+	public string BytesLabel { get; set; } = "Save file";
+
+	/// <summary>A private key or a password: hidden until shown, copied as a secret.</summary>
+	[Parameter]
+	public bool Secret { get; set; }
+
+	/// <summary>What the copy notice calls it: "Private key", "Token".</summary>
+	[Parameter]
+	public string? CopyName { get; set; }
+
+	/// <summary>Long lines wrap; off for dumps and diffs, whose columns must line up.</summary>
+	[Parameter]
+	public bool Wrap { get; set; } = true;
+
+	/// <summary>How much of a very long text is drawn. Null draws all of it; Copy and Save always take all of it.</summary>
+	[Parameter]
+	public int? DisplayChars { get; set; }
+
+	/// <summary>Buttons of the caller's own, drawn beside Copy and Save.</summary>
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	private string Shown(string text) => DisplayChars is { } limit && text.Length > limit ? text[..limit] : text;
+
+	private void ToggleShown() => _shown = !_shown;
+
+	private Task CopyAsync(string text) => Secret ? CopySecretAsync(text, CopyName ?? Title) : CopyPlainAsync(text, CopyName ?? Title);
+
+	private async Task CopyPlainAsync(string text, string what)
+	{
+		try
+		{
+			await Clipboard.WriteTextAsync(text);
+			Interaction.Notify(NoticeSeverity.Success, $"{what} copied.");
+		}
+		catch (Exception ex) when (IsPageFailure(ex))
+		{
+			Interaction.Notify(NoticeSeverity.Error, $"{what} could not be copied.");
+		}
+	}
+
+	/// <summary>Copies through the host's secret copy, which clears the clipboard after the time set under Security.</summary>
+	private async Task CopySecretAsync(string secret, string what)
+	{
+		try
+		{
+			await Clipboard.WriteSecretAsync(secret);
+		}
+		catch (Exception ex) when (IsPageFailure(ex))
+		{
+			Interaction.Notify(NoticeSeverity.Error, $"{what} could not be copied.");
+			return;
+		}
+
+		int clearSeconds = Settings.Get<SecuritySettings>().ClipboardClearSeconds;
+		Interaction.Notify(
+			NoticeSeverity.Success,
+			clearSeconds > 0
+				? string.Create(CultureInfo.CurrentCulture, $"{what} copied. The clipboard clears in {clearSeconds} s.")
+				: $"{what} copied.");
+	}
+
+	private Task SaveTextAsync(string fileName, string text) => SaveAsync(fileName, new UTF8Encoding(false).GetBytes(text));
+
+	private async Task SaveAsync(string fileName, byte[] bytes)
+	{
+		ArgumentNullException.ThrowIfNull(bytes);
+		try
+		{
+			await Files.SaveFileAsync(fileName, bytes.Length, (stream, token) => stream.WriteAsync(bytes, token).AsTask());
+		}
+		catch (Exception ex) when (IsPageFailure(ex) || ex is UnauthorizedAccessException)
+		{
+			Interaction.Notify(NoticeSeverity.Error, $"{fileName} could not be saved.");
+		}
+	}
+
+	/// <summary>A failure of the page or the file system rather than of this code: the page went away, the browser refused, the disk did.</summary>
+	private static bool IsPageFailure(Exception exception) =>
+		exception is IOException or InvalidOperationException or Microsoft.JSInterop.JSException or Microsoft.JSInterop.JSDisconnectedException;
+
+	private static string Size(int bytes) => bytes < 1024
+		? string.Create(CultureInfo.CurrentCulture, $"{bytes} bytes")
+		: string.Create(CultureInfo.CurrentCulture, $"{bytes / 1024.0:0.#} KB");
+}

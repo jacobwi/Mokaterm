@@ -2,6 +2,10 @@
 @inherits SessionViewBase
 @using Mokaterm.Modules.Ssh.Admin.Reboot
 
+@* The pages' own classes (mta-*), built in or a plugin's, come from UI.Common: a declared contract rather than a
+   stylesheet of ours they happen to reach. *@
+<link href="_content/Mokaterm.UI.Common/system-pages.css" rel="stylesheet" />
+
 <div class="mt-admin">
 	@if (_feature is null)
 	{
@@ -118,15 +122,18 @@
 			<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _rootError = null)">@rootError</MokaAlert>
 		}
 
-		<ToolNavigation Entries="NavEntries(profile)" Current="@_page" CurrentChanged="Show" Label="System pages">
-			<div class="mta-main">
-				<CascadingValue Value="_context" IsFixed="false">
-					@if (CurrentPage is { } page)
-					{
-						<DynamicComponent @key="(profile, page.Id)" Type="page.Component" />
-					}
-				</CascadingValue>
-			</div>
+			<ToolNavigation Entries="NavEntries(profile)" Current="@_page" CurrentChanged="Show" Label="System pages">
+				<div class="mta-main">
+					<CascadingValue Value="_context" IsFixed="false">
+						@if (CurrentPage is { } page)
+						{
+							// A page that throws says so itself; the rest of the view, and the other pages, carry on.
+							<ViewBoundary @key="(profile, page.Id)" Name="@(page.Title)" Fill>
+								<DynamicComponent @key="(profile, page.Id)" Type="page.Component" />
+							</ViewBoundary>
+						}
+					</CascadingValue>
+				</div>
 
 			@if (_review is { } review)
 			{

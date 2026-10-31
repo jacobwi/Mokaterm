@@ -16,15 +16,17 @@ public static class LocalFilePick
 	/// <param name="files">The host's picker.</param>
 	/// <param name="maxBytes">The largest file that will be read whole. Anything over it is refused.</param>
 	/// <param name="what">What the file was meant to be, for the message: "a private key", "a color scheme".</param>
+	/// <param name="extensions">What the picker offers, when it can filter; see <see cref="ILocalFileAccess.PickFilesAsync"/>.</param>
 	/// <param name="cancellationToken">Cancels the pick and the read.</param>
 	public static Task<PickedFile<byte[]>> ReadBytesAsync(
 		ILocalFileAccess files,
 		int maxBytes,
 		string what,
+		IReadOnlyList<string>? extensions = null,
 		CancellationToken cancellationToken = default)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
-		return ReadAsync(files, maxBytes, what, (stream, token) => ReadBytesAsync(stream, maxBytes, token), cancellationToken);
+		return ReadAsync(files, maxBytes, what, extensions, (stream, token) => ReadBytesAsync(stream, maxBytes, token), cancellationToken);
 	}
 
 	/// <param name="files">The host's picker.</param>
@@ -33,15 +35,17 @@ public static class LocalFilePick
 	/// before anything is opened.
 	/// </param>
 	/// <param name="what">What the file was meant to be, for the message: "a private key", "a color scheme".</param>
+	/// <param name="extensions">What the picker offers, when it can filter; see <see cref="ILocalFileAccess.PickFilesAsync"/>.</param>
 	/// <param name="cancellationToken">Cancels the pick and the read.</param>
 	public static Task<PickedFile<string>> ReadTextAsync(
 		ILocalFileAccess files,
 		int maxCharacters,
 		string what,
+		IReadOnlyList<string>? extensions = null,
 		CancellationToken cancellationToken = default)
 	{
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCharacters);
-		return ReadAsync(files, maxCharacters, what, (stream, token) => ReadTextAsync(stream, maxCharacters, token), cancellationToken);
+		return ReadAsync(files, maxCharacters, what, extensions, (stream, token) => ReadTextAsync(stream, maxCharacters, token), cancellationToken);
 	}
 
 	/// <summary>
@@ -53,6 +57,7 @@ public static class LocalFilePick
 	/// <param name="files">The host's picker.</param>
 	/// <param name="maxBytes">The largest file the reader may take. Anything over it is refused.</param>
 	/// <param name="what">What the file was meant to be, for the message: "a plugin package".</param>
+	/// <param name="extensions">What the picker offers, when it can filter; see <see cref="ILocalFileAccess.PickFilesAsync"/>.</param>
 	/// <param name="readAsync">
 	/// Reads the stream, which cannot seek and is closed once this returns. Its exceptions reach the caller, except when
 	/// the file was too large.
@@ -63,18 +68,20 @@ public static class LocalFilePick
 		long maxBytes,
 		string what,
 		Func<Stream, CancellationToken, Task<TResult>> readAsync,
+		IReadOnlyList<string>? extensions = null,
 		CancellationToken cancellationToken = default)
 		where TResult : class
 	{
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
 		ArgumentNullException.ThrowIfNull(readAsync);
-		return ReadAsync(files, maxBytes, what, (stream, token) => ReadCappedAsync(stream, maxBytes, readAsync, token), cancellationToken);
+		return ReadAsync(files, maxBytes, what, extensions, (stream, token) => ReadCappedAsync(stream, maxBytes, readAsync, token), cancellationToken);
 	}
 
 	private static async Task<PickedFile<TContent>> ReadAsync<TContent>(
 		ILocalFileAccess files,
 		long maxLength,
 		string what,
+		IReadOnlyList<string>? extensions,
 		Func<Stream, CancellationToken, Task<TContent?>> readAsync,
 		CancellationToken cancellationToken)
 		where TContent : class
@@ -82,7 +89,7 @@ public static class LocalFilePick
 		ArgumentNullException.ThrowIfNull(files);
 		ArgumentException.ThrowIfNullOrWhiteSpace(what);
 
-		IReadOnlyList<LocalFileItem> picked = await files.PickFilesAsync(multiple: false, cancellationToken);
+		IReadOnlyList<LocalFileItem> picked = await files.PickFilesAsync(multiple: false, extensions, cancellationToken);
 		try
 		{
 			if (picked.Count == 0 || picked[0] is not { OpenReadAsync: { } openAsync } file)

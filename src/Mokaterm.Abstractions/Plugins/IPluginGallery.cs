@@ -31,4 +31,21 @@ public interface IPluginGallery
 	/// The download failed, did not match the list, or is not a usable package; the message says why.
 	/// </exception>
 	Task<IPluginPackage> DownloadAsync(PluginGalleryEntry plugin, PluginGalleryVersion version, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// The download this window is running, or finished with and nothing has taken yet, or null. It survives leaving the
+	/// Plugins page, unlike the page that started it.
+	/// </summary>
+	PluginGalleryDownload? Download { get; }
+
+	/// <summary>
+	/// Downloads one version as this window's <see cref="Download"/> and returns once it finished, whichever way it went:
+	/// the outcome is in the record, not thrown. Only one download runs at a time; a second call while one runs is
+	/// refused. The package stays until <see cref="TakeDownload"/> or the next download, so a page that was left and
+	/// returned to can still open the install dialog.
+	/// </summary>
+	Task BeginDownloadAsync(PluginGalleryEntry plugin, PluginGalleryVersion version);
+
+	/// <summary>Takes the finished download's package, if it has one and nothing took it yet; the download is then gone.</summary>
+	IPluginPackage? TakeDownload();
 }

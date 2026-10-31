@@ -1,4 +1,5 @@
 using System.Runtime.Loader;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.Abstractions.Modules;
 using Mokaterm.Abstractions.Platform;
@@ -8,6 +9,8 @@ using Mokaterm.Core.Extensions;
 using Mokaterm.Core.Plugins;
 using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Contributions;
+using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Plugins.Tests;
 
@@ -95,6 +98,62 @@ public sealed class PluginLoadingTests : IDisposable
 	}
 
 	[Fact]
+	public async Task PluginWhoseAppToolIdIsTaken_IsRefusedOutLoud()
+	{
+		await InstallTrustedAsync();
+		PluginCatalog catalog = Open();
+		catalog.ConfirmStarted();
+
+		// A built-in app tool already holds the sample's app tool id.
+		ServiceCollection services = new();
+		services.AddAppTool(new AppToolDescriptor
+		{
+			Id = "subnet-calculator",
+			Title = "Subnet calculator",
+			Icon = MokatermIcons.Globe,
+			Component = typeof(BuiltInAppTool),
+		});
+		new MokatermBuilder(services).AddPlugins(catalog);
+		using ServiceProvider provider = services.BuildServiceProvider();
+
+		PluginRecord record = Assert.Single(provider.GetRequiredService<IPluginManager>().Plugins);
+		Assert.Equal(PluginStatus.Failed, record.Status);
+		Assert.Contains("subnet-calculator", record.Problem, StringComparison.Ordinal);
+		Assert.Empty(provider.GetServices<PluginInfo>());
+		// Everything it registered is taken out again, not only the clashing tool.
+		Assert.DoesNotContain(provider.GetServices<SessionToolDescriptor>(), tool => tool.Key == "sample-plugin");
+		Assert.Empty(provider.GetServices<SystemPageDescriptor>());
+		Assert.Empty(provider.GetServices<SettingsPageDescriptor>());
+		// The built-in one it clashed with is untouched.
+		Assert.Single(provider.GetServices<AppToolDescriptor>(), tool => tool.Id == "subnet-calculator" && tool.Component == typeof(BuiltInAppTool));
+	}
+
+	[Fact]
+	public async Task PluginWhoseSessionToolKeyIsTakenForAnotherProtocol_IsKept()
+	{
+		await InstallTrustedAsync();
+		PluginCatalog catalog = Open();
+		catalog.ConfirmStarted();
+
+		// The sample's session tool key is held on a protocol the sample does not register for, which is how tools on
+		// different protocols share a command on purpose.
+		ServiceCollection services = new();
+		services.AddSessionTool(new SessionToolDescriptor
+		{
+			ProtocolId = "ssh",
+			Id = "sample-plugin",
+			Title = "Sample",
+			Icon = MokatermIcons.Tag,
+			Component = typeof(BuiltInSessionView),
+		});
+		new MokatermBuilder(services).AddPlugins(catalog);
+		using ServiceProvider provider = services.BuildServiceProvider();
+
+		Assert.Equal(PluginStatus.Enabled, Assert.Single(provider.GetRequiredService<IPluginManager>().Plugins).Status);
+		Assert.Contains(provider.GetServices<SessionToolDescriptor>(), tool => tool.ProtocolId == "demo" && tool.Key == "sample-plugin");
+	}
+
+	[Fact]
 	public async Task LoadedPlugin_BringsItsSettingsPage_UnderItsOwnName()
 	{
 		await InstallTrustedAsync();
@@ -173,6 +232,10 @@ public sealed class PluginLoadingTests : IDisposable
 		{
 		}
 	}
+
+	private sealed class BuiltInAppTool : AppToolBase;
+
+	private sealed class BuiltInSessionView : SessionViewBase;
 
 	private PluginCatalog Open() => PluginCatalog.Open(new PluginCatalogOptions { Directory = _folder, Host = HostKind.Desktop, UserManaged = true });
 

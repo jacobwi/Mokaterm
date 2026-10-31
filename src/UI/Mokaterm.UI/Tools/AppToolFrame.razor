@@ -10,7 +10,10 @@
 		   OnPopOut="PopOutAsync"
 		   OnReturn="ReturnToDialog"
 		   OnClose="CloseDialog">
-	<DynamicComponent Type="Tool.Component" />
+	@* The tool's own boundary, so a tool that throws says so itself and can be loaded again. *@
+	<ViewBoundary Name="@Tool.Title" Fill>
+		<DynamicComponent Type="Tool.Component" />
+	</ViewBoundary>
 </ToolFrame>
 
 @code {

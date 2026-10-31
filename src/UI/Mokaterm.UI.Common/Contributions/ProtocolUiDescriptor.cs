@@ -1,10 +1,11 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.UI.Common.Components;
 
 namespace Mokaterm.UI.Common.Contributions;
 
 /// <summary>How the shell presents a protocol. Registered by the module next to its protocol provider.</summary>
-public sealed record ProtocolUiDescriptor
+public sealed record ProtocolUiDescriptor : IContributionIdentity
 {
 	public required string ProtocolId { get; init; }
 
@@ -21,4 +22,8 @@ public sealed record ProtocolUiDescriptor
 	/// Must derive from <see cref="SessionViewBase"/>. Terminal and file system sessions leave this null.
 	/// </summary>
 	public Type? SessionView { get; init; }
+
+	string IContributionIdentity.Kind => "protocol";
+	string IContributionIdentity.Id => ProtocolId;
+	string? IContributionIdentity.Scope => null;
 }

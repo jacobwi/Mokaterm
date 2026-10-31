@@ -117,6 +117,32 @@ public sealed partial class ToolFrameTests
 		Assert.Equal(["Keep on top", "Show the main window"], Actions(html));
 	}
 
+	[Fact]
+	public async Task AppTool_ThatThrows_SaysSoItselfInsteadOfEndingTheFrame()
+	{
+		AppToolDescriptor broken = new()
+		{
+			Id = "broken-tool",
+			Title = "Broken tool",
+			Icon = MokatermIcons.Globe,
+			Component = typeof(ThrowingAppBody),
+		};
+		await using ToolHarness harness = await ToolHarness.CreateAsync(new FakeToolWindows(), appTools: [broken]);
+
+		// The frame's header and buttons stay; the body says what failed and offers to load it again.
+		string html = await StaticRender.RenderAsync<AppToolFrame>(
+			services => Register(services, harness),
+			new Dictionary<string, object?>
+			{
+				[nameof(AppToolFrame.Presentation)] = ToolPresentation.Dialog,
+				[nameof(AppToolFrame.Tool)] = broken,
+			});
+
+		Assert.Contains("Broken tool stopped working", html, StringComparison.Ordinal);
+		Assert.Contains("the tool failed", html, StringComparison.Ordinal);
+		Assert.Contains("Try again", html, StringComparison.Ordinal);
+	}
+
 	// By default the header is the icon and the title; what the tool does shows when the title is pointed at.
 	[Theory]
 	[InlineData(ToolPresentation.Dialog)]
@@ -335,5 +361,13 @@ public sealed partial class ToolFrameTests
 	private sealed class AppBody : AppToolBase
 	{
 		protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "the subnet tool");
+	}
+
+	/// <summary>Stands in for a plugin tool that fails the moment it starts.</summary>
+	private sealed class ThrowingAppBody : AppToolBase
+	{
+		protected override void OnInitialized() => throw new InvalidOperationException("the tool failed");
+
+		protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "never shown");
 	}
 }

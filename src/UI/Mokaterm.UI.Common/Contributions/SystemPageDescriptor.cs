@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.UI.Common.Contributions;
@@ -7,7 +8,7 @@ namespace Mokaterm.UI.Common.Contributions;
 /// A page in the System view's side menu. The view's own pages register this way too, so a plugin page sits among them
 /// by <see cref="Order"/> and is opened by its id like any other.
 /// </summary>
-public sealed record SystemPageDescriptor
+public sealed record SystemPageDescriptor : IContributionIdentity
 {
 	/// <summary>
 	/// The stable name the navigation and other pages open it by, such as <c>services</c> or <c>fail2ban</c>: lower case
@@ -37,4 +38,8 @@ public sealed record SystemPageDescriptor
 	/// server.
 	/// </summary>
 	public Func<ISystemPageContext, string?>? Unavailable { get; init; }
+
+	string IContributionIdentity.Kind => "System page";
+	string IContributionIdentity.Id => Id;
+	string? IContributionIdentity.Scope => null;
 }

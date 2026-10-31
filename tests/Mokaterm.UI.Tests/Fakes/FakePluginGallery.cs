@@ -45,4 +45,11 @@ internal sealed class FakePluginGallery : IPluginGallery
 
 	public Task<IPluginPackage> DownloadAsync(PluginGalleryEntry plugin, PluginGalleryVersion version, CancellationToken cancellationToken) =>
 		throw new NotSupportedException("A static render presses no button.");
+
+	public PluginGalleryDownload? Download => null;
+
+	public Task BeginDownloadAsync(PluginGalleryEntry plugin, PluginGalleryVersion version) =>
+		throw new NotSupportedException("A static render presses no button.");
+
+	public IPluginPackage? TakeDownload() => null;
 }

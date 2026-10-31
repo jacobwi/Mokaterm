@@ -1,0 +1,34 @@
+@using Mokaterm.UI.Common.Components
+
+@* Labeled facts as a two-column grid: uppercase micro-labels, values beside them, data in mono with a copy button. *@
+<dl class="mt-pui-facts">
+	@foreach (Fact fact in Facts)
+	{
+		<dt>@fact.Label</dt>
+		<dd>
+			@if (fact.Values.Count == 0)
+			{
+				<span class="mt-pui-facts-none">none</span>
+			}
+			@foreach (string value in fact.Values)
+			{
+				<span class="@(fact.Mono ? "mt-pui-facts-value mt-pui-facts-mono" : "mt-pui-facts-value")">
+					<span class="mt-pui-facts-text">@value</span>
+					@if (fact.Copyable)
+					{
+						<CopyButton Text="@value" Label="@($"Copy {fact.Label}")" />
+					}
+				</span>
+			}
+			@if (fact.Note is { Length: > 0 } note)
+			{
+				<span class="mt-pui-facts-note">@note</span>
+			}
+		</dd>
+	}
+</dl>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<Fact> Facts { get; set; } = [];
+}

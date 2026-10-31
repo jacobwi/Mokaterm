@@ -7,7 +7,7 @@ internal sealed class NoLocalFiles : ILocalFileAccess
 {
 	public bool CanPickFolders => false;
 
-	public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default) =>
+	public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default) =>
 		throw new NotSupportedException();
 
 	public ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default) =>

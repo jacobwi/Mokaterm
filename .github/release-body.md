@@ -1,3 +1,33 @@
+## What's new in 0.2.5
+
+**Plugins**
+
+- A plugin that tries to take the id of a tool, page or protocol Mokaterm already has is refused at load, with the
+  reason on the Plugins page, instead of silently replacing what was there.
+- A page that throws no longer takes its whole tool with it: each System page, Docker page and tool says what went
+  wrong itself, and Try again reloads that page alone.
+- The install picker offers `.mokaplugin` files instead of every file.
+- A plugin waiting for the next start says which version it brings, on its row and on its gallery card, instead of a
+  versionless "Waits for restart".
+- A download from the gallery belongs to the window rather than the page: leaving Settings no longer stops it, and a
+  package that finished meanwhile opens its install dialog when you come back.
+- For plugin authors: a page kit in `Mokaterm.UI.Common` (chips, fact lists, output boxes, and the System page styles as
+  a linked contract rather than styles a page hopes to reach), and a fifth package, `Mokaterm.Plugin.TestHost`, that
+  draws a plugin's views in its tests on a faked desktop or web host.
+
+**Plugin updates (1.1.0, in the gallery)**
+
+- **Certificates**: the server check probes each TLS version on its own and warns when a server still accepts one older
+  than 1.2; STARTTLS for SMTP, IMAP and FTP; the System page finds certificates in Caddy, HAProxy, lighttpd and Traefik
+  beside certbot, nginx and Apache, and can refresh itself while open.
+- **Network Toolkit**: DS and DNSKEY lookups with the DNSSEC OK bit, the answer's AD flag marks validated replies;
+  whois falls back to RDAP over HTTPS where port 43 gives no answer; the recent targets of the window sit under the
+  DNS, ping, port, traceroute and whois inputs.
+- **Developer Utilities**: a Common patterns picker in the regex tool (email, URL, IPv4 and IPv6, UUID, JWT, semver and
+  more), pragmatic patterns with named groups where they help.
+- **Password Generator**: characters to leave out of generated passwords, and the EFF short word list for shorter
+  passphrases.
+
 ## What's new in 0.2.4
 
 **Remote desktop (RDP)**

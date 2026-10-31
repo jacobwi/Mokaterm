@@ -19,11 +19,17 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 
 	public bool CanResumeSaves => true;
 
-	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default)
+	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default)
 	{
 		List<string> paths = await MainThread.InvokeOnMainThreadAsync(async () =>
 		{
-			PickOptions options = new() { PickerTitle = multiple ? "Choose files to upload" : "Choose a file" };
+			PickOptions options = new()
+			{
+				PickerTitle = multiple ? "Choose files to upload" : "Choose a file",
+				// The desktop host is Windows, so one platform's list is enough; a host that cannot filter ignores it.
+				FileTypes = extensions is { Count: > 0 } ? new FilePickerFileType(
+					new Dictionary<DevicePlatform, IEnumerable<string>> { [DevicePlatform.WinUI] = extensions }) : null,
+			};
 			if (multiple)
 			{
 				IEnumerable<FileResult?>? results = await FilePicker.Default.PickMultipleAsync(options);

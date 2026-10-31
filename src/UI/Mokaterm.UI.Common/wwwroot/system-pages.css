@@ -1,0 +1,409 @@
+/* The System view's pages: rows, cards, chips, key-values and command blocks, in Mokaterm.UI.Common so every page
+   draws the same whether it is built in or a plugin's. The view that hosts the pages links this file; the classes are
+   the contract a System page builds on (mta-*), unchanged from when they lived in the view's own stylesheet. */
+
+/* Shared by every page, which renders inside the hosting view. */
+.mta-spacer {
+	flex: 1;
+}
+
+.mta-label {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mta-dim {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mta-after {
+	margin-left: 6px;
+}
+
+.mta-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mta-loading {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-xl) 0;
+}
+
+.mta-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.mta-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-sm);
+	background: transparent;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	font-size: var(--moka-font-size-xs);
+	cursor: pointer;
+	transition: border-color var(--moka-transition-fast), color var(--moka-transition-fast);
+}
+
+.mta-chip:hover {
+	border-color: var(--moka-color-primary-border);
+	color: var(--moka-color-on-surface);
+}
+
+.mta-chip:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mta-chip--active {
+	border-color: var(--moka-color-primary-border);
+	color: var(--moka-color-on-surface);
+	box-shadow: inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-chip-count {
+	color: var(--moka-color-on-surface-tertiary);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+}
+
+.mta-chip-count--alert {
+	color: var(--moka-color-error);
+}
+
+.mta-link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--moka-color-on-surface-variant);
+	font: inherit;
+	font-size: var(--moka-font-size-xs);
+	text-decoration: underline dotted;
+	cursor: pointer;
+}
+
+.mta-link:hover:not(:disabled) {
+	color: var(--moka-color-primary);
+}
+
+/* The pointer goes through to the hint around a greyed link, which says why it cannot be used, the way it does for a
+   disabled Moka button. */
+.mta-link:disabled {
+	cursor: default;
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.mta-table {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+}
+
+.mta-row {
+	display: grid;
+	grid-template-columns: var(--mta-cols);
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 30px;
+	padding: 3px var(--moka-spacing-sm);
+	border-top: 1px solid var(--moka-color-outline-variant);
+	font-size: var(--moka-font-size-sm);
+}
+
+.mta-row:first-child {
+	border-top: 0;
+}
+
+.mta-row:not(.mta-row--head):hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mta-row--head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	min-height: 26px;
+	background: var(--moka-color-surface);
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mta-row--clickable {
+	cursor: pointer;
+}
+
+.mta-row--clickable:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-row--selected,
+.mta-row--selected:hover {
+	background: var(--moka-color-surface-2);
+	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+}
+
+.mta-cell {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mta-cell--end {
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* A hint that is itself a cell, a card's line or a figure is a block, so its text still ends in an ellipsis: the
+   tooltip's own inline-flex would let it run out of the box instead. One around a card fills the card's place. */
+.moka-tooltip-trigger:is(.mta-cell, .mta-card-sub, .mta-stat) {
+	display: block;
+}
+
+.moka-tooltip-trigger.mta-card-hint {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+}
+
+/* The row menu stays quiet until the row is pointed at or chosen. */
+.mta-row-menu {
+	opacity: 0.35;
+	transition: opacity var(--moka-transition-fast);
+}
+
+.mta-row:hover .mta-row-menu,
+.mta-row--selected .mta-row-menu,
+.mta-row-menu:focus-within {
+	opacity: 1;
+}
+
+.mta-more {
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	border-top: 1px solid var(--moka-color-outline-variant);
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mta-kv {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 4px var(--moka-spacing-md);
+	margin: 0;
+	font-size: var(--moka-font-size-sm);
+}
+
+.mta-kv dt {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 20px;
+	text-transform: uppercase;
+}
+
+.mta-kv dd {
+	min-width: 0;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.mta-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+
+button.mta-card {
+	cursor: pointer;
+	transition: border-color var(--moka-transition-fast), background var(--moka-transition-fast);
+}
+
+button.mta-card:hover {
+	border-color: var(--moka-color-primary-border);
+	background: var(--moka-color-surface-hover);
+}
+
+button.mta-card:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-card-label {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.mta-stat {
+	overflow: hidden;
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: 20px;
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: 1.2;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mta-stat--small {
+	font-size: 15px;
+}
+
+.mta-stat--alert {
+	color: var(--moka-color-error);
+}
+
+.mta-card-sub {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mta-pre {
+	max-height: 260px;
+	margin: 0;
+	padding: var(--moka-spacing-sm);
+	overflow: auto;
+	border-left: 3px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	line-height: var(--moka-line-height-base);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	tab-size: 4;
+}
+
+.mta-pre--commands {
+	border-left-color: var(--moka-color-primary);
+	color: var(--moka-color-on-surface);
+}
+
+.mta-pre--result {
+	max-height: 150px;
+}
+
+.mta-pre--fill {
+	flex: 1;
+	max-height: none;
+	min-height: 120px;
+}
+
+/* The log page hands its whole height to the shared log view, which scrolls its own lines. */
+.mta-logs {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.mta-logs-field {
+	flex: 1 1 180px;
+	min-width: 0;
+}
+
+.mta-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-form {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: var(--moka-spacing-sm);
+	align-items: start;
+}
+
+.mta-form-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mta-inline > .mta-grow {
+	flex: 1 1 180px;
+	min-width: 0;
+}
+
+.mta-runs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+/* Columns that only fit a wide list step aside on a narrow one. */
+@container mta-main (max-width: 559px) {
+	.mta-row {
+		grid-template-columns: var(--mta-cols-narrow, var(--mta-cols));
+	}
+
+	.mta-wide {
+		display: none;
+	}
+
+	.mta-kv {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+	}
+
+	.mta-kv dd {
+		margin-bottom: var(--moka-spacing-xs);
+	}
+}

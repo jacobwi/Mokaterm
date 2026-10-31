@@ -70,7 +70,8 @@ internal sealed class DemoLocalFileAccess : ILocalFileAccess
 
 	public bool CanPickFolders => true;
 
-	public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default)
+	// The canned files are whatever the demo serves; extensions are a picker question and there is no picker here.
+	public ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default)
 	{
 		LocalFileItem notes = Generated("release-notes.txt", 4 * KiB, ReleaseNotes);
 		IReadOnlyList<LocalFileItem> files = multiple

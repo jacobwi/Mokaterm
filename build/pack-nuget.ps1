@@ -25,6 +25,7 @@ $projects = @(
 	'src\Mokaterm.Abstractions\Mokaterm.Abstractions.csproj',
 	'src\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj',
 	'src\Mokaterm.Plugin.Sdk\Mokaterm.Plugin.Sdk.csproj',
+	'src\Mokaterm.Plugin.TestHost\Mokaterm.Plugin.TestHost.csproj',
 	'templates\Mokaterm.Plugin.Templates\Mokaterm.Plugin.Templates.csproj'
 )
 

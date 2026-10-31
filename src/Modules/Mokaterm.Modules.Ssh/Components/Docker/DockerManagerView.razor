@@ -57,7 +57,10 @@
 						<CascadingValue Value="_context" IsFixed="true">
 							@if (CurrentPage is { } page)
 							{
-								<DynamicComponent @key="page.Id" Type="page.Component" Parameters="PageParameters" />
+								// A page that throws says so itself; the manager and its other pages carry on.
+								<ViewBoundary @key="page.Id" Name="@(page.Title)" Fill>
+									<DynamicComponent @key="page.Id" Type="page.Component" Parameters="PageParameters" />
+								</ViewBoundary>
 							}
 						</CascadingValue>
 					</div>

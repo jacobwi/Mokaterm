@@ -13,6 +13,10 @@
 
 		<!-- The plugin takes UI.Common from its host and does not copy it; a test project is its own host. -->
 		<ProjectReference Include="..\..\src\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+
+		<!-- The render harness a plugin's tests get as a package (Mokaterm.Plugin.TestHost); here it is a project, like
+		     UI.Common above. -->
+		<ProjectReference Include="..\..\src\Mokaterm.Plugin.TestHost\Mokaterm.Plugin.TestHost.csproj" />
 	</ItemGroup>
 
 </Project>

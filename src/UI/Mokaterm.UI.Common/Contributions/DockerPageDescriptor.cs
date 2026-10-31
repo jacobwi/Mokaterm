@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.UI.Common.Contributions;
@@ -7,7 +8,7 @@ namespace Mokaterm.UI.Common.Contributions;
 /// A page in the Docker manager's side menu. The manager's own pages register this way too, so a plugin page sits
 /// among them by <see cref="Order"/> and is opened by its id like any other.
 /// </summary>
-public sealed record DockerPageDescriptor
+public sealed record DockerPageDescriptor : IContributionIdentity
 {
 	/// <summary>
 	/// The stable name the navigation and other pages open it by, such as <c>containers</c>: lower case letters, digits
@@ -30,4 +31,8 @@ public sealed record DockerPageDescriptor
 	/// the reason, and still opens. Asked whenever the navigation is drawn, so it reads the context and runs nothing.
 	/// </summary>
 	public Func<IDockerPageContext, string?>? Unavailable { get; init; }
+
+	string IContributionIdentity.Kind => "Docker page";
+	string IContributionIdentity.Id => Id;
+	string? IContributionIdentity.Scope => null;
 }

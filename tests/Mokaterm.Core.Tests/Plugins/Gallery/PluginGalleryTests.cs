@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.Abstractions.Platform;
@@ -97,6 +98,80 @@ public sealed class PluginGalleryTests : IDisposable
 		// What the gallery hands over is what a picked file gives: the manager installs it.
 		await _manager.InstallAsync(read, enable: false, Ct).WaitAsync(Limit, Ct);
 		Assert.Equal(PluginPendingChange.Install, Assert.Single(_manager.Plugins).Pending);
+	}
+
+	[Fact]
+	public async Task AWindowDownload_IsKeptUntilTaken_SoAPageLeftAndReturnedCanStillOpenIt()
+	{
+		TestGallery server = new();
+		byte[] package = TestPlugins.Zip(TestPlugins.CodePlugin("acme.proxmox", "1.2.0"));
+		server.Publish(TestGallery.Index(TestGallery.Plugin("acme.proxmox", hasCode: true, TestGallery.Version("acme.proxmox", "1.2.0", package))));
+		server.Host("acme.proxmox", "1.2.0", package);
+		using PluginGallery gallery = server.Gallery(_manager);
+		PluginGalleryEntry entry = await FindAsync(gallery, "acme.proxmox");
+		int changes = 0;
+		gallery.Changed += (_, _) => changes++;
+
+		await gallery.BeginDownloadAsync(entry, entry.Newest!).WaitAsync(Limit, Ct);
+
+		PluginGalleryDownload? download = gallery.Download;
+		Assert.NotNull(download);
+		Assert.True(download.Done);
+		Assert.Null(download.Problem);
+		Assert.Equal("acme.proxmox", download.Package!.Id);
+		Assert.Equal("1.2.0", download.Version);
+
+		// Taken once: nothing waits after that, and a second take hands back nothing.
+		using IPluginPackage? taken = gallery.TakeDownload();
+		Assert.Same(download.Package, taken);
+		Assert.Null(gallery.Download);
+		Assert.Null(gallery.TakeDownload());
+		Assert.True(changes >= 2);
+	}
+
+	[Fact]
+	public async Task AWindowDownload_ThatFails_RecordsWhyWithoutThrowing()
+	{
+		TestGallery server = new();
+		byte[] package = TestPlugins.Zip(TestPlugins.ThemePack("acme.themes"));
+		server.Publish(TestGallery.Index(TestGallery.Plugin("acme.themes", hasCode: false, TestGallery.Version("acme.themes", "1.0.0", package))));
+		server.Server.Refuse(TestGallery.PackageAddress("acme.themes", "1.0.0"), HttpStatusCode.NotFound);
+		using PluginGallery gallery = server.Gallery(_manager);
+		PluginGalleryEntry entry = await FindAsync(gallery, "acme.themes");
+
+		await gallery.BeginDownloadAsync(entry, entry.Newest!).WaitAsync(Limit, Ct);
+
+		PluginGalleryDownload? download = gallery.Download;
+		Assert.NotNull(download);
+		Assert.True(download.Done);
+		Assert.Null(download.Package);
+		Assert.Contains("answered 404", download.Problem, StringComparison.Ordinal);
+		Assert.Null(gallery.TakeDownload());
+
+		// A failed download does not block the next one, and its record gives way to it.
+		server.Host("acme.themes", "1.0.0", package);
+		await gallery.BeginDownloadAsync(entry, entry.Newest!).WaitAsync(Limit, Ct);
+		Assert.NotNull(gallery.Download!.Package);
+	}
+
+	[Fact]
+	public async Task ASecondWindowDownload_ReplacesThePackageNobodyTook()
+	{
+		TestGallery server = new();
+		byte[] package = TestPlugins.Zip(TestPlugins.ThemePack("acme.themes"));
+		server.Publish(TestGallery.Index(TestGallery.Plugin("acme.themes", hasCode: false, TestGallery.Version("acme.themes", "1.0.0", package))));
+		server.Host("acme.themes", "1.0.0", package);
+		using PluginGallery gallery = server.Gallery(_manager);
+		PluginGalleryEntry entry = await FindAsync(gallery, "acme.themes");
+
+		await gallery.BeginDownloadAsync(entry, entry.Newest!).WaitAsync(Limit, Ct);
+		await gallery.BeginDownloadAsync(entry, entry.Newest!).WaitAsync(Limit, Ct);
+
+		// What waits is the second download's package, not a disposed leftover.
+		PluginGalleryDownload? download = gallery.Download;
+		Assert.NotNull(download);
+		Assert.True(download.Done);
+		Assert.NotNull(gallery.TakeDownload());
 	}
 
 	[Fact]

@@ -63,7 +63,10 @@ internal sealed class UiContributions : IUiContributions
 	public MokaIconDefinition GetProtocolIcon(string protocolId) =>
 		FindProtocol(protocolId)?.Icon ?? MokatermIcons.Server;
 
-	/// <summary>One per id, the last registration winning, so a plugin loaded after a module can take a page's place.</summary>
+	/// <summary>
+	/// One per id, the last registration winning, so a module can take a page's place from an earlier one. A plugin that
+	/// tries it is refused at load, so what this replaces is always Mokaterm's own.
+	/// </summary>
 	private static TDescriptor[] Ordered<TDescriptor>(
 		IEnumerable<TDescriptor> descriptors,
 		Func<TDescriptor, string> id,

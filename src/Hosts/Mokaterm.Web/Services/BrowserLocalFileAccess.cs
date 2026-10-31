@@ -27,9 +27,11 @@ internal sealed class BrowserLocalFileAccess : ILocalFileAccess, IAsyncDisposabl
 
 	public bool CanPickFolders => true;
 
-	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, CancellationToken cancellationToken = default)
+	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default)
 	{
-		PickResult result = await _module.InvokeAsync<PickResult>("pickFiles", cancellationToken, multiple, false);
+		// The browser's accept list is the extensions as given, such as ".mokaplugin".
+		string? accept = extensions is { Count: > 0 } ? string.Join(',', extensions) : null;
+		PickResult result = await _module.InvokeAsync<PickResult>("pickFiles", cancellationToken, multiple, false, accept);
 		return await HoldAsync(result, includeDirectories: false);
 	}
 

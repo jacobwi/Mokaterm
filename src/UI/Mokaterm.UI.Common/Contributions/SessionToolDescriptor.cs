@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Mokaterm.Abstractions.Contributions;
 using Mokaterm.UI.Common.Components;
 
 namespace Mokaterm.UI.Common.Contributions;
@@ -8,7 +9,7 @@ namespace Mokaterm.UI.Common.Contributions;
 /// the toolbar, in the command palette, and opens the component in a dialog over the session or, on the desktop, in a
 /// window of its own.
 /// </summary>
-public sealed record SessionToolDescriptor
+public sealed record SessionToolDescriptor : IContributionIdentity
 {
 	/// <summary>
 	/// The protocol the tool belongs to. Unlike protocol views, tools are not inherited: a variant such as <c>sftp</c>
@@ -44,4 +45,8 @@ public sealed record SessionToolDescriptor
 	public string Key => string.Join(
 		'-',
 		(Id is { Length: > 0 } id ? id : Title).ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+	string IContributionIdentity.Kind => "session tool";
+	string IContributionIdentity.Id => Key;
+	string? IContributionIdentity.Scope => ProtocolId;
 }
