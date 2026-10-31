@@ -163,6 +163,8 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 		Rebuild();
 	}
 
+	private void ClearFilter() => OnQueryChanged("");
+
 	private void Select(ConnectionTreeRow row) => _selectedKey = row.Key;
 
 	/// <summary>A plain click selects one row; Ctrl adds or drops a row and Shift picks the range from the selected one.</summary>

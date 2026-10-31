@@ -137,3 +137,7 @@
 		padding: var(--moka-spacing-xl) var(--moka-spacing-md);
 	}
 }
+
+.mt-welcome-more {
+	margin: 0 0 var(--moka-spacing-xs);
+}
