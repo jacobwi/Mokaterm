@@ -2,6 +2,15 @@
 
 To be planned. The carried items below still stand.
 
+# Released: 0.2.7 (0.2.6 withdrawn: it failed to start)
+
+## 0.2.6 was pulled back
+
+Tagged and briefly published, then drafted again within the hour: the cross-pane tab drag's
+module import used a path that does not exist, and the exception from OnAfterRenderAsync
+took the root boundary down — the app opened to "Mokaterm stopped working". 0.2.7 is 0.2.6
+with the import fixed and the bridge hardened to never take the app with it.
+
 # Released: 0.2.6
 
 ## A general pass on the app's UI

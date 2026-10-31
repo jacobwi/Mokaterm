@@ -1,3 +1,14 @@
+## What's new in 0.2.7
+
+**Fixes 0.2.6, which failed to start.**
+
+- 0.2.6 opened with "Mokaterm stopped working — Object reference not set to an instance of
+  an object": the new cross-pane tab drag imported its script at a path that does not exist,
+  and the failure took the whole interface down with it. The import now uses the path the
+  shell itself uses, and a drag bridge that cannot attach is logged and swallowed — tabs
+  still move through their menu and the commands.
+- If you installed 0.2.6, update to 0.2.7 from Settings, Updates (or the GitHub release).
+
 ## What's new in 0.2.6
 
 **Connections**
