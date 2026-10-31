@@ -4,6 +4,7 @@
 
 <HeadedDialog Open="Open"
 			  Title="@Title"
+			  TitleHint="@TitleHint"
 			  Icon="Icon"
 			  DialogSize="DialogSize"
 			  CloseOnBackdropClick="false"
@@ -24,6 +25,10 @@
 
 	[Parameter]
 	public string? Title { get; set; }
+
+	/// <summary>One line the title carries when pointed at, for the editor that wants to say what it is about.</summary>
+	[Parameter]
+	public string? TitleHint { get; set; }
 
 	/// <summary>Drawn before the title, the way every dialog in the app names what it is.</summary>
 	[Parameter]

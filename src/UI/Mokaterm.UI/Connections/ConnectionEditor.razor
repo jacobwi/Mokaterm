@@ -2,6 +2,7 @@
 
 <ShellEditorDialog Open="@(Request is not null)"
 				   Title="@DialogTitle"
+				   TitleHint="@DialogTitleHint"
 				   Icon="MokatermIcons.User"
 				   DialogSize="MokaDialogSize.Large"
 				   Busy="_saving"
@@ -23,7 +24,7 @@
 				}
 				else
 				{
-					<div class="mt-section">Host</div>
+					<h3 class="mt-section" id="ce-host">Host</h3>
 					@if (_hosts.Count > 0)
 					{
 						<MokaSegmentedControl AriaLabel="Host" Value="@(_newHost ? NewHostMode : SavedHostMode)" ValueChanged="OnHostModeChanged" Size="MokaSize.Sm">
@@ -82,7 +83,7 @@
 						}
 					}
 
-					<div class="mt-section">Login</div>
+					<h3 class="mt-section" id="ce-login">Login</h3>
 					<MokaFieldWrapper Label="Protocol" HelperText="@Protocol?.Description" Disabled="_saving">
 						<MokaSegmentedControl AriaLabel="Protocol" Value="@_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
 							@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
@@ -140,7 +141,7 @@
 
 					@if (CredentialKindFor(_method) is { } kind)
 					{
-						<div class="mt-section">@CredentialTitle(kind)</div>
+						<h3 class="mt-section" id="ce-credential">@CredentialTitle(kind)</h3>
 						<MokaFieldWrapper Label="Source" HelperText="@CredentialSourceHelp" Disabled="_saving">
 							<MokaSegmentedControl AriaLabel="@CredentialTitle(kind)" Value="@(_useKeychain ? KeychainSource : LoginSource)" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
 								<MokaSegment Value="@LoginSource"
@@ -186,7 +187,7 @@
 											 Disabled="_saving" />
 							@if (_credentialError is not null)
 							{
-								<MokaText Size="MokaSize.Xs" Color="MokaColor.Error">@_credentialError</MokaText>
+								<MokaAlert Severity="MokaToastSeverity.Error" Dense>@_credentialError</MokaAlert>
 							}
 						}
 					}
@@ -197,7 +198,7 @@
 
 					@if (OptionsEditorType is { } optionsEditor)
 					{
-						<div class="mt-section">@ProtocolName options</div>
+						<h3 class="mt-section" id="ce-options">@ProtocolName options</h3>
 						@* The module's own editor: if it fails, the rest of the login can still be edited and saved. *@
 						<ViewBoundary @key="optionsEditor" Name="@($"The {ProtocolName} options")">
 							<DynamicComponent Type="optionsEditor" Parameters="OptionsEditorParameters" />
@@ -206,7 +207,7 @@
 
 					@if (Protocol?.Has(ProtocolCapabilities.Terminal) == true)
 					{
-						<div class="mt-section">Terminal</div>
+						<h3 class="mt-section" id="ce-terminal">Terminal</h3>
 						<MokaGrid ColumnsValue="repeat(auto-fit, minmax(170px, 1fr))" Gap="MokaSpacingScale.Md">
 							<MokaSelect TValue="string"
 										Label="Theme"
@@ -244,7 +245,8 @@
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Disabled="_saving" OnClick="Close">Cancel</MokaButton>
 		@if (IsDraft)
 		{
-			<MokaButton StartIcon="MokatermIcons.Connect" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: true)">
+			@* The filled button is the dialog's one primary in every mode; Enter presses it. *@
+			<MokaButton StartIcon="MokatermIcons.Connect" Loading="_saving" Disabled="_loading" data-primary="true" OnClick="() => SaveAsync(connect: true)">
 				Save and connect
 			</MokaButton>
 		}
@@ -253,7 +255,7 @@
 			<MokaButton Variant="MokaVariant.Outlined" StartIcon="MokatermIcons.Connect" Disabled="@(_saving || _loading)" OnClick="() => SaveAsync(connect: true)">
 				Save and connect
 			</MokaButton>
-			<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_loading" OnClick="() => SaveAsync(connect: false)">
+			<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" Disabled="_loading" data-primary="true" OnClick="() => SaveAsync(connect: false)">
 				Save
 			</MokaButton>
 		}

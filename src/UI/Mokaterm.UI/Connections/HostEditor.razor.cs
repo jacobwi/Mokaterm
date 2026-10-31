@@ -58,6 +58,9 @@ public sealed partial class HostEditor : ShellEditorBase<HostEditorRequest>
 	[Inject]
 	private ILogger<HostEditor> Logger { get; set; } = default!;
 
+	/// <summary>Enter saves: every field here belongs to the form, none needs Enter for itself.</summary>
+	protected override bool SubmitOnEnter => true;
+
 	protected override bool IsBusy => _saving;
 
 	/// <summary>The address as it would be stored, which is what the preview and the clash check read.</summary>

@@ -132,11 +132,21 @@
 					   OnClick="() => Sessions.OpenAsync(login.Id, reuseExisting: true)"
 					   OnContextMenu="e => Menu.Show(e, Connections.LoginMenu(host, login))">
 			<EndContent>
+				@* A favorite is more than a menu item: the star is the affordance, on the row, for mouse and keyboard. *@
+				<IconButton Icon="MokaIcons.Toggle.Star"
+							Label="@(login.IsFavorite ? "Remove from favorites" : "Add to favorites")"
+							AriaLabel="@(login.IsFavorite ? $"Remove {login.GetTitle(host)} from favorites" : $"Add {login.GetTitle(host)} to favorites")"
+							Active="login.IsFavorite"
+							Pressed="login.IsFavorite"
+							Size="MokaSize.Xs"
+							OnClick="() => Connections.ToggleFavoriteAsync(login)" />
 				@if (lastConnected is { } connectedAt)
 				{
-					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">
-						@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())
-					</MokaText>
+					<Hint Text="@DisplayFormat.Timestamp(connectedAt)" Position="MokaTooltipPosition.BottomEnd">
+						<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">
+							@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())
+						</MokaText>
+					</Hint>
 				}
 			</EndContent>
 		</MokaListItem>;

@@ -322,6 +322,11 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 			case "Delete" when current is not null:
 				await DeleteAsync(current);
 				break;
+			case "ContextMenu" when current is { Host: { } menuHost, Login: { } login }:
+				// The keyboard's own menu key and Shift+F10 open the row's menu, so favoriting never needs a mouse.
+				// A keyboard event carries no position (0,0), which the menu reads as "under whatever has focus".
+				Menu.Show(new MouseEventArgs(), Actions.LoginMenu(menuHost, login));
+				break;
 		}
 	}
 
