@@ -25,7 +25,7 @@
 			{
 				@if (_results.Count == 0)
 				{
-					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary);padding:var(--moka-spacing-md)">
+					<MokaText Size="MokaSize.Xs" Style="@(TextStyles.Tertiary + ";padding:var(--moka-spacing-md)")">
 						No settings match.
 					</MokaText>
 				}
@@ -91,10 +91,10 @@
 		@if (Selected is { } selected)
 		{
 			<div class="mt-settings-page-header">
-				<MokaText Element="h2" SizeValue="17px" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
+				<MokaText Element="h2" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
 				@if (!string.IsNullOrWhiteSpace(selected.Description))
 				{
-					<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">@selected.Description</MokaText>
+					<MokaText Size="MokaSize.Sm" Style="@TextStyles.Muted">@selected.Description</MokaText>
 				}
 			</div>
 			@* Module pages included: one that fails takes only itself down, and picking another page leaves the error behind. *@

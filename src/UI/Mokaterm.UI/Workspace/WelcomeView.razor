@@ -6,7 +6,7 @@
 		@if (!Catalog.IsLoaded)
 		{
 			@* Leading with "nothing saved yet" before the catalog is read would be wrong for everyone who has hosts. *@
-			<div class="mt-welcome-loading">
+			<div class="mt-welcome-loading" role="status" aria-label="Reading your connections">
 				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
 			</div>
 		}
@@ -134,7 +134,7 @@
 			<EndContent>
 				@if (lastConnected is { } connectedAt)
 				{
-					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">
+					<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">
 						@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())
 					</MokaText>
 				}

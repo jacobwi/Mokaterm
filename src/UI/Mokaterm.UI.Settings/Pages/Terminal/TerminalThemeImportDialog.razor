@@ -9,7 +9,7 @@
 			  CloseOnBackdropClick="false">
 	<ChildContent>
 		<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
-			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
 				Paste a scheme from Windows Terminal, iTerm2, Alacritty, VS Code or X resources, or pick a file.
 			</MokaText>
 
@@ -38,7 +38,7 @@
 					<TerminalThemePreview Theme="@Named(theme)" FontFamily="@FontFamily" FontSize="12" />
 					<MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Sm" Style="flex:1;min-width:200px">
 						<MokaFlexbox Direction="MokaDirection.Row" Align="MokaAlign.Center" Gap="MokaSpacingScale.Xs">
-							<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">Read as</MokaText>
+							<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Tertiary">Read as</MokaText>
 							<MokaTag Text="@FormatLabel(_import.Format)" Size="MokaSize.Xs" Color="MokaColor.Primary" />
 						</MokaFlexbox>
 						<MokaTextField Label="Name"

@@ -15,7 +15,7 @@
 		 @oncontextmenu:preventDefault>
 		@if (!Catalog.IsLoaded)
 		{
-			<div class="mt-explorer-message">
+			<div class="mt-explorer-message" role="status" aria-label="Reading your connections">
 				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
 			</div>
 		}
@@ -24,7 +24,7 @@
 			<div class="mt-explorer-message">
 				@if (_query.Trim().Length > 0)
 				{
-					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">Nothing matches the filter.</MokaText>
+					<MokaText Size="MokaSize.Xs" Style="@TextStyles.Tertiary">Nothing matches the filter.</MokaText>
 				}
 				else
 				{
@@ -104,7 +104,7 @@
 									case { Folder: not null }:
 										if (row.ChildCount > 0)
 										{
-											<MokaText Element="span" Mono Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">@row.ChildCount</MokaText>
+											<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">@row.ChildCount</MokaText>
 										}
 										break;
 									case { Login: { } login }:

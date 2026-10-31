@@ -11,7 +11,7 @@
 		<PromptBody @ref="Body" AutofocusSelf="@(Prompt.Questions.Count == 0)">
 			@if (!string.IsNullOrWhiteSpace(Prompt.Instruction))
 			{
-				<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">@Prompt.Instruction</MokaText>
+				<MokaText Size="MokaSize.Sm" Style="@TextStyles.Muted">@Prompt.Instruction</MokaText>
 			}
 			@for (int i = 0; i < Prompt.Questions.Count; i++)
 			{

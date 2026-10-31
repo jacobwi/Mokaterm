@@ -117,7 +117,7 @@
 			<div class="mt-session-overlay">
 				<div class="mt-session-card">
 					<MokaSpinner Label="@(Session.StatusMessage ?? "Connecting")" />
-					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="color:var(--moka-color-on-surface-variant)">
+					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">
 						@Endpoint
 					</MokaText>
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="DisconnectAsync">

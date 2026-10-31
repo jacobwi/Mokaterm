@@ -50,7 +50,7 @@
 
 	RenderFragment CompactRow(ITransferItem item) =>
 		@<div @key="item.Id" class="tq-row tq-row--compact">
-			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
+			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="@TextStyles.Muted" />
 			<span class="tq-name" title="@item.Name">@item.Name</span>
 			@Badges(item)
 			<span class="tq-route" title="@Tooltip(item)">@Route(item)</span>
@@ -66,7 +66,7 @@
 	RenderFragment FullRow(ITransferItem item) =>
 		@<div @key="item.Id" class="tq-row">
 			<div class="tq-line">
-				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)" />
+				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="@TextStyles.Muted" />
 				<span class="tq-name" title="@item.Name">@item.Name</span>
 				@Badges(item)
 				<span class="tq-grow"></span>
@@ -92,7 +92,7 @@
 	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="border-bottom:1px solid var(--moka-color-outline-variant)">
 		@if (ShowTitle)
 		{
-			<MokaIcon Icon="MokatermIcons.Transfers" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)" />
+			<MokaIcon Icon="MokatermIcons.Transfers" Size="MokaSize.Xs" Style="@TextStyles.Muted" />
 			<span class="tq-title">Transfers</span>
 		}
 		@if (snapshot.Running > 0)

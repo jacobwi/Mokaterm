@@ -17,7 +17,9 @@
 
 				@if (_loading)
 				{
-					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+					<div role="status" aria-label="Reading the connection">
+						<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+					</div>
 				}
 				else
 				{
@@ -38,7 +40,7 @@
 										   @bind-Value="_newHostAddress"
 										   @bind-Value:after="OnNewHostAddressChanged"
 										   ErrorText="@_hostError"
-										   Placeholder="10.10.2.3 or server.example.com"
+										   Placeholder="@HostAddress.Placeholder"
 										   Disabled="_saving"
 										   spellcheck="false"
 										   autocomplete="off"
@@ -190,7 +192,7 @@
 					}
 					else if (_method == AuthenticationMethod.Agent)
 					{
-						<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">Keys come from the running SSH agent.</MokaText>
+						<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">Keys come from the running SSH agent.</MokaText>
 					}
 
 					@if (OptionsEditorType is { } optionsEditor)

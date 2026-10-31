@@ -5,6 +5,9 @@ public static class TextStyles
 {
 	public const string Muted = "color:var(--moka-color-on-surface-variant)";
 
+	/// <summary>For the quietest text on a surface: timestamps beside names, notes under values.</summary>
+	public const string Tertiary = "color:var(--moka-color-on-surface-tertiary)";
+
 	/// <summary>Letter spacing and color for uppercase micro-labels; size, weight and case come from MokaText parameters.</summary>
 	public const string MicroLabel = "letter-spacing:0.08em;color:var(--moka-color-on-surface-tertiary)";
 
