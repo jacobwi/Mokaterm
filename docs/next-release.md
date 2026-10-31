@@ -1,4 +1,27 @@
-# Next release (0.2.5)
+# Next release (0.2.6)
+
+## A general pass on the app's UI
+
+The ask is a broad one — "improve the app UI in general" — so the areas get picked before the work starts. Candidates,
+in no order yet:
+
+- The home screen (favorites, recent logins, the key hints) — what a returning user meets first.
+- Settings as a whole: density, the search's reach, the pages' shared rhythm.
+- Tab and pane chrome: the split panes, the session toolbar, moving tabs between panes.
+- The connection editor and quick connect, the two doors into a session.
+- The command palette and shortcuts story (Moka.Red's hotkey registry is young enough to lean on).
+- The file browser's toolbar and breadcrumb.
+
+Whichever are picked, the pass is Moka.Red-shaped: consistency of tooltips, focus, keyboard and spacing, not a
+retheme.
+
+## Carried
+
+- **PublicApiAnalyzers on Abstractions and UI.Common** needs a baseline generator of our own first (the RS0016 fixer
+  cannot run headless and there is no genapi tool on NuGet).
+- The older reliability items below (a real Linux test server, code signing, the flaky-test sweep) stay.
+
+# Released: 0.2.5
 
 ## Plugin system
 
@@ -25,8 +48,10 @@
 7. **`Mokaterm.Plugin.TestHost`**, a fifth SDK package: the static-render harness a plugin's tests draw its views with,
    on a faked desktop or web host, with settings, notices and the clipboard steerable by the test.
 
-Still to do: PublicApiAnalyzers on the two contract packages needs a baseline generator first (the RS0016 fixer cannot
-run headless and there is no genapi tool on NuGet), so it stays on the list.
+The gallery followed with the four plugins at 1.1.0: Certificates with TLS version pinning, STARTTLS and four more
+server sources; Network Toolkit with DNSSEC records and RDAP; Developer Utilities with regex presets; Password
+Generator with excluded characters and the EFF short list. Network Toolkit 1.2.0's plan (TCP probes, the server's
+vantage point, a TCP dumper and a DNS mapper) is in the gallery repository's `docs/next-release.md`.
 
 ## Older plans
 
