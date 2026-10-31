@@ -77,7 +77,7 @@
 
 	<SettingsSection Title="Environments"
 					 Description="Give sessions on tagged hosts their own colors, so a production window is recognizable at a glance.">
-		<SettingsRow Label="Production" Description="Used unless the connection sets its own theme." ControlWidth="240px">
+		<SettingsRow Label="Production" Description="Used unless the connection sets its own theme." ControlWidth="@SettingWidths.Standard">
 			<MokaSelect TValue="string"
 						Items="ThemeChoices"
 						Value="@ChoiceOf(settings.ProductionThemeId)"
@@ -86,7 +86,7 @@
 						Size="MokaSize.Sm"
 						aria-label="Theme for production hosts" />
 		</SettingsRow>
-		<SettingsRow Label="Staging" ControlWidth="240px">
+		<SettingsRow Label="Staging" ControlWidth="@SettingWidths.Standard">
 			<MokaSelect TValue="string"
 						Items="ThemeChoices"
 						Value="@ChoiceOf(settings.StagingThemeId)"
@@ -95,7 +95,7 @@
 						Size="MokaSize.Sm"
 						aria-label="Theme for staging hosts" />
 		</SettingsRow>
-		<SettingsRow Label="Development" ControlWidth="240px">
+		<SettingsRow Label="Development" ControlWidth="@SettingWidths.Standard">
 			<MokaSelect TValue="string"
 						Items="ThemeChoices"
 						Value="@ChoiceOf(settings.DevelopmentThemeId)"
@@ -109,7 +109,7 @@
 	<SettingsSection Title="Text">
 		<SettingsRow Label="Font family"
 					 Description="A CSS font list, tried in order. Fonts must be installed on the device showing the terminal."
-					 ControlWidth="340px">
+					 ControlWidth="@SettingWidths.Wide">
 			<TextSetting Value="@settings.FontFamily"
 						 ValueChanged="value => SaveAsync(s => s with { FontFamily = value })"
 						 Suggestions="FontSuggestions"
@@ -126,7 +126,7 @@
 						   Suffix="px"
 						   AriaLabel="Font size in pixels" />
 		</SettingsRow>
-		<SettingsRow Label="Line height" Description="Row height as a multiple of the font size." ControlWidth="240px">
+		<SettingsRow Label="Line height" Description="Row height as a multiple of the font size." ControlWidth="@SettingWidths.Standard">
 			<MokaSlider Value="settings.LineHeight"
 						ValueChanged="SetLineHeightAsync"
 						Min="TerminalSettings.MinLineHeight"
@@ -137,7 +137,7 @@
 		</SettingsRow>
 		<SettingsRow Label="Minimum contrast"
 					 Description="Lightens or darkens text that would be hard to read on its background. 1 keeps the theme's colors."
-					 ControlWidth="240px">
+					 ControlWidth="@SettingWidths.Standard">
 			<MokaSlider Value="settings.MinimumContrastRatio"
 						ValueChanged="SetMinimumContrastAsync"
 						Min="TerminalSettings.MinContrastRatio"
@@ -159,7 +159,7 @@
 								  Options="PromptColorOptions"
 								  AriaLabel="Prompt colors" />
 		</SettingsRow>
-		<SettingsRow Label="Letter spacing" Description="Extra whole pixels between characters." ControlWidth="240px">
+		<SettingsRow Label="Letter spacing" Description="Extra whole pixels between characters." ControlWidth="@SettingWidths.Standard">
 			<MokaSlider Value="settings.LetterSpacing"
 						ValueChanged="SetLetterSpacingAsync"
 						Min="TerminalSettings.MinLetterSpacing"
@@ -242,7 +242,7 @@
 	<SettingsSection Title="Sessions">
 		<SettingsRow Label="Terminal type"
 					 Description="Sent as TERM when a session opens a terminal. Applies to sessions opened afterwards."
-					 ControlWidth="340px">
+					 ControlWidth="@SettingWidths.Wide">
 			<TextSetting Value="@settings.TerminalType"
 						 ValueChanged="value => SaveAsync(s => s with { TerminalType = value })"
 						 Suggestions="TerminalTypeSuggestions"

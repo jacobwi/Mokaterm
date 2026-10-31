@@ -18,7 +18,8 @@
 
 /* A container for its own width, which is what SessionToolbar folds its buttons by. */
 .mt-session-toolbar {
-	height: var(--moka-height-toolbar-dense);
+	/* Scaled by the density the Appearance page sets, like every other measure the theme owns. */
+	height: calc(var(--moka-height-toolbar-dense) * var(--moka-density, 1));
 	background: var(--moka-color-surface);
 	container-type: inline-size;
 	container-name: mt-session-toolbar;

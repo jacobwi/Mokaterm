@@ -4,7 +4,7 @@
 			<MokaStatusDot Color="MokaColor.Warning" Size="MokaSize.Sm" Label="Vault locked" />
 			@if (LockReasonText is { } reason)
 			{
-				<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant);margin-top:var(--moka-spacing-xs)">@reason</MokaText>
+				<MokaText Size="MokaSize.Sm" Style="@(TextStyles.Muted + ";margin-top:var(--moka-spacing-xs)")">@reason</MokaText>
 			}
 		</div>
 
@@ -43,7 +43,7 @@
 		}
 
 		<MokaFlexbox Direction="MokaDirection.Row" Justify="MokaJustify.SpaceBetween" Align="MokaAlign.Center">
-			<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">
+			<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Tertiary">
 				@SessionsText
 			</MokaText>
 			@if (CanReset)

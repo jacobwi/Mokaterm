@@ -67,7 +67,9 @@ internal sealed record ToolbarPlan(IReadOnlyList<ToolbarSlot> Slots, bool MoreAl
 		ArgumentNullException.ThrowIfNull(hidden);
 		if (layout == SessionToolbarLayout.Compact)
 		{
-			return new ToolbarPlan([], MoreAlways: true);
+			// Everything goes behind the menu except what is happening rather than what can be clicked: the
+			// recording's dot and the pinned reconnect.
+			return new ToolbarPlan([.. actions.Where(action => action.Pinned || action.Dot != ToolbarDot.None).Select(action => new ToolbarSlot(action, Divider: false, FoldClass: null, DividerFoldClass: null))], MoreAlways: true);
 		}
 
 		bool grouped = layout == SessionToolbarLayout.Grouped;

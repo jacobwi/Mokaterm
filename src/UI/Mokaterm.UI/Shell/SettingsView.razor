@@ -25,7 +25,7 @@
 			{
 				@if (_results.Count == 0)
 				{
-					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary);padding:var(--moka-spacing-md)">
+					<MokaText Size="MokaSize.Xs" Style="@(TextStyles.Tertiary + ";padding:var(--moka-spacing-md)")">
 						No settings match.
 					</MokaText>
 				}
@@ -43,7 +43,13 @@
 											  OnClick="() => Open(position)"
 											  tabindex="-1">
 									<span class="mt-settings-result">
-										<span class="mt-settings-result-label">@row.Label</span>
+										<span class="mt-settings-result-label">
+											@* Where each word landed, so a row's label shows why it matched. *@
+											@foreach ((string piece, bool hit) in SettingsSearch.Mark(row.Label, _query))
+											{
+												<span class="@(hit ? "mt-settings-hit" : null)">@piece</span>
+											}
+										</span>
 										@* A label such as Style or Status needs its section to say where it is when nothing else does. *@
 										@if ((row.Description ?? row.Section) is { } detail)
 										{
@@ -91,10 +97,10 @@
 		@if (Selected is { } selected)
 		{
 			<div class="mt-settings-page-header">
-				<MokaText Element="h2" SizeValue="17px" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
+				<MokaText Element="h2" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
 				@if (!string.IsNullOrWhiteSpace(selected.Description))
 				{
-					<MokaText Size="MokaSize.Sm" Style="color:var(--moka-color-on-surface-variant)">@selected.Description</MokaText>
+					<MokaText Size="MokaSize.Sm" Style="@TextStyles.Muted">@selected.Description</MokaText>
 				}
 			</div>
 			@* Module pages included: one that fails takes only itself down, and picking another page leaves the error behind. *@

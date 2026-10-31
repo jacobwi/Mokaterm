@@ -55,6 +55,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<ISettingsNavigator, ShellSettingsNavigator>();
 		services.AddScoped<ShellInterop>();
 		services.AddScoped<PageVisibility>();
+		services.AddScoped<TabDrag>();
 		services.AddScoped<ShellInputBridge>();
 		services.AddScoped<ShellCommandRegistry>();
 		services.AddScoped<SessionWorkspace>();

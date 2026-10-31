@@ -35,13 +35,24 @@ public sealed partial class SessionToolbarTests
 	}
 
 	[Fact]
-	public async Task Compact_DrawsOnlyTheMenu_AndNamesItForTheSession()
+	public async Task Compact_KeepsWhatIsHappening_BesideTheMenu()
 	{
 		string html = await RenderAsync(SessionToolbarLayout.Compact, Actions(), []);
 
-		Assert.Equal(["more"], Buttons(html));
+		// The recording's dot is a state, not a button, so it stays out of the menu.
+		Assert.Equal(["record", "more"], Buttons(html));
 		Assert.Contains("aria-label=\"Session actions\"", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("mt-tb-more--fold", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Compact_KeepsAPinnedActionSuchAsReconnect()
+	{
+		List<ToolbarAction> actions = [.. Actions(), Action("reconnect", ToolbarGroup.Connection) with { Pinned = true }];
+
+		string html = await RenderAsync(SessionToolbarLayout.Compact, actions, []);
+
+		Assert.Equal(["record", "reconnect", "more"], Buttons(html));
 	}
 
 	[Fact]

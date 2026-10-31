@@ -18,6 +18,7 @@ namespace Mokaterm.UI.Workspace;
 public sealed partial class WelcomeView : ComponentBase, IDisposable
 {
 	private List<(HostProfile Host, ConnectionProfile Login)> _favorites = [];
+	private int _favoritesTotal;
 	private List<(HostProfile Host, ConnectionProfile Login)> _recent = [];
 	private int _restoreCount;
 	private bool _hasHosts;
@@ -105,18 +106,20 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 			}
 		}
 
-		_favorites =
-		[
-			.. logins
+		// The same limit the Recent column takes: a vault of thirty favorites would otherwise stretch one column of the
+		// grid far past its neighbours, and a star is only ever a click away in the connections panel.
+		int limit = Math.Max(0, Settings.Get<GeneralSettings>().RecentConnectionsLimit);
+		IEnumerable<(HostProfile Host, ConnectionProfile Login)> favorites =
+			logins
 				.Where(entry => entry.Login.IsFavorite)
-				.OrderBy(entry => entry.Login.GetTitle(entry.Host), StringComparer.CurrentCultureIgnoreCase),
-		];
+				.OrderBy(entry => entry.Login.GetTitle(entry.Host), StringComparer.CurrentCultureIgnoreCase);
+		_favoritesTotal = favorites.Count();
+		_favorites = [.. favorites.Take(limit)];
 
 		// A login deleted since the last run is not worth offering, so the count only covers ones still in the vault.
 		HashSet<Guid> known = [.. catalog.Connections.Select(login => login.Id)];
 		_restoreCount = Restore.Pending.Count(known.Contains);
 
-		int limit = Math.Max(0, Settings.Get<GeneralSettings>().RecentConnectionsLimit);
 		_recent =
 		[
 			.. logins

@@ -163,6 +163,8 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 		Rebuild();
 	}
 
+	private void ClearFilter() => OnQueryChanged("");
+
 	private void Select(ConnectionTreeRow row) => _selectedKey = row.Key;
 
 	/// <summary>A plain click selects one row; Ctrl adds or drops a row and Shift picks the range from the selected one.</summary>
@@ -321,6 +323,11 @@ public sealed partial class ConnectionExplorer : ComponentBase, IDisposable
 				break;
 			case "Delete" when current is not null:
 				await DeleteAsync(current);
+				break;
+			case "ContextMenu" when current is { Host: { } menuHost, Login: { } login }:
+				// The keyboard's own menu key and Shift+F10 open the row's menu, so favoriting never needs a mouse.
+				// A keyboard event carries no position (0,0), which the menu reads as "under whatever has focus".
+				Menu.Show(new MouseEventArgs(), Actions.LoginMenu(menuHost, login));
 				break;
 		}
 	}

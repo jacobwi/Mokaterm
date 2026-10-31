@@ -279,3 +279,40 @@ export function boxOf(element) {
 	const rect = element?.getBoundingClientRect?.();
 	return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null;
 }
+
+// A tab being dragged between panes: the strip's own drag carries no payload Blazor can read, so this watches for a
+// dragstart on the pane (where it bubbles up from the tab), names the tab from the strip's data-tab-id, and tells the
+// pane's .NET side, which shares it with the other panes. The drop itself is handled by each pane's Blazor events.
+export function attachTabDrag(root, dotNetRef) {
+	attachOnce(root, 'tabDrag', (target) => {
+		let dragging = false;
+		const onDragStart = (event) => {
+			const tab = event.target?.closest?.('[data-tab-id]');
+			if (tab) {
+				dragging = true;
+				// A drag with no data is cancelled by some browsers the moment the source is rendered differently.
+				event.dataTransfer?.setData('text/plain', tab.dataset.tabId);
+				dotNetRef.invokeMethodAsync('TabDragStarted', tab.dataset.tabId);
+			}
+		};
+		// Only a tab drag may drop here: preventDefault is what allows a drop, and doing it for every drag would take
+		// the file drops the terminal and the file browser already handle away from them.
+		const onDragOver = (event) => {
+			if (dragging) {
+				event.preventDefault();
+			}
+		};
+		const onDragEnd = () => {
+			dragging = false;
+			dotNetRef.invokeMethodAsync('TabDragEnded');
+		};
+		target.addEventListener('dragstart', onDragStart);
+		target.addEventListener('dragover', onDragOver);
+		target.addEventListener('dragend', onDragEnd);
+		return () => {
+			target.removeEventListener('dragstart', onDragStart);
+			target.removeEventListener('dragover', onDragOver);
+			target.removeEventListener('dragend', onDragEnd);
+		};
+	});
+}

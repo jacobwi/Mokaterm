@@ -14,12 +14,12 @@
 						}
 						@if (Names.Count > MaxListed)
 						{
-							<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">@MoreText</MokaText>
+							<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">@MoreText</MokaText>
 						}
 					</MokaFlexbox>
 				</MokaScrollArea>
 			}
-			<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-variant)">
+			<MokaText Size="MokaSize.Xs" Style="@TextStyles.Muted">
 				Keep both pastes each copy under a new name. Overwrite replaces what is there, and a folder is merged into the one of the same name.
 			</MokaText>
 			@if (AsRoot)

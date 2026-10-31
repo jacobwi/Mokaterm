@@ -108,7 +108,7 @@
 								aria-label="Use regular expression"
 								aria-pressed="@AriaPressed(_findRegex)">.*</MokaButton>
 				</Hint>
-				<MokaText Element="span" Size="MokaSize.Xs" Mono Style="min-width:4.5rem;color:var(--moka-color-on-surface-variant)">@_findStatus</MokaText>
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@("min-width:4.5rem;" + TextStyles.Muted)">@_findStatus</MokaText>
 				<IconButton Icon="MokaIcons.Navigation.ChevronUp" Color="MokaColor.Primary" OnClick="FindPreviousAsync" Label="Previous match" Shortcut="Shift+Enter" />
 				<IconButton Icon="MokaIcons.Navigation.ChevronDown" Color="MokaColor.Primary" OnClick="FindNextAsync" Label="Next match" Shortcut="Enter" />
 				<IconButton Icon="MokaIcons.Navigation.Close" Color="MokaColor.Primary" OnClick="CloseFindAsync" Label="Close" Shortcut="Escape" AriaLabel="Close find" Position="MokaTooltipPosition.BottomEnd" />

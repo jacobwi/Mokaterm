@@ -8,6 +8,8 @@
 	</div>
 
 	<div class="mt-explorer-tree"
+		 role="tree"
+		 aria-label="Connections"
 		 tabindex="0"
 		 @ref="_tree"
 		 @onkeydown="OnKeyDownAsync"
@@ -15,7 +17,7 @@
 		 @oncontextmenu:preventDefault>
 		@if (!Catalog.IsLoaded)
 		{
-			<div class="mt-explorer-message">
+			<div class="mt-explorer-message" role="status" aria-label="Reading your connections">
 				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
 			</div>
 		}
@@ -24,7 +26,8 @@
 			<div class="mt-explorer-message">
 				@if (_query.Trim().Length > 0)
 				{
-					<MokaText Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">Nothing matches the filter.</MokaText>
+					<MokaText Size="MokaSize.Xs" Style="@TextStyles.Tertiary">Nothing matches the filter.</MokaText>
+					<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" OnClick="ClearFilter">Clear the filter</MokaButton>
 				}
 				else
 				{
@@ -70,7 +73,12 @@
 						<MokaListItem Active="@(row.Key == _selectedKey)" Style="@IndentStyle(row.Depth)">
 							<ChildContent>
 								<span class="mt-tree-line" title="@RowTooltip(row)">
-									<span class="mt-tree-chevron" @onclick="() => Toggle(row)" @onclick:stopPropagation @ondblclick:stopPropagation>
+									<span class="mt-tree-chevron"
+									  @onclick="() => Toggle(row)"
+									  @onclick:stopPropagation
+									  @ondblclick:stopPropagation
+									  aria-expanded="@(row.Expandable ? (row.Expanded ? "true" : "false") : null)"
+									  role="@(row.Expandable ? "button" : null)">
 										@if (row.Expandable)
 										{
 											<MokaIcon Icon="@(row.Expanded ? MokaIcons.Navigation.ChevronDown : MokaIcons.Navigation.ChevronRight)" SizeValue="12px" />
@@ -104,7 +112,7 @@
 									case { Folder: not null }:
 										if (row.ChildCount > 0)
 										{
-											<MokaText Element="span" Mono Size="MokaSize.Xs" Style="color:var(--moka-color-on-surface-tertiary)">@row.ChildCount</MokaText>
+											<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">@row.ChildCount</MokaText>
 										}
 										break;
 									case { Login: { } login }:

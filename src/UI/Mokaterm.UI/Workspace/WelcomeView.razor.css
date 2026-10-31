@@ -35,14 +35,14 @@
 
 .mt-welcome-mark {
 	font-family: var(--moka-font-family-mono);
-	font-size: 17px;
+	font-size: var(--moka-font-size-base);
 	font-weight: var(--moka-font-weight-semibold);
 	color: var(--moka-color-primary);
 }
 
 .mt-welcome-title {
 	margin: 0;
-	font-size: 17px;
+	font-size: var(--moka-font-size-base);
 	font-weight: var(--moka-font-weight-semibold);
 	letter-spacing: -0.01em;
 	color: var(--moka-color-on-surface);
@@ -136,4 +136,8 @@
 		gap: var(--moka-spacing-lg);
 		padding: var(--moka-spacing-xl) var(--moka-spacing-md);
 	}
+}
+
+.mt-welcome-more {
+	margin: 0 0 var(--moka-spacing-xs);
 }

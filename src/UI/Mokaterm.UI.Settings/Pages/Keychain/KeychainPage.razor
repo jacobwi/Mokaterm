@@ -4,6 +4,7 @@
 <VaultListFrame Title="Keychain"
 				LockedDescription="Unlock the vault to see and manage shared credentials."
 				IsUnlocked="IsUnlocked"
+				IsLoading="@(!IsLoaded)"
 				LoadError="@LoadError">
 	<MokaTable TItem="CredentialInfo"
 			   Items="Items"

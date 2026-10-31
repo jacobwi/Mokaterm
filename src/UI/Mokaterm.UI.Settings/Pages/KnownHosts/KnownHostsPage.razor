@@ -4,6 +4,7 @@
 <VaultListFrame Title="Known hosts"
 				LockedDescription="Unlock the vault to see and manage trusted servers."
 				IsUnlocked="IsUnlocked"
+				IsLoading="@(!IsLoaded)"
 				LoadError="@LoadError">
 	<MokaTable TItem="KnownHost"
 			   Items="Items"

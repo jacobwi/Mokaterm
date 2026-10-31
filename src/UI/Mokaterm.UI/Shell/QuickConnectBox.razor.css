@@ -81,7 +81,8 @@
 	background: var(--moka-color-surface);
 	color: var(--moka-color-on-surface);
 	font-size: var(--moka-font-size-xs);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+
+	/* A refused scheme or port story is long; it wraps like Hint.razor does instead of ellipsizing away the reason. */
+	max-width: 20rem;
+	overflow-wrap: anywhere;
 }

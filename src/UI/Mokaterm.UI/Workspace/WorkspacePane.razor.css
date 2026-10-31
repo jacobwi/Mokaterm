@@ -46,4 +46,11 @@
 /* Which pane the commands act on. Only drawn while several are on screen. */
 .mt-workspace-pane--focused > .mt-workspace-tabs {
 	box-shadow: inset 0 -2px 0 var(--moka-color-primary-border);
+	background: color-mix(in srgb, var(--moka-color-primary) 4%, transparent);
+}
+
+/* Where a tab from another pane would land. */
+.mt-workspace-pane--droptarget {
+	outline: 2px dashed var(--moka-color-primary-border);
+	outline-offset: -3px;
 }

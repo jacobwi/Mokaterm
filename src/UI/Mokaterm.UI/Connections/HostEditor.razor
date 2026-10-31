@@ -34,14 +34,14 @@
 					<div class="mt-preview-note">How this host reads in the tree, on its tabs and in the status bar.</div>
 				</div>
 
-				<div class="mt-section">Machine</div>
+				<h3 class="mt-section" id="he-machine">Machine</h3>
 				<MokaGrid ColumnsValue="repeat(auto-fit, minmax(200px, 1fr))" Gap="MokaSpacingScale.Md">
 					<MokaTextField Label="Address"
 								   Required
 								   @bind-Value="_address"
 								   @bind-Value:after="OnAddressChanged"
 								   ErrorText="@_addressError"
-								   Placeholder="10.10.2.3 or server.example.com"
+								   Placeholder="@HostAddress.Placeholder"
 								   Disabled="_saving"
 								   spellcheck="false"
 								   autocomplete="off"
@@ -68,7 +68,7 @@
 							Searchable="@(_folderOptions.Count > 8)"
 							Disabled="_saving" />
 
-				<div class="mt-section">Appearance</div>
+				<h3 class="mt-section" id="he-appearance">Appearance</h3>
 				<MokaFieldWrapper Label="Environment" HelperText="@EnvironmentHelp" Disabled="_saving">
 					<div class="mt-env">
 						<MokaSegmentedControl AriaLabel="Environment" Value="@_environment.ToString()" ValueChanged="OnEnvironmentChanged" Size="MokaSize.Sm">
@@ -126,7 +126,7 @@
 							  Disabled="_saving"
 							  data-no-submit="true" />
 
-				<div class="mt-section">Notes</div>
+				<h3 class="mt-section" id="he-notes">Notes</h3>
 				<MokaTextArea @bind-Value="_notes"
 							  Rows="3"
 							  Placeholder="Anything worth remembering about this machine."
@@ -141,6 +141,6 @@
 		{
 			<MokaButton Variant="MokaVariant.Outlined" Disabled="_saving" OnClick="() => SaveAsync(addLogin: true)">Save and add login</MokaButton>
 		}
-		<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" OnClick="() => SaveAsync(addLogin: false)">Save</MokaButton>
+		<MokaButton StartIcon="MokaIcons.Action.Save" Loading="_saving" data-primary="true" OnClick="() => SaveAsync(addLogin: false)">Save</MokaButton>
 	</Actions>
 </ShellEditorDialog>

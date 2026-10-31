@@ -68,6 +68,83 @@ internal static class SettingsSearch
 
 	private static bool Has(string text, string word) => text.Contains(word, StringComparison.Ordinal);
 
+	/// <summary>
+	/// The label in pieces, each marked with whether a query word landed in it, so a result row can show where the words
+	/// matched. Punctuation takes the state of the letter before it, so "Right-click" marked at "click" is one marked
+	/// piece.
+	/// </summary>
+	public static IReadOnlyList<(string Text, bool Matched)> Mark(string label, string query)
+	{
+		ArgumentNullException.ThrowIfNull(label);
+		string[] words = Fold(query).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+		if (words.Length == 0 || label.Length == 0)
+		{
+			return [(label, false)];
+		}
+
+		// Fold with a map back to the original characters, then mark each word's spans through the map.
+		StringBuilder folded = new(label.Length);
+		int[] map = new int[label.Length];
+		bool matched = false;
+		bool[] isMatch = new bool[label.Length];
+		int written = 0;
+		bool pendingSpace = false;
+		for (int index = 0; index < label.Length; index++)
+		{
+			char character = label[index];
+			if (char.IsLetterOrDigit(character))
+			{
+				if (pendingSpace && folded.Length > 0)
+				{
+					folded.Append(' ');
+					written++;
+				}
+
+				map[written] = index;
+				folded.Append(char.ToLowerInvariant(character));
+				written++;
+				pendingSpace = false;
+			}
+			else
+			{
+				pendingSpace = true;
+			}
+		}
+
+		string foldedText = folded.ToString();
+		foreach (string word in words)
+		{
+			for (int at = 0; (at = foldedText.IndexOf(word, at, StringComparison.Ordinal)) >= 0; at += word.Length)
+			{
+				for (int inside = at; inside < at + word.Length && inside < written; inside++)
+				{
+					isMatch[map[inside]] = true;
+				}
+			}
+		}
+
+		List<(string, bool)> pieces = [];
+		int start = 0;
+		matched = isMatch[0];
+		for (int index = 1; index < label.Length; index++)
+		{
+			bool here = isMatch[index];
+			if (char.IsLetterOrDigit(label[index]) && here != matched)
+			{
+				pieces.Add((label[start..index], matched));
+				start = index;
+				matched = here;
+			}
+			else if (char.IsLetterOrDigit(label[index]))
+			{
+				matched = here;
+			}
+		}
+
+		pieces.Add((label[start..], matched));
+		return pieces;
+	}
+
 	/// <summary>Lower case, with every run of characters that are neither letters nor digits turned into one space.</summary>
 	internal static string Fold(string? text)
 	{

@@ -2,6 +2,9 @@ namespace Mokaterm.UI.Connections;
 
 internal static class HostAddress
 {
+	/// <summary>What both address fields show as their example, so the editor and the host dialog teach one shape.</summary>
+	public const string Placeholder = "10.10.2.3 or server.example.com";
+
 	/// <summary>Trims whitespace and the brackets people type around IPv6 addresses.</summary>
 	public static string Normalize(string? address)
 	{

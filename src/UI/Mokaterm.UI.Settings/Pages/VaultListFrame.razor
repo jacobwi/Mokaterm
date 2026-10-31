@@ -1,6 +1,7 @@
 @* The frame the vault list pages share: the locked state instead of the list, and a load failure above it. A page that
    forgets the alert would show an empty list where the document could not be read. *@
 
+@using Moka.Red.Feedback.Loading
 <SettingsPage Title="@Title">
 	@if (IsUnlocked)
 	{
@@ -8,7 +9,20 @@
 		{
 			<MokaAlert Severity="MokaToastSeverity.Error" Dense>@LoadError</MokaAlert>
 		}
-		@ChildContent
+		@if (IsLoading)
+		{
+			@* The shape of the list that is coming, so an empty table never reads as "nothing here". *@
+			<div class="vault-list-loading" role="status" aria-label="Reading the vault">
+				@for (int line = 0; line < 5; line++)
+				{
+					<MokaSkeleton Shape="MokaSkeletonShape.Text" Lines="1" />
+				}
+			</div>
+		}
+		else
+		{
+			@ChildContent
+		}
 	}
 	else
 	{
@@ -27,6 +41,10 @@
 
 	[Parameter]
 	public bool IsUnlocked { get; set; }
+
+	/// <summary>True while the vault document is being read, before the list can exist.</summary>
+	[Parameter]
+	public bool IsLoading { get; set; }
 
 	/// <summary>Set when the load failed for a reason other than the vault locking.</summary>
 	[Parameter]

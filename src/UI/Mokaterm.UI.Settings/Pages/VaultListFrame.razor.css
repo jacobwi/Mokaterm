@@ -1,0 +1,7 @@
+
+.vault-list-loading {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	padding: var(--moka-spacing-sm) 0;
+}

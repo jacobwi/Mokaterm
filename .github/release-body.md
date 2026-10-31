@@ -1,3 +1,24 @@
+## What's new in 0.2.6
+
+**Connections**
+
+- A tab can be dragged from one pane to another: the pane it is over draws a dashed target and takes the tab on drop.
+  Dragging within a pane still reorders, and dropping files on the terminal works exactly as before.
+- The connection and host editors submit on Enter, like every other editor, with one clearly primary button in every
+  mode, and each section is a heading rather than a styled line.
+- A favorite is a star on the welcome rows themselves — on for a favorite, pressable by keyboard — and the menu key or
+  Shift+F10 opens a row's menu in the connections panel, so favoriting never needs a mouse.
+- The quick connect's refusal text wraps instead of cutting off the reason.
+
+**Look and consistency**
+
+- The welcome screen's favorites take the same limit as recent connections and say how many more are in the panel; the
+  welcome rows and the connections panel show the same logins at the same density.
+- The settings search marks where each word landed in a row's label.
+- The keychain and known-hosts lists show their shape while the vault is being read, instead of reading as empty.
+- The focused pane is a tinted strip, not only an underline; the session toolbar's height follows the density set under
+  Appearance; the Compact toolbar keeps the recording dot and Reconnect beside its menu.
+
 ## What's new in 0.2.5
 
 **Plugins**

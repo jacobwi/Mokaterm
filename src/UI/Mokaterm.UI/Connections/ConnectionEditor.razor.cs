@@ -122,6 +122,16 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 	/// <summary>A quick-connect target with no session yet: saving it is how it gets opened, so Save alone is not offered.</summary>
 	private bool IsDraft => Request?.Draft is not null;
 
+	/// <summary>One line beside the title saying what this dialog is about, per mode.</summary>
+	private string? DialogTitleHint =>
+		Request?.TransientSession is not null ? "Saving the tab you connected with"
+		: Request?.Draft is not null ? "Give the quick connect a home and connect"
+		: _original is null ? "A login to one machine"
+		: null;
+
+	/// <summary>Enter saves: every field here belongs to the form, none needs Enter for itself.</summary>
+	protected override bool SubmitOnEnter => true;
+
 	private ProtocolDescriptor? Protocol => Protocols.FindDescriptor(_protocolId);
 
 	private string ProtocolName => Protocol?.DisplayName ?? _protocolId.ToUpperInvariant();
