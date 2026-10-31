@@ -13,6 +13,7 @@
 		<Project Path="src/Mokaterm.Sessions/Mokaterm.Sessions.csproj" />
 		<Project Path="src/Mokaterm.Generators/Mokaterm.Generators.csproj" />
 		<Project Path="src/Mokaterm.Plugin.Sdk/Mokaterm.Plugin.Sdk.csproj" />
+		<Project Path="src/Mokaterm.Plugin.TestHost/Mokaterm.Plugin.TestHost.csproj" />
 	</Folder>
 	<Folder Name="/src/UI/">
 		<Project Path="src/UI/Mokaterm.UI.Common/Mokaterm.UI.Common.csproj" />

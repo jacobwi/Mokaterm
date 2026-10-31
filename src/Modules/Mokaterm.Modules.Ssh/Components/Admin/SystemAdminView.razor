@@ -2,6 +2,10 @@
 @inherits SessionViewBase
 @using Mokaterm.Modules.Ssh.Admin.Reboot
 
+@* The pages' own classes (mta-*), built in or a plugin's, come from UI.Common: a declared contract rather than a
+   stylesheet of ours they happen to reach. *@
+<link href="_content/Mokaterm.UI.Common/system-pages.css" rel="stylesheet" />
+
 <div class="mt-admin">
 	@if (_feature is null)
 	{

@@ -1,0 +1,68 @@
+.mt-pui-facts {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 4px var(--moka-spacing-md);
+	margin: 0;
+	font-size: var(--moka-font-size-sm);
+	container-type: inline-size;
+}
+
+.mt-pui-facts dt {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 22px;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.mt-pui-facts dd {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	margin: 0;
+}
+
+.mt-pui-facts-value {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+	min-height: 22px;
+	color: var(--moka-color-on-surface);
+}
+
+.mt-pui-facts-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.mt-pui-facts-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mt-pui-facts-none {
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-pui-facts-note {
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+}
+
+/* A narrow list puts each label above its value. The list is its own container, so its rows follow its width. */
+@container (max-width: 380px) {
+	.mt-pui-facts dt {
+		grid-column: 1 / -1;
+		line-height: 18px;
+	}
+
+	.mt-pui-facts dd {
+		grid-column: 1 / -1;
+		margin-bottom: var(--moka-spacing-xs);
+	}
+}

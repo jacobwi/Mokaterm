@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Render harness for plugin tests: draws a tool, a page or a component to HTML through Blazor's static renderer,
+		with the host services a plugin's views inject already faked, so a plugin's tests can check what its UI shows on
+		both hosts without a browser. A test project references this package and Mokaterm.UI.Common; the plugin package
+		itself never sees it, because the reference carries PrivateAssets="all".
+	-->
+	<PropertyGroup>
+		<TargetFramework>$(MokatermTargetFramework)</TargetFramework>
+		<RootNamespace>Mokaterm.Plugin.TestHost</RootNamespace>
+		<Nullable>enable</Nullable>
+		<IsPackable>true</IsPackable>
+		<PackageId>Mokaterm.Plugin.TestHost</PackageId>
+		<Description>Test harness for Mokaterm plugins: renders a plugin's views to HTML with Blazor's static renderer, on a faked desktop or web host, with the host services faked and ready to inspect. For plugin test projects only.</Description>
+		<PackageTags>mokaterm;plugin;blazor;testing</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\UI\Mokaterm.UI.Common\Mokaterm.UI.Common.csproj" />
+	</ItemGroup>
+
+</Project>

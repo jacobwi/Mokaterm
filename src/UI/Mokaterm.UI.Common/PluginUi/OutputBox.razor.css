@@ -1,0 +1,88 @@
+.mt-pui-output {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface);
+}
+
+.mt-pui-output-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.mt-pui-output-title {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mt-pui-output-tag {
+	padding: 0 6px;
+	border: 1px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-sm);
+	color: var(--moka-color-primary);
+	font-size: 9px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mt-pui-output-detail {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-pui-output-gap {
+	flex: 1;
+}
+
+.mt-pui-output-text {
+	max-height: 320px;
+	margin: 0;
+	padding: var(--moka-spacing-sm);
+	overflow: auto;
+	border-left: 3px solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+.mt-pui-output-text--nowrap {
+	white-space: pre;
+	overflow-wrap: normal;
+}
+
+.mt-pui-output-hidden {
+	padding: var(--moka-spacing-sm);
+	border-left: 3px solid var(--moka-color-primary-border);
+	border-radius: var(--moka-radius-sm);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-pui-output-cut {
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+}

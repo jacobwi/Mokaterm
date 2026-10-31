@@ -18,6 +18,15 @@
 5. **A gallery download belongs to the window, not the page.** Leaving the Plugins page no longer cancels it: the
    download runs as the window's `IPluginGallery.Download`, coming back shows how far it is, and a package that
    finished in the meantime opens its install dialog on return.
+6. **A page kit in UI.Common.** `Mokaterm.UI.Common.PluginUi` (StatusChip, ChipRow, Fact/FactList, OutputBox) is what
+   the four first-party plugins had drifted three copies of, and the System page classes (`mta-*`) ship as
+   `system-pages.css`, linked by the view, so a plugin page styles itself by contract instead of reaching into the Ssh
+   module's stylesheet.
+7. **`Mokaterm.Plugin.TestHost`**, a fifth SDK package: the static-render harness a plugin's tests draw its views with,
+   on a faked desktop or web host, with settings, notices and the clipboard steerable by the test.
+
+Still to do: PublicApiAnalyzers on the two contract packages needs a baseline generator first (the RS0016 fixer cannot
+run headless and there is no genapi tool on NuGet), so it stays on the list.
 
 ## Older plans
 
