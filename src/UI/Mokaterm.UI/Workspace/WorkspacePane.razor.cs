@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Moka.Red.ContextMenu;
 using Moka.Red.Core.Interactions;
@@ -59,6 +60,9 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 	private TabDrag Drag { get; set; } = default!;
 
 	[Inject]
+	private ILogger<WorkspacePane> Logger { get; set; } = default!;
+
+	[Inject]
 	private IJSRuntime Js { get; set; } = default!;
 
 	private string PaneClass =>
@@ -94,8 +98,20 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 
 		// The strip's own drag says which tab it carries only to itself; this shares it with the other panes. The
 		// listeners live and die with the pane's element (attachTabDrag is attach-once on it).
-		_dragScript = new JsModule(Js, "./js/shell.js");
-		await _dragScript.InvokeVoidAsync("attachTabDrag", _root, _dragSelf);
+		//
+		// An exception thrown from here takes the whole app down with it, and a drag affordance is never worth that:
+		// when the bridge cannot be attached, tabs still move through their menu and the commands, so every failure,
+		// a missing module included, is logged and swallowed. 0.2.6 started with "Mokaterm stopped working" because
+		// this import ran at a path that does not exist.
+		try
+		{
+			_dragScript = new JsModule(Js, ShellInterop.ModulePath);
+			await _dragScript.InvokeVoidAsync("attachTabDrag", _root, _dragSelf);
+		}
+		catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or ObjectDisposedException or TaskCanceledException)
+		{
+			Logger.LogWarning("Attaching the tab drag bridge failed; tabs still move through their menu. {Failure}", ex.Message);
+		}
 	}
 
 	/// <summary>A tab of this pane started being dragged; the other panes read it from the shared state.</summary>

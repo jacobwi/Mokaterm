@@ -10,7 +10,7 @@ namespace Mokaterm.UI.Shell;
 /// </summary>
 internal sealed class ShellInterop : IAsyncDisposable
 {
-	private const string ModulePath = "./_content/Mokaterm.UI/js/shell.js";
+	internal const string ModulePath = "./_content/Mokaterm.UI/js/shell.js";
 
 	private readonly JsModule _module;
 
