@@ -1,3 +1,14 @@
+## What's new in 0.2.8
+
+**Plugins**
+
+- Plugin updates get found on their own: the startup check also reads the plugin gallery's signed list once (Settings,
+  Updates, "Check for plugin updates", on by default) and shows a notice naming the plugins with newer versions.
+  Installing stays where it was — the Plugins page, with its trust step — and the web host never checks.
+- The Plugins page gains "Check for updates" beside "Install from file", and a banner above the rows when updates are
+  known. Every window of the run shares the one trusted list, so installed plugins show their update chips as soon as
+  the app starts.
+
 ## What's new in 0.2.7
 
 **Fixes 0.2.6, which failed to start.**
