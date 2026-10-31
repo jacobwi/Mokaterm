@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Moka.Red.ContextMenu;
 using Moka.Red.Core.Interactions;
 using Moka.Red.Navigation.Tabs.Models;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Sessions;
+using Mokaterm.UI.Common.Interop;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 
@@ -25,6 +27,10 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 	private Guid? _activeId;
 	private bool _alone;
 	private bool _disposed;
+	private ElementReference _root;
+	private JsModule? _dragScript;
+	private DotNetObjectReference<WorkspacePane>? _dragSelf;
+	private int _dragDepth;
 
 	/// <summary>The pane this shows, an id from <see cref="SessionWorkspace.Panes"/>.</summary>
 	[Parameter]
@@ -49,7 +55,15 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 	[Inject]
 	private MokaTabIconProvider IconProvider { get; set; } = default!;
 
-	private string PaneClass => Focused ? "mt-workspace-pane mt-workspace-pane--focused" : "mt-workspace-pane";
+	[Inject]
+	private TabDrag Drag { get; set; } = default!;
+
+	[Inject]
+	private IJSRuntime Js { get; set; } = default!;
+
+	private string PaneClass =>
+		(Focused ? "mt-workspace-pane mt-workspace-pane--focused" : "mt-workspace-pane")
+		+ (_dragDepth > 0 && Drag.IsForeignDrag(PaneId) ? " mt-workspace-pane--droptarget" : null);
 
 	private string? ActiveTabId => Shell.SettingsOpen ? null : _activeId?.ToString("N");
 
@@ -58,15 +72,73 @@ public sealed partial class WorkspacePane : ComponentBase, IDisposable
 		_disposed = true;
 		Workspace.Changed -= OnWorkspaceChanged;
 		Shell.Changed -= OnShellChanged;
+		_dragSelf?.Dispose();
+		_ = _dragScript?.DisposeAsync().AsTask();
 	}
 
 	protected override void OnInitialized()
 	{
 		Workspace.Changed += OnWorkspaceChanged;
 		Shell.Changed += OnShellChanged;
+		_dragSelf = DotNetObjectReference.Create(this);
 	}
 
 	protected override void OnParametersSet() => Rebuild();
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender)
+		{
+			return;
+		}
+
+		// The strip's own drag says which tab it carries only to itself; this shares it with the other panes. The
+		// listeners live and die with the pane's element (attachTabDrag is attach-once on it).
+		_dragScript = new JsModule(Js, "./js/shell.js");
+		await _dragScript.InvokeVoidAsync("attachTabDrag", _root, _dragSelf);
+	}
+
+	/// <summary>A tab of this pane started being dragged; the other panes read it from the shared state.</summary>
+	[JSInvokable]
+	public void TabDragStarted(string tabId)
+	{
+		if (TryParseTabId(tabId) is { } id && Workspace.Find(id) is not null)
+		{
+			Drag.Start(id, PaneId);
+		}
+	}
+
+	[JSInvokable]
+	public void TabDragEnded() => Drag.End();
+
+	// Enter and leave fire for every child the pointer crosses, so a depth counter says when the pane is left for real.
+	private void OnForeignDragEnter()
+	{
+		if (Drag.IsForeignDrag(PaneId) && _dragDepth++ == 0)
+		{
+			StateHasChanged();
+		}
+	}
+
+	private void OnForeignDragLeave()
+	{
+		if (_dragDepth > 0 && --_dragDepth == 0)
+		{
+			StateHasChanged();
+		}
+	}
+
+	private void OnDropAsync()
+	{
+		_dragDepth = 0;
+		if (Drag.SessionId is { } id && Drag.SourcePane != PaneId)
+		{
+			Workspace.MoveToPane(id, Workspace.PositionOf(PaneId));
+		}
+
+		Drag.End();
+		StateHasChanged();
+	}
 
 	private static Guid? TryParseTabId(string tabId) => Guid.TryParseExact(tabId, "N", out Guid id) ? id : null;
 

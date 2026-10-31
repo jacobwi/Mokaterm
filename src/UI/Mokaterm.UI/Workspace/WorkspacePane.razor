@@ -1,4 +1,10 @@
-<div class="@PaneClass" @onfocusin="FocusThisPane" @onpointerdown="FocusThisPane">
+<div class="@PaneClass"
+	 @ref="_root"
+	 @onfocusin="FocusThisPane"
+	 @onpointerdown="FocusThisPane"
+	 @ondragenter="OnForeignDragEnter"
+	 @ondragleave="OnForeignDragLeave"
+	 @ondrop="OnDropAsync">
 	<div class="mt-workspace-tabs">
 		@if (_tabs.Count > 0)
 		{
