@@ -1,3 +1,11 @@
+## What's new in 0.2.10
+
+**Fixes**
+
+- **Fixed: restarting after installing a plugin could say "another copy of Mokaterm is already running".** The copy
+  that was closing held the data folder's lock a little longer than the new copy waited for it. The new copy now waits
+  for the lock itself, and the old one ends itself after an orderly close instead of lingering.
+
 ## What's new in 0.2.9
 
 **Terminal**
