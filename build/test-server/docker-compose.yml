@@ -1,0 +1,25 @@
+# The real Linux server the live tests run against (docs/next-release.md, "A real Linux test server").
+#
+#   docker compose -f build/test-server/docker-compose.yml up -d --build
+#   $env:MOKATERM_TEST_SSH = "test:testing123@localhost:2222"
+#   dotnet test --solution Mokaterm.slnx
+#
+# One Ubuntu with OpenSSH, the commands the System view reads (cron, systemd-analyze, ss, ufw...), sudo for the
+# root-mode paths, and a Docker daemon of its own (dind) so the Docker manager's reads meet containers for real.
+# Nothing here is a production image: the password is fixed, the host key is regenerated on build, and the port is
+# only published on the loopback interface.
+
+services:
+  test-server:
+    build: .
+    container_name: mokaterm-test-server
+    ports:
+      # Both loopbacks: a caller that resolves localhost to ::1 first (dotnet does) is as welcome as IPv4.
+      - "127.0.0.1:2222:22"
+      - "[::1]:2222:22"
+    privileged: true
+    healthcheck:
+      test: ["CMD", "sshd", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
