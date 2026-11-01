@@ -1,4 +1,8 @@
-# Next release (0.2.9)
+# Next release (0.2.10)
+
+To be planned. The carried items below still stand.
+
+# Released: 0.2.9
 
 ## rz/sz (ZMODEM) in the terminal
 

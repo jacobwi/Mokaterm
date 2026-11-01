@@ -1,3 +1,33 @@
+## What's new in 0.2.9
+
+**Terminal**
+
+- **ZMODEM transfers: run `sz` on the server and Mokaterm answers it.** The offer bar shows the file's name, size and
+  date (Save / Skip / Cancel), a progress line runs under the terminal (percent, speed, time left), and a finished
+  transfer leaves a short `[mokaterm]` line in the scrollback. `rz` on the server offers to pick files and streams them
+  out. The protocol is implemented in Mokaterm itself, to the last detail — corruption rewinds and retransmits, cancel
+  works from either side, several files per run — and because nothing in it is SSH-specific, **serial and Telnet
+  sessions get their first file transfer**.
+- **Fixed: agent and X11 forwarding has never worked against a real server.** The connection died the moment the server
+  opened the forwarded agent channel. Found by Mokaterm's own new Linux test server; forwarding now registers the
+  channel with the SSH library the way its own port forwards do.
+- **Fixed: a command run without a shell that read its input (`cat`, and anything like it) hung until its timeout.**
+  Its input is now closed with an explicit end-of-file. Also found by the test server — against which the whole SSH
+  suite, 2,092 tests, now runs.
+
+**Look**
+
+- Built on Moka.Red 0.1.22: a select's dropdown is a raised panel that fits its content, with a check on the chosen
+  option and a styled scrollbar; the status bar's rules are drawn by the library instead of styled neighbours; and a
+  JavaScript report can no longer take a render down with it (the crash behind 0.2.6's withdrawal, hardened at the
+  source).
+
+**Plugins**
+
+- **Kubernetes 1.0.0 in the gallery**: a session tool for SSH with a cluster overview, pods and their detail, tail logs
+  that follow, a one-shot command runner over exec, and confirmed rollout restart, undo and status. Settings, Plugins,
+  Browse installs it.
+
 ## What's new in 0.2.8
 
 **Plugins**
