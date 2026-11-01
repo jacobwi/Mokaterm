@@ -24,7 +24,7 @@ public static class Program
 			.Run();
 
 		// A restart starts this copy before the old one has gone; it holds the key and the lock checked below.
-		DesktopRestarter.WaitForPreviousRun(Environment.GetCommandLineArgs());
+		DesktopRestarter.WaitForPreviousRun(Environment.GetCommandLineArgs(), DesktopPaths.Root);
 
 		WinRT.ComWrappersSupport.InitializeComWrappers();
 

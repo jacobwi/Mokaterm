@@ -52,15 +52,27 @@ internal sealed class DesktopRestarter : IAppRestarter
 
 		await _sessions.ShutDownAsync().ConfigureAwait(false);
 		MainThread.BeginInvokeOnMainThread(() => Application.Current?.Quit());
+		// WinUI's Quit closes the window but does not always end the process while background threads are alive, and
+		// until the process ends this copy holds the single instance key and the data folder lock. The new copy waits
+		// for those, but not forever: after a grace period that covers an orderly close, this process ends itself, so
+		// a restart never leaves the user looking at "another copy is already running".
+		_ = Task.Run(async () =>
+		{
+			await Task.Delay(TimeSpan.FromSeconds(8)).ConfigureAwait(false);
+			_logger.LogWarning("This copy was still running after a restart; ending it.");
+			Environment.Exit(0);
+		});
 		return true;
 #endif
 	}
 
 	/// <summary>
-	/// In a copy started by <see cref="RestartAsync"/>, waits for the copy that started it to exit. Runs first thing in
-	/// <c>Main</c>, before the single instance check.
+	/// In a copy started by <see cref="RestartAsync"/>, waits for the copy that started it to let go. Runs first thing
+	/// in <c>Main</c>, before the single instance check. The process ending is the first sign; the data folder lock is
+	/// the one that matters, because a copy whose window has closed and whose instance key has gone can still hold it
+	/// while it winds down — the exact copy that made a restart say "another copy is already running".
 	/// </summary>
-	public static void WaitForPreviousRun(string[] arguments)
+	public static void WaitForPreviousRun(string[] arguments, string dataRoot)
 	{
 		int index = Array.IndexOf(arguments, AfterArgument);
 		if (index < 0
@@ -73,11 +85,16 @@ internal sealed class DesktopRestarter : IAppRestarter
 		try
 		{
 			using Process previous = Process.GetProcessById(processId);
-			previous.WaitForExit(TimeSpan.FromSeconds(20));
+			previous.WaitForExit(TimeSpan.FromSeconds(30));
 		}
 		catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
 		{
 			// Already gone, which is what we were waiting for.
 		}
+
+		// The lock outlives the window by however long the copy takes to end; this waits for that too, so the wait on
+		// the process above is only the fast path. A copy that ends releases it; a copy that will not end gets ended by
+		// its own restart, so this always comes back within the cap.
+		_ = SingleInstance.WaitUntilFolderFree(dataRoot, TimeSpan.FromSeconds(30));
 	}
 }

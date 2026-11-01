@@ -88,6 +88,24 @@ internal static class SingleInstance
 	/// <summary>The UI thread's queue, once WinUI runs. A launch handed over before that is ignored: the window comes up anyway.</summary>
 	public static void ListenOn(DispatcherQueue queue) => _uiQueue = queue;
 
+	/// <summary>
+	/// Blocks until <paramref name="dataRoot"/>'s lock is free (or <paramref name="cap"/> passes), without taking it:
+	/// for a restart's copy, whose predecessor may be letting go. True when the folder is free.
+	/// </summary>
+	public static bool WaitUntilFolderFree(string dataRoot, TimeSpan cap)
+	{
+		try
+		{
+			using Mutex folderLock = new(initiallyOwned: false, @"Local\" + KeyFor(dataRoot));
+			return folderLock.WaitOne(cap);
+		}
+		catch (Exception ex) when (ex is ArgumentException or ObjectDisposedException)
+		{
+			// A name Windows refuses is not a lock anyone holds; starting is the honest answer.
+			return true;
+		}
+	}
+
 	// Case and a trailing separator do not make another folder on Windows. Hashed so the key has a fixed length and
 	// no path characters, whatever the folder is called.
 	private static string KeyFor(string dataRoot)
