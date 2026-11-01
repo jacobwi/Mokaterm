@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Security.Cryptography;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.Abstractions.Security;
+using Mokaterm.Modules.Ssh.Forwarding;
 using Mokaterm.UI.Common.Formatting;
 using Renci.SshNet;
 using Renci.SshNet.Common;
@@ -59,7 +60,8 @@ internal sealed class RemoteCommand : IExecChannel
 
 	/// <summary>
 	/// Closes stdin without writing anything, so a command that reads it sees the end of its input instead of waiting
-	/// for a line that will never come.
+	/// for a line that will never come. Disposing the stream alone does not do that: SSH.NET sends EOF only after data
+	/// was written, so the channel is told apart from the stream.
 	/// </summary>
 	public void CloseInput()
 	{
@@ -75,6 +77,7 @@ internal sealed class RemoteCommand : IExecChannel
 		}
 
 		CloseInput(stdin);
+		SshNetInternals.SendCommandInputEof(_command);
 	}
 
 	/// <summary>

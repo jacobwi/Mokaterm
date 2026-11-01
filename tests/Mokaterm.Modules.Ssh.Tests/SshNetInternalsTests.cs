@@ -82,6 +82,17 @@ public sealed class SshNetInternalsTests
 	}
 
 	[Fact]
+	public void ACommandInputEof_IsReachableAndNeedsNoChannelBeforeTheCommandRuns()
+	{
+		// The reason the EOF is sent by hand: SSH.NET's input stream sends it only when disposed after data, so a command
+		// that reads stdin would wait for its end until the run's timeout.
+		Assert.Null(SshNetInternals.CommandInputEofProblem);
+
+		// A command that never ran has no channel, so there is nothing to send the EOF on; that must not throw.
+		SshNetInternals.SendCommandInputEof(NewCommand());
+	}
+
+	[Fact]
 	public void StockChannelOpen_StillThrowsForAnAgentChannel()
 	{
 		// The reason the message table is changed at all. When this starts passing a channel through, the change can go.
@@ -162,5 +173,11 @@ public sealed class SshNetInternalsTests
 		MethodInfo method = target.GetType().GetMethod(name, Hidden, [.. arguments.Select(argument => argument.GetType())])
 			?? throw new InvalidOperationException($"SSH.NET no longer has SshMessageFactory.{name}.");
 		return method.Invoke(target, arguments);
+	}
+
+	private static SshCommand NewCommand()
+	{
+		ConstructorInfo constructor = typeof(SshCommand).GetConstructors(Hidden).Single(candidate => candidate.GetParameters().Length == 3);
+		return (SshCommand)constructor.Invoke([SshNetSession.Create(), "cat", Encoding.UTF8]);
 	}
 }

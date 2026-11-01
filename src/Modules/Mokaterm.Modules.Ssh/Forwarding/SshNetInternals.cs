@@ -2,24 +2,26 @@ using System.Collections;
 using System.Reflection;
 using System.Text;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 using Renci.SshNet.Messages;
 using Renci.SshNet.Messages.Connection;
 
 namespace Mokaterm.Modules.Ssh.Forwarding;
 
 /// <summary>
-/// Every place this module reaches inside SSH.NET 2026.0.0 without a public API, which agent and X11 forwarding and
-/// keepalives that want a reply need and nothing else does. Each lookup runs once. One that fails turns off the feature
-/// that needs it, with the reason, and never throws into a session; the tests for this type fail when an SSH.NET update
-/// moves any of it.
+/// Every place this module reaches inside SSH.NET 2026.0.0 without a public API, which agent and X11 forwarding, the
+/// commands' empty stdin and keepalives that want a reply need and nothing else does. Each lookup runs once. One that
+/// fails turns off the feature that needs it, with the reason, and never throws into a session; the tests for this type
+/// fail when an SSH.NET update moves any of it.
 /// </summary>
 /// <remarks>
 /// What is public: <see cref="Session"/> with its channel events and its global request reply events, the channel
 /// messages and <see cref="RequestInfo"/>. What is not: <c>BaseClient.Session</c>, which is the only way from a client to
 /// its session; <c>Session.SendMessage</c>, which is the only way to write a message; the message table, which has no
 /// class for the <c>auth-agent@openssh.com</c> channel type and so fails the whole connection when a server opens one;
-/// and the <see cref="GlobalRequestMessage"/> constructor that takes a request name, whose public one leaves the name
-/// empty and then cannot write it.
+/// the <see cref="GlobalRequestMessage"/> constructor that takes a request name, whose public one leaves the name
+/// empty and then cannot write it; and <see cref="Renci.SshNet.SshCommand"/>'s channel, which is the only way to close a
+/// command's stdin when nothing was written to it, since SSH.NET sends that EOF only after data.
 /// </remarks>
 internal static class SshNetInternals
 {
@@ -35,6 +37,8 @@ internal static class SshNetInternals
 	private static readonly Lazy<SessionAccess> Access = new(LoadSessionAccess, LazyThreadSafetyMode.ExecutionAndPublication);
 
 	private static readonly Lazy<KeepAliveAccess> KeepAlive = new(LoadKeepAliveAccess, LazyThreadSafetyMode.ExecutionAndPublication);
+
+	private static readonly Lazy<CommandInputAccess> CommandInput = new(LoadCommandInputAccess, LazyThreadSafetyMode.ExecutionAndPublication);
 
 	private static readonly Lock PatchLock = new();
 
@@ -79,6 +83,36 @@ internal static class SshNetInternals
 
 	/// <summary>A new <c>keepalive@openssh.com</c> global request that wants a reply, or null when none can be built.</summary>
 	public static GlobalRequestMessage? CreateKeepAliveRequest() => KeepAlive.Value.Create?.Invoke();
+
+	/// <summary>Why a command's stdin cannot be closed with an EOF, or null when it can.</summary>
+	public static string? CommandInputEofProblem => CommandInput.Value.Problem;
+
+	/// <summary>
+	/// Closes <paramref name="command"/>'s stdin with an EOF when nothing was written to it. SSH.NET sends EOF only when
+	/// the input stream is disposed after data was written, so without this a command that reads stdin would wait for its
+	/// end until the run's timeout. Does nothing when the channel is already closed or SSH.NET can no longer be reached.
+	/// </summary>
+	public static void SendCommandInputEof(SshCommand command)
+	{
+		ArgumentNullException.ThrowIfNull(command);
+		if (CommandInput.Value.Send is not { } send)
+		{
+			return;
+		}
+
+		try
+		{
+			send(command);
+		}
+		catch (Exception ex) when (ex is TargetInvocationException
+			{
+				InnerException: InvalidOperationException or SshException or ObjectDisposedException
+			}
+			or InvalidOperationException or SshException or ObjectDisposedException)
+		{
+			// The command finished before stdin was closed, so nothing more will read it.
+		}
+	}
 
 	/// <summary>
 	/// Makes SSH.NET read a channel open of a type it has no class for, such as <c>auth-agent@openssh.com</c>, instead of
@@ -128,6 +162,37 @@ internal static class SshNetInternals
 		catch (Exception ex) when (ex is ArgumentException or MemberAccessException or AmbiguousMatchException)
 		{
 			return new SessionAccess(null, null, $"SSH.NET's session could not be reached ({ex.GetType().Name}).");
+		}
+	}
+
+	/// <summary>
+	/// Finds the channel under a command and the EOF write on it, both without a public API: <see cref="Renci.SshNet.SshCommand"/>
+	/// closes its input stream without an EOF whenever nothing was written to it first. The EOF is written through
+	/// reflection's own invoke, since a delegate cannot bind to an interface method through a base-type parameter.
+	/// </summary>
+	private static CommandInputAccess LoadCommandInputAccess()
+	{
+		try
+		{
+			FieldInfo? channel = typeof(SshCommand).GetField("_channel", Instance);
+			MethodInfo? eof = typeof(SshCommand).Assembly.GetType("Renci.SshNet.Channels.IChannel")?.GetMethod("SendEof", Instance, Type.EmptyTypes);
+			if (channel is null || eof is null || eof.ReturnType != typeof(void))
+			{
+				return CommandInputAccess.Missing("SshCommand._channel or IChannel.SendEof");
+			}
+
+			return new CommandInputAccess(command =>
+			{
+				// A command that never ran has no channel, so there is nothing to send the EOF on.
+				if (channel.GetValue(command) is { } target)
+				{
+					_ = eof.Invoke(target, null);
+				}
+			}, null);
+		}
+		catch (Exception ex) when (ex is ArgumentException or MemberAccessException or AmbiguousMatchException or InvalidOperationException)
+		{
+			return new CommandInputAccess(null, $"SSH.NET's command input could not be reached ({ex.GetType().Name}).");
 		}
 	}
 
@@ -258,6 +323,11 @@ internal static class SshNetInternals
 	private sealed record SessionAccess(Func<BaseClient, object?>? ReadSession, Action<Session, Message>? Send, string? Problem)
 	{
 		public static SessionAccess Missing(string member) => new(null, null, $"SSH.NET no longer has {member}.");
+	}
+
+	private sealed record CommandInputAccess(Action<SshCommand>? Send, string? Problem)
+	{
+		public static CommandInputAccess Missing(string member) => new(null, $"SSH.NET no longer has {member}.");
 	}
 
 	private sealed record KeepAliveAccess(Func<GlobalRequestMessage>? Create, string? Problem)

@@ -20,7 +20,8 @@ namespace Mokaterm.Modules.Ssh.Forwarding;
 /// on the shell's channel before the shell starts, and accepting channels the server opens. The first is sent from the
 /// moment the server confirms the shell's channel, which is before SSH.NET can send the shell request, because both
 /// arrive on SSH.NET's message loop in order. The second listens to the session's public channel events and answers with
-/// channels of its own (<see cref="SshForwardedChannel"/>). Only the target of a session forwards: jump hosts never open
+/// channels of its own (<see cref="SshForwardedChannel"/>), after telling the session to read channel opens at all, which
+/// a client that only opens channels of its own never does. Only the target of a session forwards: jump hosts never open
 /// a shell, and every channel here closes with the session.
 /// </summary>
 /// <remarks>
@@ -149,6 +150,16 @@ internal sealed class SshForwarding : ISshForwardingFeature, IAsyncDisposable
 
 		if (_session is not null && (_agentWanted || _x11Wanted))
 		{
+			string? registerProblem = RegisterChannelOpen();
+			if (registerProblem is not null)
+			{
+				_agent = Unavailable(_agent, _agentWanted, registerProblem);
+				_x11 = Unavailable(_x11, _x11Wanted, registerProblem);
+				_agentWanted = false;
+				_x11Wanted = false;
+				return;
+			}
+
 			_session.ChannelOpenReceived += OnChannelOpen;
 			_session.ChannelDataReceived += OnChannelData;
 			_session.ChannelWindowAdjustReceived += OnChannelWindowAdjust;
@@ -358,6 +369,34 @@ internal sealed class SshForwarding : ISshForwardingFeature, IAsyncDisposable
 			!wanted ? line
 			: sent ? line with { State = SshForwardingState.Requested, Problem = null }
 			: line with { Problem = "The connection closed before the request could be sent." };
+	}
+
+	/// <summary>
+	/// Tells SSH.NET to read the channel opens the server sends, which a session that only opens channels of its own
+	/// never does: <see cref="Session.RegisterMessage(string)"/> is what SSH.NET's own remote forwards call, and a
+	/// channel open that arrives unregistered ends the whole connection. The registration stays for the session's
+	/// life, as with a remote forward, and a key exchange keeps it: it refills from the activated set.
+	/// </summary>
+	/// <returns>
+	/// Null when channel opens will be read, or when the session is not connected, which has no message table to
+	/// register into and could not send the requests anyway; otherwise why they will not be.
+	/// </returns>
+	private string? RegisterChannelOpen()
+	{
+		if (!_session!.IsConnected)
+		{
+			return null;
+		}
+
+		try
+		{
+			_session.RegisterMessage(SshNetInternals.ChannelOpenMessageName);
+			return null;
+		}
+		catch (Exception ex) when (ex is SshException or ArgumentException)
+		{
+			return $"SSH.NET would not read channels the server opens ({ex.Message}).";
+		}
 	}
 
 	private void OnChannelOpen(object? sender, MessageEventArgs<ChannelOpenMessage> e)
