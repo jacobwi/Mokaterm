@@ -30,6 +30,7 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 	private TerminalSinkAttachment[] _attachments = [];
 	private ITerminalChannel? _channel;
 	private CancellationTokenSource? _pumpCancellation;
+	private TerminalZmodem? _zmodem;
 	private TerminalSize _size;
 	private TerminalSize _remoteSize;
 	private int _generation;
@@ -43,6 +44,25 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 	}
 
 	public event Action? StateChanged;
+
+	/// <summary>The stream's ZMODEM transfer, once <see cref="EnableZmodem"/> armed it. The session manager does that for
+	/// every stream it opens; null on streams nobody armed, such as the tests'.</summary>
+	public ITerminalZmodem? Zmodem => _zmodem;
+
+	/// <summary>Arms ZMODEM detection on this stream. The transfer takes the channel over when a peer's rz or sz starts.</summary>
+	internal void EnableZmodem(TerminalZmodem zmodem)
+	{
+		ArgumentNullException.ThrowIfNull(zmodem);
+		lock (_lock)
+		{
+			if (_disposed)
+			{
+				return;
+			}
+
+			_zmodem = zmodem;
+		}
+	}
 
 	/// <summary>The latest size a view asked for. It is sent to the channel when open, or to the next one bound.</summary>
 	public TerminalSize Size
@@ -152,6 +172,23 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 			return;
 		}
 
+		if (_zmodem?.Engaged == true)
+		{
+			// The channel belongs to a running transfer; keystrokes would only corrupt its frames.
+			return;
+		}
+
+		await SendRawAsync(data, cancellationToken);
+	}
+
+	/// <summary>Writes to the channel whatever the ZMODEM protocol itself has to say, past the keystroke filter.</summary>
+	internal async ValueTask SendRawAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+	{
+		if (data.IsEmpty)
+		{
+			return;
+		}
+
 		await _writeGate.WaitAsync(cancellationToken);
 		try
 		{
@@ -163,7 +200,7 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			// The channel is going away; input typed at that moment is dropped like input sent while closed.
+			// The channel is going away; bytes headed there are dropped like input sent while closed.
 			_logger.LogDebug(ex, "Dropped terminal input because the channel failed.");
 		}
 		finally
@@ -246,6 +283,7 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 	{
 		TerminalSinkAttachment[] attachments;
 		CancellationTokenSource? pumpCancellation;
+		TerminalZmodem? zmodem;
 		bool wasOpen;
 		lock (_lock)
 		{
@@ -260,9 +298,13 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 			pumpCancellation = _pumpCancellation;
 			_pumpCancellation = null;
 			_channel = null;
+			zmodem = _zmodem;
 			wasOpen = _isOpen;
 			_isOpen = false;
 		}
+
+		// A transfer cannot live on a stream nobody reads anymore.
+		zmodem?.Abort();
 
 		// Closing the attachments releases a pump waiting for queue space; cancelling stops its next read.
 		foreach (TerminalSinkAttachment attachment in attachments)
@@ -348,7 +390,7 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 					break;
 				}
 
-				await PublishAsync(buffer.AsMemory(0, read), cancellationToken);
+				await PublishAsync(buffer.AsMemory(0, read), cancellationToken, interceptZmodem: true);
 			}
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -426,11 +468,31 @@ internal sealed class TerminalStream : ITerminalStream, IAsyncDisposable
 		}
 	}
 
-	private async ValueTask PublishAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+	private async ValueTask PublishAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken, bool interceptZmodem = false)
 	{
 		await _publishGate.WaitAsync(cancellationToken);
 		try
 		{
+			lock (_lock)
+			{
+				if (_disposed)
+				{
+					return;
+				}
+			}
+
+			if (interceptZmodem && _zmodem is { } zmodem)
+			{
+				// While a transfer runs the protocol eats the output; what it hands back is plain terminal text.
+				int keep = await zmodem.ConsumeOutputAsync(data, cancellationToken);
+				if (keep <= 0)
+				{
+					return;
+				}
+
+				data = data[..keep];
+			}
+
 			TerminalSinkAttachment[] targets;
 			lock (_lock)
 			{

@@ -152,6 +152,53 @@
 	white-space: nowrap;
 }
 
+/* The rz/sz bar: a file offer, a request for files, or a moving file's progress line. */
+.mt-terminal-zmodem {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 13;
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-md);
+	padding: var(--moka-spacing-xs) var(--moka-spacing-md);
+	background: color-mix(in srgb, var(--moka-color-surface) 96%, transparent);
+	backdrop-filter: blur(4px);
+	border-top: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-zmodem-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-zmodem-name {
+	flex: 0 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+}
+
+.mt-zmodem-meta {
+	flex: 0 0 auto;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-variant);
+	white-space: nowrap;
+}
+
+.mt-zmodem-bar {
+	flex: 1 1 8rem;
+	min-width: 4rem;
+}
+
+.mt-zmodem-grow {
+	flex: 1 1 auto;
+}
+
 .mt-terminal-hint ::deep .moka-btn {
 	background: var(--moka-color-surface);
 	text-transform: none;

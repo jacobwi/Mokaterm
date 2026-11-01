@@ -1,8 +1,10 @@
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Sessions;
@@ -31,6 +33,7 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 	private readonly IHostIdentityVerifier _hostVerifier;
 	private readonly IUserInteraction _interaction;
 	private readonly ISettingsService _settings;
+	private readonly ILocalFileAccess? _localFiles;
 	private readonly ILogger<SessionManager> _logger;
 	private readonly TimeProvider _timeProvider;
 	private readonly Lock _lock = new();
@@ -46,7 +49,8 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 		IUserInteraction interaction,
 		ISettingsService settings,
 		ILogger<SessionManager> logger,
-		TimeProvider timeProvider)
+		TimeProvider timeProvider,
+		IServiceProvider? services = null)
 	{
 		_repository = repository;
 		_credentialStore = credentialStore;
@@ -56,6 +60,7 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 		_settings = settings;
 		_logger = logger;
 		_timeProvider = timeProvider;
+		_localFiles = services?.GetService<ILocalFileAccess>();
 	}
 
 	public event Action? SessionsChanged;
@@ -212,6 +217,7 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 
 		// The stream exists before connecting so a view can attach and report its size right away.
 		TerminalStream? terminal = protocol.Has(ProtocolCapabilities.Terminal) ? new TerminalStream(ReplayBufferBytes(), _logger) : null;
+		terminal?.EnableZmodem(new TerminalZmodem(terminal, _localFiles, _timeProvider, _logger));
 		SessionHandle handle = new(
 			host,
 			connection,

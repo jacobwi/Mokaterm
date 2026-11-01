@@ -8,6 +8,7 @@ using Moka.Red.ContextMenu;
 using Moka.Red.Core.Enums;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Interaction;
+using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Sessions;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Terminal;
@@ -60,6 +61,11 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 	private readonly TerminalFolderTracker _folders = new();
 	private bool _trackingFolder;
+
+	private ITerminalZmodem? _zmodem;
+	private IReadOnlyList<LocalFileItem>? _zmodemPicked;
+	private ILocalFileAccess? _zmodemPickedFrom;
+	private bool _zmodemBusy;
 
 	private bool _findOpen;
 	private bool _findFocusPending;
@@ -561,6 +567,109 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		StateHasChanged();
 	}
 
+	/// <summary>The session's ZMODEM transfer moved: an offer arrived, bytes flowed, or it ended. Runs on any thread.</summary>
+	private void OnZmodemChanged()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_ = InvokeAsync(() =>
+		{
+			if (_disposed)
+			{
+				return;
+			}
+
+			// A finished transfer lets go of the files its picker lent us; the web host keeps them only this long.
+			if (_zmodem is { Phase: ZmodemPhase.Done } && _zmodemPicked is { } picked)
+			{
+				_zmodemPicked = null;
+				_ = ReleasePickedAsync(picked);
+			}
+
+			StateHasChanged();
+		});
+	}
+
+	private async Task ReleasePickedAsync(IReadOnlyList<LocalFileItem> picked)
+	{
+		try
+		{
+			if (_zmodemPickedFrom is { } files)
+			{
+				_zmodemPickedFrom = null;
+				await files.ReleaseAsync(picked);
+			}
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogDebug(ex, "Releasing the picked files after a ZMODEM transfer failed.");
+		}
+	}
+
+	private async Task AcceptZmodemAsync()
+	{
+		if (_zmodem is not { } zmodem || _zmodemBusy)
+		{
+			return;
+		}
+
+		_zmodemBusy = true;
+		try
+		{
+			await zmodem.AcceptAsync(_disposeCts.Token);
+		}
+		catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+		{
+			// The view closed while the save dialog was up.
+		}
+		finally
+		{
+			_zmodemBusy = false;
+		}
+	}
+
+	private void SkipZmodem() => _zmodem?.Skip();
+
+	private void CancelZmodem() => _zmodem?.Cancel();
+
+	private async Task ChooseZmodemFilesAsync()
+	{
+		if (_zmodem is not { } zmodem || _zmodemBusy)
+		{
+			return;
+		}
+
+		ILocalFileAccess? files = Services.GetService<ILocalFileAccess>();
+		if (files is null)
+		{
+			Interaction.Notify(NoticeSeverity.Warning, "This build of Mokaterm cannot pick files to send.", "Nothing to send");
+			return;
+		}
+
+		_zmodemBusy = true;
+		try
+		{
+			IReadOnlyList<LocalFileItem> picked = await files.PickFilesAsync(multiple: true, cancellationToken: _disposeCts.Token);
+			if (picked.Count > 0)
+			{
+				_zmodemPicked = picked;
+				_zmodemPickedFrom = files;
+				zmodem.SendFiles(picked);
+			}
+		}
+		catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+		{
+			// The view closed while the picker was open.
+		}
+		finally
+		{
+			_zmodemBusy = false;
+		}
+	}
+
 	// A failed script import stays failed for the life of the page, so there is nothing to retry; the view says why it is
 	// empty instead of staying blank.
 	private async Task<bool> TryCreateTerminalAsync()
@@ -762,6 +871,11 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		_sink = new TerminalOutputSink(Interop, _instance.Task, work => InvokeAsync(work));
 		_attachment = stream.Attach(_sink);
 		_attachedStream = stream;
+		_zmodem = stream.Zmodem;
+		if (_zmodem is not null)
+		{
+			_zmodem.Changed += OnZmodemChanged;
+		}
 	}
 
 	private void Detach()
@@ -769,6 +883,12 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		// The sink goes first: it releases a write still waiting on xterm.js, so detaching cannot wait on the view.
 		_sink?.Dispose();
 		_attachment?.Dispose();
+		if (_zmodem is not null)
+		{
+			_zmodem.Changed -= OnZmodemChanged;
+		}
+
+		_zmodem = null;
 		_sink = null;
 		_attachment = null;
 		_attachedStream = null;
@@ -1006,4 +1126,9 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 		// The search addon stops counting at its highlight limit and reports no active index past it.
 		TerminalSearchResult limited => string.Create(CultureInfo.CurrentCulture, $"{limited.Count}+"),
 	};
+
+	/// <summary>Whole percentages for the progress bar; null while the size is unknown.</summary>
+	private static double? ZmodemBarValue(ZmodemProgress progress) => progress.TotalBytes is { } total && total > 0
+		? Math.Round(Math.Clamp(100d * progress.TransferredBytes / total, 0, 100))
+		: null;
 }

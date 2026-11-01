@@ -50,6 +50,40 @@
 		</div>
 	}
 
+	@if (_zmodem is { Phase: ZmodemPhase.Offering, Offer: { } zmodemOffer })
+	{
+		<div class="mt-terminal-zmodem" role="alertdialog" aria-label="Incoming file">
+			<MokaIcon Icon="MokaIcons.Action.Download" Size="MokaSize.Sm" Style="@TextStyles.Muted" />
+			<span class="mt-zmodem-text" title="@zmodemOffer.FileName">@ZmodemBarText.Offer(zmodemOffer)</span>
+			<span class="mt-zmodem-grow"></span>
+			<MokaButton Variant="MokaVariant.Soft" Size="MokaSize.Sm" Color="MokaColor.Primary" OnClick="AcceptZmodemAsync" Disabled="@_zmodemBusy">Save</MokaButton>
+			<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" Color="MokaColor.Surface" OnClick="SkipZmodem">Skip</MokaButton>
+			<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" Color="MokaColor.Surface" OnClick="CancelZmodem">Cancel</MokaButton>
+		</div>
+	}
+	else if (_zmodem is { Phase: ZmodemPhase.ChoosingFiles })
+	{
+		<div class="mt-terminal-zmodem" role="alertdialog" aria-label="Send files">
+			<MokaIcon Icon="MokaIcons.Action.Upload" Size="MokaSize.Sm" Style="@TextStyles.Muted" />
+			<span class="mt-zmodem-text">@ZmodemBarText.WaitingForFiles()</span>
+			<span class="mt-zmodem-grow"></span>
+			<MokaButton Variant="MokaVariant.Soft" Size="MokaSize.Sm" Color="MokaColor.Primary" OnClick="ChooseZmodemFilesAsync" Disabled="@_zmodemBusy">Choose files</MokaButton>
+			<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" Color="MokaColor.Surface" OnClick="CancelZmodem">Cancel</MokaButton>
+		</div>
+	}
+	else if (_zmodem is { Phase: ZmodemPhase.Receiving or ZmodemPhase.Sending, Progress: { } zmodemProgress })
+	{
+		<div class="mt-terminal-zmodem">
+			<MokaIcon Icon="@(zmodemProgress.Receiving ? MokaIcons.Action.Download : MokaIcons.Action.Upload)" Size="MokaSize.Sm" Style="@TextStyles.Muted" />
+			<span class="mt-zmodem-name" title="@zmodemProgress.FileName">@zmodemProgress.FileName</span>
+			<div class="mt-zmodem-bar">
+				<MokaProgress Value="@ZmodemBarValue(zmodemProgress)" />
+			</div>
+			<span class="mt-zmodem-meta">@ZmodemBarText.Progress(zmodemProgress)</span>
+			<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Sm" Color="MokaColor.Surface" OnClick="CancelZmodem">Cancel</MokaButton>
+		</div>
+	}
+
 	@if (ShowReconnectHint)
 	{
 		<div class="mt-terminal-hint">

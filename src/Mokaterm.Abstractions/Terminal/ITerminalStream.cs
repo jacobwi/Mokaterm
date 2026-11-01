@@ -35,6 +35,12 @@ public interface ITerminalStream
 	/// side, so every attached view and the replay buffer show it.
 	/// </summary>
 	ValueTask WriteLocalAsync(string text, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// The session's ZMODEM (<c>rz</c>/<c>sz</c>) transfer: watches the output for an entry frame, takes over the stream
+	/// while one runs, and answers the file offers. Null on streams that do not support it.
+	/// </summary>
+	ITerminalZmodem? Zmodem => null;
 }
 
 /// <summary>Receives terminal output. Implemented by views and by anything that records sessions.</summary>

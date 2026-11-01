@@ -1,3 +1,37 @@
+# Next release (0.2.9)
+
+## rz/sz (ZMODEM) in the terminal
+
+Run `sz file...` on the server and Mokaterm answers it: the entry frame is recognized before it reaches xterm, an offer
+bar shows the file's name, size and date (Save / Skip / Cancel), and the bytes stream in with a progress line — name,
+percent, speed and time left — while the terminal stays a terminal around it. Downloads go through the same save path
+as the file browser (the transfer download directory, or a save dialog when the settings ask for one each time), and a
+finished transfer leaves a `[mokaterm]` line in the scrollback with what arrived. Run `rz` on the server instead and the
+bar offers to pick files; they stream out in ≤1 KiB subframes with 32-bit frame checks when the peer takes them.
+
+1. **The watcher lives in the terminal pump.** Every session's stream watches its output for a ZMODEM entry frame
+   (`**\x18B00...` — ZRQINIT from `sz`, a ZRINIT from `rz`, or a ZFILE), holding back bytes that could still begin a
+   frame so nothing lands in xterm twice or half. A frame whose check fails is plain terminal text again; the echo of
+   the user typing `rz` is never mistaken for one. Only a frame that parses whole and passes its CRC engages the
+   transfer.
+2. **The protocol is ours, in `Mokaterm.Sessions/Zmodem`.** Hex and binary headers (16- and 32-bit CRC), ZDLE escaping
+   to lrzsz's rules (including the CR-after-`@` Telenet case), and the frames a file transfer needs: ZRQINIT, ZRINIT,
+   ZSINIT, ZFILE, ZSKIP, ZACK, ZNAK, ZRPOS, ZDATA, ZEOF, ZFIN, ZCAN. Our ZRINIT answers honestly: full duplex,
+   overlapped I/O, 32-bit CRCs, no buffer limit. Both flows run as pure state machines — corruption sends the peer back
+   with ZRPOS to the last good byte, a retransmit request mid-stream rewinds the source and continues, and Cancel is
+   the protocol's own ZCAN plus the eight-CAN sequence. Multiple files per session, on either side.
+3. **Keystrokes during a transfer are dropped.** The channel belongs to the protocol until the transfer ends; typing
+   would only corrupt its frames. Cancel (the bar, or the peer's own give-up) hands the channel back, and a fresh
+   watcher arms itself for the next `sz`.
+4. **No protocol in it is SSH-specific.** The engine talks to the session's terminal channel and nothing else, so a
+   serial or Telnet session gets its first file transfer the same way.
+5. **Honest limits.** No resume (`sz -r` and interrupted-file continuation are refused rather than half-done — the
+   transfer starts at zero and a retry starts over); no ZCOMMAND, ZCRC pre-check or ZSINIT attention strings (the
+   answer is acknowledged and ignored — a PTY stream cannot be interrupted anyway); file modes arrive but are not
+   applied (the local file keeps its platform's defaults); the transfer does not join the file browser's queue, so it
+   has no retry row there. The tests cover the codec and both state machines against crafted byte streams — CI has no
+   real `sz`/`rz`, so the byte-exact fixtures (including lrzsz's own ZRINIT bytes) carry the interop weight.
+
 # Next release (0.2.7)
 
 To be planned. The carried items below still stand.

@@ -33,6 +33,18 @@ internal sealed class FakeTerminalChannel : ITerminalChannel
 		}
 	}
 
+	/// <summary>The raw input bytes: protocol frames are not valid UTF-8, so text loses them.</summary>
+	public byte[] InputBytes
+	{
+		get
+		{
+			lock (_lock)
+			{
+				return [.. _input];
+			}
+		}
+	}
+
 	public IReadOnlyList<TerminalSize> Resizes
 	{
 		get
