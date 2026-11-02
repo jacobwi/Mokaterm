@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Net;
+using System.Net.Sockets;
 using MQTTnet;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
@@ -47,11 +48,22 @@ internal sealed class LoopbackBroker : IAsyncDisposable
 	/// <param name="username">Null takes any login, which is how a broker with open access behaves.</param>
 	public static async Task<LoopbackBroker> StartAsync(string? username = null, string? password = null)
 	{
-		LoopbackBroker broker = new(LoopbackPort.Free(), username, password);
-		broker._server.ClientSubscribedTopicAsync += broker.OnSubscribedAsync;
-		broker._server.InterceptingPublishAsync += broker.OnPublishAsync;
-		await broker._server.StartAsync();
-		return broker;
+		// A free port is only free when asked: a test running in parallel can bind it before this broker does.
+		for (int attempt = 1; ; attempt++)
+		{
+			LoopbackBroker broker = new(LoopbackPort.Free(), username, password);
+			broker._server.ClientSubscribedTopicAsync += broker.OnSubscribedAsync;
+			broker._server.InterceptingPublishAsync += broker.OnPublishAsync;
+			try
+			{
+				await broker._server.StartAsync();
+				return broker;
+			}
+			catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse && attempt < 5)
+			{
+				await broker.DisposeAsync();
+			}
+		}
 	}
 
 	/// <summary>Publishes as the broker itself, which is how a test makes a message arrive at the client.</summary>
