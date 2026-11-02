@@ -1,3 +1,15 @@
+## What's new in 0.2.11
+
+**Look**
+
+- Built on Moka.Red 0.2.0: dialogs fade out when they close instead of vanishing, and keep to the window when it is
+  narrow.
+
+**Plugins**
+
+- **Network Toolkit 1.2.3 fixes its Connections tab**, which drew each connection's local address, remote address and
+  state on top of each other and ran past the bottom of the tool. Settings, Plugins shows the update.
+
 ## What's new in 0.2.10
 
 **Fixes**
@@ -13,14 +25,14 @@
 - **ZMODEM transfers: run `sz` on the server and Mokaterm answers it.** The offer bar shows the file's name, size and
   date (Save / Skip / Cancel), a progress line runs under the terminal (percent, speed, time left), and a finished
   transfer leaves a short `[mokaterm]` line in the scrollback. `rz` on the server offers to pick files and streams them
-  out. The protocol is implemented in Mokaterm itself, to the last detail — corruption rewinds and retransmits, cancel
-  works from either side, several files per run — and because nothing in it is SSH-specific, **serial and Telnet
+  out. The protocol is implemented in Mokaterm itself, to the last detail (corruption rewinds and retransmits, cancel
+  works from either side, several files per run), and because nothing in it is SSH-specific, **serial and Telnet
   sessions get their first file transfer**.
 - **Fixed: agent and X11 forwarding has never worked against a real server.** The connection died the moment the server
   opened the forwarded agent channel. Found by Mokaterm's own new Linux test server; forwarding now registers the
   channel with the SSH library the way its own port forwards do.
 - **Fixed: a command run without a shell that read its input (`cat`, and anything like it) hung until its timeout.**
-  Its input is now closed with an explicit end-of-file. Also found by the test server — against which the whole SSH
+  Its input is now closed with an explicit end-of-file. Also found by the test server, against which the whole SSH
   suite, 2,092 tests, now runs.
 
 **Look**
@@ -42,7 +54,7 @@
 
 - Plugin updates get found on their own: the startup check also reads the plugin gallery's signed list once (Settings,
   Updates, "Check for plugin updates", on by default) and shows a notice naming the plugins with newer versions.
-  Installing stays where it was — the Plugins page, with its trust step — and the web host never checks.
+  Installing stays where it was (the Plugins page, with its trust step), and the web host never checks.
 - The Plugins page gains "Check for updates" beside "Install from file", and a banner above the rows when updates are
   known. Every window of the run shares the one trusted list, so installed plugins show their update chips as soon as
   the app starts.
@@ -51,10 +63,10 @@
 
 **Fixes 0.2.6, which failed to start.**
 
-- 0.2.6 opened with "Mokaterm stopped working — Object reference not set to an instance of
+- 0.2.6 opened with "Mokaterm stopped working: Object reference not set to an instance of
   an object": the new cross-pane tab drag imported its script at a path that does not exist,
   and the failure took the whole interface down with it. The import now uses the path the
-  shell itself uses, and a drag bridge that cannot attach is logged and swallowed — tabs
+  shell itself uses, and a drag bridge that cannot attach is logged and swallowed, so tabs
   still move through their menu and the commands.
 - If you installed 0.2.6, update to 0.2.7 from Settings, Updates (or the GitHub release).
 
@@ -66,7 +78,7 @@
   Dragging within a pane still reorders, and dropping files on the terminal works exactly as before.
 - The connection and host editors submit on Enter, like every other editor, with one clearly primary button in every
   mode, and each section is a heading rather than a styled line.
-- A favorite is a star on the welcome rows themselves — on for a favorite, pressable by keyboard — and the menu key or
+- A favorite is a star on the welcome rows themselves (on for a favorite, pressable by keyboard), and the menu key or
   Shift+F10 opens a row's menu in the connections panel, so favoriting never needs a mouse.
 - The quick connect's refusal text wraps instead of cutting off the reason.
 
