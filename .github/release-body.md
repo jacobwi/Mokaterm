@@ -1,3 +1,11 @@
+## What's new in 0.3.3
+
+**Plugins**
+
+- **Fixed: after one crash, plugins stayed off at every start.** A start that skipped plugins because the last one ended
+  while they were loading never cleared that state, so "Plugins are off for this start" came back every time. The first
+  start of 0.3.3 clears it, and the one after loads your plugins again. The notice now also has a Restart now button.
+
 ## What's new in 0.3.2
 
 **System and Docker**
