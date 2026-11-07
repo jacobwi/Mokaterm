@@ -1,3 +1,21 @@
+## What's new in 0.3.2
+
+**System and Docker**
+
+- **Every list in the System and Docker tools is a real table now**: one line per row, columns that sort, the open row
+  highlighted, the row menu on a right-click, and long lists (installed packages, processes, failed logins) scroll
+  through thousands of rows instead of stopping at a cap.
+- **The Docker manager looks and works like the System tool**: a header with the filter, the page's main action and
+  refresh, and the list with its panel beside it. Containers are grouped by compose project in groups that fold, with
+  logs, shell and restart a hover away; the Overview shows its counts as tiles, and Cleanup shows one kind at a time.
+
+**Start screen**
+
+- **A new start screen**: favorites and recent logins as two lists with each machine's colour, protocol, port and
+  environment, the actions as tiles with their shortcuts, and a count of what the vault holds. An empty vault gets
+  larger tiles and the protocols this copy speaks, and the offer to reopen last time's sessions names them.
+- Fixed: clicking a star on the start screen also opened that login.
+
 ## What's new in 0.3.1
 
 **Plugins**
