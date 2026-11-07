@@ -21,7 +21,7 @@ namespace Mokaterm.UI;
 public sealed partial class MokatermApp : ComponentBase, IDisposable
 {
 	private readonly CancellationTokenSource _disposeCts = new();
-	private MokaTheme _theme = MokaTheme.Dark;
+	private MokaTheme _theme = MokaTheme.Red;
 	private bool _booted;
 	private bool _booting;
 	private string _bootStatus = "starting";

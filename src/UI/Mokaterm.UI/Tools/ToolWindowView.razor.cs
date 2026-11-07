@@ -24,7 +24,7 @@ public sealed partial class ToolWindowView : ComponentBase, IAsyncDisposable
 	// The vault's idle timer counts minutes, so the page reports input at most this often, as the main window does.
 	private static readonly TimeSpan ActivityReportInterval = TimeSpan.FromSeconds(20);
 
-	private MokaTheme _theme = MokaTheme.Dark;
+	private MokaTheme _theme = MokaTheme.Red;
 	private ISessionHandle? _session;
 	private SessionToolDescriptor? _sessionTool;
 	private AppToolDescriptor? _appTool;

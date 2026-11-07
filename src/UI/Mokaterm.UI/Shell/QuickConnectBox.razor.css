@@ -39,13 +39,6 @@
 	letter-spacing: 0.06em;
 }
 
-/* The full names are longer than the picker, so its list sizes to them instead of to the button. */
-.mt-qc-protocol ::deep .moka-select-dropdown {
-	right: auto;
-	min-width: 100%;
-	width: max-content;
-}
-
 .mt-qc-protocol-option {
 	display: inline-flex;
 	align-items: center;

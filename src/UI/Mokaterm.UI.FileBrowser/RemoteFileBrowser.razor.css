@@ -79,8 +79,10 @@
 	color: var(--moka-color-primary);
 }
 
+/* Grows from nothing rather than from a width of its own: Moka's toolbar wraps, and a wider start would push the
+   buttons beside the filter onto a line of their own. */
 .fb-filter {
-	flex: 1 1 160px;
+	flex: 1 1 0;
 	min-width: 88px;
 	max-width: 280px;
 }

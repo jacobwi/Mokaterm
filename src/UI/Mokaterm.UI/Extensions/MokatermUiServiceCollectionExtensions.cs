@@ -41,7 +41,7 @@ public static class MokatermUiServiceCollectionExtensions
 	{
 		ArgumentNullException.ThrowIfNull(services);
 
-		services.AddMokaRed(options => options.Theme = MokaTheme.Dark);
+		services.AddMokaRed(options => options.Theme = MokaTheme.Red);
 		services.AddMokaTabs<Guid>();
 		services.AddMokatermUiCommon();
 		services.AddMokatermTerminal();

@@ -11,16 +11,22 @@ internal static class ThemeFactory
 		// Clamped first: settings.json can be edited by hand, and a zero or absurd scale would make the whole UI
 		// unusable. The section owns that range, so the slider and the theme cannot disagree about what is applied.
 		AppearanceSettings usable = settings.Clamped();
-		MokaTheme theme = usable.Mode == ThemeMode.Dark ? MokaTheme.Dark : MokaTheme.Light;
-		theme = theme.WithAccent(usable.AccentColor);
+		MokaTheme theme = usable.Mode == ThemeMode.Dark ? MokaTheme.Red : MokaTheme.RedLight;
 
-		double density = usable.Density switch
+		// Red tunes its own accent shades for contrast. WithAccent reads a color as a hue and finds new shades, so the
+		// default red would come out as a slightly different red than the one the theme was drawn with.
+		if (!string.Equals(usable.AccentColor, AppearanceSettings.DefaultAccentColor, StringComparison.OrdinalIgnoreCase))
 		{
-			UiDensity.Compact => 0.75,
-			UiDensity.Comfortable => 1.15,
-			_ => 1.0,
+			theme = theme.WithAccent(usable.AccentColor);
+		}
+
+		theme = usable.Density switch
+		{
+			UiDensity.Compact => theme.WithDensity(MokaDensity.Compact),
+			UiDensity.Comfortable => theme.WithDensity(1.15),
+			_ => theme,
 		};
 
-		return theme.WithDensity(density).WithFontScale(usable.FontScale);
+		return theme.WithFontScale(usable.FontScale);
 	}
 }
