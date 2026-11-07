@@ -73,6 +73,7 @@ foreach ($entry in $placeholders) {
 
 if (Test-Path $outputDir) { Remove-Item -Recurse -Force $outputDir }
 New-Item -ItemType Directory -Force $outputDir | Out-Null
+& (Join-Path $PSScriptRoot 'clear-host-build.ps1')
 
 # MAUI writes the real manifest into obj behind a stamp file, so a build that only changes the version reuses the one
 # from last time and the package keeps the old number without saying so. Removing it forces the version through.

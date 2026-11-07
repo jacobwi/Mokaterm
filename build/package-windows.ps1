@@ -121,6 +121,7 @@ Push-Location $repo
 try {
 	Write-Host "Publishing $mainExe $Version for $runtime..."
 	if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
+	& (Join-Path $PSScriptRoot 'clear-host-build.ps1')
 
 	# RuntimeIdentifierOverride instead of -r: Microsoft's workaround for a Windows App SDK publishing bug (the project
 	# turns it into RuntimeIdentifier). .NET 10 takes only portable identifiers such as win-x64.
@@ -159,6 +160,14 @@ try {
 	}
 
 	if (-not (Test-Path (Join-Path $publishDir $mainExe))) { throw "The publish output has no $mainExe." }
+
+	# A self-contained app needs WinUI's control resources in its own resource index, or it closes at start; one of
+	# them stands for all (clear-host-build.ps1 says how they went missing once).
+	$resourceIndex = Join-Path $publishDir 'Mokaterm.Maui.pri'
+	$indexText = if (Test-Path $resourceIndex) { [System.Text.Encoding]::Unicode.GetString([System.IO.File]::ReadAllBytes($resourceIndex)) } else { '' }
+	if (-not $indexText.Contains('Microsoft.UI.Xaml.Controls.ContentDialog')) {
+		throw "Mokaterm.Maui.pri in the publish output holds no WinUI resources, and an app built from it closes at start."
+	}
 	if (-not (Test-Path $icon)) { throw "$icon is missing; build/make-app-icon.ps1 draws it." }
 
 	# The splash Setup shows while it installs, drawn for this version. WPF draws it and needs a single-threaded
