@@ -1,15 +1,9 @@
-/* The shared table look comes from the manager and the sorting headers are SortHeaders; this adds the CPU line beside
-   its figure. */
-.mt-dks-table td {
-	vertical-align: middle;
-}
-
-.mt-dks-name {
-	max-width: 220px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: 12px;
+/* A figure with its recent line or its bar beside it, the figure in a fixed width so the lines start in one place. */
+.mt-dks-cpu,
+.mt-dks-memory {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
 }
 
 .mt-dks-figure {
@@ -17,20 +11,12 @@
 	min-width: 52px;
 }
 
-.mt-dks-cpu {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-xs);
-}
-
 .mt-dks-cpu ::deep .mt-dks-spark {
 	flex: 0 0 72px;
 	width: 72px;
 }
 
-/* ::deep because the header cells are SortHeader's markup, and the narrow page drops their column as well as its cells. */
-@container mt-dk-page (max-width: 560px) {
-	.mt-dks-table ::deep .mt-dks-optional {
-		display: none;
-	}
+.mt-dks-memory ::deep .mt-usage {
+	flex: 0 0 56px;
+	width: 56px;
 }

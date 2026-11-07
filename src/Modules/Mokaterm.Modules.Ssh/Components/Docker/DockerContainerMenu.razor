@@ -1,63 +1,21 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@using Moka.Red.Feedback.Dropdown
-@using Moka.Red.Feedback.Popover
 
-@* Every action on one container, in one menu: the row and the panel show only the two or three used most. *@
-<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
-	<ChildContent>
-		<IconButton Size="MokaSize.Xs"
-					Icon="MokaIcons.Navigation.MoreHorizontal"
-					Disabled="Disabled"
-					Label="More actions"
-					AriaLabel="@($"Actions for {Name}")"
-					Position="MokaTooltipPosition.BottomEnd" />
-	</ChildContent>
-	<Items>
-		@if (IsAlive)
-		{
-			<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" OnClick="@(() => OnAction.InvokeAsync("restart"))" />
-			<MokaDropdownItem Text="Stop" Icon="DockerIcons.Stop" OnClick="@(() => OnAction.InvokeAsync("stop"))" />
-			@if (State == "paused")
-			{
-				<MokaDropdownItem Text="Unpause" Icon="MokatermIcons.Play" OnClick="@(() => OnAction.InvokeAsync("unpause"))" />
-			}
-			else
-			{
-				<MokaDropdownItem Text="Pause" Icon="MokatermIcons.Pause" OnClick="@(() => OnAction.InvokeAsync("pause"))" />
-			}
-			<MokaDropdownItem Text="Kill" Icon="DockerIcons.Kill" OnClick="@(() => OnAction.InvokeAsync("kill"))" />
-		}
-		else
-		{
-			<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => OnAction.InvokeAsync("start"))" />
-		}
-		@if (HasUpdate)
-		{
-			<MokaDropdownItem Text="Update the image" Icon="DockerIcons.Update" OnClick="@(() => OnAction.InvokeAsync("update"))" />
-		}
-		<MokaDropdownItem Divider />
-		<MokaDropdownItem Text="Open a shell in a new tab" Icon="MokatermIcons.Terminal" Disabled="@(State != "running" || !HasTerminal)" OnClick="@(() => OnAction.InvokeAsync("shell"))" />
-		<MokaDropdownItem Text="Run a command" Icon="MokatermIcons.Command" Disabled="@(State != "running")" OnClick="@(() => OnAction.InvokeAsync("run"))" />
-		<MokaDropdownItem Text="Browse files" Icon="MokatermIcons.FolderOpen" Disabled="@(State != "running")" OnClick="@(() => OnAction.InvokeAsync("files"))" />
-		<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => OnAction.InvokeAsync("logs"))" />
-		<MokaDropdownItem Text="Inspect" Icon="MokaIcons.File.Code" OnClick="@(() => OnAction.InvokeAsync("inspect"))" />
-		<MokaDropdownItem Text="Stats" Icon="DockerIcons.Stats" OnClick="@(() => OnAction.InvokeAsync("stats"))" />
-		<MokaDropdownItem Text="Mounts" Icon="DockerIcons.Volume" OnClick="@(() => OnAction.InvokeAsync("mounts"))" />
-		<MokaDropdownItem Divider />
-		<MokaDropdownItem Text="Copy name" Icon="MokaIcons.Content.Copy" OnClick="@(() => OnAction.InvokeAsync("copy-name"))" />
-		<MokaDropdownItem Text="Copy id" Icon="MokaIcons.Content.Copy" OnClick="@(() => OnAction.InvokeAsync("copy-id"))" />
-		<MokaDropdownItem Divider />
-		<MokaDropdownItem Text="Remove" Icon="MokaIcons.Action.Delete" OnClick="@(() => OnAction.InvokeAsync("remove"))" />
-		<MokaDropdownItem Text="Remove with its volumes" Icon="MokaIcons.Action.Delete" OnClick="@(() => OnAction.InvokeAsync("remove-volumes"))" />
-	</Items>
-</MokaDropdown>
+@* Every action on one container, in one menu: the row and the panel show only the ones used most. A right-click on
+   the row opens the same items. *@
+<IconButton Size="MokaSize.Xs"
+			Icon="MokaIcons.Navigation.MoreHorizontal"
+			Disabled="Disabled"
+			OnClick="Open"
+			Label="More actions"
+			AriaLabel="@($"Actions for {Name}")"
+			Position="MokaTooltipPosition.BottomEnd" />
 
 @code {
+	[Inject]
+	private IMokaContextMenuService Menu { get; set; } = default!;
+
 	[Parameter, EditorRequired]
 	public string Name { get; set; } = "";
-
-	[Parameter]
-	public string Id { get; set; } = "";
 
 	/// <summary>Docker's state, lower case: what decides between start and stop.</summary>
 	[Parameter]
@@ -78,5 +36,54 @@
 	[Parameter]
 	public EventCallback<string> OnAction { get; set; }
 
-	private bool IsAlive => State is "running" or "paused" or "restarting";
+	/// <summary>
+	/// The menu of one container. While a change runs (<paramref name="busy"/>) the items that change something are off
+	/// and the ones that only show something stay.
+	/// </summary>
+	internal static List<MokaContextMenuItem> Items(string state, bool hasTerminal, bool hasUpdate, bool busy, Func<string, Task> act)
+	{
+		bool alive = state is "running" or "paused" or "restarting";
+		bool running = state == "running";
+		List<MokaContextMenuItem> items = [];
+		if (alive)
+		{
+			items.Add(Item("Restart", MokatermIcons.Reconnect, "restart", busy, act));
+			items.Add(Item("Stop", DockerIcons.Stop, "stop", busy, act));
+			items.Add(state == "paused" ? Item("Unpause", MokatermIcons.Play, "unpause", busy, act) : Item("Pause", MokatermIcons.Pause, "pause", busy, act));
+			items.Add(Item("Kill", DockerIcons.Kill, "kill", busy, act));
+		}
+		else
+		{
+			items.Add(Item("Start", MokatermIcons.Play, "start", busy, act));
+		}
+
+		if (hasUpdate)
+		{
+			items.Add(Item("Update the image", DockerIcons.Update, "update", busy, act));
+		}
+
+		items.Add(Item("Open a shell in a new tab", MokatermIcons.Terminal, "shell", busy || !running || !hasTerminal, act, dividerBefore: true));
+		items.Add(Item("Run a command", MokatermIcons.Command, "run", !running, act));
+		items.Add(Item("Browse files", MokatermIcons.FolderOpen, "files", !running, act));
+		items.Add(Item("Logs", MokaIcons.File.FileText, "logs", false, act));
+		items.Add(Item("Inspect", MokaIcons.File.Code, "inspect", false, act));
+		items.Add(Item("Stats", DockerIcons.Stats, "stats", false, act));
+		items.Add(Item("Mounts", DockerIcons.Volume, "mounts", false, act));
+		items.Add(Item("Copy name", MokaIcons.Content.Copy, "copy-name", false, act, dividerBefore: true));
+		items.Add(Item("Copy id", MokaIcons.Content.Copy, "copy-id", false, act));
+		items.Add(Item("Remove", MokaIcons.Action.Delete, "remove", busy, act, dividerBefore: true));
+		items.Add(Item("Remove with its volumes", MokaIcons.Action.Delete, "remove-volumes", busy, act));
+		return items;
+	}
+
+	private static MokaContextMenuItem Item(string text, MokaIconDefinition icon, string action, bool disabled, Func<string, Task> act, bool dividerBefore = false) => new()
+	{
+		Text = text,
+		Icon = icon,
+		Disabled = disabled,
+		DividerBefore = dividerBefore,
+		OnClick = () => act(action),
+	};
+
+	private void Open(MouseEventArgs args) => Menu.Show(args, Items(State, HasTerminal, HasUpdate, busy: false, OnAction.InvokeAsync));
 }

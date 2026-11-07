@@ -1,89 +1,132 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
 @inherits DockerManagerPageBase
 
-<div class="mt-dk-toolbar">
-	<div class="mt-dk-toolbar-search">
-		<MokaSearchInput Size="MokaSize.Sm" Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, driver or path" Debounce="100" aria-label="Filter volumes" />
-	</div>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add"
-				OnClick="ToggleCreate" aria-expanded="@(_creating ? "true" : "false")">
-		New
-	</MokaButton>
-	@if (Navigation is { } navigation)
-	{
-		<Hint Text="Unused volumes with their sizes, removed together">
-			<MokaButton Variant="MokaVariant.Text"
-						Color="MokaColor.Surface"
-						Size="MokaSize.Xs"
-						StartIcon="DockerIcons.Prune"
-						OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
-				@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
-			</MokaButton>
-		</Hint>
-	}
-	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
-</div>
-
-@if (_creating)
-{
-	<form class="mt-dk-form" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
-		<div class="mt-dk-form-field">
-			<MokaTextField Value="@_name"
-						   ValueChanged="OnNameChanged"
-						   ErrorText="@_nameError"
-						   Placeholder="New volume: letters, digits, '_', '.' and '-'"
-						   Disabled="IsBusy"
-						   Size="MokaSize.Sm"
-						   spellcheck="false"
-						   autocomplete="off"
-						   aria-label="New volume name" />
-		</div>
-		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
-	</form>
-}
-
-@LoadErrorPanel(RefreshAsync)
-@ChangePanel
-
-<div class="@(_selected is null ? "mt-dk-split" : "mt-dk-split mt-dk-split--open")">
-	<div class="mt-dk-split-list" role="list" aria-label="Volumes">
-		@if (IsFirstLoad)
+<ToolPageFrame Title="Volumes"
+			   Summary="@Summary"
+			   Search="@_query"
+			   SearchChanged="OnQueryChanged"
+			   SearchPlaceholder="Filter by name, driver or path"
+			   PrimaryText="New volume"
+			   PrimaryIcon="MokaIcons.Action.Add"
+			   PrimaryDisabled="IsBusy"
+			   OnPrimary="ToggleCreate"
+			   Loading="FrameLoading"
+			   Loaded="@(!IsFirstLoad)"
+			   Error="@LoadError"
+			   LoadingText="Listing volumes"
+			   OnRefresh="@(() => RefreshByHandAsync(RefreshAsync))"
+			   ListPage
+			   Detail="@DetailFragment">
+	<ChipsEnd>
+		@if (Navigation is { } navigation)
 		{
-			<div class="mt-dk-center"><MokaSpinner Label="Listing volumes" /></div>
+			<Hint Text="Unused volumes with their sizes, removed together">
+				<MokaButton Variant="MokaVariant.Text"
+							Color="MokaColor.Surface"
+							Size="MokaSize.Xs"
+							StartIcon="DockerIcons.Prune"
+							OnClick="@(() => navigation.ShowCleanup("volumes"))">
+					@($"Clean up ({UnusedCount.ToString(CultureInfo.CurrentCulture)} unused)")
+				</MokaButton>
+			</Hint>
 		}
-		else if (Shown.Count == 0)
+	</ChipsEnd>
+	<Notices>
+		@if (_creating)
 		{
-			<MokaEmptyState Icon="DockerIcons.Volume"
-							Title="@(_volumes.Count == 0 ? "No volumes" : "Nothing matches")"
-							Description="@(_volumes.Count == 0 ? "Containers and compose create them, or New creates one." : "No volume matches the filter.")" />
+			<form class="mt-dk-form" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+				<div class="mt-dk-form-field">
+					<MokaTextField Value="@_name"
+								   ValueChanged="OnNameChanged"
+								   ErrorText="@_nameError"
+								   Placeholder="New volume: letters, digits, '_', '.' and '-'"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="New volume name" />
+				</div>
+				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="ToggleCreate">Cancel</MokaButton>
+			</form>
 		}
-		@foreach (DockerVolume volume in Shown)
-		{
-			<div class="@(volume.Name == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="volume.Name">
-				<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(volume))" title="@volume.Mountpoint">
-					<MokaStatusDot Size="MokaSize.Xs" Color="@(volume.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="volume.InUse" />
-					<span class="mt-dk-cell-name mt-dk-cell--w45">@volume.Name</span>
-					<span class="mt-dk-cell mt-dk-cell--w12">@volume.Driver</span>
-					<span class="mt-dk-cell mt-dk-cell--grow">@(volume.InUse ? "" : "unused")</span>
-				</button>
-				<span class="mt-dk-hover">
+		@ChangePanel
+	</Notices>
+	<ChildContent>
+		<ToolTable TItem="DockerVolume"
+				   Items="_shown"
+				   ItemKey="@(volume => volume.Name)"
+				   Label="Volumes"
+				   IsSelected="@(volume => volume.Name == _selected)"
+				   OnRowClick="OnRowClick"
+				   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+				   RowClass="@(volume => volume.InUse ? null : "mt-dk-row--down")"
+				   EmptyIcon="DockerIcons.Volume"
+				   EmptyTitle="@(_volumes.Count == 0 ? "No volumes" : "Nothing matches")"
+				   EmptyText="@(_volumes.Count == 0 ? "Containers and compose create them, or New volume creates one." : "No volume matches the filter.")">
+			<RowActions Context="volume">
+				<span class="mt-dk-quick">
 					<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
 								Disabled="@(IsBusy || !CanRemove(volume))" OnClick="@(() => RemoveAsync(volume))"
-								Label="@(volume.InUse ? "A container still uses it" : $"Remove {volume.Name}")" AriaLabel="@($"Remove {volume.Name}")" />
+								Label="@(volume.InUse ? "A container still uses it" : $"Remove {volume.Name}")" AriaLabel="@($"Remove {volume.Name}")"
+								Position="MokaTooltipPosition.BottomEnd" />
 				</span>
-			</div>
-		}
-	</div>
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+							OnClick="@(args => ShowRowMenu(args, MenuFor(volume)))"
+							Label="More actions"
+							AriaLabel="@($"Actions for {volume.Name}")"
+							Position="MokaTooltipPosition.BottomEnd" />
+			</RowActions>
+			<ChildContent>
+				<MokaColumn TItem="DockerVolume" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+					<CellTemplate Context="volume">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@(volume.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="volume.InUse" />
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerVolume" Title="Volume" Field="@(volume => volume.Name)" SortComparer="ByName" Mono Class="mt-col-main">
+					<CellTemplate Context="volume">
+						<span class="mt-dk-name" title="@volume.Name">@volume.Name</span>
+						@if (volume.IsAnonymous)
+						{
+							<span class="mt-dk-flag mt-dk-after">anonymous</span>
+						}
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerVolume" Title="Driver" Field="@(volume => volume.Driver)" Mono Class="mt-col-wide">
+					<CellTemplate Context="volume">
+						<span class="mt-dk-dim">@volume.Driver</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerVolume" Title="Use" Field="@(volume => volume.InUse)" SortComparer="ByUse">
+					<CellTemplate Context="volume">
+						<span class="@(volume.InUse ? "mt-dk-flag mt-dk-flag--on" : "mt-dk-flag")">@(volume.InUse ? "in use" : "unused")</span>
+					</CellTemplate>
+				</MokaColumn>
+			</ChildContent>
+		</ToolTable>
+	</ChildContent>
+</ToolPageFrame>
 
-	@if (_selected is { } selected)
-	{
-		<div class="mt-dk-split-panel">
-			<div class="mt-dk-panel-head">
-				<span class="mt-dk-cell-name">@selected</span>
-				<span class="mt-dk-spacer"></span>
-				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close" OnClick="ClosePanel" Label="Close the panel" Position="MokaTooltipPosition.BottomEnd" />
-			</div>
+@code {
+	private RenderFragment? DetailFragment => _selected is { } selected ? DetailPanel(selected) : null;
+
+	private RenderFragment DetailPanel(string selected) => @<ToolDetailPanel Title="@selected"
+																			 Subtitle="@(_details is { } shown && shown.Name == selected ? shown.Driver + " driver" : null)"
+																			 DotColor="@(SelectedVolume?.InUse == true ? MokaColor.Success : MokaColor.Surface)"
+																			 DotGlow="@(SelectedVolume?.InUse == true)"
+																			 OnClose="ClosePanel">
+		<Actions>
+			@if (SelectedVolume is { } volume)
+			{
+				<Hint Text="@(volume.InUse ? "A container still uses it" : null)">
+					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+								Disabled="@(IsBusy || !CanRemove(volume))" OnClick="@(() => RemoveAsync(volume))">
+						Remove
+					</MokaButton>
+				</Hint>
+			}
+		</Actions>
+		<ChildContent>
 			<div class="mt-dk-scroll">
 				@if (_details is { } details && details.Name == selected)
 				{
@@ -110,7 +153,7 @@
 								<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(use.State)" />
 								<span class="mt-dk-variable-name">@use.Container</span>
 								<span class="mt-dk-variable-value">@use.Destination</span>
-								<span class="mt-dk-label">@(use.ReadWrite ? "rw" : "ro")</span>
+								<span class="mt-dk-flag">@(use.ReadWrite ? "rw" : "ro")</span>
 							</div>
 						}
 					</div>
@@ -131,6 +174,6 @@
 					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
 				}
 			</div>
-		</div>
-	}
-</div>
+		</ChildContent>
+	</ToolDetailPanel>;
+}

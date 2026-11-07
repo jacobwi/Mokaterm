@@ -24,6 +24,8 @@
 		<MokaAlert Severity="MokaToastSeverity.Error" Dense>@error</MokaAlert>
 	}
 
+	@Notices
+
 	@if (!Loaded && Loading)
 	{
 		<div class="mt-page-loading">
@@ -134,6 +136,13 @@
 
 	[Parameter]
 	public string? Error { get; set; }
+
+	/// <summary>
+	/// Full-width lines between the header and the content, over the list and its panel alike: the outcome of the last
+	/// change, a warning, a short form the header's action opened.
+	/// </summary>
+	[Parameter]
+	public RenderFragment? Notices { get; set; }
 
 	[Parameter]
 	public string LoadingText { get; set; } = "Reading";

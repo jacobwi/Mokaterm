@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Moka.Red.ContextMenu;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.FileSystem;
@@ -21,6 +23,7 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 {
 	private DockerRestartLoops? _followedLoops;
 	private Action? _onLoopsChanged;
+	private bool _refreshingByHand;
 
 	[Inject]
 	private ISessionManager Sessions { get; set; } = default!;
@@ -30,6 +33,9 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 
 	[Inject]
 	private IFileBrowserDialog FileBrowser { get; set; } = default!;
+
+	[Inject]
+	private IMokaContextMenuService ContextMenu { get; set; } = default!;
 
 	/// <summary>Opens another page of the manager; null outside one, such as in a test.</summary>
 	private protected DockerPageContext? Navigation => Context as DockerPageContext;
@@ -56,6 +62,38 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 	private protected DockerRestartLoops? RestartLoops => Feature?.RestartLoops;
 
 	private protected DockerRestartRecord? LoopOf(string id, string? name = null) => RestartLoops?.FindLooping(id, name);
+
+	/// <summary>
+	/// What the page frame's spinner follows: the first read, then only a read the user asked for, so the refresh button
+	/// does not spin at every poll.
+	/// </summary>
+	private protected bool FrameLoading => IsFirstLoad ? IsLoading : _refreshingByHand;
+
+	/// <summary>A refresh from the page's own button, which <see cref="FrameLoading"/> shows.</summary>
+	private protected async Task RefreshByHandAsync(Func<Task> refresh)
+	{
+		ArgumentNullException.ThrowIfNull(refresh);
+		_refreshingByHand = true;
+		try
+		{
+			await refresh();
+		}
+		finally
+		{
+			_refreshingByHand = false;
+		}
+	}
+
+	/// <summary>A row's menu, from its menu button or a right-click: the same items either way.</summary>
+	private protected void ShowRowMenu(MouseEventArgs args, IReadOnlyList<MokaContextMenuItem> items)
+	{
+		ArgumentNullException.ThrowIfNull(args);
+		ArgumentNullException.ThrowIfNull(items);
+		if (items.Count > 0)
+		{
+			ContextMenu.Show(args, items);
+		}
+	}
 
 	// The health watch reads every ten seconds whatever the page does, so a page that shows loops draws again when one
 	// starts or ends rather than waiting for its own refresh.

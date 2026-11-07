@@ -1,12 +1,19 @@
+using System.Globalization;
+using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
 using Moka.Red.Core.Enums;
+using Moka.Red.Icons;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's compose projects: <c>compose ls -a</c> where the compose has it, completed from the container labels,
-/// which are the whole list on a host with the Python compose. A row opens the project; "Find compose files" searches
-/// the usual folders for files that run as no project yet, and each can be brought up from here.
+/// The host's compose projects in one table: <c>compose ls -a</c> where the compose has it, completed from the container
+/// labels, which are the whole list on a host with the Python compose. A row opens the project in place of the list;
+/// "Find compose files" searches the usual folders for files that run as no project yet and lists them beside the
+/// table, where each can be brought up.
 /// </summary>
 public sealed partial class DockerComposePage : DockerManagerPageBase
 {
@@ -20,7 +27,20 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 	private string? _findProblem;
 	private bool _finding;
 
-	private IReadOnlyList<ComposeProject> Shown => _shown;
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
+
+	private bool ShowsList => _selected is null;
+
+	private string? Summary => IsFirstLoad || !ShowsList
+		? null
+		: string.Create(
+			CultureInfo.CurrentCulture,
+			$"{_projects.Count} {(_projects.Count == 1 ? "project" : "projects")}, {_projects.Count(project => project.RunningCount > 0)} running · {Feature?.Compose?.Display ?? "no compose found"}");
+
+	private EventCallback<string> SearchCallback => ShowsList ? EventCallback.Factory.Create<string>(this, OnQueryChanged) : default;
+
+	private EventCallback RefreshCallback => ShowsList ? EventCallback.Factory.Create(this, () => RefreshByHandAsync(RefreshAsync)) : default;
 
 	private string? ToolNote => Feature?.Compose switch
 	{
@@ -46,6 +66,27 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 		ComposeProjectHealth.Unhealthy => MokaColor.Error,
 		_ => MokaColor.Surface,
 	};
+
+	private static int ByName(ComposeProject left, ComposeProject right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int ByRunning(ComposeProject left, ComposeProject right) => left.RunningCount.CompareTo(right.RunningCount);
+
+	/// <summary>The row's menu, from its button or a right-click.</summary>
+	private List<MokaContextMenuItem> MenuFor(ComposeProject project)
+	{
+		List<MokaContextMenuItem> items = [new MokaContextMenuItem { Text = "Open", Icon = DockerIcons.Compose, OnClickSync = () => Open(project) }];
+		if (Feature?.Compose is not null)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Restart", Icon = MokatermIcons.Reconnect, Disabled = IsBusy, OnClick = () => RestartAsync(project) });
+		}
+
+		if (project.WorkingDirectory is { } folder)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Copy the folder", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, folder, "folder") });
+		}
+
+		return items;
+	}
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{

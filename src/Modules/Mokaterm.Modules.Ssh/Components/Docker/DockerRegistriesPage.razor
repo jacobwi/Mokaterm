@@ -1,6 +1,4 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@using Moka.Red.Feedback.Dropdown
-@using Moka.Red.Feedback.Popover
 @using Moka.Red.Forms.PasswordField
 @inherits DockerManagerPageBase
 
@@ -13,11 +11,11 @@
 			   PrimaryIcon="DockerIcons.Registry"
 			   PrimaryDisabled="IsWorking"
 			   OnPrimary="@(() => StartLogin(null))"
-			   Loading="IsLoading"
+			   Loading="FrameLoading"
 			   Loaded="@(!IsFirstLoad)"
 			   Error="@LoadError"
 			   LoadingText="Reading the client config"
-			   OnRefresh="RefreshAsync"
+			   OnRefresh="@(() => RefreshByHandAsync(RefreshAsync))"
 			   ListPage
 			   Detail="@DetailFragment">
 	<Chips>
@@ -40,7 +38,7 @@
 			}
 		}
 	</Chips>
-	<ChildContent>
+	<Notices>
 		@ChangePanel
 		@if (_warning is { } warning)
 		{
@@ -53,66 +51,73 @@
 		{
 			<span class="mt-dk-note">@savedProblem</span>
 		}
-
 		@if (_config is { Exists: false } missing)
 		{
 			<span class="mt-dk-note">@($"{missing.Path} does not exist yet: {DockerRegistryWording.Whose(missing)} has never logged in anywhere.")</span>
 		}
-
-		@if (Shown.Count == 0)
+	</Notices>
+	<ChildContent>
+		@if (_rows.Count == 0)
 		{
 			<MokaEmptyState Icon="DockerIcons.Registry"
-							Title="@(_rows.Count == 0 ? "Not logged in anywhere" : "Nothing matches")"
-							Description="@(_rows.Count == 0 ? "Log in to push to a registry or pull private images. Docker Hub is used when no registry is named." : "No registry matches the filter.")">
-				@if (_rows.Count == 0)
-				{
-					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="DockerIcons.Registry" Disabled="IsWorking" OnClick="@(() => StartLogin(null))">Log in</MokaButton>
-				}
+							Title="Not logged in anywhere"
+							Description="Log in to push to a registry or pull private images. Docker Hub is used when no registry is named.">
+				<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="DockerIcons.Registry" Disabled="IsWorking" OnClick="@(() => StartLogin(null))">Log in</MokaButton>
 			</MokaEmptyState>
 		}
-		<div class="mt-dk-list" role="list" aria-label="Registries">
-			@foreach (RegistryRow row in Shown)
-			{
-				<div class="@(row.Host == _selected && !_loggingIn ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="row.Host">
-					<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(row))" aria-description="@RowState(row)">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@(row.Entry is { LoggedIn: true } ? MokaColor.Success : MokaColor.Surface)" Glow="@(row.Entry is { LoggedIn: true })" />
-						<span class="mt-dk-cell-name mt-dk-cell--w45">@row.Display</span>
-						<span class="mt-dk-cell mt-dk-cell--grow">@RowState(row)</span>
-						@if (row.Entry is { StoredInFile: true })
-						{
-							<MokaTag Text="IN FILE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
-						}
-						@if (row.Saved is not null)
-						{
-							<MokaTag Text="SAVED" Size="MokaSize.Xs" Color="MokaColor.Info" />
-						}
-					</button>
-					<span class="mt-dk-hover">
-						<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
-							<ChildContent>
-								<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
-											Disabled="IsWorking" Label="More actions" AriaLabel="@($"Actions for {row.Display}")" Position="MokaTooltipPosition.BottomEnd" />
-							</ChildContent>
-							<Items>
-								@if (row.Saved is { } saved)
+		else
+		{
+			<ToolTable TItem="RegistryRow"
+					   Items="Shown"
+					   ItemKey="@(row => row.Host)"
+					   Label="Registries"
+					   IsSelected="@(row => row.Host == _selected && !_loggingIn)"
+					   OnRowClick="OnRowClick"
+					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+					   EmptyIcon="DockerIcons.Registry"
+					   EmptyTitle="Nothing matches"
+					   EmptyText="No registry matches the filter.">
+				<RowActions Context="row">
+					<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+								Disabled="IsWorking"
+								OnClick="@(args => ShowRowMenu(args, MenuFor(row)))"
+								Label="More actions"
+								AriaLabel="@($"Actions for {row.Display}")"
+								Position="MokaTooltipPosition.BottomEnd" />
+				</RowActions>
+				<ChildContent>
+					<MokaColumn TItem="RegistryRow" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+						<CellTemplate Context="row">
+							<MokaStatusDot Size="MokaSize.Xs" Color="@(row.Entry is { LoggedIn: true } ? MokaColor.Success : MokaColor.Surface)" Glow="@(row.Entry is { LoggedIn: true })" />
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RegistryRow" Title="Registry" Field="@(row => row.Display)" SortComparer="ByName" Mono Class="mt-col-main">
+						<CellTemplate Context="row">
+							<span class="mt-dk-name" title="@row.Display">@row.Display</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RegistryRow" Title="State" Field="RowState" Class="mt-col-wider">
+						<CellTemplate Context="row">
+							<span class="mt-dk-dim mt-dk-clip mt-dk-clip--long" title="@RowState(row)">@RowState(row)</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="RegistryRow" Title="" Sortable="false" Resizable="false">
+						<CellTemplate Context="row">
+							<span class="mt-dk-chips">
+								@if (row.Entry is { StoredInFile: true })
 								{
-									<MokaDropdownItem Text="@($"Log in as {saved.User}")" Icon="DockerIcons.Registry" OnClick="@(() => LoginSavedAsync(saved))" />
+									<MokaTag Text="IN FILE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 								}
-								<MokaDropdownItem Text="Log in with another account" Icon="DockerIcons.Registry" OnClick="@(() => StartLogin(row))" />
-								@if (row.Entry is { LoggedIn: true })
+								@if (row.Saved is not null)
 								{
-									<MokaDropdownItem Text="Log out" Icon="MokatermIcons.Disconnect" OnClick="@(() => LogoutAsync(row))" />
+									<MokaTag Text="SAVED" Size="MokaSize.Xs" Color="MokaColor.Info" />
 								}
-								@if (row.Saved is { } forget)
-								{
-									<MokaDropdownItem Text="Forget the saved login" Icon="MokaIcons.Action.Delete" OnClick="@(() => ForgetAsync(forget))" />
-								}
-							</Items>
-						</MokaDropdown>
-					</span>
-				</div>
-			}
-		</div>
+							</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+			</ToolTable>
+		}
 	</ChildContent>
 </ToolPageFrame>
 
@@ -179,12 +184,12 @@
 					@($"Log in as {saved.User}")
 				</MokaButton>
 			}
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="IsWorking" OnClick="@(() => StartLogin(row))">
+			<MokaButton Variant="MokaVariant.Outlined" Color="@(row.Saved is null ? MokaColor.Primary : MokaColor.Surface)" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry" Disabled="IsWorking" OnClick="@(() => StartLogin(row))">
 				@(row.Entry is { LoggedIn: true } ? "Log in again" : "Log in")
 			</MokaButton>
 			@if (row.Entry is { LoggedIn: true })
 			{
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Disconnect" Disabled="IsWorking" OnClick="@(() => LogoutAsync(row))">
+				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Disconnect" Disabled="IsWorking" OnClick="@(() => LogoutAsync(row))">
 					Log out
 				</MokaButton>
 			}

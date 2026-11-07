@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.Primitives.DataList;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Tools;
 
@@ -54,6 +55,30 @@ public sealed partial class DockerRestartsPanel : DockerManagerPageBase
 		details.Status is "running" or "paused" || details.FinishedAt is null
 			? Record?.LastExit
 			: new DockerContainerExit(details.ExitCode ?? 0, details.OomKilled, details.Error, details.FinishedAt);
+
+	private List<MokaDataListItem> Facts(DockerContainerDetails details)
+	{
+		DockerContainerExit? exit = LastExit(details);
+		List<MokaDataListItem> facts =
+		[
+			new("Restarts", RestartsText(details)),
+			new("Policy", DockerRestartWording.Policy(details.RestartPolicy)),
+			new("Last exit", ExitText(exit)),
+		];
+		if (exit is not null)
+		{
+			facts.Add(new("Out of memory", exit.OomKilled ? "yes: the kernel killed it at its memory limit" : "no"));
+			if (exit.Error.Length > 0)
+			{
+				facts.Add(new("Docker said", exit.Error));
+			}
+		}
+
+		facts.Add(new("Last started", When(details.StartedAt)));
+		facts.Add(new("Last stopped", When(details.FinishedAt ?? exit?.FinishedAt)));
+		facts.Add(new("Runs last", RunsText(details)));
+		return facts;
+	}
 
 	private string RestartsText(DockerContainerDetails details)
 	{

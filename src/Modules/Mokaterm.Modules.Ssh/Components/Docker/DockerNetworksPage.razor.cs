@@ -1,12 +1,16 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's networks with the containers on each, read from the container list, so a network a stopped container
-/// still names counts as in use. Built-in networks and networks in use cannot be removed from here.
+/// The host's networks in one table with the containers on each, read from the container list, so a network a stopped
+/// container still names counts as in use. Built-in networks and networks in use cannot be removed from here.
 /// </summary>
 public sealed partial class DockerNetworksPage : DockerManagerPageBase
 {
@@ -17,18 +21,30 @@ public sealed partial class DockerNetworksPage : DockerManagerPageBase
 	private string? _nameError;
 	private bool _creating;
 
-	private IReadOnlyList<DockerNetwork> Shown => _shown;
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
 
 	private List<DockerNetwork> Removable => [.. _networks.Where(network => network.IsRemovable)];
 
+	private string? Summary => IsFirstLoad
+		? null
+		: string.Create(CultureInfo.CurrentCulture, $"{_networks.Count} networks, {_networks.Count(network => network.InUse)} in use, {_networks.Count(network => network.IsBuiltIn)} built in");
+
 	protected override Task OnInitializedAsync() => RefreshAsync();
 
-	private static string ContainersText(DockerNetwork network) => network.Containers.Count switch
-	{
-		0 => "",
-		1 => "1 container",
-		int count => string.Create(CultureInfo.CurrentCulture, $"{count} containers"),
-	};
+	private static string ContainersText(DockerNetwork network) => string.Join(", ", network.Containers);
+
+	private static string KindText(DockerNetwork network) => network.IsBuiltIn ? "built in" : network.Internal ? "internal" : "";
+
+	private static int ByName(DockerNetwork left, DockerNetwork right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	/// <summary>The row's menu, from its button or a right-click.</summary>
+	private List<MokaContextMenuItem> MenuFor(DockerNetwork network) =>
+	[
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, network.Name, "name") },
+		new MokaContextMenuItem { Text = $"Copy id {network.ShortId}", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, network.Id, "id") },
+		new MokaContextMenuItem { Text = RemoveTitle(network), Icon = MokaIcons.Action.Delete, Disabled = IsBusy || !network.IsRemovable, DividerBefore = true, OnClick = () => RemoveAsync(network) },
+	];
 
 	private static string RemoveTitle(DockerNetwork network) =>
 		network.IsBuiltIn ? "Docker's own network cannot be removed"

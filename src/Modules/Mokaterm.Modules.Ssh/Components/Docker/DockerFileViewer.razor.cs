@@ -49,6 +49,9 @@ public sealed partial class DockerFileViewer : DockerManagerPageBase
 
 	private Task OpenAsync(RemoteFileEntry entry) => ShowAsync(entry.Path);
 
+	/// <summary>A click on a row, or Enter on one of its cells; nothing while the last one still reads.</summary>
+	private Task OpenEntryAsync(RemoteFileEntry entry) => _busy ? Task.CompletedTask : OpenAsync(entry);
+
 	private Task UpAsync()
 	{
 		string parent = DockerHostPaths.DirectoryOf(_path);

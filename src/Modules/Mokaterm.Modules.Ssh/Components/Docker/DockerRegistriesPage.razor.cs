@@ -1,10 +1,13 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Icons;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
@@ -62,6 +65,42 @@ public sealed partial class DockerRegistriesPage : DockerManagerPageBase
 		{ Helper: { } helper } => $"Credentials come from docker-credential-{helper}",
 		_ => "Not logged in",
 	};
+
+	private static int ByName(RegistryRow left, RegistryRow right) => StringComparer.OrdinalIgnoreCase.Compare(left.Display, right.Display);
+
+	/// <summary>The row's menu, from its button or a right-click.</summary>
+	private List<MokaContextMenuItem> MenuFor(RegistryRow row)
+	{
+		List<MokaContextMenuItem> items = [];
+		if (row.Saved is { } saved)
+		{
+			items.Add(new MokaContextMenuItem { Text = $"Log in as {saved.User}", Icon = DockerIcons.Registry, Disabled = IsWorking, OnClick = () => LoginSavedAsync(saved) });
+		}
+
+		items.Add(new MokaContextMenuItem { Text = "Log in with another account", Icon = DockerIcons.Registry, Disabled = IsWorking, OnClickSync = () => StartLogin(row) });
+		if (row.Entry is { LoggedIn: true })
+		{
+			items.Add(new MokaContextMenuItem { Text = "Log out", Icon = MokatermIcons.Disconnect, Disabled = IsWorking, OnClick = () => LogoutAsync(row) });
+		}
+
+		if (row.Saved is { } forget)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Forget the saved login", Icon = MokaIcons.Action.Delete, DividerBefore = true, OnClick = () => ForgetAsync(forget) });
+		}
+
+		return items;
+	}
+
+	private void OnRowClick(RegistryRow row)
+	{
+		if (row.Host == _selected && !_loggingIn)
+		{
+			CloseDetail();
+			return;
+		}
+
+		Select(row);
+	}
 
 	private Task RefreshAsync() => LoadAsync(async token =>
 	{

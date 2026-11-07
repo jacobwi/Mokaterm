@@ -1,128 +1,106 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
 @inherits DockerManagerPageBase
 
-<div class="mt-dk-toolbar">
-	<span class="mt-dk-label">Engine</span>
-	<span class="mt-dk-spacer"></span>
-	<IconButton Size="MokaSize.Xs"
-				Icon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading"
-				OnClick="RefreshAsync"
-				Label="Look again" />
-</div>
-
-@LoadErrorPanel(RefreshAsync)
-@if (RestartLoops?.Looping is { Count: > 0 } loops)
-{
-	<MokaAlert Severity="MokaToastSeverity.Error" Dense>
-		<div class="mt-dk-alert-line">
-			<span>@DockerRestartWording.Count(loops.Count)</span>
-			@if (Navigation is { } navigation)
-			{
-				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="DockerIcons.Container" OnClick="navigation.ShowRestartLoops">
-					Show @(loops.Count == 1 ? "it" : "them")
-				</MokaButton>
-			}
-		</div>
-	</MokaAlert>
-}
-
-<div class="mt-dk-scroll">
-	@if (Feature?.Status is { } status)
-	{
-		<div class="mt-dk-stats">
-			<div class="mt-dk-stat">
-				<span class="mt-dk-label">Containers</span>
-				<span class="mt-dk-stat-value">@Count(status.Info?.Containers)</span>
-				<span class="mt-dk-note">@ContainerSplit(status)</span>
-			</div>
-			<div class="mt-dk-stat">
-				<span class="mt-dk-label">Images</span>
-				<span class="mt-dk-stat-value">@Count(status.Info?.Images)</span>
-			</div>
-			<div class="mt-dk-stat">
-				<span class="mt-dk-label">CPUs</span>
-				<span class="mt-dk-stat-value">@Count(status.Info?.Cpus)</span>
-			</div>
-			<div class="mt-dk-stat">
-				<span class="mt-dk-label">Memory</span>
-				<span class="mt-dk-stat-value">@(status.Info is { MemoryBytes: > 0 } info ? DisplayFormat.Bytes(info.MemoryBytes) : "-")</span>
-			</div>
-		</div>
-
-		<dl class="mt-dk-facts">
-			<dt>Server</dt><dd>@Join(status.Version?.ServerVersion, status.Version?.Platform)</dd>
-			<dt>API</dt><dd>@status.Version?.ServerApiVersion</dd>
-			<dt>Client</dt><dd>@Join(status.Version?.ClientVersion, status.Version?.Context is { Length: > 0 } context ? $"context {context}" : null)</dd>
-			<dt>Host</dt><dd>@Join(status.Info?.Name, status.Info?.OperatingSystem)</dd>
-			<dt>Kernel</dt><dd>@Join(status.Info?.KernelVersion ?? status.Version?.KernelVersion, status.Info?.Architecture)</dd>
-			<dt>Storage</dt><dd>@Join(status.Info?.StorageDriver, status.Info?.RootDirectory)</dd>
-			<dt>Mode</dt><dd>@ModeText(status)</dd>
-		</dl>
-
-		<div class="mt-dk-section">
-			<span class="mt-dk-label">Compose</span>
-			<dl class="mt-dk-facts">
-				<dt>Plugin</dt><dd>@InstallText(status.Compose.Plugin, "docker compose")</dd>
-				<dt>Standalone</dt><dd>@InstallText(status.Compose.Standalone, "docker-compose")</dd>
-				<dt>In use</dt><dd>@(Feature.Compose is { } compose ? $"{compose.Display}{(compose.SupportsList ? "" : ", projects from container labels")}" : "none")</dd>
-			</dl>
-			<div class="mt-dk-toolbar">
-				<span class="mt-dk-note">Compose commands use</span>
-				<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
-					<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
-					<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
-					<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
-				</MokaSegmentedControl>
-			</div>
-			<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>
-		</div>
-	}
-
-	<div class="mt-dk-section">
-		<div class="mt-dk-section-head">
-			<span class="mt-dk-label">Disk usage</span>
-			<span class="mt-dk-cell">docker system df</span>
-			<span class="mt-dk-spacer"></span>
-			@if (Navigation is { } navigation)
-			{
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
-							OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
-					Clean up
-				</MokaButton>
-			}
-		</div>
-		@if (IsFirstLoad)
+<ToolPageFrame Title="Overview"
+			   Summary="@Summary"
+			   Loading="FrameLoading"
+			   Loaded="@(!IsFirstLoad)"
+			   Error="@LoadError"
+			   LoadingText="Reading the engine"
+			   OnRefresh="@(() => RefreshByHandAsync(RefreshAsync))">
+	<Notices>
+		@if (RestartLoops?.Looping is { Count: > 0 } loops)
 		{
-			<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+				<div class="mt-dk-alert-line">
+					<span>@DockerRestartWording.Count(loops.Count)</span>
+					@if (Navigation is { } navigation)
+					{
+						<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="DockerIcons.Container" OnClick="navigation.ShowRestartLoops">
+							Show @(loops.Count == 1 ? "it" : "them")
+						</MokaButton>
+					}
+				</div>
+			</MokaAlert>
 		}
-		else if (_usage.Count > 0)
+	</Notices>
+	<ChildContent>
+		@if (Feature?.Status is { } status)
 		{
-			<dl class="mt-dk-facts">
-				@foreach (DockerDiskUsage row in _usage)
+			<div class="mt-dk-tiles">
+				<MokaStat Tile Value="@Count(status.Info?.Containers)" Label="Containers" HelpText="@ContainerSplit(status)" />
+				<MokaStat Tile Value="@Count(status.Info?.Images)" Label="Images" />
+				<MokaStat Tile Value="@Count(status.Info?.Cpus)" Label="CPUs" />
+				<MokaStat Tile Value="@(status.Info is { MemoryBytes: > 0 } info ? DisplayFormat.Bytes(info.MemoryBytes) : "-")" Label="Memory" />
+				@if (Reclaimable is { } reclaimable)
 				{
-					<dt @key="row.Type">@row.Type</dt>
-					<dd>@UsageLine(row)</dd>
+					<MokaStat Tile Value="@DisplayFormat.Bytes(reclaimable)" Label="Reclaimable" HelpText="docker system df" Color="@(reclaimable > 0 ? MokaColor.Warning : null)" />
 				}
-			</dl>
-		}
-	</div>
+			</div>
 
-	@if (Navigation is { } images)
-	{
+			<div class="mt-dk-columns">
+				<div class="mt-dk-section">
+					<span class="mt-dk-label">Engine</span>
+					<MokaDataList Items="EngineFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+				</div>
+
+				<div class="mt-dk-section">
+					<span class="mt-dk-label">Compose</span>
+					<MokaDataList Items="ComposeFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+					<div class="mt-dk-toolbar">
+						<span class="mt-dk-note">Compose commands use</span>
+						<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
+							<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
+							<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
+							<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
+						</MokaSegmentedControl>
+					</div>
+					<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>
+				</div>
+			</div>
+		}
+
 		<div class="mt-dk-section">
 			<div class="mt-dk-section-head">
-				<span class="mt-dk-label">Build and push</span>
+				<span class="mt-dk-label">Disk usage</span>
+				<span class="mt-dk-mono mt-dk-muted">docker system df</span>
 				<span class="mt-dk-spacer"></span>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build" OnClick="images.BuildImage">
-					Build image
-				</MokaButton>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry"
-							OnClick="@(() => images.Navigate(DockerPageIds.Registries))">
-					Registries
-				</MokaButton>
+				@if (Navigation is { } navigation)
+				{
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+								OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
+						Clean up
+					</MokaButton>
+				}
 			</div>
-			<span class="mt-dk-note">Builds and pushes show their output while they run, and carry on when the page changes.</span>
+			@if (_usage.Count > 0)
+			{
+				<div class="mt-dk-inline-table">
+					@DiskUsageTable(_usage)
+				</div>
+			}
+			else if (!IsFirstLoad)
+			{
+				<span class="mt-dk-note">This docker printed no disk usage.</span>
+			}
 		</div>
-	}
-</div>
+
+		@if (Navigation is { } images)
+		{
+			<div class="mt-dk-section">
+				<div class="mt-dk-section-head">
+					<span class="mt-dk-label">Build and push</span>
+					<span class="mt-dk-spacer"></span>
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build" OnClick="images.BuildImage">
+						Build image
+					</MokaButton>
+					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry"
+								OnClick="@(() => images.Navigate(DockerPageIds.Registries))">
+						Registries
+					</MokaButton>
+				</div>
+				<span class="mt-dk-note">Builds and pushes show their output while they run, and carry on when the page changes.</span>
+			</div>
+		}
+	</ChildContent>
+</ToolPageFrame>

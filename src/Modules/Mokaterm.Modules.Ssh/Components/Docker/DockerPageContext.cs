@@ -7,8 +7,9 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// <summary>
 /// What every page of the Docker manager gets from the manager, cascaded: how to open another page, and for a page from
 /// another module the session's docker client behind <see cref="IDockerPageContext"/>. The manager's own pages also
-/// use it for "New container" from an image, and for the containers page opened on its restart loops or on one
-/// container, where a request for the page being opened waits here until that page takes it, once.
+/// use it for "New container" from an image, for the containers page opened on its restart loops or on one container,
+/// and for the cleanup page opened on one kind, where a request for the page being opened waits here until that page
+/// takes it, once.
 /// </summary>
 internal sealed class DockerPageContext : IDockerPageContext
 {
@@ -17,6 +18,7 @@ internal sealed class DockerPageContext : IDockerPageContext
 	private string? _newContainerImage;
 	private bool _buildImage;
 	private bool _restartLoops;
+	private string? _cleanupKind;
 	private (string Id, string Tab)? _container;
 
 	/// <param name="show">Shows a page by its id.</param>
@@ -72,6 +74,22 @@ internal sealed class DockerPageContext : IDockerPageContext
 		string? image = _newContainerImage;
 		_newContainerImage = null;
 		return image;
+	}
+
+	/// <summary>Opens the cleanup page on one kind, such as <c>images</c>: what the images and volumes pages link to.</summary>
+	public void ShowCleanup(string kind)
+	{
+		ArgumentNullException.ThrowIfNull(kind);
+		_cleanupKind = kind;
+		_show(DockerPageIds.Cleanup);
+	}
+
+	/// <summary>The kind the cleanup page was asked to open on, once; later calls get null.</summary>
+	public string? TakeCleanupKind()
+	{
+		string? kind = _cleanupKind;
+		_cleanupKind = null;
+		return kind;
 	}
 
 	public void ShowRestartLoops()

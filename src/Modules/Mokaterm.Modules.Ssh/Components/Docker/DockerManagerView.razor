@@ -20,7 +20,7 @@
 			<MokaStatusDot Size="MokaSize.Xs" Color="@HeadColor" Pulse="_detecting" Label="@HeadLabel" />
 			@if (_status.Version is { ServerApiVersion.Length: > 0 } version)
 			{
-				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-meta">API @version.ServerApiVersion</MokaText>
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-muted">API @version.ServerApiVersion</MokaText>
 			}
 			@if (_feature.Compose is { } compose)
 			{

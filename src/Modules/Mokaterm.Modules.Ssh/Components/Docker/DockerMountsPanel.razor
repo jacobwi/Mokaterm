@@ -25,7 +25,7 @@ else
 				<MokaTag Text="@(mount.ReadWrite ? "RW" : "RO")" Size="MokaSize.Xs" Color="@(mount.ReadWrite ? MokaColor.Surface : MokaColor.Info)" />
 				@if (mount.Name.Length > 0)
 				{
-					<span class="mt-dk-cell">volume @mount.Name</span>
+					<span class="mt-dk-mono mt-dk-muted">volume @mount.Name</span>
 				}
 				<span class="mt-dk-spacer"></span>
 				@if (CanView(mount))

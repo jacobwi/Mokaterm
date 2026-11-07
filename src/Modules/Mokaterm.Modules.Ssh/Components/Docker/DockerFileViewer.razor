@@ -46,27 +46,39 @@
 
 @if (_file is { } file)
 {
-	<span class="mt-dk-cell">@FileLine(file, _fileSize)</span>
+	<span class="mt-dk-mono mt-dk-muted">@FileLine(file, _fileSize)</span>
 	<pre class="mt-dk-box mt-dk-box--nowrap">@file.Text</pre>
 }
 else if (_entries is { } entries)
 {
-	@if (entries.Count == 0)
-	{
-		<span class="mt-dk-cell">Empty.</span>
-	}
-	<div class="mt-dk-list" role="list" aria-label="Files">
-		@foreach (RemoteFileEntry entry in entries)
-		{
-			<div class="mt-dk-row" role="listitem" @key="entry.Path">
-				<button type="button" class="mt-dk-row-main" disabled="@_busy" @onclick="@(() => OpenAsync(entry))">
-					<MokaIcon Icon="@(entry.IsDirectoryLike ? MokatermIcons.Folder : entry.Kind == RemoteEntryKind.SymbolicLink ? MokatermIcons.Symlink : MokatermIcons.File)" Size="MokaSize.Xs" />
-					<span class="mt-dk-cell-name">@entry.Name</span>
-					<span class="mt-dk-cell mt-dk-cell--grow">@(entry.LinkTarget is { Length: > 0 } target ? $"→ {target}" : "")</span>
-					<span class="mt-dk-cell">@(entry.IsDirectoryLike ? "" : DisplayFormat.Bytes(entry.Size))</span>
-					<span class="mt-dk-cell">@DisplayFormat.Timestamp(entry.LastModified)</span>
-				</button>
-			</div>
-		}
+	<div class="mt-dk-inline-table">
+		<ToolTable TItem="RemoteFileEntry"
+				   Items="entries"
+				   ItemKey="@(entry => entry.Path)"
+				   Label="Files"
+				   OnRowClick="OpenEntryAsync"
+				   EmptyTitle="Empty"
+				   EmptyText="Nothing is in this folder.">
+			<MokaColumn TItem="RemoteFileEntry" Title="Name" Field="@(entry => entry.Name)" Sortable="false" Mono Class="mt-col-main">
+				<CellTemplate Context="entry">
+					<span class="mt-dk-file" title="@entry.Name">
+						<MokaIcon Icon="@(entry.IsDirectoryLike ? MokatermIcons.Folder : entry.Kind == RemoteEntryKind.SymbolicLink ? MokatermIcons.Symlink : MokatermIcons.File)" Size="MokaSize.Xs" />
+						@entry.Name
+						@if (entry.LinkTarget is { Length: > 0 } target)
+						{
+							<span class="mt-dk-dim">@($"\u2192 {target}")</span>
+						}
+					</span>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn TItem="RemoteFileEntry" Title="Size" Field="@(entry => entry.Size)" Sortable="false" Mono Align="MokaTextAlign.Right">
+				<CellTemplate Context="entry">@(entry.IsDirectoryLike ? "" : DisplayFormat.Bytes(entry.Size))</CellTemplate>
+			</MokaColumn>
+			<MokaColumn TItem="RemoteFileEntry" Title="Modified" Field="@(entry => entry.LastModified)" Sortable="false" Mono Class="mt-col-wide">
+				<CellTemplate Context="entry">
+					<span class="mt-dk-dim">@DisplayFormat.Timestamp(entry.LastModified)</span>
+				</CellTemplate>
+			</MokaColumn>
+		</ToolTable>
 	</div>
 }

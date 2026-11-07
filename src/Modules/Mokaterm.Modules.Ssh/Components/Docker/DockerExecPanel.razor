@@ -66,7 +66,7 @@ else
 			<div class="mt-dk-section-head">
 				<span class="mt-dk-label">Result</span>
 				<MokaTag Text="@result.ExitText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@(result.Succeeded ? MokaColor.Success : MokaColor.Error)" />
-				<span class="mt-dk-cell">@Duration(result)</span>
+				<span class="mt-dk-mono mt-dk-muted">@Duration(result)</span>
 				<span class="mt-dk-spacer"></span>
 				<CopyButton Text="@result.Command" Label="Copy the command" />
 			</div>
@@ -92,14 +92,19 @@ else
 	{
 		<div class="mt-dk-section">
 			<span class="mt-dk-label">This session</span>
-			@foreach ((DockerExecRequest entry, int index) in History.Select((entry, index) => (entry, index)))
-			{
-				<div class="mt-dk-row" @key="index">
-					<button type="button" class="mt-dk-row-main" disabled="@_running" @onclick="@(() => Load(entry))">
-						<Hint Text="Put it back in the box" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-cell mt-dk-cell--grow">@HistoryLine(entry)</Hint>
-					</button>
-				</div>
-			}
+			<span class="mt-dk-note">A command picked here goes back in the box above.</span>
+			<div class="mt-dk-inline-table">
+				<ToolTable TItem="DockerExecRequest"
+						   Items="History"
+						   Label="Commands run in this session"
+						   OnRowClick="LoadFromHistory">
+					<MokaColumn TItem="DockerExecRequest" Title="Command" Field="HistoryLine" Sortable="false" Mono Class="mt-col-main">
+						<CellTemplate Context="entry">
+							<span title="@HistoryLine(entry)">@HistoryLine(entry)</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ToolTable>
+			</div>
 		</div>
 	}
 }

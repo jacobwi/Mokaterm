@@ -72,6 +72,14 @@ public sealed partial class DockerExecPanel : DockerManagerPageBase
 	private Task OnCommandKeyDown(KeyboardEventArgs args) =>
 		args.Key == "Enter" && (args.CtrlKey || args.MetaKey) ? RunAsync() : Task.CompletedTask;
 
+	private void LoadFromHistory(DockerExecRequest entry)
+	{
+		if (!_running)
+		{
+			Load(entry);
+		}
+	}
+
 	private void Load(DockerExecRequest entry)
 	{
 		_command = entry.Command;

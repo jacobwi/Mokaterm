@@ -1,5 +1,10 @@
+using System.Globalization;
+using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
@@ -21,15 +26,52 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	private string? _nameError;
 	private bool _creating;
 
-	private IReadOnlyList<DockerVolume> Shown => _shown;
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
 
 	private int UnusedCount => _volumes.Count(CanRemove);
+
+	private DockerVolume? SelectedVolume => _selected is { } name ? _volumes.FirstOrDefault(volume => volume.Name == name) : null;
+
+	private string? Summary => IsFirstLoad
+		? null
+		: string.Create(CultureInfo.CurrentCulture, $"{_volumes.Count} volumes, {_volumes.Count(volume => volume.InUse)} in use, {_volumes.Count(volume => !volume.InUse)} unused");
 
 	protected override Task OnInitializedAsync() => RefreshAsync();
 
 	/// <summary>Unused, and named in a way this app passes to docker: a plugin driver may name its volumes otherwise.</summary>
 	private static bool CanRemove(DockerVolume volume) =>
 		!volume.InUse && DockerNames.ExistingNameProblem(volume.Name, "volume") is null;
+
+	private static int ByName(DockerVolume left, DockerVolume right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int ByUse(DockerVolume left, DockerVolume right) => right.InUse.CompareTo(left.InUse);
+
+	/// <summary>The row's menu, from its button or a right-click.</summary>
+	private List<MokaContextMenuItem> MenuFor(DockerVolume volume) =>
+	[
+		new MokaContextMenuItem { Text = "Show details", Icon = MokaIcons.Toggle.Eye, OnClick = () => Select(volume) },
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, volume.Name, "name") },
+		new MokaContextMenuItem
+		{
+			Text = "Copy the host path",
+			Icon = MokaIcons.Content.Copy,
+			Disabled = volume.Mountpoint.Length == 0,
+			OnClick = () => CopyTextAsync(Clipboard, volume.Mountpoint, "host path"),
+		},
+		new MokaContextMenuItem { Text = "Remove", Icon = MokaIcons.Action.Delete, Disabled = IsBusy || !CanRemove(volume), DividerBefore = true, OnClick = () => RemoveAsync(volume) },
+	];
+
+	private Task OnRowClick(DockerVolume volume)
+	{
+		if (volume.Name == _selected)
+		{
+			ClosePanel();
+			return Task.CompletedTask;
+		}
+
+		return Select(volume);
+	}
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{

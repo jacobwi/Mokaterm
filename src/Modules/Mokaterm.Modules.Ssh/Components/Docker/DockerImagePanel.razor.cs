@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.Primitives.DataList;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Modules.Ssh.Docker;
@@ -33,9 +35,17 @@ public sealed partial class DockerImagePanel : DockerManagerPageBase
 	[Parameter]
 	public bool Tagged { get; set; }
 
-	/// <summary>Docker's own size and age, such as "187MB" and "2 days ago".</summary>
+	/// <summary>Docker's own size, such as "187MB".</summary>
 	[Parameter]
-	public string Details { get; set; } = "";
+	public string Size { get; set; } = "";
+
+	/// <summary>Docker's own age, such as "2 days ago".</summary>
+	[Parameter]
+	public string Created { get; set; } = "";
+
+	/// <summary>How many containers were made from it, when docker said.</summary>
+	[Parameter]
+	public int? Containers { get; set; }
 
 	/// <summary>Every local tag of the same repository, for a push of all of them.</summary>
 	[Parameter]
@@ -59,6 +69,31 @@ public sealed partial class DockerImagePanel : DockerManagerPageBase
 	private string Registry => DockerImageName.Parse(Reference)?.Registry ?? DockerImageName.DefaultRegistry;
 
 	private string RegistryDisplay => DockerRegistryNames.IsDockerHub(Registry) ? $"{DockerRegistryNames.DockerHubName} (docker.io)" : Registry;
+
+	private List<MokaDataListItem> Facts
+	{
+		get
+		{
+			List<MokaDataListItem> facts = [];
+			if (Size.Length > 0)
+			{
+				facts.Add(new("Size", Size));
+			}
+
+			if (Created.Length > 0)
+			{
+				facts.Add(new("Created", Created));
+			}
+
+			if (Containers is { } containers)
+			{
+				facts.Add(new("Containers", containers.ToString(CultureInfo.CurrentCulture)));
+			}
+
+			facts.Add(new("Tagged", Tagged ? $"yes, {RepositoryTags.Count} local {(RepositoryTags.Count == 1 ? "tag" : "tags")} of {Repository}" : "no, so it can be tagged but not pushed"));
+			return facts;
+		}
+	}
 
 	protected override async Task OnParametersSetAsync()
 	{

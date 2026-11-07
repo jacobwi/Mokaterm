@@ -1,17 +1,22 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Formatting;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's images, one line each: pull one by reference, ask the registries whether a tag moved on (and pull the
-/// newer image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu
-/// only). A selected image opens its panel, where it is tagged and pushed; Build opens the build form. Builds and
-/// pushes run in the session's background and show their output in place of the list. Pruning lives on the cleanup
-/// page, which lists what would go first.
+/// The host's images in one table: pull one by reference, ask the registries whether a tag moved on (and pull the newer
+/// image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu only).
+/// A selected image opens its panel, where it is tagged and pushed; Build opens the build form. Builds and pushes run in
+/// the session's background and show their output in place of the list. Pruning lives on the cleanup page, which lists
+/// what would go first.
 /// </summary>
 public sealed partial class DockerImagesPage : DockerManagerPageBase
 {
@@ -37,7 +42,17 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 	[Inject]
 	private IClipboardService Clipboard { get; set; } = default!;
 
-	private IReadOnlyList<DockerImage> Shown => _shown;
+	private bool ShowsList => _view == ListView;
+
+	private string? Summary => IsFirstLoad
+		? null
+		: string.Create(
+			CultureInfo.CurrentCulture,
+			$"{_images.Count} images, {_tagged.Count} tagged, {DanglingCount} dangling · {DisplayFormat.Bytes(_images.DistinctBy(image => image.Id).Sum(image => image.SizeBytes ?? 0))}");
+
+	private EventCallback<string> SearchCallback => ShowsList ? EventCallback.Factory.Create<string>(this, OnQueryChanged) : default;
+
+	private EventCallback RefreshCallback => ShowsList ? EventCallback.Factory.Create(this, () => RefreshByHandAsync(RefreshAsync)) : default;
 
 	/// <summary>Every tag on the host: what "Check for updates" asks about.</summary>
 	private IReadOnlyList<string> TaggedReferences => _tagged;
@@ -77,8 +92,40 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 
 	private static string Key(DockerImage image) => image.Reference + "|" + image.Id;
 
-	private static string PanelDetails(DockerImage image) =>
-		string.Join(", ", new[] { image.Size, image.CreatedSince }.Where(part => part.Length > 0));
+	private static int ByReference(DockerImage left, DockerImage right) => StringComparer.OrdinalIgnoreCase.Compare(left.Reference, right.Reference);
+
+	private static int ByCreated(DockerImage left, DockerImage right) => Nullable.Compare(left.CreatedAt, right.CreatedAt);
+
+	private static int BySize(DockerImage left, DockerImage right) => Nullable.Compare(left.SizeBytes, right.SizeBytes);
+
+	private ImageUpdateResult? UpdateOf(DockerImage image) => image.IsTagged ? Feature?.ImageUpdates.Find(image.Reference) : null;
+
+	/// <summary>The row's menu, from its button or a right-click.</summary>
+	private List<MokaContextMenuItem> MenuFor(DockerImage image)
+	{
+		List<MokaContextMenuItem> items = [];
+		if (UpdateOf(image) is { HasUpdate: true })
+		{
+			items.Add(new MokaContextMenuItem { Text = "Pull the newer image", Icon = DockerIcons.Update, Disabled = IsBusy, OnClick = () => PullUpdateAsync(image) });
+		}
+
+		if (image.IsTagged)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Check for an update", Icon = DockerIcons.Update, OnClick = () => CheckOneAsync(image) });
+		}
+
+		if (Navigation is { } navigation)
+		{
+			items.Add(new MokaContextMenuItem { Text = "New container from this image", Icon = MokatermIcons.Play, Disabled = IsBusy, OnClickSync = () => navigation.NewContainer(image.Reference) });
+		}
+
+		items.Add(new MokaContextMenuItem { Text = "Tag or push", Icon = DockerIcons.Push, OnClickSync = () => Select(image) });
+		items.Add(new MokaContextMenuItem { Text = "Remove", Icon = MokaIcons.Action.Delete, Disabled = IsBusy, DividerBefore = true, OnClick = () => RemoveAsync(image, force: false) });
+		items.Add(new MokaContextMenuItem { Text = "Remove even if used (--force)", Icon = MokaIcons.Action.Delete, Disabled = IsBusy, OnClick = () => RemoveAsync(image, force: true) });
+		items.Add(new MokaContextMenuItem { Text = $"Copy id {image.ShortId}", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, image.Id, "id") });
+		items.Add(new MokaContextMenuItem { Text = "Copy the reference", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, image.Reference, "reference") });
+		return items;
+	}
 
 	private IReadOnlyList<string> RepositoryTags(DockerImage image) =>
 		image.IsTagged
@@ -86,6 +133,17 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 			: [];
 
 	private void Select(DockerImage image) => _selected = Key(image);
+
+	private void OnRowClick(DockerImage image)
+	{
+		if (Key(image) == _selected)
+		{
+			ClosePanel();
+			return;
+		}
+
+		Select(image);
+	}
 
 	private void ClosePanel() => _selected = null;
 

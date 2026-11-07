@@ -17,7 +17,7 @@
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Memory</MokaText>
 				<span class="mt-dk-stat-value">@stats.MemoryPercent</span>
 				<UsageBar Percent="stats.MemoryPercentValue" />
-				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-meta">@stats.Memory</MokaText>
+				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-muted">@stats.Memory</MokaText>
 				<Sparkline Values="_history.Memory(stats.Id)" Max="100" Slots="DockerStatsHistory.Length" Label="Recent memory samples" />
 			</div>
 			<div class="mt-dk-stat">

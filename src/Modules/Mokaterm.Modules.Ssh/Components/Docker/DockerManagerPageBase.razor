@@ -20,4 +20,38 @@
 			</Hint>
 		}
 	</text>;
+
+	/// <summary>What docker system df prints, one row per kind: the overview's summary and the cleanup page's.</summary>
+	private protected static RenderFragment DiskUsageTable(IReadOnlyList<DockerDiskUsage> rows) => @<ToolTable TItem="DockerDiskUsage"
+																										   Items="rows"
+																										   ItemKey="@(row => row.Type)"
+																										   Label="Disk usage">
+		<MokaColumn TItem="DockerDiskUsage" Title="Kind" Field="@(row => row.Type)" Class="mt-col-main">
+			<CellTemplate Context="row">@row.Type</CellTemplate>
+		</MokaColumn>
+		<MokaColumn TItem="DockerDiskUsage" Title="Total" Field="@(row => row.TotalCount)" SortComparer="ByTotal" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+			<CellTemplate Context="row">@row.TotalCount</CellTemplate>
+		</MokaColumn>
+		<MokaColumn TItem="DockerDiskUsage" Title="Active" Field="@(row => row.Active)" SortComparer="ByActive" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+			<CellTemplate Context="row">@row.Active</CellTemplate>
+		</MokaColumn>
+		<MokaColumn TItem="DockerDiskUsage" Title="Size" Field="@(row => row.Size)" SortComparer="BySize" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+			<CellTemplate Context="row">@row.Size</CellTemplate>
+		</MokaColumn>
+		<MokaColumn TItem="DockerDiskUsage" Title="Reclaimable" Field="@(row => row.Reclaimable)" SortComparer="ByReclaimable" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+			<CellTemplate Context="row">
+				<span class="@(row.ReclaimableBytes is > 0 ? null : "mt-dk-dim")">@row.Reclaimable</span>
+			</CellTemplate>
+		</MokaColumn>
+	</ToolTable>;
+
+	private static int ByTotal(DockerDiskUsage left, DockerDiskUsage right) => Number(left.TotalCount).CompareTo(Number(right.TotalCount));
+
+	private static int ByActive(DockerDiskUsage left, DockerDiskUsage right) => Number(left.Active).CompareTo(Number(right.Active));
+
+	private static int BySize(DockerDiskUsage left, DockerDiskUsage right) => (DockerSizes.Parse(left.Size) ?? -1).CompareTo(DockerSizes.Parse(right.Size) ?? -1);
+
+	private static int ByReclaimable(DockerDiskUsage left, DockerDiskUsage right) => (left.ReclaimableBytes ?? -1).CompareTo(right.ReclaimableBytes ?? -1);
+
+	private static int Number(string text) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : -1;
 }

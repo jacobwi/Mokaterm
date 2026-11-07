@@ -1,7 +1,6 @@
 /* The tool is registered wide, so the dialog or window around it has a fixed height and the manager fills it: the
-   navigation stays put and each page scrolls on its own. Every page renders inside this component, so the shared
-   styles live here behind ::deep. The look is lines and micro-labels rather than boxes: rows have no border, sections
-   are a label and some air. */
+   navigation stays put and each page lays itself out on ToolPageFrame, its list and panel scrolling on their own. Every
+   page renders inside this component, so the shared styles live here behind ::deep. */
 .mt-dk {
 	container-type: inline-size;
 	container-name: mt-dk mt-tool-nav;
@@ -21,6 +20,8 @@
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
+	padding-bottom: var(--moka-spacing-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
 }
 
 /* Pages and the panels inside them are child components, so these rules reach them through ::deep. */
@@ -30,7 +31,6 @@
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: var(--moka-spacing-sm);
 	min-width: 0;
 	min-height: 0;
 }
@@ -44,16 +44,17 @@
 	padding: var(--moka-spacing-md);
 }
 
-.mt-dk ::deep .mt-dk-meta,
-.mt-dk ::deep .mt-dk-muted {
+.mt-dk ::deep .mt-dk-muted,
+.mt-dk ::deep .mt-dk-dim {
 	color: var(--moka-color-on-surface-variant);
 }
 
-.mt-dk ::deep .mt-dk-spacer {
+.mt-dk ::deep .mt-dk-spacer,
+.mt-dk ::deep .mt-dk-grow {
 	flex: 1;
 }
 
-/* Micro-labels: what CLAUDE.md asks for section titles and keys. */
+/* Micro-labels: section titles and keys. */
 .mt-dk ::deep .mt-dk-label {
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -68,6 +69,47 @@
 	letter-spacing: 0.02em;
 }
 
+/* The title of a view that takes the page's place: the new container form, a build, a compose project. */
+.mt-dk ::deep .mt-dk-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--moka-font-size-sm);
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+.mt-dk ::deep .mt-dk-title--data {
+	font-family: var(--moka-font-family-mono);
+}
+
+/* A container's panel holds its log and its inspect output, so on a page wide enough for both the panel gets a larger
+   share than ToolPageFrame gives a System page's. */
+@container mt-page (min-width: 720px) {
+	.mt-dk ::deep .mt-page-md--open {
+		grid-template-columns: minmax(0, 1.3fr) minmax(340px, 1fr);
+	}
+}
+
+/* Prose wraps; only data is cut to one line. */
+.mt-dk ::deep .mt-dk-note {
+	min-width: 0;
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--moka-color-on-surface-variant);
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-note--error,
+.mt-dk ::deep .mt-dk-problem {
+	color: var(--moka-color-error);
+}
+
+.mt-dk ::deep .mt-dk-problem {
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+}
+
 .mt-dk ::deep .mt-dk-toolbar {
 	display: flex;
 	flex-shrink: 0;
@@ -77,16 +119,11 @@
 	min-width: 0;
 }
 
-.mt-dk ::deep .mt-dk-toolbar-search {
-	flex: 1 1 160px;
-	min-width: 120px;
-}
-
 .mt-dk ::deep .mt-dk-scroll {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: var(--moka-spacing-xs);
+	gap: var(--moka-spacing-sm);
 	min-width: 0;
 	min-height: 0;
 	overflow: auto;
@@ -102,214 +139,35 @@
 	padding: var(--moka-spacing-xxs);
 }
 
-/* A list with a panel under it (or beside it, when the page is wide enough for both). */
-.mt-dk ::deep .mt-dk-split {
+/* A column that hands what is left of its height to one child: a table whose header stays put while its rows scroll. */
+.mt-dk ::deep .mt-dk-fill {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: var(--moka-spacing-xs);
 	min-width: 0;
 	min-height: 0;
 }
 
-.mt-dk ::deep .mt-dk-split-list {
+/* A table among other sections of a page that scrolls as a whole: as tall as its rows. */
+.mt-dk ::deep .mt-dk-inline-table .mt-tool-table {
+	height: auto;
+}
+
+/* A panel whose log has to fill it: ToolDetailPanel grows with its content, so it is held to the frame's height. */
+.mt-dk ::deep .mt-dk-detail-fill {
 	display: flex;
-	flex: 1;
-	flex-direction: column;
-	gap: 1px;
-	min-width: 0;
+	height: 100%;
 	min-height: 0;
-	overflow: auto;
 }
 
-.mt-dk ::deep .mt-dk-split-list > * {
-	flex-shrink: 0;
-}
-
-.mt-dk ::deep .mt-dk-split--open .mt-dk-split-list {
-	flex: 0 1 34%;
-	min-height: 96px;
-}
-
-.mt-dk ::deep .mt-dk-split-panel {
-	display: flex;
-	flex: 1 1 66%;
-	flex-direction: column;
-	gap: var(--moka-spacing-xs);
-	min-width: 0;
-	min-height: 0;
-	padding-top: var(--moka-spacing-xs);
-	border-top: 1px solid var(--moka-color-outline-variant);
-}
-
-@container mt-dk-page (min-width: 900px) {
-	.mt-dk ::deep .mt-dk-split--open {
-		flex-direction: row;
-	}
-
-	.mt-dk ::deep .mt-dk-split--open .mt-dk-split-list {
-		flex: 0 1 42%;
-	}
-
-	.mt-dk ::deep .mt-dk-split-panel {
-		padding-top: 0;
-		padding-left: var(--moka-spacing-sm);
-		border-top: none;
-		border-left: 1px solid var(--moka-color-outline-variant);
-	}
-}
-
-/* A group header: a chevron, the name as a micro-label and its counts. A button, so the keyboard folds it too. */
-.mt-dk ::deep .mt-dk-group {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-xs);
-	min-width: 0;
-	margin-top: var(--moka-spacing-xs);
-	padding: 2px var(--moka-spacing-xxs);
-	border: none;
-	border-radius: var(--moka-radius-sm);
-	background: none;
-	color: var(--moka-color-on-surface-tertiary);
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
-}
-
-.mt-dk ::deep .mt-dk-group:first-child {
-	margin-top: 0;
-}
-
-.mt-dk ::deep .mt-dk-group:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
-}
-
-/* A row: no border, a raise on hover and a glow when selected. The main part is a button; actions sit beside it. A row
-   is as tall as the small icon buttons it holds, so a row without them lines up with the rest at every density. */
-.mt-dk ::deep .mt-dk-row {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-xxs);
-	min-width: 0;
-	min-height: var(--moka-button-height-sm);
-	padding: 0 var(--moka-spacing-xxs);
-	border-radius: var(--moka-radius-sm);
-	transition: background var(--moka-transition-fast);
-}
-
-.mt-dk ::deep .mt-dk-row:hover {
-	background: var(--moka-color-surface-hover);
-}
-
-.mt-dk ::deep .mt-dk-row--selected {
-	box-shadow: inset 0 0 20px var(--moka-color-primary-glow), inset 2px 0 0 var(--moka-color-primary);
-}
-
-.mt-dk ::deep .mt-dk-row-main {
-	display: flex;
+.mt-dk ::deep .mt-dk-detail-fill .mt-detail {
 	flex: 1;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-	padding: 3px 0;
-	border: none;
-	background: none;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
+	height: 100%;
+	min-height: 0;
 }
 
-/* A row's state dot says what the state is in its hint. The dot is 6px across, so the hint's element reaches a few
-   pixels past it to be found by the pointer, without taking any more room in the row. */
-.mt-dk ::deep .mt-dk-state {
-	margin: -4px;
-	padding: 4px;
-}
-
-.mt-dk ::deep .mt-dk-row-main:focus-visible {
-	outline: none;
-	border-radius: var(--moka-radius-sm);
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
-}
-
-.mt-dk ::deep .mt-dk-row-static {
-	cursor: default;
-}
-
-/* Cells: the name keeps its width, what follows shrinks and cuts. */
-.mt-dk ::deep .mt-dk-cell-name {
-	flex: 0 1 auto;
-	min-width: 48px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-family: var(--moka-font-family-mono);
-	font-size: 12px;
-}
-
-.mt-dk ::deep .mt-dk-cell {
-	flex: 0 1 auto;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-family: var(--moka-font-family-mono);
-	font-size: 11px;
-	color: var(--moka-color-on-surface-variant);
-}
-
-/* Prose wraps; only data is cut to one line. */
-.mt-dk ::deep .mt-dk-note {
-	min-width: 0;
-	font-size: 11px;
-	line-height: 1.45;
-	color: var(--moka-color-on-surface-variant);
-	overflow-wrap: anywhere;
-}
-
-/* The minimum keeps an image name readable when a long port list sits beside it: the ports give way first. */
-.mt-dk ::deep .mt-dk-cell--grow {
-	flex: 1 1 0;
-	min-width: 30%;
-}
-
-.mt-dk ::deep .mt-dk-cell--error {
-	color: var(--moka-color-error);
-}
-
-/* A hint that is itself a cell is a block, so its text still aligns and ends in an ellipsis: the tooltip's own
-   inline-flex would let it run out of the box instead. */
-.mt-dk ::deep .moka-tooltip-trigger:is(.mt-dk-cell, .mt-dk-cell-name) {
-	display: block;
-}
-
-.mt-dk ::deep .mt-dk-row-actions {
-	display: flex;
-	flex-shrink: 0;
-	align-items: center;
-}
-
-/* Actions that appear on hover or focus, and stay for the selected row; a screen with no hover always shows them. */
-.mt-dk ::deep .mt-dk-hover {
-	display: flex;
-	flex-shrink: 0;
-	align-items: center;
-	opacity: 0;
-	transition: opacity var(--moka-transition-fast);
-}
-
-.mt-dk ::deep .mt-dk-row:hover .mt-dk-hover,
-.mt-dk ::deep .mt-dk-row:focus-within .mt-dk-hover,
-.mt-dk ::deep .mt-dk-row--selected .mt-dk-hover {
-	opacity: 1;
-}
-
-@media (hover: none) {
-	.mt-dk ::deep .mt-dk-hover {
-		opacity: 1;
-	}
+.mt-dk ::deep .mt-dk-detail-fill .mt-detail-body {
+	min-height: 0;
 }
 
 .mt-dk ::deep .mt-dk-panel-head {
@@ -328,12 +186,22 @@
 	}
 }
 
+/* Menu entries that repeat a labelled button: hidden while the button shows, shown once it folds away. */
+.mt-dk ::deep .mt-dk-narrow-only {
+	display: none;
+}
+
+@container mt-dk-page (max-width: 520px) {
+	.mt-dk ::deep .mt-dk-narrow-only {
+		display: flex;
+	}
+}
+
 .mt-dk ::deep .mt-dk-section {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: var(--moka-spacing-xs);
 	min-width: 0;
-	padding-top: var(--moka-spacing-xs);
 }
 
 .mt-dk ::deep .mt-dk-section-head {
@@ -341,6 +209,15 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: var(--moka-button-height-sm);
+}
+
+/* Sections side by side while the page has room for two. */
+.mt-dk ::deep .mt-dk-columns {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: var(--moka-spacing-md) var(--moka-spacing-lg);
 	min-width: 0;
 }
 
@@ -380,17 +257,6 @@
 
 .mt-dk ::deep .mt-dk-box--short {
 	max-height: 160px;
-}
-
-.mt-dk ::deep .mt-dk-box--fill {
-	flex: 1;
-	min-height: 120px;
-	max-height: none;
-}
-
-.mt-dk ::deep .mt-dk-box--tall {
-	min-height: 120px;
-	max-height: 420px;
 }
 
 .mt-dk ::deep .mt-dk-box--nowrap {
@@ -458,27 +324,18 @@
 	gap: var(--moka-spacing-xs);
 }
 
-/* Key and value pairs that wrap the value rather than the key. */
-.mt-dk ::deep .mt-dk-facts {
-	display: grid;
-	grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
-	gap: 1px var(--moka-spacing-sm);
-	margin: 0;
-	min-width: 0;
-	font-size: var(--moka-font-size-xs);
-}
-
-.mt-dk ::deep .mt-dk-facts > dt {
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
+/* Facts (MokaDataList): keys as micro-labels, values as data that wraps rather than widening the panel. */
+.mt-dk ::deep .mt-dk-facts .moka-data-list-term {
+	min-width: 7rem;
 	color: var(--moka-color-on-surface-tertiary);
 	font-size: 10px;
 	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
 	line-height: 1.8;
+	text-transform: uppercase;
 }
 
-.mt-dk ::deep .mt-dk-facts > dd {
-	margin: 0;
+.mt-dk ::deep .mt-dk-facts .moka-data-list-description {
 	min-width: 0;
 	font-family: var(--moka-font-family-mono);
 	font-size: 11px;
@@ -486,6 +343,24 @@
 	overflow-wrap: anywhere;
 }
 
+/* Facts whose keys are data themselves (ports, networks, labels) keep their case. */
+.mt-dk ::deep .mt-dk-facts--data .moka-data-list-term {
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
+	font-weight: var(--moka-font-weight-normal);
+	letter-spacing: 0.02em;
+	text-transform: none;
+	overflow-wrap: anywhere;
+}
+
+.mt-dk ::deep .mt-dk-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+/* A container's own figures, drawn like the overview's MokaStat tiles but with a line or a bar under the value. */
 .mt-dk ::deep .mt-dk-stats {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -495,39 +370,17 @@
 .mt-dk ::deep .mt-dk-stat {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 3px;
 	min-width: 0;
+	padding: 0.5625rem 0.625rem;
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-variant);
 }
 
 .mt-dk ::deep .mt-dk-stat-value {
-	font-family: var(--moka-font-family-mono);
-	font-size: 18px;
+	font-size: 1.0625rem;
 	font-weight: var(--moka-font-weight-semibold);
-	line-height: 1.2;
-	overflow-wrap: anywhere;
-}
-
-.mt-dk ::deep .mt-dk-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: var(--moka-font-size-xs);
-}
-
-.mt-dk ::deep .mt-dk-table th {
-	padding: 2px var(--moka-spacing-xs) 2px 0;
-	text-align: left;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	color: var(--moka-color-on-surface-tertiary);
-	font-size: 10px;
-	font-weight: var(--moka-font-weight-semibold);
-}
-
-.mt-dk ::deep .mt-dk-table td {
-	padding: 2px var(--moka-spacing-xs) 2px 0;
-	border-top: 1px solid var(--moka-color-outline-variant);
-	font-family: var(--moka-font-family-mono);
-	font-size: 11px;
+	line-height: var(--moka-line-height-tight);
 	overflow-wrap: anywhere;
 }
 
@@ -582,147 +435,205 @@
 	min-height: 0;
 }
 
-.mt-dk ::deep .mt-dk-list {
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
-	min-width: 0;
-}
-
-/* Menu entries that repeat a labelled button: hidden while the button shows, shown once it folds away. */
-.mt-dk ::deep .mt-dk-narrow-only {
-	display: none;
-}
-
-@container mt-dk-page (max-width: 520px) {
-	.mt-dk ::deep .mt-dk-narrow-only {
-		display: flex;
-	}
-}
-
-/* Fixed shares for the first columns, so rows line up under each other however long a name is. */
-.mt-dk ::deep .mt-dk-cell--w45 {
-	flex: 0 0 45%;
-}
-
-.mt-dk ::deep .mt-dk-cell--w30 {
-	flex: 0 0 30%;
-}
-
-.mt-dk ::deep .mt-dk-cell--w12 {
-	flex: 0 0 12%;
-}
-
-.mt-dk ::deep .mt-dk-cell--count {
-	flex: 0 0 32px;
-	text-align: right;
-}
-
-.mt-dk ::deep .mt-dk-cell--size {
-	flex: 0 0 64px;
-	text-align: right;
-}
-
-.mt-dk ::deep .mt-dk-cell--time {
-	flex: 0 0 96px;
-}
-
-@container mt-dk-page (max-width: 520px) {
-	.mt-dk ::deep .mt-dk-cell--optional {
-		display: none;
-	}
-}
-
 /* A command or a file being edited is code: it reads in the monospace font, the way the result under it does. */
 .mt-dk ::deep .mt-dk-code textarea {
 	font-family: var(--moka-font-family-mono);
 	font-size: 12px;
 }
 
-/*
-	A list whose rows share one set of columns, so a name, an image or a port list starts at the same place on every row
-	whatever the other rows hold. Each row, and the button inside it, takes the list's columns as a subgrid, and the row's
-	actions sit in the last column against its end. The box around the list is a container, so the columns follow the
-	list's own width: beside an open panel the list is narrow even when the page is wide.
-*/
-.mt-dk ::deep .mt-dk-grid-box {
-	container-type: inline-size;
-	container-name: mt-dk-list;
-}
-
-.mt-dk ::deep .mt-dk-grid {
-	display: grid;
-	align-content: start;
-	gap: 1px var(--moka-spacing-sm);
-	min-width: 0;
-}
-
-.mt-dk ::deep .mt-dk-grid > * {
-	grid-column: 1 / -1;
-}
-
-.mt-dk ::deep .mt-dk-grid > .mt-dk-row {
-	display: grid;
-	grid-template-columns: subgrid;
-	gap: normal;
-}
-
-.mt-dk ::deep .mt-dk-grid > .mt-dk-row > .mt-dk-row-main {
-	display: grid;
-	grid-column: 1 / -2;
-	grid-template-columns: subgrid;
-	gap: normal;
-}
-
-.mt-dk ::deep .mt-dk-grid > .mt-dk-row > .mt-dk-hover {
-	grid-column: -2 / -1;
-	justify-self: end;
-}
-
-/* The update and restart loop chips share one column, which gives way before the image does. */
-.mt-dk ::deep .mt-dk-chips {
+.mt-dk ::deep .mt-dk-copyline {
 	display: flex;
-	gap: var(--moka-spacing-xxs);
-	min-width: 0;
-	overflow: hidden;
-}
-
-/* A scaled service's containers sit under its name: the dot where the name starts, the status across the rest. */
-.mt-dk ::deep .mt-dk-nested {
-	display: flex;
-	grid-column: 2;
 	align-items: center;
-	gap: var(--moka-spacing-sm);
+	gap: var(--moka-spacing-xs);
 	min-width: 0;
 }
 
-.mt-dk ::deep .mt-dk-cell--rest {
-	grid-column: 3 / -1;
+/*
+	Table cells (ToolTable). A name reads as data in the text colour, everything after it a step quieter. A column that
+	is not the table's main one is as wide as what it shows, so long values are held to a width (mt-dk-clip) and cut.
+*/
+.mt-dk ::deep .mt-dk-name {
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
 }
 
-/* State, name, health, image, chips, ports, actions. The image keeps a share of its own, so the ports give way first. */
-.mt-dk ::deep .mt-dk-grid--containers {
-	grid-template-columns: auto fit-content(30%) auto minmax(25%, 1fr) minmax(0, max-content) fit-content(26%) auto;
+.mt-dk ::deep .mt-dk-clip {
+	display: inline-block;
+	max-width: 28ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: bottom;
+	white-space: nowrap;
 }
 
-/* State, name, health or problem, image, chips, ports, running count, uptime, actions. */
-.mt-dk ::deep .mt-dk-grid--services {
-	grid-template-columns:
-		auto fit-content(26%) fit-content(20%) minmax(25%, 1fr) minmax(0, max-content) fit-content(22%) auto fit-content(14%)
-		auto;
+.mt-dk ::deep .mt-dk-clip--long {
+	max-width: 48ch;
 }
 
-/* Wider than the page's own fold at 520px, so whenever the page hides the optional cells their columns are gone too. */
-@container mt-dk-list (max-width: 560px) {
-	.mt-dk ::deep .mt-dk-grid .mt-dk-cell--optional {
+.mt-dk ::deep .mt-dk-after {
+	margin-left: 6px;
+}
+
+/* A word about a row (healthy, dangling, built in) as a micro-label beside the data. */
+.mt-dk ::deep .mt-dk-flag {
+	color: var(--moka-color-on-surface-tertiary);
+	font-family: var(--moka-font-family);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.mt-dk ::deep .mt-dk-flag--bad {
+	color: var(--moka-color-error);
+}
+
+.mt-dk ::deep .mt-dk-flag--on {
+	color: var(--moka-color-on-surface-variant);
+}
+
+/* The update and restart loop chips share one column, empty on most rows. */
+.mt-dk ::deep .mt-dk-chips {
+	display: inline-flex;
+	gap: var(--moka-spacing-xxs);
+	vertical-align: middle;
+}
+
+/* Tags wrap long text since Moka.Red 0.3.1; in a one-line row a chip keeps its words on one line. */
+.mt-dk ::deep .mt-dk-chips *,
+.mt-dk ::deep td .moka-tag {
+	white-space: nowrap;
+}
+
+/* A row's state dot says what the state is in its hint. The dot is 6px across, so the hint's element reaches a few
+   pixels past it to be found by the pointer, without taking any more room in the row. */
+.mt-dk ::deep .mt-dk-state {
+	margin: -4px;
+	padding: 4px;
+}
+
+/* A stopped container, an unused volume: still listed, a step back from the ones that run. */
+.mt-dk ::deep .mt-dk-row--down .mt-dk-name {
+	color: var(--moka-color-on-surface-variant);
+}
+
+/* A scaled service's containers sit under it, their names stepped in. */
+.mt-dk ::deep .mt-dk-row--nested td {
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-dk ::deep .mt-dk-nested {
+	padding-left: calc(var(--moka-spacing-md) + 4px);
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+}
+
+.mt-dk ::deep .mt-dk-twisty {
+	margin-right: 4px;
+	color: var(--moka-color-on-surface-tertiary);
+	vertical-align: -1px;
+}
+
+.mt-dk ::deep .mt-dk-group-name {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mt-dk ::deep .mt-dk-group-count {
+	color: var(--moka-color-on-surface-tertiary);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-normal);
+}
+
+/*
+	A row's quick actions show on a row that is pointed at, has the focus or is open; its menu button always shows. They
+	float over the end of the row, left of the menu, on the row's own background, so the column holds one button and the
+	table keeps its width for the data. Where nothing hovers, and on a list narrowed by the panel beside it, they stay
+	out: the menu and the panel offer the same.
+*/
+.mt-dk ::deep tbody tr {
+	--mt-dk-row-bg: var(--moka-color-surface);
+}
+
+.mt-dk ::deep tbody tr:hover {
+	--mt-dk-row-bg: var(--moka-color-surface-raised);
+}
+
+.mt-dk ::deep tbody tr.moka-table-row--selected {
+	--mt-dk-row-bg: var(--moka-color-primary-row);
+}
+
+.mt-dk ::deep td.moka-table-cell--actions {
+	position: relative;
+}
+
+.mt-dk ::deep .mt-dk-quick {
+	position: absolute;
+	top: 50%;
+	right: 100%;
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xxs);
+	padding-left: var(--moka-spacing-lg);
+	background: linear-gradient(to right, transparent, var(--mt-dk-row-bg) var(--moka-spacing-lg));
+	opacity: 0;
+	pointer-events: none;
+	transform: translateY(-50%);
+	transition: opacity var(--moka-transition-fast);
+}
+
+.mt-dk ::deep tr:hover .mt-dk-quick,
+.mt-dk ::deep tr:focus-within .mt-dk-quick,
+.mt-dk ::deep .moka-table-row--selected .mt-dk-quick {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+@media (hover: none) {
+	.mt-dk ::deep .mt-dk-quick {
 		display: none;
 	}
+}
 
-	.mt-dk ::deep .mt-dk-grid--containers {
-		grid-template-columns: auto fit-content(36%) auto minmax(20%, 1fr) minmax(0, max-content) auto;
+@container mt-tool-table (max-width: 799px) {
+	.mt-dk ::deep .mt-dk-quick {
+		display: none;
 	}
+}
 
-	.mt-dk ::deep .mt-dk-grid--services {
-		grid-template-columns: auto fit-content(32%) fit-content(24%) minmax(20%, 1fr) minmax(0, max-content) auto auto;
-	}
+/* A file name in a table, its icon beside it. */
+.mt-dk ::deep .mt-dk-file {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	max-width: 100%;
+}
+
+/* A compose project in place of the list: its head, its actions, then a tab that fills the rest. */
+.mt-dk ::deep .mt-dk-project {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: 0;
+}
+
+.mt-dk ::deep .mt-dk-project-folder {
+	flex: 0 1 auto;
+	min-width: 0;
+	margin-left: var(--moka-spacing-xs);
+}
+
+/* A compose file found on disk with what can be done with it. */
+.mt-dk ::deep .mt-dk-found {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	min-height: var(--moka-button-height-sm);
+	border-bottom: 1px solid var(--moka-color-outline-variant);
 }

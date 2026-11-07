@@ -15,7 +15,7 @@
 			{
 				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
 			}
-			<span class="mt-dk-cell-name">@run.Title</span>
+			<span class="mt-dk-title">@run.Title</span>
 			<MokaTag Text="@run.StateText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@StateColor(run.State)" />
 			@if (Elapsed(run) is { Length: > 0 } elapsed)
 			{

@@ -1,168 +1,172 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
-@using Moka.Red.Feedback.Dropdown
-@using Moka.Red.Feedback.Popover
 @inherits DockerManagerPageBase
 
-<div class="mt-dk-toolbar">
-	<div class="mt-dk-toolbar-search">
-		<MokaSearchInput Size="MokaSize.Sm" Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, tag or id" Debounce="100" aria-label="Filter images" />
-	</div>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download"
-				OnClick="TogglePull" aria-expanded="@(_pulling ? "true" : "false")">
-		Pull
-	</MokaButton>
-	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build"
-				Disabled="@(IsWorking || _view == BuildView)" OnClick="ShowBuild">
-		Build
-	</MokaButton>
-	@if (LiveRun is { } live && _view != LiveView)
-	{
-		<Hint Text="@($"{live.Title}: show its output")">
-			<MokaButton Variant="MokaVariant.Text" Color="@(live.IsRunning ? MokaColor.Warning : MokaColor.Surface)" Size="MokaSize.Xs"
-						StartIcon="@(live.IsRunning ? DockerIcons.Build : MokaIcons.File.FileText)" OnClick="ShowLive">
-				@(live.IsRunning ? "Running" : $"Last run: {live.StateText}")
-			</MokaButton>
-		</Hint>
-	}
-	<DockerUpdateCheck Session="Session" References="TaggedReferences" OnChecked="StateHasChanged" />
-	@if (Navigation is { } navigation)
-	{
-		<Hint Text="Dangling and unused images, with what each frees">
-			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
-						OnClick="@(() => navigation.Navigate(DockerPageIds.Cleanup))">
-				@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
-			</MokaButton>
-		</Hint>
-	}
-	<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
-				Disabled="IsLoading" OnClick="RefreshAsync" Label="Refresh" />
-</div>
-
-@if (_pulling)
-{
-	<form class="mt-dk-form" @onsubmit="PullAsync" @onsubmit:preventDefault="true">
-		<div class="mt-dk-form-field">
-			<MokaTextField Value="@_pull"
-						   ValueChanged="OnPullChanged"
-						   ErrorText="@_pullError"
-						   Placeholder="nginx:1.27 or registry.example.com/team/app:tag"
-						   Disabled="IsBusy"
-						   Size="MokaSize.Sm"
-						   spellcheck="false"
-						   autocomplete="off"
-						   aria-label="Image to pull" />
-		</div>
-		<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download" Disabled="IsBusy">Pull</MokaButton>
-	</form>
-}
-
-@LoadErrorPanel(RefreshAsync)
-@ChangePanel
-
-@if (_view == BuildView)
-{
-	<DockerBuildView Session="Session" Visible="Visible" OnStarted="ShowLive" OnCancel="ShowList" />
-}
-else if (_view == LiveView)
-{
-	<DockerLiveRunPanel Session="Session" Visible="Visible" Owner="@DockerLivePlan.ImagesOwner" OnBack="ShowList" BackLabel="Back to the images" />
-}
-else
-{
-<div class="@(SelectedImage is null ? "mt-dk-split" : "mt-dk-split mt-dk-split--open")">
-<div class="mt-dk-split-list">
-	@if (IsFirstLoad)
-	{
-		<div class="mt-dk-center"><MokaSpinner Label="Listing images" /></div>
-	}
-	else if (Shown.Count == 0)
-	{
-		<MokaEmptyState Icon="DockerIcons.Image"
-						Title="@(_images.Count == 0 ? "No images" : "Nothing matches")"
-						Description="@(_images.Count == 0 ? "Pull one, or let compose build one." : "No image matches the filter.")" />
-	}
-	<div class="mt-dk-list" role="list" aria-label="Images">
-		@foreach (DockerImage image in Shown)
+<ToolPageFrame Title="Images"
+			   Summary="@Summary"
+			   Search="@_query"
+			   SearchChanged="SearchCallback"
+			   SearchPlaceholder="Filter by name, tag or id"
+			   PrimaryText="@(ShowsList ? "Build" : null)"
+			   PrimaryIcon="DockerIcons.Build"
+			   PrimaryDisabled="IsWorking"
+			   PrimaryTitle="@(LiveRuns?.IsRunning == true ? "A build or a push is still running" : null)"
+			   OnPrimary="ShowBuild"
+			   Loading="FrameLoading"
+			   Loaded="@(!IsFirstLoad)"
+			   Error="@LoadError"
+			   LoadingText="Listing images"
+			   OnRefresh="RefreshCallback"
+			   ListPage="ShowsList"
+			   Detail="@DetailFragment">
+	<Chips>
+		@if (ShowsList)
 		{
-			ImageUpdateResult? update = image.IsTagged ? Feature?.ImageUpdates.Find(image.Reference) : null;
-			<div class="@(Key(image) == _selected ? "mt-dk-row mt-dk-row--selected" : "mt-dk-row")" role="listitem" @key="Key(image)">
-				<button type="button" class="mt-dk-row-main" @onclick="@(() => Select(image))">
-					<span class="mt-dk-cell-name mt-dk-cell--w45" title="@image.Reference">@image.Reference</span>
-					<span class="mt-dk-cell--w12">
-						@if (image.IsDangling)
-						{
-							<span class="mt-dk-label">dangling</span>
-						}
-						else if (update is { HasUpdate: true })
-						{
-							@UpdateChip(image.Reference)
-						}
-						else if (update is { Label.Length: > 0 })
-						{
-							<Hint Text="@update.Detail"><span class="mt-dk-label">@update.Label</span></Hint>
-						}
-					</span>
-					<span class="mt-dk-cell mt-dk-cell--grow">@image.CreatedSince</span>
-					<span class="mt-dk-cell mt-dk-cell--size">@image.Size</span>
-				</button>
-				<span class="mt-dk-hover">
-					<CopyButton Text="@image.Reference" Label="Copy the reference" />
-					@if (Navigation is { } rowNavigation)
-					{
-						<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Play"
-									Disabled="IsBusy" OnClick="@(() => rowNavigation.NewContainer(image.Reference))"
-									Label="New container from this image" AriaLabel="@($"New container from {image.Reference}")" />
-					}
-					<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
-								Disabled="IsBusy" OnClick="@(() => RemoveAsync(image, force: false))" Label="Remove" AriaLabel="@($"Remove {image.Reference}")" />
-					<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
-						<ChildContent>
-							<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
-										Disabled="IsBusy" Label="More actions" AriaLabel="@($"Actions for {image.Reference}")" Position="MokaTooltipPosition.BottomEnd" />
-						</ChildContent>
-						<Items>
-							@if (update is { HasUpdate: true })
-							{
-								<MokaDropdownItem Text="Pull the newer image" Icon="DockerIcons.Update" OnClick="@(() => PullUpdateAsync(image))" />
-							}
-							@if (image.IsTagged)
-							{
-								<MokaDropdownItem Text="Check for an update" Icon="DockerIcons.Update" OnClick="@(() => CheckOneAsync(image))" />
-							}
-							@if (Navigation is { } menuNavigation)
-							{
-								<MokaDropdownItem Text="New container from this image" Icon="MokatermIcons.Play" OnClick="@(() => menuNavigation.NewContainer(image.Reference))" />
-							}
-							<MokaDropdownItem Text="Tag or push" Icon="DockerIcons.Push" OnClick="@(() => Select(image))" />
-							<MokaDropdownItem Divider />
-							<MokaDropdownItem Text="Remove" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: false))" />
-							<MokaDropdownItem Text="Remove even if used (--force)" Icon="MokaIcons.Action.Delete" OnClick="@(() => RemoveAsync(image, force: true))" />
-							<MokaDropdownItem Divider />
-							<MokaDropdownItem Text="@($"Copy id {image.ShortId}")" Icon="MokaIcons.Content.Copy" OnClick="@(() => CopyTextAsync(Clipboard, image.Id, "id"))" />
-						</Items>
-					</MokaDropdown>
-				</span>
-			</div>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download"
+						OnClick="TogglePull" aria-expanded="@(_pulling ? "true" : "false")">
+				Pull
+			</MokaButton>
+			<DockerUpdateCheck Session="Session" References="TaggedReferences" OnChecked="StateHasChanged" />
+			@if (LiveRun is { } live)
+			{
+				<Hint Text="@($"{live.Title}: show its output")">
+					<MokaButton Variant="MokaVariant.Text" Color="@(live.IsRunning ? MokaColor.Warning : MokaColor.Surface)" Size="MokaSize.Xs"
+								StartIcon="@(live.IsRunning ? DockerIcons.Build : MokaIcons.File.FileText)" OnClick="ShowLive">
+						@(live.IsRunning ? "Running" : $"Last run: {live.StateText}")
+					</MokaButton>
+				</Hint>
+			}
 		}
-	</div>
-</div>
-	@if (SelectedImage is { } selected)
-	{
-		<div class="mt-dk-split-panel">
-			<DockerImagePanel @key="Key(selected)"
-							  Session="Session"
-							  Visible="Visible"
-							  Reference="@selected.Reference"
-							  ImageId="@selected.Id"
-							  Repository="@selected.Repository"
-							  Tagged="selected.IsTagged"
-							  TagSource="@selected.RemoveTarget"
-							  Details="@PanelDetails(selected)"
-							  RepositoryTags="RepositoryTags(selected)"
-							  OnClose="ClosePanel"
-							  OnChanged="RefreshAsync"
-							  OnPushStarted="ShowLive" />
-		</div>
-	}
-</div>
+	</Chips>
+	<ChipsEnd>
+		@if (ShowsList && Navigation is { } navigation)
+		{
+			<Hint Text="Dangling and unused images, with what each frees">
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Prune"
+							OnClick="@(() => navigation.ShowCleanup("images"))">
+					@($"Clean up ({DanglingCount.ToString(CultureInfo.CurrentCulture)} dangling)")
+				</MokaButton>
+			</Hint>
+		}
+	</ChipsEnd>
+	<Notices>
+		@if (_pulling && ShowsList)
+		{
+			<form class="mt-dk-form" @onsubmit="PullAsync" @onsubmit:preventDefault="true">
+				<div class="mt-dk-form-field">
+					<MokaTextField Value="@_pull"
+								   ValueChanged="OnPullChanged"
+								   ErrorText="@_pullError"
+								   Placeholder="nginx:1.27 or registry.example.com/team/app:tag"
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off"
+								   aria-label="Image to pull" />
+				</div>
+				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download" Disabled="IsBusy">Pull</MokaButton>
+				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="TogglePull">Cancel</MokaButton>
+			</form>
+		}
+		@ChangePanel
+	</Notices>
+	<ChildContent>
+		@if (_view == BuildView)
+		{
+			<DockerBuildView Session="Session" Visible="Visible" OnStarted="ShowLive" OnCancel="ShowList" />
+		}
+		else if (_view == LiveView)
+		{
+			<DockerLiveRunPanel Session="Session" Visible="Visible" Owner="@DockerLivePlan.ImagesOwner" OnBack="ShowList" BackLabel="Back to the images" />
+		}
+		else
+		{
+			<ToolTable TItem="DockerImage"
+					   Items="_shown"
+					   ItemKey="@(image => Key(image))"
+					   Label="Images"
+					   IsSelected="@(image => Key(image) == _selected)"
+					   OnRowClick="OnRowClick"
+					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+					   RowClass="@(image => image.IsDangling ? "mt-dk-row--down" : null)"
+					   EmptyIcon="DockerIcons.Image"
+					   EmptyTitle="@(_images.Count == 0 ? "No images" : "Nothing matches")"
+					   EmptyText="@(_images.Count == 0 ? "Pull one, or let compose build one." : "No image matches the filter.")">
+				<RowActions Context="image">
+					<span class="mt-dk-quick">
+						<CopyButton Text="@image.Reference" Label="Copy the reference" />
+						@if (Navigation is { } rowNavigation)
+						{
+							<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Play"
+										Disabled="IsBusy" OnClick="@(() => rowNavigation.NewContainer(image.Reference))"
+										Label="New container from this image" AriaLabel="@($"New container from {image.Reference}")" />
+						}
+						<IconButton Color="MokaColor.Error" Size="MokaSize.Xs" Icon="MokaIcons.Action.Delete"
+									Disabled="IsBusy" OnClick="@(() => RemoveAsync(image, force: false))" Label="Remove" AriaLabel="@($"Remove {image.Reference}")" />
+					</span>
+					<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+								Disabled="IsBusy"
+								OnClick="@(args => ShowRowMenu(args, MenuFor(image)))"
+								Label="More actions"
+								AriaLabel="@($"Actions for {image.Reference}")"
+								Position="MokaTooltipPosition.BottomEnd" />
+				</RowActions>
+				<ChildContent>
+					<MokaColumn TItem="DockerImage" Title="Image" Field="@(image => image.Reference)" SortComparer="ByReference" Mono Class="mt-col-main">
+						<CellTemplate Context="image">
+							<span class="mt-dk-name" title="@image.Reference">@image.Reference</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerImage" Title="" Sortable="false" Resizable="false">
+						<CellTemplate Context="image">
+							@if (image.IsDangling)
+							{
+								<span class="mt-dk-flag">dangling</span>
+							}
+							else if (UpdateOf(image) is { HasUpdate: true })
+							{
+								@UpdateChip(image.Reference)
+							}
+							else if (UpdateOf(image) is { Label.Length: > 0 } checkedImage)
+							{
+								<Hint Text="@checkedImage.Detail"><span class="mt-dk-flag">@checkedImage.Label</span></Hint>
+							}
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerImage" Title="Id" Field="@(image => image.ShortId)" Mono Class="mt-col-wider">
+						<CellTemplate Context="image">
+							<span class="mt-dk-dim">@image.ShortId</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerImage" Title="Created" Field="@(image => image.CreatedAt)" SortComparer="ByCreated" SortDescendingFirst Mono Class="mt-col-wide">
+						<CellTemplate Context="image">
+							<span class="mt-dk-dim">@image.CreatedSince</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerImage" Title="Size" Field="@(image => image.SizeBytes)" SortComparer="BySize" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+						<CellTemplate Context="image">@image.Size</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+			</ToolTable>
+		}
+	</ChildContent>
+</ToolPageFrame>
+
+@code {
+	private RenderFragment? DetailFragment => ShowsList && SelectedImage is { } selected
+		? @<DockerImagePanel @key="Key(selected)"
+							 Session="Session"
+							 Visible="Visible"
+							 Reference="@selected.Reference"
+							 ImageId="@selected.Id"
+							 Repository="@selected.Repository"
+							 Tagged="selected.IsTagged"
+							 TagSource="@selected.RemoveTarget"
+							 Size="@selected.Size"
+							 Created="@selected.CreatedSince"
+							 Containers="selected.ContainerCount"
+							 RepositoryTags="RepositoryTags(selected)"
+							 OnClose="ClosePanel"
+							 OnChanged="RefreshAsync"
+							 OnPushStarted="ShowLive" />
+		: null;
 }

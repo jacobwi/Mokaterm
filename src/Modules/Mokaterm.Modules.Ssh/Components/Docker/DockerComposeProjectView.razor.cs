@@ -1,16 +1,22 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.ContextMenu;
 using Moka.Red.Core.Enums;
+using Moka.Red.Core.Icons;
+using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// One compose project in one place: a header with its state, its compose and its folder; the actions used most as
-/// labelled buttons and the rest in a menu (all in the menu when the page is narrow); one row per service with its own
-/// actions; and its logs, files, env files and configuration as tabs. Every action shows what it touches while it
-/// runs, keeps the tail of its output from the last run, and refreshes the project after.
+/// One compose project in one place: a header with its state, its folder and its compose; the actions used most as
+/// labelled buttons and the rest in a menu (all in the menu when the page is narrow); a table with a row per service and
+/// its own actions, where a scaled service opens to its containers; and its logs, files, env files and configuration as
+/// tabs. Every action shows what it touches while it runs, keeps the tail of its output from the last run, and refreshes
+/// the project after.
 /// </summary>
 public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 {
@@ -32,6 +38,7 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	private ComposeProject? _project;
 	private ComposeTarget? _target;
 	private IReadOnlyList<ComposeService> _services = [];
+	private IReadOnlyList<ServiceLine> _lines = [];
 	private IReadOnlyList<string> _defined = [];
 	private ComposeProjectContext? _context;
 	private int _version;
@@ -43,6 +50,9 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	[Parameter, EditorRequired]
 	public string ProjectName { get; set; } = "";
 
+	[Inject]
+	private IClipboardService Clipboard { get; set; } = default!;
+
 	[Parameter]
 	public EventCallback OnBack { get; set; }
 
@@ -51,6 +61,8 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	public EventCallback OnFind { get; set; }
 
 	private ComposeTool? Tool => Feature?.Compose;
+
+	private IReadOnlyList<ServiceLine> Lines => _lines;
 
 	private string LiveOwner => DockerLivePlan.ComposeOwner(ProjectName);
 
@@ -127,6 +139,7 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 		{
 			_target = null;
 			_services = [];
+			_lines = [];
 			_context = null;
 			return;
 		}
@@ -151,7 +164,96 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 
 		_services = ComposeService.Group(members, _defined);
 		_context = new ComposeProjectContext(project, _target, _services, ++_version, RunAsync);
+		BuildLines();
 	});
+
+	/// <summary>Every service, with a scaled one's containers under it while it is open.</summary>
+	private void BuildLines()
+	{
+		List<ServiceLine> lines = [];
+		foreach (ComposeService service in _services)
+		{
+			lines.Add(new ServiceLine(service, null));
+			if (service.IsScaled && _expanded.Contains(service.Name))
+			{
+				lines.AddRange(service.Containers.Select(container => new ServiceLine(service, container)));
+			}
+		}
+
+		_lines = lines;
+	}
+
+	private static string? LineClass(ServiceLine line) =>
+		line.Container is not null ? "mt-dk-row--nested"
+		: line.Service.State is ComposeServiceState.Stopped or ComposeServiceState.NoContainer ? "mt-dk-row--down"
+		: null;
+
+	/// <summary>A row's menu, from its button or a right-click: a service's actions, or a scaled one's container's.</summary>
+	private List<MokaContextMenuItem> MenuFor(ServiceLine line) =>
+		line.Container is { } container ? ContainerMenu(container) : MenuFor(line.Service);
+
+	private List<MokaContextMenuItem> MenuFor(ComposeService service)
+	{
+		if (_target is not { } target)
+		{
+			return [];
+		}
+
+		bool files = target.HasFiles;
+		List<MokaContextMenuItem> items =
+		[
+			Action("Restart", MokatermIcons.Reconnect, "restart", service, IsBusy),
+			Action("Stop", DockerIcons.Stop, "stop", service, IsBusy),
+			Action("Start", MokatermIcons.Play, "start", service, IsBusy),
+			Action("Recreate this service", MokatermIcons.Reconnect, "recreate", service, IsBusy || !files),
+			Action("Pull its image", MokaIcons.Action.Download, "pull", service, IsBusy || !files),
+			Action("Build its image", DockerIcons.Build, "build", service, IsBusy || !files || IsWorking),
+			Action("Update this service (pull, then up)", DockerIcons.Update, "update", service, IsBusy || !files),
+		];
+		bool first = true;
+		if (ServiceLoop(service) is { } loop && Navigation is { } navigation)
+		{
+			items.Add(new MokaContextMenuItem
+			{
+				Text = "Why it keeps restarting",
+				Icon = DockerIcons.Container,
+				DividerBefore = true,
+				OnClickSync = () => navigation.ShowContainer(loop.Id, DockerContainerPanel.RestartsTab),
+			});
+			first = false;
+		}
+
+		items.Add(new MokaContextMenuItem { Text = "Logs", Icon = MokaIcons.File.FileText, DividerBefore = first, OnClickSync = () => ShowLogs(service.Name) });
+		items.Add(new MokaContextMenuItem
+		{
+			Text = "Browse files",
+			Icon = MokatermIcons.FolderOpen,
+			Disabled = RunningContainer(service) is null,
+			OnClick = () => RunningContainer(service) is { } browsed ? BrowseFilesAsync(browsed.Name) : Task.CompletedTask,
+		});
+		return items;
+	}
+
+	private MokaContextMenuItem Action(string text, MokaIconDefinition icon, string action, ComposeService service, bool disabled) => new()
+	{
+		Text = text,
+		Icon = icon,
+		Disabled = disabled,
+		OnClick = () => RunAsync(action, service.Name),
+	};
+
+	private List<MokaContextMenuItem> ContainerMenu(ComposeContainer container) =>
+	[
+		new MokaContextMenuItem
+		{
+			Text = "Open a shell in a new tab",
+			Icon = MokatermIcons.Terminal,
+			Disabled = IsBusy || !container.IsRunning || !CanOpenShellTab,
+			OnClick = () => ShellAsync(container.Name),
+		},
+		new MokaContextMenuItem { Text = "Browse files", Icon = MokatermIcons.FolderOpen, Disabled = !container.IsRunning, OnClick = () => BrowseFilesAsync(container.Name) },
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, container.Name, "name") },
+	];
 
 	/// <summary>The ports of a service's running containers: a scaled service may publish one per replica.</summary>
 	private static IReadOnlyList<DockerPort> RunningPorts(ComposeService service) =>
@@ -165,17 +267,20 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 		_tab = "logs";
 	}
 
-	private void ToggleService(ComposeService service)
+	/// <summary>A click on a scaled service, or Enter on one of its cells, opens it to its containers or folds it again.</summary>
+	private void ToggleService(ServiceLine line)
 	{
-		if (!service.IsScaled)
+		if (line.Container is not null || !line.Service.IsScaled)
 		{
 			return;
 		}
 
-		if (!_expanded.Remove(service.Name))
+		if (!_expanded.Remove(line.Service.Name))
 		{
-			_expanded.Add(service.Name);
+			_expanded.Add(line.Service.Name);
 		}
+
+		BuildLines();
 	}
 
 	private void ToggleBuild() => _build = !_build;
@@ -231,5 +336,11 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 		{
 			Feature?.ImageUpdates.Forget([.. _services.Where(item => service is null || item.Name == service).Select(item => item.Image)]);
 		}
+	}
+
+	/// <summary>A row of the services table: a service, or one of a scaled service's containers under it.</summary>
+	private sealed record ServiceLine(ComposeService Service, ComposeContainer? Container)
+	{
+		public string Key => Container is { } container ? $"{Service.Name}/{container.Name}" : Service.Name;
 	}
 }

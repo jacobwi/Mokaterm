@@ -22,30 +22,7 @@
 		<span class="mt-dk-note">Docker has not restarted it in a loop lately. This is what it knows about its restarts.</span>
 	}
 
-	<dl class="mt-dk-facts">
-		<dt>Restarts</dt>
-		<dd>@RestartsText(details)</dd>
-		<dt>Policy</dt>
-		<dd>@DockerRestartWording.Policy(details.RestartPolicy)</dd>
-		<dt>Last exit</dt>
-		<dd>@ExitText(LastExit(details))</dd>
-		@if (LastExit(details) is { } exit)
-		{
-			<dt>Out of memory</dt>
-			<dd>@(exit.OomKilled ? "yes: the kernel killed it at its memory limit" : "no")</dd>
-			@if (exit.Error.Length > 0)
-			{
-				<dt>Docker said</dt>
-				<dd>@exit.Error</dd>
-			}
-		}
-		<dt>Last started</dt>
-		<dd>@When(details.StartedAt)</dd>
-		<dt>Last stopped</dt>
-		<dd>@When(details.FinishedAt ?? LastExit(details)?.FinishedAt)</dd>
-		<dt>Runs last</dt>
-		<dd>@RunsText(details)</dd>
-	</dl>
+	<MokaDataList Items="Facts(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
 
 	<div class="mt-dk-toolbar">
 		<MokaButton Variant="MokaVariant.Outlined"
