@@ -4,6 +4,7 @@ using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Plugin.TestHost;
 using Mokaterm.Plugins.Sample.Subnets;
+using Mokaterm.UI.Common.Components;
 
 namespace Mokaterm.Plugins.Sample.Tests;
 
@@ -23,6 +24,19 @@ public sealed class ToolRenderTests
 		Assert.Contains("Address and prefix", html, StringComparison.Ordinal);
 		Assert.Contains("192.168.1.10/24", html, StringComparison.Ordinal);
 		Assert.Contains("data-autofocus", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_ViewTabs_DrawsMokasTabs()
+	{
+		string html = await StaticRender.RenderAsync<ViewTabs>(new Dictionary<string, object?>(StringComparer.Ordinal)
+		{
+			[nameof(ViewTabs.Tabs)] = new List<(string Id, string Text)> { ("hosts", "Hosts"), ("keys", "Keys") },
+			[nameof(ViewTabs.Active)] = "hosts",
+		});
+
+		Assert.Contains("Hosts", html, StringComparison.Ordinal);
+		Assert.Contains("Keys", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

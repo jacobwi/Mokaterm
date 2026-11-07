@@ -39,6 +39,7 @@ public static class StaticRender
 		collection.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
 		collection.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 		collection.AddScoped<IJSRuntime, IdleJsRuntime>();
+		collection.AddScoped<NavigationManager, StaticNavigation>();
 		collection.AddSingleton<IClipboardService, TestClipboard>();
 		collection.AddSingleton<TestInteraction>();
 		collection.AddSingleton<IUserInteraction>(provider => provider.GetRequiredService<TestInteraction>());
