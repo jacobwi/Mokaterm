@@ -1,3 +1,13 @@
+## What's new in 0.3.1
+
+**Plugins**
+
+- **The gallery's plugins have 0.3 builds**: Certificates 1.2.0, Developer Utilities 1.2.0, Kubernetes 1.1.0, Network
+  Toolkit 1.3.0 and Password Generator 1.2.0. Settings, Plugins shows the updates, and installs them in place of the
+  0.2 builds that 0.3.0 marked incompatible.
+- For plugin authors: `Mokaterm.Plugin.TestHost` registers a navigation manager, so a test that renders a view with
+  `ViewTabs` no longer fails.
+
 ## What's new in 0.3.0
 
 **Look**
