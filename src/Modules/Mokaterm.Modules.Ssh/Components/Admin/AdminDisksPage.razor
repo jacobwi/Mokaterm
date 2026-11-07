@@ -1,3 +1,4 @@
+@using Moka.Red.Navigation.Breadcrumb
 @using Mokaterm.Modules.Ssh.Admin.Storage
 @using Mokaterm.UI.Common.Formatting
 @inherits AdminPageBase
@@ -5,7 +6,7 @@
 <ToolPageFrame Title="Disks"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="@(_view == "space" ? "Filter by name" : "Filter by device or mount point")"
 				PrimaryText="@(_view == "space" ? "Find large files" : null)"
 				PrimaryIcon="MokaIcons.Action.Search"
@@ -24,7 +25,7 @@
 	<ChipsEnd>
 		@if (_view is "usage" or "mounts")
 		{
-			<MokaCheckbox Value="_everything" ValueChanged="@(value => _everything = value)" Label="Kernel and memory file systems too" />
+			<MokaCheckbox Value="_everything" ValueChanged="OnEverythingChanged" Label="Kernel and memory file systems too" />
 		}
 	</ChipsEnd>
 	<ChildContent>
@@ -37,109 +38,134 @@
 					break;
 
 				case "devices":
-					@if (snapshot.Devices.Count == 0)
-					{
-						<MokaEmptyState Icon="SshIcons.Disk" Title="No block devices" Description="Neither lsblk nor /proc/partitions listed one, which is usual in a container." />
-					}
-					else
-					{
-						<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) 56px 72px 72px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 64px minmax(0, 1fr)">
-							<div class="mta-row mta-row--head">
-								<span>Device</span>
-								<span class="mta-wide">Type</span>
-								<span class="mta-wide">File system</span>
-								<span>Size</span>
-								<span>Mounted on</span>
-							</div>
-							@foreach ((BlockDevice device, int depth) in Flatten(snapshot.Devices, 0).Where(pair => Matches(pair.Device.Name) || Matches(pair.Device.MountPoint)))
-							{
-								<div class="@(device.Name == _device ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-									 @key="@($"{device.Name}|{depth}|{device.MountPoint}")"
-									 role="button"
-									 tabindex="0"
-									 @onclick="@(() => SelectDevice(device))"
-									 @onkeydown="@(args => OnDeviceKey(args, device))">
-									<Hint Text="@DeviceTitle(device)" Position="MokaTooltipPosition.BottomStart" Class="mta-cell" Style="@($"padding-left:{depth * 14}px")">
-										<span class="mta-mono">@device.Name</span>
-										@if (device.Model.Length > 0 || device.Label.Length > 0)
+					<div class="mta-stack">
+						<ToolTable TItem="AdminRow<BlockDevice>"
+								   Items="_devicesShown"
+								   ItemKey="@(row => $"{row.Item.Name}|{row.Depth}|{row.Item.MountPoint}")"
+								   Label="Block devices"
+								   IsSelected="@(row => row.Item.Name == _device)"
+								   OnRowClick="@(row => SelectDevice(row.Item))"
+								   EmptyIcon="SshIcons.Disk"
+								   EmptyTitle="@(snapshot.Devices.Count == 0 ? "No block devices" : "Nothing matches")"
+								   EmptyText="@(snapshot.Devices.Count == 0 ? "Neither lsblk nor /proc/partitions listed one, which is usual in a container." : "No device or mount point matches the filter.")">
+							<MokaColumn TItem="AdminRow<BlockDevice>" Title="Device" Sortable="false" Class="mt-col-main">
+								<CellTemplate Context="row">
+									<Hint Text="@DeviceTitle(row.Item)" Position="MokaTooltipPosition.BottomStart" Class="mta-cell" Style="@Indent(row.Depth, 14)">
+										<span class="mta-mono">@row.Item.Name</span>
+										@if (row.Item.Model.Length > 0 || row.Item.Label.Length > 0)
 										{
-											<span class="mta-dim mta-after">@(device.Model.Length > 0 ? device.Model : device.Label)</span>
+											<span class="mta-dim mta-after">@(row.Item.Model.Length > 0 ? row.Item.Model : row.Item.Label)</span>
 										}
-										@if (_smart.TryGetValue(device.Name, out SmartReport? health) && health.Passed is { } passed)
+										@if (_smart.TryGetValue(row.Item.Name, out SmartReport? health) && health.Passed is { } passed)
 										{
 											<span class="mta-after"><MokaTag Text="@(passed && !health.NeedsAttention ? "OK" : "CHECK")" Size="MokaSize.Xs" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : MokaColor.Error)" /></span>
 										}
 									</Hint>
-									<span class="mta-cell mta-mono mta-dim mta-wide">@device.Type</span>
-									<span class="mta-cell mta-mono mta-dim mta-wide">@device.FileSystem</span>
-									<span class="mta-cell mta-mono">@(device.SizeBytes is { } size ? DisplayFormat.Bytes(size) : "")</span>
-									<span class="mta-cell mta-mono" title="@device.MountPoint">@device.MountPoint</span>
-								</div>
-							}
-						</div>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<BlockDevice>" Title="Type" Sortable="false" Mono Class="mt-col-wide">
+								<CellTemplate Context="row">
+									<span class="mta-dim">@row.Item.Type</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<BlockDevice>" Title="File system" Sortable="false" Mono Class="mt-col-wide">
+								<CellTemplate Context="row">
+									<span class="mta-dim">@row.Item.FileSystem</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<BlockDevice>" Title="Size" Sortable="false" Mono Align="MokaTextAlign.Right">
+								<CellTemplate Context="row">
+									@(row.Item.SizeBytes is { } size ? DisplayFormat.Bytes(size) : "")
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<BlockDevice>" Title="Mounted on" Sortable="false" Mono Class="mta-col-cut">
+								<CellTemplate Context="row">
+									<span title="@row.Item.MountPoint">@row.Item.MountPoint</span>
+								</CellTemplate>
+							</MokaColumn>
+						</ToolTable>
 						@if (snapshot.DevicesFromPartitions)
 						{
 							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">lsblk is not installed, so only names and sizes from /proc/partitions are known.</MokaText>
 						}
-					}
+					</div>
 					break;
 
 				case "usage":
-					<div class="mta-table" style="--mta-cols: minmax(0, 1.2fr) minmax(0, 1fr) 60px 120px 70px; --mta-cols-narrow: minmax(0, 1fr) 96px 60px">
-						<div class="mta-row mta-row--head">
-							<SortHeader Label="Mounted on" Direction="@(_sort.DirectionOf("mount"))" OnSort="@(() => _sort.Toggle("mount", startDescending: false))" />
-							<span class="mta-wide">Source</span>
-							<span class="mta-wide">Type</span>
-							<SortHeader Label="Used" Direction="@(_sort.DirectionOf("used"))" OnSort="@(() => _sort.Toggle("used", startDescending: true))" />
-							<SortHeader Label="Size" Direction="@(_sort.DirectionOf("size"))" OnSort="@(() => _sort.Toggle("size", startDescending: true))" />
-						</div>
-						@foreach (FileSystemUsage item in SortedUsage(snapshot.Usage.Where(item => (_everything || DiskCommands.IsStorage(item)) && (Matches(item.MountPoint) || Matches(item.Source)))))
-						{
-							<div class="mta-row mta-row--clickable"
-								 @key="@($"{item.MountPoint}|{item.Source}")"
-								 role="button"
-								 tabindex="0"
-								 @onclick="@(() => OpenSpaceAsync(item.MountPoint))"
-								 @onkeydown="@(args => OnUsageKeyAsync(args, item.MountPoint))">
+					<ToolTable TItem="FileSystemUsage"
+							   Items="_usageShown"
+							   ItemKey="@(item => $"{item.MountPoint}|{item.Source}")"
+							   Label="File systems"
+							   OnRowClick="@(item => OpenSpaceAsync(item.MountPoint))"
+							   SortColumn="Mounted on"
+							   SortDirection="MokaSortDirection.Ascending"
+							   EmptyIcon="SshIcons.Disk"
+							   EmptyTitle="Nothing matches"
+							   EmptyText="@(_everything ? "No file system matches the filter." : "No storage file system matches the filter. Tick kernel and memory file systems to see those too.")">
+						<MokaColumn TItem="FileSystemUsage" Title="Mounted on" Field="@(item => item.MountPoint)" SortComparer="ByMountPoint" Class="mt-col-main">
+							<CellTemplate Context="item">
 								@* The hint names the whole mount point, so the cell needs no title of its own. *@
 								<Hint Text="@($"See what is using space on {item.MountPoint}")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@item.MountPoint</Hint>
-								<span class="mta-cell mta-mono mta-dim mta-wide" title="@item.Source">@item.Source</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide">@item.Type</span>
-								<Hint Text="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")" Class="mta-cell">
-									<span class="mta-mono">@AdminFormat.Percent(item.UsedPercent)</span>
-									<span class="mta-mono mta-dim mta-after">@AdminFormat.Kb(item.AvailableKb) free</span>
-									<UsageBar Percent="item.UsedPercent" />
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="FileSystemUsage" Title="Source" Field="@(item => item.Source)" Mono Class="mt-col-wide mta-col-cut">
+							<CellTemplate Context="item">
+								<span class="mta-dim" title="@item.Source">@item.Source</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="FileSystemUsage" Title="Type" Field="@(item => item.Type)" Mono Class="mt-col-wider">
+							<CellTemplate Context="item">
+								<span class="mta-dim">@item.Type</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="FileSystemUsage" Title="Used" Field="@(item => item.UsedPercent)" SortComparer="ByUsed" SortDescendingFirst>
+							<CellTemplate Context="item">
+								<Hint Text="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")">
+									<span class="mta-used">
+										<span class="mta-mono mta-used-figure">@AdminFormat.Percent(item.UsedPercent)</span>
+										<UsageBar Percent="item.UsedPercent" Class="mta-used-bar" />
+										<span class="mta-mono mta-dim">@AdminFormat.Kb(item.AvailableKb) free</span>
+									</span>
 								</Hint>
-								<span class="mta-cell mta-mono">@AdminFormat.Kb(item.TotalKb)</span>
-							</div>
-						}
-					</div>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="FileSystemUsage" Title="Size" Field="@(item => item.TotalKb)" SortComparer="BySize" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+							<CellTemplate Context="item">
+								@AdminFormat.Kb(item.TotalKb)
+							</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 					break;
 
 				default:
-					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) 76px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) 70px">
-						<div class="mta-row mta-row--head">
-							<span>Mounted on</span>
-							<span class="mta-wide">Source</span>
-							<span>Type</span>
-							<span class="mta-wide">Options</span>
-						</div>
-						@foreach (MountEntry mount in snapshot.Mounts.Where(mount => (_everything || IsStorageMount(mount, snapshot)) && (Matches(mount.MountPoint) || Matches(mount.Source))))
-						{
-							<div class="mta-row" @key="@($"{mount.MountPoint}|{mount.Source}|{mount.Type}")">
-								<span class="mta-cell mta-mono" title="@mount.MountPoint">
-									@mount.MountPoint
-									@if (mount.IsReadOnly)
-									{
-										<span class="mta-after"><MokaTag Text="RO" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
-									}
-								</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide" title="@mount.Source">@mount.Source</span>
-								<span class="mta-cell mta-mono">@mount.Type</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide" title="@mount.Options">@mount.Options</span>
-							</div>
-						}
-					</div>
+					<ToolTable TItem="MountEntry"
+							   Items="_mountsShown"
+							   ItemKey="@(mount => $"{mount.MountPoint}|{mount.Source}|{mount.Type}")"
+							   Label="Mounts"
+							   EmptyIcon="SshIcons.Disk"
+							   EmptyTitle="Nothing matches"
+							   EmptyText="@(_everything ? "No mount matches the filter." : "No storage mount matches the filter. Tick kernel and memory file systems to see those too.")">
+						<MokaColumn TItem="MountEntry" Title="Mounted on" Field="@(mount => mount.MountPoint)" Mono Class="mta-col-cut">
+							<CellTemplate Context="mount">
+								<span title="@mount.MountPoint">@mount.MountPoint</span>
+								@if (mount.IsReadOnly)
+								{
+									<span class="mta-after"><MokaTag Text="RO" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+								}
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="MountEntry" Title="Source" Field="@(mount => mount.Source)" Mono Class="mt-col-wide mta-col-cut">
+							<CellTemplate Context="mount">
+								<span class="mta-dim" title="@mount.Source">@mount.Source</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="MountEntry" Title="Type" Field="@(mount => mount.Type)" Mono />
+						<MokaColumn TItem="MountEntry" Title="Options" Field="@(mount => mount.Options)" Sortable="false" Mono Class="mt-col-main mt-col-wide">
+							<CellTemplate Context="mount">
+								<span class="mta-dim" title="@mount.Options">@mount.Options</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 					break;
 			}
 		}
@@ -150,7 +176,9 @@
 	private const string SpaceTab = "space";
 
 	private DiskSnapshot? _snapshot;
-	private readonly AdminSort _sort = new("mount");
+	private List<FileSystemUsage> _usageShown = [];
+	private List<MountEntry> _mountsShown = [];
+	private List<AdminRow<BlockDevice>> _devicesShown = [];
 	private string _view = "usage";
 	private string _filter = "";
 	private bool _everything;
@@ -212,6 +240,7 @@
 	{
 		AdminOutcome outcome = await ReadAsync(DiskCommands.Read(), cancellationToken);
 		_snapshot = DiskCommands.Parse(outcome.Output);
+		ApplyFilter();
 
 		// A refresh or a change of root mode reads everything again: what root can see is not what the login can.
 		_spaceCache.Clear();
@@ -248,25 +277,26 @@
 	private RenderFragment SpaceView(DiskSnapshot snapshot) => __builder =>
 	{
 		IReadOnlyList<(string Name, string Path)> trail = SpaceCommands.Trail(_spacePath);
-		<div class="mta-space">
-			<nav class="mta-crumbs" aria-label="Folder">
-				@for (int index = 0; index < trail.Count; index++)
-				{
-					(string name, string path) = trail[index];
-					bool last = index == trail.Count - 1;
-					@if (index > 1)
-					{
-						<span class="mta-dim" aria-hidden="true">/</span>
-					}
-					<button type="button" class="@(last ? "mta-crumb mta-crumb--here" : "mta-crumb")" aria-current="@(last ? "location" : null)" disabled="@last" @onclick="@(() => MeasureAsync(path))">@name</button>
-				}
-				<span class="mta-spacer"></span>
+		<div class="mta-stack">
+			<div class="mta-crumbs">
+				<MokaBreadcrumb @key="_spacePath" Look="MokaBreadcrumbLook.Path" Class="mta-crumbs-path" aria-label="Folder">
+					<Root>
+						@CrumbButton(trail[0].Name, trail[0].Path, trail.Count == 1)
+					</Root>
+					<ChildContent>
+						@for (int index = 1; index < trail.Count; index++)
+						{
+							(string name, string path) = trail[index];
+							<MokaBreadcrumbItem>@CrumbButton(name, path, index == trail.Count - 1)</MokaBreadcrumbItem>
+						}
+					</ChildContent>
+				</MokaBreadcrumb>
 				@if (SpaceCommands.Parent(_spacePath) is { } up)
 				{
 					<button type="button" class="mta-link" @onclick="@(() => MeasureAsync(up))">Up</button>
 				}
 				<button type="button" class="mta-link" disabled="@_measuring" @onclick="@(() => MeasureAsync(_spacePath, reuse: false))">Measure again</button>
-			</nav>
+			</div>
 
 			@if (_measuring)
 			{
@@ -280,8 +310,7 @@
 			}
 			else if (_space is { } report)
 			{
-				List<FileSystemUsage> mounts = [.. MountsInside(snapshot, _spacePath)];
-				long top = Math.Max(1, report.TotalKb ?? report.Entries.Select(entry => entry.Kb).DefaultIfEmpty(0).Sum());
+				List<SpaceRow> rows = SpaceRows(snapshot, report);
 				<div class="mta-space-head">
 					<span class="mta-stat mta-stat--small">@(report.TotalKb is { } total ? AdminFormat.Kb(total) : "?")</span>
 					<span class="mta-dim">@SpaceNote(report)</span>
@@ -290,53 +319,53 @@
 						<button type="button" class="mta-link" @onclick="Context.EnableRoot">Turn on root mode to read them</button>
 					}
 				</div>
-				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 90px minmax(80px, 1fr); --mta-cols-narrow: minmax(0, 1fr) 80px">
-					<div class="mta-row mta-row--head">
-						<span>Folder</span>
-						<span>Size</span>
-						<span class="mta-wide">Share</span>
-					</div>
-					@foreach (SpaceEntry entry in report.Entries.Where(entry => Matches(entry.Name) && !mounts.Any(mount => mount.MountPoint == entry.Path)))
-					{
-						<div class="mta-row mta-row--clickable" @key="entry.Path" role="button" tabindex="0"
-							 @onclick="@(() => MeasureAsync(entry.Path))"
-							 @onkeydown="@(args => OnFolderKeyAsync(args, entry.Path))">
-							<Hint Text="@($"Open {entry.Path}")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@entry.Name/</Hint>
-							<span class="mta-cell mta-mono">@AdminFormat.Kb(entry.Kb)</span>
-							<span class="mta-cell mta-wide"><UsageBar Percent="@(entry.Kb * 100.0 / top)" /></span>
-						</div>
-					}
-					@if (report.FilesHereKb is { } files && files > 0)
-					{
-						<div class="mta-row">
-							<span class="mta-cell mta-dim">Files directly in this folder</span>
-							<span class="mta-cell mta-mono">@AdminFormat.Kb(files)</span>
-							<span class="mta-cell mta-wide"><UsageBar Percent="@(files * 100.0 / top)" /></span>
-						</div>
-					}
-					@foreach (FileSystemUsage mount in mounts.Where(mount => Matches(SpaceCommands.NameOf(mount.MountPoint))))
-					{
-						<div class="mta-row mta-row--clickable" @key="@($"mount|{mount.MountPoint}")" role="button" tabindex="0"
-							 @onclick="@(() => MeasureAsync(mount.MountPoint))"
-							 @onkeydown="@(args => OnFolderKeyAsync(args, mount.MountPoint))">
-							<Hint Text="@($"{mount.Source}, a file system of its own, so du left it out here. Open it to measure it.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
-								@SpaceCommands.NameOf(mount.MountPoint)/
-								<span class="mta-dim mta-after">@($"{mount.Type} file system of its own")</span>
-							</Hint>
-							<span class="mta-cell mta-mono mta-dim">@AdminFormat.Kb(mount.UsedKb)</span>
-							<span class="mta-cell mta-wide"></span>
-						</div>
-					}
-					@if (report.Entries.Count == 0 && mounts.Count == 0 && report.FilesHereKb is null or 0)
-					{
-						<div class="mta-more">Nothing under this folder takes any space.</div>
-					}
-				</div>
+				<ToolTable TItem="SpaceRow"
+						   Items="rows"
+						   ItemKey="@(row => row.Mount is null ? row.Path ?? "" : "mount|" + row.Path)"
+						   Label="@($"Folders in {_spacePath}")"
+						   OnRowClick="OpenSpaceRowAsync"
+						   RowClass="@(row => row.Path is null ? "mta-row--still" : null)"
+						   EmptyIcon="SshIcons.Disk"
+						   EmptyTitle="@(_filter.Trim().Length > 0 ? "Nothing matches" : "Nothing takes space")"
+						   EmptyText="@(_filter.Trim().Length > 0 ? "No folder here matches the filter." : "Nothing under this folder takes any space.")">
+					<MokaColumn TItem="SpaceRow" Title="Folder" Field="@(row => row.Name)" Class="mt-col-main">
+						<CellTemplate Context="row">
+							@if (row.Mount is { } mount)
+							{
+								<Hint Text="@($"{mount.Source}, a file system of its own, so du left it out here. Open it to measure it.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
+									@row.Name/
+									<span class="mta-dim mta-after">@($"{mount.Type} file system of its own")</span>
+								</Hint>
+							}
+							else if (row.Path is { } path)
+							{
+								<Hint Text="@($"Open {path}")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">@row.Name/</Hint>
+							}
+							else
+							{
+								<span class="mta-dim">@row.Name</span>
+							}
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="SpaceRow" Title="Size" Field="@(row => row.Kb)" SortComparer="BySize" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+						<CellTemplate Context="row">
+							<span class="@(row.Mount is null ? null : "mta-dim")">@AdminFormat.Kb(row.Kb)</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="SpaceRow" Title="Share" Field="@(row => row.Share)" Sortable="false" Class="mt-col-wide">
+						<CellTemplate Context="row">
+							@if (row.Mount is null)
+							{
+								<UsageBar Percent="row.Share" Class="mta-share-bar" />
+							}
+						</CellTemplate>
+					</MokaColumn>
+				</ToolTable>
 			}
 
 			@if (_searching || _large is not null || _largeError is not null)
 			{
-				<section class="mta-section mta-large" aria-label="Large files">
+				<section class="@(_large is { Entries.Count: > 0 } ? "mta-section mta-large mta-large--table" : "mta-section mta-large")" aria-label="Large files">
 					<div class="mta-inline">
 						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Large files</MokaText>
 						<AdminChips Items="LargeChoices" Value="@_largeKb.ToString(CultureInfo.InvariantCulture)" ValueChanged="OnLargeSizeChangedAsync" AriaLabel="Files over" />
@@ -363,21 +392,29 @@
 						else
 						{
 							long largest = Math.Max(1, large.Entries[0].Kb);
-							<div class="mta-table" style="--mta-cols: minmax(0, 1.6fr) 90px minmax(80px, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) 80px">
-								<div class="mta-row mta-row--head">
-									<span>File</span>
-									<span>Size</span>
-									<span class="mta-wide"></span>
-								</div>
-								@foreach (SpaceEntry file in large.Entries.Where(file => Matches(file.Path)))
-								{
-									<div class="mta-row" @key="file.Path">
-										<span class="mta-cell mta-mono" title="@file.Path">@Relative(file.Path, large.Path)</span>
-										<span class="mta-cell mta-mono">@AdminFormat.Kb(file.Kb)</span>
-										<span class="mta-cell mta-wide"><UsageBar Percent="@(file.Kb * 100.0 / largest)" /></span>
-									</div>
-								}
-							</div>
+							<ToolTable TItem="SpaceEntry"
+									   Items="@(large.Entries.Where(file => Matches(file.Path)).ToList())"
+									   ItemKey="@(file => file.Path)"
+									   Label="@($"Files over {AdminFormat.Kb(_largeKb)} under {large.Path}")"
+									   EmptyIcon="SshIcons.Disk"
+									   EmptyTitle="Nothing matches"
+									   EmptyText="No large file matches the filter.">
+								<MokaColumn TItem="SpaceEntry" Title="File" Field="@(file => file.Path)" Mono Class="mt-col-main">
+									<CellTemplate Context="file">
+										<span title="@file.Path">@Relative(file.Path, large.Path)</span>
+									</CellTemplate>
+								</MokaColumn>
+								<MokaColumn TItem="SpaceEntry" Title="Size" Field="@(file => file.Kb)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+									<CellTemplate Context="file">
+										@AdminFormat.Kb(file.Kb)
+									</CellTemplate>
+								</MokaColumn>
+								<MokaColumn TItem="SpaceEntry" Title="Share" Field="@(file => file.Kb)" Sortable="false" Class="mt-col-wide">
+									<CellTemplate Context="file">
+										<UsageBar Percent="@(file.Kb * 100.0 / largest)" Class="mta-share-bar" />
+									</CellTemplate>
+								</MokaColumn>
+							</ToolTable>
 						}
 						@if (LargeNote(large) is { Length: > 0 } note)
 						{
@@ -387,6 +424,17 @@
 				</section>
 			}
 		</div>
+	};
+
+	private RenderFragment CrumbButton(string name, string path, bool here) => __builder =>
+	{
+		<button type="button"
+				class="@(here ? "mta-crumb mta-crumb--here" : "mta-crumb")"
+				aria-current="@(here ? "location" : null)"
+				disabled="@here"
+				@onclick="@(() => MeasureAsync(path))">
+			@name
+		</button>
 	};
 
 	private RenderFragment DevicePanel => __builder =>
@@ -519,27 +567,40 @@
 
 		@if (report.Attributes.Count > 0)
 		{
-			<div class="mta-table" style="--mta-cols: 34px minmax(0, 1fr) 44px 44px 50px minmax(56px, 0.6fr); --mta-cols-narrow: 34px minmax(0, 1fr) 44px minmax(56px, 0.6fr)" role="table" aria-label="SMART attributes">
-				<div class="mta-row mta-row--head" role="row">
-					<span role="columnheader">ID</span>
-					<span role="columnheader">Attribute</span>
-					<span role="columnheader">Value</span>
-					<span role="columnheader" class="mta-wide">Worst</span>
-					<span role="columnheader" class="mta-wide">Thresh</span>
-					<span role="columnheader">Raw</span>
-				</div>
-				@foreach (SmartAttribute row in report.Attributes)
-				{
-					<div class="@(row.Failed ? "mta-row mta-smart--failed" : row.Worrying ? "mta-row mta-smart--worrying" : "mta-row")" role="row" @key="row.Id">
-						<span class="mta-cell mta-mono" role="cell">@row.Id</span>
-						<span class="mta-cell mta-mono" role="cell" title="@row.Name">@row.Name</span>
-						@* The name keeps its title for its full value, so the reason a row is coloured goes on its figure. *@
-						<span class="mta-cell mta-mono" role="cell"><Hint Text="@(row.Failed ? $"The disk calls this attribute failed{(row.WhenFailed.Length > 0 ? $" ({row.WhenFailed})" : "")}." : row.Worrying ? "Damaged or unreadable sectors: a disk usually gets worse from here." : null)">@row.Value</Hint></span>
-						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Worst</span>
-						<span class="mta-cell mta-mono mta-dim mta-wide" role="cell">@row.Threshold</span>
-						<span class="mta-cell mta-mono" role="cell" title="@row.Raw">@row.Raw</span>
-					</div>
-				}
+			<div class="mta-smart">
+				<ToolTable TItem="SmartAttribute"
+						   Items="report.Attributes"
+						   ItemKey="@(row => row.Id)"
+						   Label="SMART attributes"
+						   RowClass="@(row => row.Failed ? "mta-smart--failed" : row.Worrying ? "mta-smart--worrying" : null)">
+					<MokaColumn TItem="SmartAttribute" Title="ID" Field="@(row => row.Id)" Mono />
+					<MokaColumn TItem="SmartAttribute" Title="Attribute" Field="@(row => row.Name)" Mono Class="mt-col-main">
+						<CellTemplate Context="row">
+							<span title="@row.Name">@row.Name</span>
+						</CellTemplate>
+					</MokaColumn>
+					@* The name keeps its title for its full value, so the reason a row is coloured goes on its figure. *@
+					<MokaColumn TItem="SmartAttribute" Title="Value" Field="@(row => row.Value)" Mono Align="MokaTextAlign.Right">
+						<CellTemplate Context="row">
+							<Hint Text="@(row.Failed ? $"The disk calls this attribute failed{(row.WhenFailed.Length > 0 ? $" ({row.WhenFailed})" : "")}." : row.Worrying ? "Damaged or unreadable sectors: a disk usually gets worse from here." : null)">@row.Value</Hint>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="SmartAttribute" Title="Worst" Field="@(row => row.Worst)" Mono Align="MokaTextAlign.Right" Class="mt-col-wide">
+						<CellTemplate Context="row">
+							<span class="mta-dim">@row.Worst</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="SmartAttribute" Title="Thresh" Field="@(row => row.Threshold)" Mono Align="MokaTextAlign.Right" Class="mt-col-wide">
+						<CellTemplate Context="row">
+							<span class="mta-dim">@row.Threshold</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="SmartAttribute" Title="Raw" Field="@(row => row.Raw)" Mono Class="mta-col-cut">
+						<CellTemplate Context="row">
+							<span title="@row.Raw">@row.Raw</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ToolTable>
 			</div>
 		}
 
@@ -552,6 +613,68 @@
 
 	private IReadOnlyList<AdminChip> LargeChoices =>
 		[.. SpaceCommands.LargeFileSizesKb.Select(kb => new AdminChip(kb.ToString(CultureInfo.InvariantCulture), $"over {AdminFormat.Kb(kb)}"))];
+
+	private static string? Indent(int depth, int step) => depth == 0
+		? null
+		: string.Create(CultureInfo.InvariantCulture, $"padding-left:{depth * step}px");
+
+	private static int ByMountPoint(FileSystemUsage left, FileSystemUsage right) => StringComparer.OrdinalIgnoreCase.Compare(left.MountPoint, right.MountPoint);
+
+	private static int ByUsed(FileSystemUsage left, FileSystemUsage right) => left.UsedPercent.CompareTo(right.UsedPercent);
+
+	private static int BySize(FileSystemUsage left, FileSystemUsage right) => left.TotalKb.CompareTo(right.TotalKb);
+
+	private static int BySize(SpaceRow left, SpaceRow right) => left.Kb.CompareTo(right.Kb);
+
+	private List<SpaceRow> SpaceRows(DiskSnapshot snapshot, SpaceReport report)
+	{
+		List<FileSystemUsage> mounts = [.. MountsInside(snapshot, _spacePath)];
+		long top = Math.Max(1, report.TotalKb ?? report.Entries.Select(entry => entry.Kb).DefaultIfEmpty(0).Sum());
+		List<SpaceRow> rows =
+		[
+			.. report.Entries
+				.Where(entry => Matches(entry.Name) && !mounts.Any(mount => mount.MountPoint == entry.Path))
+				.Select(entry => new SpaceRow(entry.Name, entry.Path, entry.Kb, entry.Kb * 100.0 / top)),
+		];
+		if (report.FilesHereKb is { } files && files > 0)
+		{
+			rows.Add(new SpaceRow("Files directly in this folder", null, files, files * 100.0 / top));
+		}
+
+		rows.AddRange(mounts
+			.Where(mount => Matches(SpaceCommands.NameOf(mount.MountPoint)))
+			.Select(mount => new SpaceRow(SpaceCommands.NameOf(mount.MountPoint), mount.MountPoint, mount.UsedKb, 0, mount)));
+		return rows;
+	}
+
+	private void OnFilterChanged(string value)
+	{
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void OnEverythingChanged(bool value)
+	{
+		_everything = value;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		if (_snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		_usageShown = [.. snapshot.Usage.Where(item => (_everything || DiskCommands.IsStorage(item)) && (Matches(item.MountPoint) || Matches(item.Source)))];
+		_mountsShown = [.. snapshot.Mounts.Where(mount => (_everything || IsStorageMount(mount, snapshot)) && (Matches(mount.MountPoint) || Matches(mount.Source)))];
+		_devicesShown =
+		[
+			.. Flatten(snapshot.Devices, 0)
+				.Select((pair, index) => new AdminRow<BlockDevice>(pair.Device, index, pair.Depth))
+				.Where(row => Matches(row.Item.Name) || Matches(row.Item.MountPoint)),
+		];
+	}
 
 	private static IEnumerable<(BlockDevice Device, int Depth)> Flatten(IEnumerable<BlockDevice> devices, int depth)
 	{
@@ -635,13 +758,6 @@
 			? string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h, about {hours / 24} days")
 			: string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h");
 
-	private IEnumerable<FileSystemUsage> SortedUsage(IEnumerable<FileSystemUsage> usage) => _sort.Key switch
-	{
-		"used" => _sort.Apply(usage, item => (double)item.UsedPercent),
-		"size" => _sort.Apply(usage, item => (double)item.TotalKb),
-		_ => _sort.Apply(usage, item => item.MountPoint),
-	};
-
 	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>Why the device's health cannot be asked for, or null when smartctl can be run on it.</summary>
@@ -664,15 +780,10 @@
 	private Task OpenSpaceAsync(string mountPoint)
 	{
 		_view = SpaceTab;
-		_filter = "";
 		return MeasureAsync(mountPoint);
 	}
 
-	private Task OnUsageKeyAsync(KeyboardEventArgs args, string mountPoint) =>
-		args.Key is "Enter" or " " ? OpenSpaceAsync(mountPoint) : Task.CompletedTask;
-
-	private Task OnFolderKeyAsync(KeyboardEventArgs args, string path) =>
-		args.Key is "Enter" or " " ? MeasureAsync(path) : Task.CompletedTask;
+	private Task OpenSpaceRowAsync(SpaceRow row) => row.Path is { } path ? MeasureAsync(path) : Task.CompletedTask;
 
 	/// <summary>
 	/// Opens <paramref name="path"/> in the space view, from what was measured already when it can. A newer call
@@ -687,7 +798,7 @@
 		}
 
 		_spacePath = folder;
-		_filter = "";
+		OnFilterChanged("");
 		_measure?.Cancel();
 		_measure?.Dispose();
 		_measure = null;
@@ -787,14 +898,6 @@
 		if (_device is not null)
 		{
 			StartSmartRead(device);
-		}
-	}
-
-	private void OnDeviceKey(KeyboardEventArgs args, BlockDevice device)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			SelectDevice(device);
 		}
 	}
 

@@ -20,6 +20,10 @@ public abstract class AdminPageBase : SystemPageBase
 	/// </summary>
 	private protected new AdminPageContext Context => (AdminPageContext)base.Context;
 
+	// Short lists stay whole, so the browser's own find still reaches every row; installed packages and busy process
+	// lists run to thousands and draw only the rows in view.
+	private protected const int VirtualizeAbove = 150;
+
 	private protected SystemAdminFeature Feature => Context.Feature;
 
 	private protected SystemProfile Profile => Context.Profile;

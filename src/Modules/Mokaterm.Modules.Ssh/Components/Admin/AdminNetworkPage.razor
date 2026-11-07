@@ -5,7 +5,7 @@
 <ToolPageFrame Title="Network"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter"
 				Loading="Loading"
 				Loaded="Loaded"
@@ -26,108 +26,105 @@
 					{
 						<MokaEmptyState Icon="SshIcons.Network" Title="No ip command" Description="iproute2 is not installed, so interfaces cannot be listed. Name servers and listening ports still can." />
 					}
-					else if (snapshot.Interfaces.Count == 0)
-					{
-						<MokaEmptyState Icon="SshIcons.Network" Title="No interfaces" Description="ip listed none." />
-					}
 					else
 					{
-						<div class="mta-table" style="--mta-cols: 14px minmax(0, 0.8fr) minmax(0, 1.6fr) 56px var(--moka-button-height-sm); --mta-cols-narrow: 14px minmax(0, 1fr) var(--moka-button-height-sm)">
-							<div class="mta-row mta-row--head">
-								<span></span>
-								<span>Interface</span>
-								<span class="mta-wide">Addresses</span>
-								<span class="mta-wide">MTU</span>
-								<span></span>
-							</div>
-							@foreach (NetInterface networkInterface in snapshot.Interfaces.Where(item => Matches(item.Name) || item.Addresses.Any(address => Matches(address.Address))))
+						<div class="mta-stack">
+							<ToolTable TItem="NetInterface"
+									   Items="_interfacesShown"
+									   ItemKey="@(item => item.Name)"
+									   Label="Interfaces"
+									   IsSelected="@(item => item.Name == _selected)"
+									   OnRowClick="@(item => Select(item.Name))"
+									   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+									   ActionsWidth="var(--moka-button-height-sm)"
+									   EmptyIcon="SshIcons.Network"
+									   EmptyTitle="@(snapshot.Interfaces.Count == 0 ? "No interfaces" : "Nothing matches")"
+									   EmptyText="@(snapshot.Interfaces.Count == 0 ? "ip listed none." : "No interface or address matches the filter.")">
+								<RowActions Context="item">
+									<IconButton Size="MokaSize.Xs"
+												Icon="MokaIcons.Navigation.MoreHorizontal"
+												OnClick="@(args => ShowRowMenu(args, MenuFor(item)))"
+												Label="More actions"
+												AriaLabel="@($"Actions for {item.Name}")"
+												Position="MokaTooltipPosition.BottomEnd" />
+								</RowActions>
+								<ChildContent>
+									<MokaColumn TItem="NetInterface" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+										<CellTemplate Context="item">
+											<MokaStatusDot Size="MokaSize.Xs" Color="@LinkColor(item)" Glow="item.IsUp" />
+										</CellTemplate>
+									</MokaColumn>
+									<MokaColumn TItem="NetInterface" Title="Interface" Field="@(item => item.Name)" SortComparer="ByName" Mono>
+										<CellTemplate Context="item">
+											<span>@item.Name</span>
+											@if (CarriesSession(item))
+											{
+												<Hint Text="This SSH session arrives on this interface" Class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
+											}
+										</CellTemplate>
+									</MokaColumn>
+									<MokaColumn TItem="NetInterface" Title="Addresses" Field="@(item => AddressText(item))" Mono Class="mt-col-main">
+										<CellTemplate Context="item">
+											<span class="mta-dim" title="@string.Join("\n", item.Addresses.Select(address => address.Cidr))">@AddressText(item)</span>
+										</CellTemplate>
+									</MokaColumn>
+									<MokaColumn TItem="NetInterface" Title="MTU" Field="@(item => item.Mtu)" Mono Class="mt-col-wide">
+										<CellTemplate Context="item">
+											<span class="mta-dim">@item.Mtu</span>
+										</CellTemplate>
+									</MokaColumn>
+								</ChildContent>
+							</ToolTable>
+							@if (snapshot.FromText)
 							{
-								<div class="@(networkInterface.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-									 @key="networkInterface.Name"
-									 role="button"
-									 tabindex="0"
-									 @onclick="@(() => Select(networkInterface.Name))"
-									 @onkeydown="@(args => OnRowKey(args, networkInterface.Name))"
-									 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(networkInterface)))"
-									 @oncontextmenu:preventDefault="true">
-									<MokaStatusDot Size="MokaSize.Xs" Color="@LinkColor(networkInterface)" Glow="networkInterface.IsUp" />
-									<span class="mta-cell">
-										<span class="mta-mono">@networkInterface.Name</span>
-										@if (CarriesSession(networkInterface))
-										{
-											<Hint Text="This SSH session arrives on this interface" Class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
-										}
-									</span>
-									<span class="mta-cell mta-mono mta-dim mta-wide" title="@string.Join("\n", networkInterface.Addresses.Select(address => address.Cidr))">
-										@(networkInterface.Addresses.Count == 0 ? "no address" : string.Join("  ", networkInterface.Addresses.Select(address => address.Cidr)))
-									</span>
-									<span class="mta-cell mta-mono mta-dim mta-wide">@networkInterface.Mtu</span>
-									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-										<IconButton Size="MokaSize.Xs"
-													Icon="MokaIcons.Navigation.MoreHorizontal"
-													OnClick="@(args => ShowRowMenu(args, MenuFor(networkInterface)))"
-													Label="More actions"
-													AriaLabel="@($"Actions for {networkInterface.Name}")"
-													Position="MokaTooltipPosition.BottomEnd" />
-									</span>
-								</div>
+								<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Read from plain ip output: this ip prints no JSON.</MokaText>
 							}
 						</div>
-						@if (snapshot.FromText)
-						{
-							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Read from plain ip output: this ip prints no JSON.</MokaText>
-						}
 					}
 					break;
 
 				case "routes":
-					<div class="mta-table" style="--mta-cols: minmax(0, 1.2fr) minmax(0, 1fr) 76px minmax(0, 1fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) 64px">
-						<div class="mta-row mta-row--head">
-							<span>Destination</span>
-							<span>Via</span>
-							<span>Device</span>
-							<span class="mta-wide">Source, protocol, metric</span>
-						</div>
-						@foreach (NetRoute route in snapshot.Routes.Where(route => Matches(route.Destination) || Matches(route.Device) || Matches(route.Gateway)))
-						{
-							<div class="mta-row" @key="@($"{route.Destination}|{route.Device}|{route.Gateway}|{route.Metric}")">
-								<span class="mta-cell mta-mono">@route.Destination</span>
-								<span class="mta-cell mta-mono mta-dim">@(route.Gateway.Length > 0 ? route.Gateway : "direct")</span>
-								<span class="mta-cell mta-mono">@route.Device</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide">@string.Join(" ", new[] { route.Source, route.Protocol, route.Metric?.ToString(CultureInfo.InvariantCulture) ?? "" }.Where(part => part.Length > 0))</span>
-							</div>
-						}
-					</div>
+					<ToolTable TItem="NetRoute"
+							   Items="_routesShown"
+							   ItemKey="@(route => $"{route.Destination}|{route.Device}|{route.Gateway}|{route.Metric}")"
+							   Label="Routes"
+							   EmptyIcon="SshIcons.Network"
+							   EmptyTitle="@(snapshot.Routes.Count == 0 ? "No routes" : "Nothing matches")"
+							   EmptyText="@(snapshot.Routes.Count == 0 ? "ip listed no routes." : "No route matches the filter.")">
+						<MokaColumn TItem="NetRoute" Title="Destination" Field="@(route => route.Destination)" Mono />
+						<MokaColumn TItem="NetRoute" Title="Via" Field="@(route => route.Gateway)" Mono>
+							<CellTemplate Context="route">
+								<span class="mta-dim">@(route.Gateway.Length > 0 ? route.Gateway : "direct")</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="NetRoute" Title="Device" Field="@(route => route.Device)" Mono />
+						<MokaColumn TItem="NetRoute" Title="Source, protocol, metric" Field="@(route => RouteDetails(route))" Sortable="false" Mono Class="mt-col-main mt-col-wide">
+							<CellTemplate Context="route">
+								<span class="mta-dim">@RouteDetails(route)</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 					break;
 
 				case "dns":
-					@if (snapshot.Dns.Count == 0)
-					{
-						<MokaEmptyState Icon="SshIcons.Network" Title="No name servers" Description="Neither resolvectl nor /etc/resolv.conf names one." />
-					}
-					else
-					{
-						<div class="mta-table" style="--mta-cols: 120px minmax(0, 1fr)">
-							<div class="mta-row mta-row--head">
-								<span>Where</span>
-								<span>Name servers</span>
-							</div>
-							@foreach ((string scope, IReadOnlyList<string> servers) in snapshot.Dns)
-							{
-								<div class="mta-row" @key="scope">
-									<span class="mta-cell mta-mono">@scope</span>
-									<span class="mta-cell mta-mono" title="@string.Join("\n", servers)">@string.Join("  ", servers)</span>
-								</div>
-							}
-							@if (snapshot.SearchDomains.Count > 0)
-							{
-								<div class="mta-row">
-									<span class="mta-cell mta-dim">search</span>
-									<span class="mta-cell mta-mono">@string.Join("  ", snapshot.SearchDomains)</span>
-								</div>
-							}
-						</div>
-					}
+					<ToolTable TItem="DnsRow"
+							   Items="_dnsShown"
+							   ItemKey="@(row => row.IsSearch ? "|search" : row.Scope)"
+							   Label="Name servers"
+							   EmptyIcon="SshIcons.Network"
+							   EmptyTitle="No name servers"
+							   EmptyText="Neither resolvectl nor /etc/resolv.conf names one.">
+						<MokaColumn TItem="DnsRow" Title="Where" Field="@(row => row.Scope)" Sortable="false">
+							<CellTemplate Context="row">
+								<span class="@(row.IsSearch ? "mta-dim" : "mta-mono")">@row.Scope</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="DnsRow" Title="Name servers" Field="@(row => string.Join("  ", row.Values))" Sortable="false" Mono Class="mt-col-main">
+							<CellTemplate Context="row">
+								<span title="@string.Join("\n", row.Values)">@string.Join("  ", row.Values)</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 					break;
 
 				case "ports":
@@ -137,32 +134,45 @@
 					}
 					else
 					{
-						@if (!ReadAsRoot)
-						{
-							<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Processes show for this login's own sockets. Root mode shows them all.</MokaText>
-						}
-						<div class="mta-table" style="--mta-cols: 56px minmax(0, 1.2fr) 64px minmax(0, 1fr); --mta-cols-narrow: 48px minmax(0, 1fr) 56px">
-							<div class="mta-row mta-row--head">
-								<SortHeader Label="Proto" Direction="@(_portSort.DirectionOf("proto"))" OnSort="@(() => _portSort.Toggle("proto", startDescending: false))" />
-								<SortHeader Label="Address" Direction="@(_portSort.DirectionOf("address"))" OnSort="@(() => _portSort.Toggle("address", startDescending: false))" />
-								<SortHeader Label="Port" Direction="@(_portSort.DirectionOf("port"))" OnSort="@(() => _portSort.Toggle("port", startDescending: false))" />
-								<SortHeader Label="Process" Direction="@(_portSort.DirectionOf("process"))" OnSort="@(() => _portSort.Toggle("process", startDescending: false))" Class="mta-wide" />
-							</div>
-							@foreach (ListeningSocket socket in SortedPorts(snapshot.Listening.Where(socket => Matches(socket.Process) || Matches(socket.Address) || Matches(socket.Port.ToString(CultureInfo.InvariantCulture)))))
+						<div class="mta-stack">
+							@if (!ReadAsRoot)
 							{
-								<div class="mta-row" @key="@($"{socket.Protocol}|{socket.Address}|{socket.Port}|{socket.Pid}")">
-									<span class="mta-cell mta-mono mta-dim">@socket.Protocol</span>
-									<span class="mta-cell mta-mono">@socket.Address</span>
-									<span class="mta-cell mta-mono">
-										@socket.Port
+								<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Processes show for this login's own sockets. Root mode shows them all.</MokaText>
+							}
+							<ToolTable TItem="ListeningSocket"
+									   Items="_portsShown"
+									   ItemKey="@(socket => $"{socket.Protocol}|{socket.Address}|{socket.Port}|{socket.Pid}")"
+									   Label="Listening sockets"
+									   SortColumn="Port"
+									   SortDirection="MokaSortDirection.Ascending"
+									   EmptyIcon="SshIcons.Network"
+									   EmptyTitle="@(snapshot.Listening.Count == 0 ? "Nothing listens" : "Nothing matches")"
+									   EmptyText="@(snapshot.Listening.Count == 0 ? $"{snapshot.ListeningSource} listed no listening sockets." : "No socket matches the filter.")">
+								<MokaColumn TItem="ListeningSocket" Title="Proto" Field="@(socket => socket.Protocol)" Mono>
+									<CellTemplate Context="socket">
+										<span class="mta-dim">@socket.Protocol</span>
+									</CellTemplate>
+								</MokaColumn>
+								<MokaColumn TItem="ListeningSocket" Title="Address" Field="@(socket => socket.Address)" Mono Class="mta-col-cut">
+									<CellTemplate Context="socket">
+										<span title="@socket.Address">@socket.Address</span>
+									</CellTemplate>
+								</MokaColumn>
+								<MokaColumn TItem="ListeningSocket" Title="Port" Field="@(socket => socket.Port)" SortComparer="ByPort" Mono>
+									<CellTemplate Context="socket">
+										<span>@socket.Port</span>
 										@if (socket.Port == Profile.Facts.SshServerPort && !socket.IsUdp)
 										{
 											<Hint Text="This session arrived on this port" Class="mta-after"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Warning" Glow /></Hint>
 										}
-									</span>
-									<span class="mta-cell mta-mono mta-dim mta-wide">@(socket.Process.Length > 0 ? $"{socket.Process} ({socket.Pid})" : "")</span>
-								</div>
-							}
+									</CellTemplate>
+								</MokaColumn>
+								<MokaColumn TItem="ListeningSocket" Title="Process" Field="@(socket => socket.Process)" Mono Class="mt-col-main mt-col-wide">
+									<CellTemplate Context="socket">
+										<span class="mta-dim">@(socket.Process.Length > 0 ? $"{socket.Process} ({socket.Pid})" : "")</span>
+									</CellTemplate>
+								</MokaColumn>
+							</ToolTable>
 						</div>
 					}
 					break;
@@ -176,7 +186,10 @@
 	private string _view = "interfaces";
 	private string _filter = "";
 	private string? _selected;
-	private readonly AdminSort _portSort = new("port");
+	private List<NetInterface> _interfacesShown = [];
+	private List<NetRoute> _routesShown = [];
+	private List<DnsRow> _dnsShown = [];
+	private List<ListeningSocket> _portsShown = [];
 
 	protected override bool ReadsMoreAsRoot => true;
 
@@ -198,6 +211,7 @@
 	{
 		AdminOutcome outcome = await ReadAsync(NetworkCommands.Read(ReadAsRoot), cancellationToken);
 		_snapshot = NetworkParser.Parse(outcome.Output);
+		ApplyFilter();
 	}
 
 	private RenderFragment InterfacePanel => __builder =>
@@ -267,13 +281,40 @@
 
 	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
 
-	private IEnumerable<ListeningSocket> SortedPorts(IEnumerable<ListeningSocket> sockets) => _portSort.Key switch
+	private static string AddressText(NetInterface networkInterface) => networkInterface.Addresses.Count == 0
+		? "no address"
+		: string.Join("  ", networkInterface.Addresses.Select(address => address.Cidr));
+
+	private static string RouteDetails(NetRoute route) =>
+		string.Join(" ", new[] { route.Source, route.Protocol, route.Metric?.ToString(CultureInfo.InvariantCulture) ?? "" }.Where(part => part.Length > 0));
+
+	private static int ByName(NetInterface left, NetInterface right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int ByPort(ListeningSocket left, ListeningSocket right) => left.Port.CompareTo(right.Port);
+
+	private void OnFilterChanged(string value)
 	{
-		"proto" => _portSort.Apply(sockets, socket => socket.Protocol),
-		"address" => _portSort.Apply(sockets, socket => socket.Address),
-		"process" => _portSort.Apply(sockets, socket => socket.Process),
-		_ => _portSort.Apply(sockets, socket => (double)socket.Port),
-	};
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		if (_snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		_interfacesShown = [.. snapshot.Interfaces.Where(item => Matches(item.Name) || item.Addresses.Any(address => Matches(address.Address)))];
+		_routesShown = [.. snapshot.Routes.Where(route => Matches(route.Destination) || Matches(route.Device) || Matches(route.Gateway))];
+		_dnsShown = [.. snapshot.Dns.Select(pair => new DnsRow(pair.Scope, pair.Servers))];
+		if (snapshot.SearchDomains.Count > 0)
+		{
+			_dnsShown.Add(new DnsRow("search", snapshot.SearchDomains, IsSearch: true));
+		}
+
+		_portsShown = [.. snapshot.Listening.Where(socket => Matches(socket.Process) || Matches(socket.Address) || Matches(socket.Port.ToString(CultureInfo.InvariantCulture)))];
+	}
 
 	private IReadOnlyList<MokaContextMenuItem> MenuFor(NetInterface networkInterface)
 	{
@@ -293,14 +334,6 @@
 	}
 
 	private void Select(string name) => _selected = _selected == name ? null : name;
-
-	private void OnRowKey(KeyboardEventArgs args, string name)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(name);
-		}
-	}
 
 	private async Task SetLinkAsync(NetInterface networkInterface, bool up)
 	{

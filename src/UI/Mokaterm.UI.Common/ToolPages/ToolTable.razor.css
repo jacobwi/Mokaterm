@@ -1,0 +1,53 @@
+/*
+	The table fills the list area and scrolls inside it under a fixed header, so the page itself never scrolls. It is a
+	container of its own, which is what lets a column leave when the list is narrow: the detail panel takes room from the
+	list long before the window gets small.
+*/
+.mt-tool-table {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	container: mt-tool-table / inline-size;
+}
+
+.mt-tool-table ::deep > .moka-table-wrapper {
+	flex: 1;
+	min-height: 0;
+}
+
+/*
+	One line per row. The main column takes whatever the others leave and cuts its text with an ellipsis (the
+	width: 100% and max-width: 0 pair is what makes an auto-sized table cell give way); every other column is as wide as
+	what it shows.
+*/
+.mt-tool-table ::deep td:not(.moka-table-state-cell):not(.moka-table-group-cell) {
+	height: var(--mt-tool-row);
+	padding-block: 0;
+	white-space: nowrap;
+}
+
+/* A row's state dot, in a column of its own so the name beside it can still be cut. */
+.mt-tool-table ::deep .mt-col-dot {
+	width: 1px;
+	padding-inline-end: 0;
+}
+
+.mt-tool-table ::deep .mt-col-main {
+	width: 100%;
+	max-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@container mt-tool-table (max-width: 799px) {
+	.mt-tool-table ::deep .mt-col-wider {
+		display: none;
+	}
+}
+
+@container mt-tool-table (max-width: 559px) {
+	.mt-tool-table ::deep .mt-col-wide {
+		display: none;
+	}
+}

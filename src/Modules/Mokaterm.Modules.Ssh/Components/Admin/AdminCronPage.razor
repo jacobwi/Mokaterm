@@ -6,7 +6,7 @@
 <ToolPageFrame Title="Cron"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter by command"
 				PrimaryText="@(IsCrontabView && Capabilities.HasCrontab ? "Add cron job" : null)"
 				PrimaryIcon="MokaIcons.Action.Add"
@@ -54,52 +54,59 @@
 					{
 						<pre class="mta-pre mta-pre--fill">@(_loaded.Length == 0 ? "(empty)" : _loaded)</pre>
 					}
-					else if (!document.Entries.Any() && !document.Problems.Any())
-					{
-						<MokaEmptyState Icon="SshIcons.Calendar" Title="Nothing scheduled" Description="@($"{Owner}'s crontab has no entries. Add one to run a command on a schedule.")">
-							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="Busy" OnClick="StartAdd">Add cron job</MokaButton>
-						</MokaEmptyState>
-					}
 					else
 					{
-						<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1.3fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) var(--moka-button-height-sm)">
-							<div class="mta-row mta-row--head">
-								<span>When</span>
-								<span class="mta-wide">Command</span>
-								<span></span>
-							</div>
-							@foreach ((int index, CrontabEntry entry) in document.Entries.Where(pair => Matches(pair.Entry)))
+						<div class="mta-stack">
+							@if (document.Problems.Any())
 							{
-								<div class="@(index == _selected && !_editing ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-									 @key="index"
-									 role="button"
-									 tabindex="0"
-									 @onclick="@(() => Select(index))"
-									 @onkeydown="@(args => OnRowKey(args, index))"
-									 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(index, entry)))"
-									 @oncontextmenu:preventDefault="true">
-									<span class="mta-cell" title="@entry.Schedule.Text">
-										<span>@entry.Schedule.Describe()</span><br />
-										<span class="mta-mono mta-dim">@entry.Schedule.Text</span>
-									</span>
-									<span class="mta-cell mta-mono mta-wide" title="@entry.Command">@entry.Command</span>
-									<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-										<IconButton Size="MokaSize.Xs"
-													Icon="MokaIcons.Navigation.MoreHorizontal"
-													OnClick="@(args => ShowRowMenu(args, MenuFor(index, entry)))"
-													Label="Actions for the entry"
-													Position="MokaTooltipPosition.BottomEnd" />
-									</span>
-								</div>
+								<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+									<div>Lines cron cannot read as a job:</div>
+									@foreach ((int number, CrontabLine line) in document.Problems)
+									{
+										<div @key="number">
+											<span class="mta-mono">@($"line {number}: {line.Text}")</span>
+											<span class="mta-after">@line.Problem</span>
+										</div>
+									}
+								</MokaAlert>
 							}
-							@foreach ((int number, CrontabLine line) in document.Problems)
-							{
-								<div class="mta-row" @key="@($"problem-{number}")">
-									<span class="mta-cell mta-mono" title="@line.Text">@($"line {number}: {line.Text}")</span>
-									<span class="mta-cell mta-wide" style="color:var(--moka-color-warning)" title="@line.Problem">@line.Problem</span>
-									<span></span>
-								</div>
-							}
+							<ToolTable TItem="AdminRow<CrontabEntry>"
+									   Items="_crontabShown"
+									   ItemKey="@(row => row.Index)"
+									   Label="@($"{Owner}'s crontab")"
+									   IsSelected="@(row => row.Index == _selected && !_editing)"
+									   OnRowClick="@(row => Select(row.Index))"
+									   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item.Index, args.Item.Item)))"
+									   ActionsWidth="var(--moka-button-height-sm)"
+									   EmptyIcon="SshIcons.Calendar"
+									   EmptyTitle="@(document.Entries.Any() ? "Nothing matches" : "Nothing scheduled")"
+									   EmptyText="@(document.Entries.Any() ? "No job matches the filter." : $"{Owner}'s crontab has no entries. Add cron job, at the top, runs a command on a schedule.")">
+								<RowActions Context="row">
+									<IconButton Size="MokaSize.Xs"
+												Icon="MokaIcons.Navigation.MoreHorizontal"
+												OnClick="@(args => ShowRowMenu(args, MenuFor(row.Index, row.Item)))"
+												Label="More actions"
+												AriaLabel="@($"Actions for {row.Item.Schedule.Text}")"
+												Position="MokaTooltipPosition.BottomEnd" />
+								</RowActions>
+								<ChildContent>
+									<MokaColumn TItem="AdminRow<CrontabEntry>" Title="When" Field="@(row => row.Item.Schedule.Describe())" Class="mta-col-cut mta-col-cut--wide">
+										<CellTemplate Context="row">
+											<span title="@row.Item.Schedule.Describe()">@row.Item.Schedule.Describe()</span>
+										</CellTemplate>
+									</MokaColumn>
+									<MokaColumn TItem="AdminRow<CrontabEntry>" Title="Schedule" Field="@(row => row.Item.Schedule.Text)" Sortable="false" Mono Class="mt-col-wider">
+										<CellTemplate Context="row">
+											<span class="mta-dim">@row.Item.Schedule.Text</span>
+										</CellTemplate>
+									</MokaColumn>
+									<MokaColumn TItem="AdminRow<CrontabEntry>" Title="Command" Field="@(row => row.Item.Command)" Mono Class="mt-col-main">
+										<CellTemplate Context="row">
+											<span title="@row.Item.Command">@row.Item.Command</span>
+										</CellTemplate>
+									</MokaColumn>
+								</ChildContent>
+							</ToolTable>
 						</div>
 					}
 				}
@@ -112,41 +119,49 @@
 				}
 				else if (_systemFiles is { } files)
 				{
-					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 80px minmax(0, 1.4fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) 70px">
-						<div class="mta-row mta-row--head">
-							<span>When</span>
-							<span>User</span>
-							<span class="mta-wide">Command</span>
-							<span class="mta-wide">File</span>
-						</div>
-						@foreach (SystemCronFile file in files.Where(file => file.Document is not null))
-						{
-							@foreach ((int index, CrontabEntry entry) in file.Document!.Entries.Where(pair => Matches(pair.Entry)))
+					<div class="mta-stack">
+						<ToolTable TItem="SystemCronRow"
+								   Items="_systemShown"
+								   ItemKey="@(row => $"{row.File}/{row.Index}")"
+								   Label="System cron jobs"
+								   EmptyIcon="SshIcons.Calendar"
+								   EmptyTitle="@(_filter.Trim().Length > 0 ? "Nothing matches" : "No system jobs")"
+								   EmptyText="@(_filter.Trim().Length > 0 ? "No job matches the filter." : "/etc/crontab and /etc/cron.d hold no jobs this login can read.")">
+							<MokaColumn TItem="SystemCronRow" Title="When" Field="@(row => row.Entry.Schedule.Describe())" Class="mta-col-cut mta-col-cut--wide">
+								<CellTemplate Context="row">
+									<span title="@row.Entry.Schedule.Describe()">@row.Entry.Schedule.Describe()</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="SystemCronRow" Title="Schedule" Field="@(row => row.Entry.Schedule.Text)" Sortable="false" Mono Class="mt-col-wider">
+								<CellTemplate Context="row">
+									<span class="mta-dim">@row.Entry.Schedule.Text</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="SystemCronRow" Title="User" Field="@(row => row.Entry.User)" Mono />
+							<MokaColumn TItem="SystemCronRow" Title="Command" Field="@(row => row.Entry.Command)" Mono Class="mt-col-main">
+								<CellTemplate Context="row">
+									<span title="@row.Entry.Command">@row.Entry.Command</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="SystemCronRow" Title="File" Field="@(row => row.File)" Mono Class="mt-col-wide mta-col-cut">
+								<CellTemplate Context="row">
+									<span class="mta-dim" title="@row.File">@row.File</span>
+								</CellTemplate>
+							</MokaColumn>
+						</ToolTable>
+						<dl class="mta-kv">
+							@foreach ((string period, IReadOnlyList<string> scripts) in _systemFolders)
 							{
-								<div class="mta-row" @key="@($"{file.Path}/{index}")">
-									<span class="mta-cell" title="@entry.Schedule.Text">
-										<span>@entry.Schedule.Describe()</span><br />
-										<span class="mta-mono mta-dim">@entry.Schedule.Text</span>
-									</span>
-									<span class="mta-cell mta-mono">@entry.User</span>
-									<span class="mta-cell mta-mono mta-wide" title="@entry.Command">@entry.Command</span>
-									<span class="mta-cell mta-mono mta-dim mta-wide" title="@file.Path">@file.Path</span>
-								</div>
+								<dt>@period</dt>
+								<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@(scripts.Count == 0 ? "nothing in /etc/cron." + period : string.Join("  ", scripts))</MokaText></dd>
 							}
-						}
+							@foreach (SystemCronFile unreadable in files.Where(file => !file.Readable))
+							{
+								<dt>Unreadable</dt>
+								<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@unreadable.Path</MokaText><span class="mta-dim mta-after">only root can read it</span></dd>
+							}
+						</dl>
 					</div>
-					<dl class="mta-kv" style="margin-top:var(--moka-spacing-sm)">
-						@foreach ((string period, IReadOnlyList<string> scripts) in _systemFolders)
-						{
-							<dt>@period</dt>
-							<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@(scripts.Count == 0 ? "nothing in /etc/cron." + period : string.Join("  ", scripts))</MokaText></dd>
-						}
-						@foreach (SystemCronFile unreadable in files.Where(file => !file.Readable))
-						{
-							<dt>Unreadable</dt>
-							<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@unreadable.Path</MokaText><span class="mta-dim mta-after">only root can read it</span></dd>
-						}
-					</dl>
 				}
 				break;
 
@@ -155,32 +170,41 @@
 				{
 					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@timersError</MokaAlert>
 				}
-				else if (_timers is { Count: 0 })
+				else if (_timers is not null)
 				{
-					<MokaEmptyState Icon="SshIcons.Clock" Title="No timers" Description="systemd has no timer units loaded." />
-				}
-				else if (_timers is { } timers)
-				{
-					<div class="mta-table" style="--mta-cols: 14px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); --mta-cols-narrow: 14px minmax(0, 1fr) minmax(0, 1fr)">
-						<div class="mta-row mta-row--head">
-							<span></span>
-							<span>Timer</span>
-							<span>Next</span>
-							<span class="mta-wide">Last</span>
-						</div>
-						@foreach (SystemTimer timer in timers.Where(timer => _filter.Trim().Length == 0 || timer.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)))
-						{
-							<div class="mta-row" @key="timer.Name">
+					<ToolTable TItem="SystemTimer"
+							   Items="_timersShown"
+							   ItemKey="@(timer => timer.Name)"
+							   Label="systemd timers"
+							   SortColumn="Timer"
+							   SortDirection="MokaSortDirection.Ascending"
+							   EmptyIcon="SshIcons.Clock"
+							   EmptyTitle="@(_timers.Count == 0 ? "No timers" : "Nothing matches")"
+							   EmptyText="@(_timers.Count == 0 ? "systemd has no timer units loaded." : "No timer matches the filter.")">
+						<MokaColumn TItem="SystemTimer" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+							<CellTemplate Context="timer">
 								<MokaStatusDot Size="MokaSize.Xs" Color="@(timer.ActiveState == "active" ? MokaColor.Success : MokaColor.Surface)" Glow="@(timer.ActiveState == "active")" />
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="SystemTimer" Title="Timer" Field="@(timer => timer.Name)" SortComparer="ByName" Class="mt-col-main">
+							<CellTemplate Context="timer">
 								<Hint Text="@($"{timer.Description}. Starts {timer.Activates}.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell">
-									<span class="mta-mono">@timer.Name</span><br />
-									<span class="mta-mono mta-dim">@timer.Schedule</span>
+									<span class="mta-mono">@timer.Name</span>
+									<span class="mta-mono mta-dim mta-after">@timer.Schedule</span>
 								</Hint>
-								<span class="mta-cell mta-mono" title="@timer.Next">@(timer.Next.Length == 0 ? "never" : timer.Next)</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide" title="@timer.Last">@(timer.Last.Length == 0 ? "never" : timer.Last)</span>
-							</div>
-						}
-					</div>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="SystemTimer" Title="Next" Field="@(timer => timer.Next)" Mono Class="mta-col-cut">
+							<CellTemplate Context="timer">
+								<span title="@timer.Next">@(timer.Next.Length == 0 ? "never" : timer.Next)</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="SystemTimer" Title="Last" Field="@(timer => timer.Last)" Mono Class="mt-col-wide mta-col-cut">
+							<CellTemplate Context="timer">
+								<span class="mta-dim" title="@timer.Last">@(timer.Last.Length == 0 ? "never" : timer.Last)</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 				}
 				break;
 		}
@@ -203,12 +227,15 @@
 	private string _filter = "";
 	private string _loaded = "";
 	private CrontabDocument? _document;
+	private List<AdminRow<CrontabEntry>> _crontabShown = [];
 	private string? _crontabError;
 	private bool _showRaw;
 	private IReadOnlyList<SystemCronFile>? _systemFiles;
+	private List<SystemCronRow> _systemShown = [];
 	private IReadOnlyList<(string Period, IReadOnlyList<string> Scripts)> _systemFolders = [];
 	private string? _systemError;
 	private IReadOnlyList<SystemTimer>? _timers;
+	private List<SystemTimer> _timersShown = [];
 	private string? _timersError;
 	private DateTime? _serverNow;
 	private string _serverZone = "";
@@ -297,6 +324,7 @@
 		}
 
 		await clock;
+		ApplyFilter();
 	}
 
 	private RenderFragment EntryPanel => __builder =>
@@ -430,6 +458,30 @@
 		|| entry.Command.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
 		|| entry.Schedule.Describe().Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
 
+	private static int ByName(SystemTimer left, SystemTimer right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private void OnFilterChanged(string value)
+	{
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		string filter = _filter.Trim();
+		_crontabShown = _document is { } document
+			? [.. document.Entries.Where(pair => Matches(pair.Entry)).Select(pair => new AdminRow<CrontabEntry>(pair.Entry, pair.Index))]
+			: [];
+		_systemShown = _systemFiles is { } files
+			? [.. files
+				.Where(file => file.Document is not null)
+				.SelectMany(file => file.Document!.Entries.Where(pair => Matches(pair.Entry)).Select(pair => new SystemCronRow(file.Path, pair.Index, pair.Entry)))]
+			: [];
+		_timersShown = _timers is { } timers
+			? [.. timers.Where(timer => filter.Length == 0 || timer.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))]
+			: [];
+	}
+
 	private IReadOnlyList<MokaContextMenuItem> MenuFor(int index, CrontabEntry entry) =>
 	[
 		new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(index, keepOpen: true) },
@@ -522,14 +574,6 @@
 	{
 		_editing = false;
 		_selected = _selected == index && !keepOpen ? null : index;
-	}
-
-	private void OnRowKey(KeyboardEventArgs args, int index)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(index);
-		}
 	}
 
 	private void StartAdd()

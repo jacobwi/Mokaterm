@@ -1,34 +1,29 @@
-/* What's using space: a breadcrumb of the folder, its total, then its folders with their share of it. */
-.mta-space {
+/* What's using space: the folder as a path, its total, then its folders with their share of it. Every part of the path
+   is a button, so the keyboard reaches the folders above too. */
+.mta-crumbs {
 	display: flex;
-	flex-direction: column;
+	align-items: center;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
 }
 
-.mta-crumbs {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 2px var(--moka-spacing-xs);
+.mta-crumbs ::deep .mta-crumbs-path {
+	flex: 1 1 auto;
 	min-width: 0;
-	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-xs);
 }
 
 .mta-crumb {
-	padding: 1px 4px;
+	padding: 0;
 	border: 0;
 	border-radius: var(--moka-radius-sm);
 	background: none;
-	color: var(--moka-color-on-surface-variant);
+	color: inherit;
 	font: inherit;
 	cursor: pointer;
 }
 
 .mta-crumb:hover:not(:disabled) {
-	background: var(--moka-color-surface-hover);
-	color: var(--moka-color-on-surface);
+	color: var(--moka-color-primary);
 }
 
 .mta-crumb:focus-visible {
@@ -39,6 +34,11 @@
 .mta-crumb--here {
 	color: var(--moka-color-on-surface);
 	cursor: default;
+}
+
+/* A share is a bar of its own, so its column takes a fixed width instead of the nothing an empty cell asks for. */
+.mta-stack ::deep .mta-share-bar {
+	width: 128px;
 }
 
 .mta-space-head {
@@ -55,13 +55,49 @@
 	border-top: 1px solid var(--moka-color-outline-variant);
 }
 
+/* With files to list, the large files take what they need up to about half the height, and the folders above the rest;
+   a list longer than that scrolls inside its own table. */
+.mta-large--table {
+	max-height: 55%;
+	min-height: 0;
+}
+
+.mta-large--table ::deep .mt-tool-table {
+	flex: 0 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+/* A file system's use on one line: the figure, a short bar, then what is free. */
+.mta-used {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-used-figure {
+	min-width: 3ch;
+	text-align: right;
+}
+
+.mta-used ::deep .mta-used-bar {
+	width: 72px;
+	flex-shrink: 0;
+}
+
 /* SMART rows the disk itself calls failed, and sector counters that are not zero yet. */
-.mta-smart--failed {
+.mta-smart ::deep .mta-smart--failed > td {
 	color: var(--moka-color-error);
+}
+
+.mta-smart ::deep .mta-smart--failed > td:first-child {
 	box-shadow: inset 2px 0 0 var(--moka-color-error);
 }
 
-.mta-smart--worrying {
+.mta-smart ::deep .mta-smart--worrying > td {
 	color: var(--moka-color-warning);
+}
+
+.mta-smart ::deep .mta-smart--worrying > td:first-child {
 	box-shadow: inset 2px 0 0 var(--moka-color-warning);
 }

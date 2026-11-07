@@ -5,7 +5,7 @@
 <ToolPageFrame Title="Processes"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter by command, user or PID"
 				Loading="Loading"
 				Loaded="Loaded"
@@ -17,14 +17,14 @@
 	<Chips>
 		@if (Capabilities.HasProcessTools)
 		{
-			<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => _view = value)" AriaLabel="Processes to show" />
+			<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChanged" AriaLabel="Processes to show" />
 		}
 	</Chips>
 	<ChipsEnd>
 		@if (Capabilities.HasProcessTools)
 		{
 			<Hint Text="Show each process under the one that started it">
-				<MokaCheckbox Value="_tree" ValueChanged="@(value => _tree = value)" Label="Tree" />
+				<MokaCheckbox Value="_tree" ValueChanged="OnTreeChanged" Label="Tree" />
 			</Hint>
 			<Hint Text="Read the list again every five seconds while this page is shown">
 				<MokaCheckbox Value="_autoRefresh" ValueChanged="OnAutoRefreshChanged" Label="Refresh every 5 s" />
@@ -38,73 +38,87 @@
 		}
 		else
 		{
-			IReadOnlyList<(ProcessInfo Process, int Depth)> shown = Shown();
-			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 54px 50px 40px 70px minmax(0, 2fr) var(--moka-button-height-sm); --mta-cols-narrow: 54px 50px 46px minmax(0, 1fr) var(--moka-button-height-sm)">
-				<div class="mta-row mta-row--head">
-					<SortHeader Label="PID" Direction="@(_sort.DirectionOf("pid"))" OnSort="@(() => _sort.Toggle("pid", startDescending: false))" />
-					<SortHeader Label="User" Direction="@(_sort.DirectionOf("user"))" OnSort="@(() => _sort.Toggle("user", startDescending: false))" Class="mta-wide" />
-					<SortHeader Label="CPU" Direction="@(_sort.DirectionOf("cpu"))" OnSort="@(() => _sort.Toggle("cpu", startDescending: true))" />
-					<SortHeader Label="Mem" Direction="@(_sort.DirectionOf("mem"))" OnSort="@(() => _sort.Toggle("mem", startDescending: true))" />
-					<SortHeader Label="NI" Direction="@(_sort.DirectionOf("nice"))" OnSort="@(() => _sort.Toggle("nice", startDescending: false))" Class="mta-wide" />
-					<SortHeader Label="RSS" Direction="@(_sort.DirectionOf("rss"))" OnSort="@(() => _sort.Toggle("rss", startDescending: true))" Class="mta-wide" />
-					<SortHeader Label="Command" Direction="@(_sort.DirectionOf("command"))" OnSort="@(() => _sort.Toggle("command", startDescending: false))" />
-					<span></span>
-				</div>
-				@foreach ((ProcessInfo process, int depth) in shown)
-				{
-					<div class="@RowClass(process)"
-						 @key="process.Pid"
-						 role="button"
-						 tabindex="0"
-						 @onclick="@(() => Select(process.Pid))"
-						 @onkeydown="@(args => OnRowKey(args, process.Pid))"
-						 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(process)))"
-						 @oncontextmenu:preventDefault="true">
-						<span class="mta-cell mta-mono">@process.Pid</span>
-						<span class="mta-cell mta-mono mta-dim mta-wide">@process.User</span>
-						<Hint Text="@(process.CpuSampled ? "Share of one CPU over the sampling second" : "ps's average over the process's life: it started after the sample")" Class="mta-cell mta-mono">@CpuText(process)</Hint>
-						<span class="mta-cell mta-mono">@AdminFormat.Number(process.Memory, "0.0")</span>
-						<span class="mta-cell mta-mono mta-dim mta-wide">@process.Nice</span>
-						<span class="mta-cell mta-mono mta-dim mta-wide">@AdminFormat.Kb(process.ResidentKb)</span>
-						<span class="mta-cell mta-mono" title="@process.Command" style="@Indent(depth)">
-							@if (depth > 0)
-							{
-								<span class="mta-dim" aria-hidden="true">└ </span>
-							}
-							@process.Command
-						</span>
-						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-							<IconButton Size="MokaSize.Xs"
-										Icon="MokaIcons.Navigation.MoreHorizontal"
-										OnClick="@(args => ShowRowMenu(args, MenuFor(process)))"
-										Label="More actions"
-										AriaLabel="@($"Actions for process {process.Pid}")"
-										Position="MokaTooltipPosition.BottomEnd" />
-						</span>
-					</div>
-				}
-				@if (_matching > shown.Count)
-				{
-					<div class="mta-more">@(_tree ? $"The first {shown.Count} of {AdminFormat.Count(_matching)} in tree order. Filter to find others." : $"The top {shown.Count} of {AdminFormat.Count(_matching)} by this column. Filter to find others.")</div>
-				}
-			</div>
+			<ToolTable TItem="AdminRow<ProcessInfo>"
+					   Items="_shown"
+					   ItemKey="@(row => row.Item.Pid)"
+					   Label="@(_tree ? "Process tree" : "Processes")"
+					   IsSelected="@(row => row.Item.Pid == _selected)"
+					   OnRowClick="@(row => Select(row.Item.Pid))"
+					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item.Item)))"
+					   RowClass="@(row => _context.Contains(row.Item.Pid) ? "mta-row--context" : null)"
+					   ActionsWidth="var(--moka-button-height-sm)"
+					   SortColumn="@_sortColumn"
+					   SortColumnChanged="OnSortColumnChanged"
+					   SortDirection="_sortDirection"
+					   SortDirectionChanged="OnSortDirectionChanged"
+					   Virtualize="@(_shown.Count > VirtualizeAbove)"
+					   EmptyIcon="SshIcons.Chip"
+					   EmptyTitle="Nothing matches"
+					   EmptyText="No process matches the filter.">
+				<RowActions Context="row">
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.MoreHorizontal"
+								OnClick="@(args => ShowRowMenu(args, MenuFor(row.Item)))"
+								Label="More actions"
+								AriaLabel="@($"Actions for process {row.Item.Pid}")"
+								Position="MokaTooltipPosition.BottomEnd" />
+				</RowActions>
+				<ChildContent>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="PID" Field="@(row => row.Item.Pid)" SortComparer="@(Compare("PID"))" Mono />
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="User" Field="@(row => row.Item.User)" SortComparer="@(Compare("User"))" Mono Class="mt-col-wide">
+						<CellTemplate Context="row">
+							<span class="mta-dim">@row.Item.User</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="CPU" Field="@(row => row.Item.Cpu)" SortComparer="@(Compare("CPU"))" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+						<CellTemplate Context="row">
+							<Hint Text="@(row.Item.CpuSampled ? "Share of one CPU over the sampling second" : "ps's average over the process's life: it started after the sample")">@CpuText(row.Item)</Hint>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="Mem" Field="@(row => row.Item.Memory)" SortComparer="@(Compare("Mem"))" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+						<CellTemplate Context="row">
+							@AdminFormat.Number(row.Item.Memory, "0.0")
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="NI" Field="@(row => row.Item.Nice)" SortComparer="@(Compare("NI"))" Mono Align="MokaTextAlign.Right" Class="mt-col-wider">
+						<CellTemplate Context="row">
+							<span class="mta-dim">@row.Item.Nice</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="RSS" Field="@(row => row.Item.ResidentKb)" SortComparer="@(Compare("RSS"))" SortDescendingFirst Mono Align="MokaTextAlign.Right" Class="mt-col-wider">
+						<CellTemplate Context="row">
+							<span class="mta-dim">@AdminFormat.Kb(row.Item.ResidentKb)</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="AdminRow<ProcessInfo>" Title="Command" Field="@(row => row.Item.Command)" SortComparer="@(Compare("Command"))" Mono Class="mt-col-main">
+						<CellTemplate Context="row">
+							<span title="@row.Item.Command" style="@Indent(row.Depth)">
+								@if (row.Depth > 0)
+								{
+									<span class="mta-dim" aria-hidden="true">└ </span>
+								}
+								@row.Item.Command
+							</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+			</ToolTable>
 		}
 	</ChildContent>
 </ToolPageFrame>
 
 @code {
-	private const int MaxRows = 200;
-	private const int MaxTreeRows = 500;
-
 	/// <summary>Deeper levels stop indenting, so a long chain of shells still leaves room for the command.</summary>
 	private const int MaxIndent = 12;
 
+
 	private IReadOnlyList<ProcessInfo> _processes = [];
-	private readonly AdminSort _sort = new("cpu", descending: true);
+	private List<AdminRow<ProcessInfo>> _shown = [];
+	private string? _sortColumn = "CPU";
+	private MokaSortDirection _sortDirection = MokaSortDirection.Descending;
 	private string _view = "all";
 	private string _filter = "";
 	private int? _selected;
-	private int _matching;
 	private bool _tree;
 	private bool _autoRefresh;
 	private IReadOnlySet<int> _context = new HashSet<int>();
@@ -142,6 +156,7 @@
 
 		AdminOutcome outcome = await ReadAsync(ProcessCommands.List(ReadAsRoot), cancellationToken);
 		_processes = ProcessCommands.Parse(outcome.Output);
+		ApplyFilter();
 	}
 
 	private RenderFragment ProcessPanel => __builder =>
@@ -235,7 +250,7 @@
 		</ToolDetailPanel>
 	};
 
-	private IReadOnlyList<(ProcessInfo Process, int Depth)> Shown()
+	private void ApplyFilter()
 	{
 		string filter = _filter.Trim();
 		bool Matches(ProcessInfo process) => (_view != "mine" || process.User == Context.LoginName)
@@ -248,38 +263,86 @@
 		{
 			(IReadOnlyList<ProcessInfo> kept, IReadOnlySet<int> context) = ProcessTree.WithAncestors(_processes, Matches);
 			_context = context;
-			_matching = kept.Count;
-			return [.. ProcessTree.Flatten(kept, Sorted).Take(MaxTreeRows)];
+			_shown = [.. ProcessTree.Flatten(kept, SortedSiblings).Select((pair, index) => new AdminRow<ProcessInfo>(pair.Process, index, pair.Depth))];
+			return;
 		}
 
-		List<ProcessInfo> matching = [.. _processes.Where(Matches)];
 		_context = new HashSet<int>();
-		_matching = matching.Count;
-		return [.. Sorted(matching).Take(MaxRows).Select(process => (process, 0))];
+		_shown = [.. _processes.Select((process, index) => new AdminRow<ProcessInfo>(process, index)).Where(row => Matches(row.Item))];
 	}
 
-	private IEnumerable<ProcessInfo> Sorted(IEnumerable<ProcessInfo> processes) => _sort.Key switch
+	private IEnumerable<ProcessInfo> SortedSiblings(IEnumerable<ProcessInfo> processes)
 	{
-		"pid" => _sort.Apply(processes, process => (double)process.Pid),
-		"user" => _sort.Apply(processes, process => process.User),
-		"mem" => _sort.Apply(processes, process => process.Memory ?? 0),
-		"nice" => _sort.Apply(processes, process => (double)(process.Nice ?? 0)),
-		"rss" => _sort.Apply(processes, process => (double)(process.ResidentKb ?? 0)),
-		"command" => _sort.Apply(processes, process => process.Command),
-		_ => _sort.Apply(processes, process => process.Cpu ?? 0),
+		if (_sortDirection == MokaSortDirection.None || Order(_sortColumn) is not { } order)
+		{
+			return processes;
+		}
+
+		Comparer<ProcessInfo> comparer = Comparer<ProcessInfo>.Create(order);
+		return _sortDirection == MokaSortDirection.Descending ? processes.OrderByDescending(process => process, comparer) : processes.OrderBy(process => process, comparer);
+	}
+
+	private static Comparison<ProcessInfo>? Order(string? column) => column switch
+	{
+		"PID" => (left, right) => left.Pid.CompareTo(right.Pid),
+		"User" => (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.User, right.User),
+		"CPU" => (left, right) => (left.Cpu ?? 0).CompareTo(right.Cpu ?? 0),
+		"Mem" => (left, right) => (left.Memory ?? 0).CompareTo(right.Memory ?? 0),
+		"NI" => (left, right) => (left.Nice ?? 0).CompareTo(right.Nice ?? 0),
+		"RSS" => (left, right) => (left.ResidentKb ?? 0).CompareTo(right.ResidentKb ?? 0),
+		"Command" => (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.Command, right.Command),
+		_ => null,
 	};
+
+	// In a tree the page orders each process's children itself, so every pair compares equal and the table's stable sort
+	// keeps that order instead of pulling children away from their parents.
+	private Func<AdminRow<ProcessInfo>, AdminRow<ProcessInfo>, int> Compare(string column)
+	{
+		Comparison<ProcessInfo> order = Order(column)!;
+		return (left, right) => _tree ? 0 : order(left.Item, right.Item);
+	}
+
+	private void OnFilterChanged(string value)
+	{
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void OnViewChanged(string value)
+	{
+		_view = value;
+		ApplyFilter();
+	}
+
+	private void OnTreeChanged(bool value)
+	{
+		_tree = value;
+		ApplyFilter();
+	}
+
+	private void OnSortColumnChanged(string? column)
+	{
+		_sortColumn = column;
+		if (_tree)
+		{
+			ApplyFilter();
+		}
+	}
+
+	private void OnSortDirectionChanged(MokaSortDirection direction)
+	{
+		_sortDirection = direction;
+		if (_tree)
+		{
+			ApplyFilter();
+		}
+	}
 
 	private static string CpuText(ProcessInfo process) => AdminFormat.Number(process.Cpu, "0.0");
 
 	private static string? Indent(int depth) => depth == 0
 		? null
 		: string.Create(CultureInfo.InvariantCulture, $"padding-left:{Math.Min(depth, MaxIndent) * 12}px");
-
-	private string RowClass(ProcessInfo process)
-	{
-		string css = process.Pid == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable";
-		return _context.Contains(process.Pid) ? css + " mta-row--context" : css;
-	}
 
 	/// <summary>Another user's process needs root; the login's own does not.</summary>
 	private bool NeedsRoot(ProcessInfo process) => !Profile.Facts.IsRoot && process.User != Context.LoginName;
@@ -308,14 +371,6 @@
 	}
 
 	private void Select(int pid) => _selected = _selected == pid ? null : pid;
-
-	private void OnRowKey(KeyboardEventArgs args, int pid)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(pid);
-		}
-	}
 
 	private void OnAutoRefreshChanged(bool value)
 	{

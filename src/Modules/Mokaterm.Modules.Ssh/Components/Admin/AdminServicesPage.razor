@@ -26,68 +26,65 @@
 		{
 			<MokaEmptyState Icon="SshIcons.Gear" Title="No service manager" Description="@Capabilities.ServicesMissing" />
 		}
-		else if (Shown.Count == 0)
-		{
-			<MokaEmptyState Icon="SshIcons.Gear"
-							Title="@(_units.Count == 0 ? "No services" : "Nothing matches")"
-							Description="@(_units.Count == 0 ? "The service manager listed none." : "No service matches the filter. Clear it or pick All.")" />
-		}
 		else
 		{
-			<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) 128px 84px var(--moka-button-height-sm); --mta-cols-narrow: 14px minmax(0, 1fr) 84px var(--moka-button-height-sm)">
-				<div class="mta-row mta-row--head">
-					<span></span>
-					<SortHeader Label="Service" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => SortBy("name"))" />
-					<SortHeader Label="State" Direction="@(_sort.DirectionOf("state"))" OnSort="@(() => SortBy("state"))" Class="mta-wide" />
-					<SortHeader Label="At boot" Direction="@(_sort.DirectionOf("boot"))" OnSort="@(() => SortBy("boot"))" />
-					<span></span>
-				</div>
-				@foreach (ServiceUnit unit in Shown.Take(MaxRows))
-				{
-					<div class="@(unit.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-						 @key="unit.Name"
-						 role="button"
-						 tabindex="0"
-						 aria-pressed="@(unit.Name == _selected ? "true" : "false")"
-						 @onclick="@(() => SelectAsync(unit))"
-						 @onkeydown="@(args => OnRowKeyAsync(args, unit))"
-						 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(unit)))"
-						 @oncontextmenu:preventDefault="true">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(unit.State)" Glow="@(unit.State is ServiceState.Running or ServiceState.Failed or ServiceState.Changing)" />
-						<span class="mta-cell" title="@unit.Description">
-							<span class="mta-mono">@unit.Name</span>
-							@if (unit.Description.Length > 0)
-							{
-								<span class="mta-dim mta-after">@unit.Description</span>
-							}
-						</span>
-						<span class="mta-cell mta-mono mta-dim mta-wide">@unit.StateText</span>
-						<span class="mta-cell mta-mono @(unit.Enabled == true ? "" : "mta-dim")">@BootText(unit)</span>
-						<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-							<IconButton Size="MokaSize.Xs"
-										Icon="MokaIcons.Navigation.MoreHorizontal"
-										OnClick="@(args => ShowRowMenu(args, MenuFor(unit)))"
-										Label="More actions"
-										AriaLabel="@($"Actions for {unit.Name}")"
-										Position="MokaTooltipPosition.BottomEnd" />
-						</span>
-					</div>
-				}
-				@if (Shown.Count > MaxRows)
-				{
-					<div class="mta-more">@($"{AdminFormat.Count(Shown.Count - MaxRows)} more. Narrow the filter to see them.")</div>
-				}
-			</div>
+			<ToolTable TItem="ServiceUnit"
+					   Items="Shown"
+					   ItemKey="@(unit => unit.Name)"
+					   Label="Services"
+					   IsSelected="@(unit => unit.Name == _selected)"
+					   OnRowClick="SelectAsync"
+					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+					   ActionsWidth="var(--moka-button-height-sm)"
+					   SortColumn="Service"
+					   SortDirection="MokaSortDirection.Ascending"
+					   EmptyIcon="SshIcons.Gear"
+					   EmptyTitle="@(_units.Count == 0 ? "No services" : "Nothing matches")"
+					   EmptyText="@(_units.Count == 0 ? "The service manager listed none." : "No service matches the filter. Clear it or pick All.")">
+				<RowActions Context="unit">
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.MoreHorizontal"
+								OnClick="@(args => ShowRowMenu(args, MenuFor(unit)))"
+								Label="More actions"
+								AriaLabel="@($"Actions for {unit.Name}")"
+								Position="MokaTooltipPosition.BottomEnd" />
+				</RowActions>
+				<ChildContent>
+					<MokaColumn TItem="ServiceUnit" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+						<CellTemplate Context="unit">
+							<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(unit.State)" Glow="@(unit.State is ServiceState.Running or ServiceState.Failed or ServiceState.Changing)" />
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="ServiceUnit" Title="Service" Field="@(unit => unit.Name)" SortComparer="ByName" Class="mt-col-main">
+						<CellTemplate Context="unit">
+							<span title="@unit.Description">
+								<span class="mta-mono">@unit.Name</span>
+								@if (unit.Description.Length > 0)
+								{
+									<span class="mta-dim mta-after">@unit.Description</span>
+								}
+							</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="ServiceUnit" Title="State" Field="@(unit => unit.StateText)" SortComparer="ByState" Mono Class="mt-col-wide">
+						<CellTemplate Context="unit">
+							<span class="mta-dim">@unit.StateText</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="ServiceUnit" Title="At boot" Field="BootText" SortComparer="ByBoot" Mono>
+						<CellTemplate Context="unit">
+							<span class="@(unit.Enabled == true ? "" : "mta-dim")">@BootText(unit)</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+			</ToolTable>
 		}
 	</ChildContent>
 </ToolPageFrame>
 
 @code {
-	private const int MaxRows = 400;
-
 	private IReadOnlyList<ServiceUnit> _units = [];
 	private List<ServiceUnit> _shown = [];
-	private readonly AdminSort _sort = new("name");
 	private string _filter = "";
 	private string _state = "all";
 	private string? _selected;
@@ -244,6 +241,12 @@
 		_ => "BusyBox init",
 	};
 
+	private static int ByName(ServiceUnit left, ServiceUnit right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int ByState(ServiceUnit left, ServiceUnit right) => StringComparer.OrdinalIgnoreCase.Compare(left.StateText, right.StateText);
+
+	private static int ByBoot(ServiceUnit left, ServiceUnit right) => StringComparer.OrdinalIgnoreCase.Compare(BootText(left), BootText(right));
+
 	private static string BootText(ServiceUnit unit) => unit.EnabledText.Length > 0
 		? unit.EnabledText
 		: unit.Enabled switch { true => "enabled", false => "disabled", _ => "" };
@@ -294,12 +297,6 @@
 		ApplyFilter();
 	}
 
-	private void SortBy(string key)
-	{
-		_sort.Toggle(key, startDescending: false);
-		ApplyFilter();
-	}
-
 	private void ApplyFilter()
 	{
 		string filter = _filter.Trim();
@@ -315,15 +312,7 @@
 				|| unit.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
 				|| unit.Description.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
-		_shown =
-		[
-			.. _sort.Key switch
-			{
-				"state" => _sort.Apply(matching, unit => unit.StateText),
-				"boot" => _sort.Apply(matching, BootText),
-				_ => _sort.Apply(matching, unit => unit.Name),
-			},
-		];
+		_shown = [.. matching];
 	}
 
 	private Task SelectAsync(ServiceUnit unit) => SelectAsync(unit, keepOpen: false);
@@ -351,14 +340,6 @@
 		_showUnitFile = false;
 		_overrideSaved = null;
 		_overrideProblem = null;
-	}
-
-	private async Task OnRowKeyAsync(KeyboardEventArgs args, ServiceUnit unit)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			await SelectAsync(unit);
-		}
 	}
 
 	private async Task LoadStatusAsync(string name)

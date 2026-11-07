@@ -6,7 +6,7 @@
 <ToolPageFrame Title="Packages"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter by name"
 				PrimaryText="@PrimaryText"
 				PrimaryIcon="PrimaryIcon"
@@ -71,13 +71,7 @@
 			{
 				<div class="mta-loading"><MokaSpinner Label="@($"Asking {packages.DisplayName} for updates")" /></div>
 			}
-			else if (_updates.Count == 0)
-			{
-				<MokaEmptyState Icon="MokaIcons.Status.CheckCircle"
-								Title="Up to date"
-								Description="@($"{packages.DisplayName} knows of no newer versions. Its lists may be old: refresh them to ask the repositories again.")" />
-			}
-			else if (_view == "security" && _security is null)
+			else if (_view == "security" && _security is null && _updates.Count > 0)
 			{
 				@if (_securityNote is { } securityNote)
 				{
@@ -88,108 +82,101 @@
 					<div class="mta-loading"><MokaSpinner Label="@($"Asking {packages.DisplayName} which updates fix security problems")" /></div>
 				}
 			}
-			else if (_view == "security" && _security is { Count: 0 })
-			{
-				<MokaEmptyState Icon="MokatermIcons.ShieldCheck"
-								Title="No security updates"
-								Description="@($"None of the pending updates fixes a security problem, as far as {packages.DisplayName}'s lists know.")" />
-			}
 			else
 			{
-				List<PackageUpdate> updates = [.. Sorted(_updates.Where(Matches).Where(update => _view != "security" || IsSecurity(update)))];
-				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr)">
-					<div class="mta-row mta-row--head">
-						<SortHeader Label="Package" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
-						<span class="mta-wide">Installed</span>
-						<span>Available</span>
-						<SortHeader Label="From" Direction="@(_sort.DirectionOf("source"))" OnSort="@(() => _sort.Toggle("source", startDescending: false))" Class="mta-wide" />
-					</div>
-					@foreach (PackageUpdate update in updates.Take(MaxRows))
-					{
-						<div class="mta-row" @key="@(update.Name + "/" + update.Architecture)">
-							<span class="mta-cell mta-mono" title="@update.Name">
-								@update.Name
-								@if (_view == "updates" && IsSecurity(update))
-								{
-									<span class="mta-after"><MokaTag Text="SECURITY" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
-								}
-							</span>
-							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.CurrentVersion">@update.CurrentVersion</span>
-							<span class="mta-cell mta-mono" title="@update.NewVersion">@update.NewVersion</span>
-							<span class="mta-cell mta-mono mta-dim mta-wide" title="@update.Source">@update.Source</span>
-						</div>
-					}
-					@if (updates.Count > MaxRows)
-					{
-						<div class="mta-more">@($"{AdminFormat.Count(updates.Count - MaxRows)} more. Narrow the filter to see them.")</div>
-					}
-				</div>
+				<ToolTable TItem="PackageUpdate"
+						   Items="_updatesShown"
+						   ItemKey="@(update => update.Name + "/" + update.Architecture)"
+						   Label="@(_view == "security" ? "Security updates" : "Upgradable packages")"
+						   SortColumn="Package"
+						   SortDirection="MokaSortDirection.Ascending"
+						   Virtualize="@(_updatesShown.Count > VirtualizeAbove)"
+						   EmptyIcon="@(_updates.Count == 0 ? MokaIcons.Status.CheckCircle : _view == "security" && _security is { Count: 0 } ? MokatermIcons.ShieldCheck : SshIcons.Package)"
+						   EmptyTitle="@UpdatesEmptyTitle"
+						   EmptyText="@UpdatesEmptyText(packages)">
+					<MokaColumn TItem="PackageUpdate" Title="Package" Field="@(update => update.Name)" SortComparer="ByName" Mono Class="mt-col-main">
+						<CellTemplate Context="update">
+							<span title="@update.Name">@update.Name</span>
+							@if (_view == "updates" && IsSecurity(update))
+							{
+								<span class="mta-after"><MokaTag Text="SECURITY" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+							}
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="PackageUpdate" Title="Installed" Field="@(update => update.CurrentVersion)" Mono Class="mt-col-wide mta-col-cut">
+						<CellTemplate Context="update">
+							<span class="mta-dim" title="@update.CurrentVersion">@update.CurrentVersion</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="PackageUpdate" Title="Available" Field="@(update => update.NewVersion)" Mono Class="mta-col-cut">
+						<CellTemplate Context="update">
+							<span title="@update.NewVersion">@update.NewVersion</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="PackageUpdate" Title="From" Field="@(update => update.Source)" SortComparer="BySource" Mono Class="mt-col-wider mta-col-cut">
+						<CellTemplate Context="update">
+							<span class="mta-dim" title="@update.Source">@update.Source</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ToolTable>
 			}
 		}
 		else
 		{
-			List<InstalledPackage> installed = [.. Sorted(_installed.Where(Matches))];
-			@if (installed.Count == 0)
-			{
-				<MokaEmptyState Icon="SshIcons.Package" Title="Nothing matches" Description="No installed package matches the filter. Install it if it is missing.">
-					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="@(Context.RootChangeBlocked is not null)" OnClick="StartInstall">
-						Install a package
-					</MokaButton>
-				</MokaEmptyState>
-			}
-			else
-			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) minmax(0, 1fr) 64px var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) var(--moka-button-height-sm)">
-					<div class="mta-row mta-row--head">
-						<SortHeader Label="Package" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
-						<SortHeader Label="Version" Direction="@(_sort.DirectionOf("version"))" OnSort="@(() => _sort.Toggle("version", startDescending: false))" />
-						<span class="mta-wide">Arch</span>
-						<span></span>
-					</div>
-					@foreach (InstalledPackage package in installed.Take(MaxRows))
-					{
-						string key = package.Name + "/" + package.Architecture;
-						<div class="@(key == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-							 @key="key"
-							 role="button"
-							 tabindex="0"
-							 @onclick="@(() => Select(key))"
-							 @onkeydown="@(args => OnRowKey(args, key))"
-							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(package)))"
-							 @oncontextmenu:preventDefault="true">
-							<span class="mta-cell mta-mono" title="@package.Name">@package.Name</span>
-							<span class="mta-cell mta-mono mta-dim" title="@package.Version">@package.Version</span>
-							<span class="mta-cell mta-mono mta-dim mta-wide">@package.Architecture</span>
-							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-								<IconButton Size="MokaSize.Xs"
-											Icon="MokaIcons.Navigation.MoreHorizontal"
-											OnClick="@(args => ShowRowMenu(args, MenuFor(package)))"
-											Label="More actions"
-											AriaLabel="@($"Actions for {package.Name}")"
-											Position="MokaTooltipPosition.BottomEnd" />
-							</span>
-						</div>
-					}
-					@if (installed.Count > MaxRows)
-					{
-						<div class="mta-more">@($"{AdminFormat.Count(installed.Count - MaxRows)} more. Narrow the filter to see them.")</div>
-					}
-				</div>
-			}
+			<ToolTable TItem="InstalledPackage"
+					   Items="_installedShown"
+					   ItemKey="@(package => KeyOf(package))"
+					   Label="Installed packages"
+					   IsSelected="@(package => KeyOf(package) == _selected)"
+					   OnRowClick="@(package => Select(KeyOf(package)))"
+					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+					   ActionsWidth="var(--moka-button-height-sm)"
+					   SortColumn="Package"
+					   SortDirection="MokaSortDirection.Ascending"
+					   Virtualize="@(_installedShown.Count > VirtualizeAbove)"
+					   EmptyIcon="SshIcons.Package"
+					   EmptyTitle="@(_installed.Count == 0 ? "No packages" : "Nothing matches")"
+					   EmptyText="@(_installed.Count == 0 ? $"{packages.DisplayName} listed none." : "No installed package matches the filter. Install, at the top, starts with the filter as the package's name.")">
+				<RowActions Context="package">
+					<IconButton Size="MokaSize.Xs"
+								Icon="MokaIcons.Navigation.MoreHorizontal"
+								OnClick="@(args => ShowRowMenu(args, MenuFor(package)))"
+								Label="More actions"
+								AriaLabel="@($"Actions for {package.Name}")"
+								Position="MokaTooltipPosition.BottomEnd" />
+				</RowActions>
+				<ChildContent>
+					<MokaColumn TItem="InstalledPackage" Title="Package" Field="@(package => package.Name)" SortComparer="ByName" Mono Class="mt-col-main">
+						<CellTemplate Context="package">
+							<span title="@package.Name">@package.Name</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="InstalledPackage" Title="Version" Field="@(package => package.Version)" Mono Class="mta-col-cut">
+						<CellTemplate Context="package">
+							<span class="mta-dim" title="@package.Version">@package.Version</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="InstalledPackage" Title="Arch" Field="@(package => package.Architecture)" Mono Class="mt-col-wide">
+						<CellTemplate Context="package">
+							<span class="mta-dim">@package.Architecture</span>
+						</CellTemplate>
+					</MokaColumn>
+				</ChildContent>
+			</ToolTable>
 		}
 	</ChildContent>
 </ToolPageFrame>
 
 @code {
-	private const int MaxRows = 400;
 
 	private IReadOnlyList<InstalledPackage> _installed = [];
+	private List<InstalledPackage> _installedShown = [];
 	private IReadOnlyList<PackageUpdate>? _updates;
+	private List<PackageUpdate> _updatesShown = [];
 	private string? _updatesError;
 	private HashSet<string>? _security;
 	private string? _securityNote;
 	private RebootStatus? _reboot;
-	private readonly AdminSort _sort = new("name");
 	private string _view = "installed";
 	private string _filter = "";
 	private string? _selected;
@@ -229,8 +216,12 @@
 		];
 
 	private InstalledPackage? Selected => _selected is { } key
-		? _installed.FirstOrDefault(package => package.Name + "/" + package.Architecture == key)
+		? _installed.FirstOrDefault(package => KeyOf(package) == key)
 		: null;
+
+	private string UpdatesEmptyTitle => _updates is { Count: 0 }
+		? "Up to date"
+		: _view == "security" && _security is { Count: 0 } ? "No security updates" : "Nothing matches";
 
 	private RenderFragment? DetailFragment => _view != "installed" ? null : _installing ? InstallPanel : Selected is null ? null : PackagePanel;
 
@@ -256,6 +247,7 @@
 		}
 
 		_installed = packages.ParseInstalled(outcome.Output);
+		ApplyFilter();
 		_ = LoadRebootAsync(cancellationToken);
 		if (_view != "installed" || _updates is not null)
 		{
@@ -324,25 +316,37 @@
 		</ToolDetailPanel>
 	};
 
-	private IEnumerable<InstalledPackage> Sorted(IEnumerable<InstalledPackage> packages) => _sort.Key switch
+	private static string KeyOf(InstalledPackage package) => package.Name + "/" + package.Architecture;
+
+	private static int ByName(InstalledPackage left, InstalledPackage right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int ByName(PackageUpdate left, PackageUpdate right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private static int BySource(PackageUpdate left, PackageUpdate right) => StringComparer.OrdinalIgnoreCase.Compare(left.Source, right.Source);
+
+	private string UpdatesEmptyText(PackageCommands packages) => _updates is { Count: 0 }
+		? $"{packages.DisplayName} knows of no newer versions. Its lists may be old: refresh them to ask the repositories again."
+		: _view == "security" && _security is { Count: 0 }
+			? $"None of the pending updates fixes a security problem, as far as {packages.DisplayName}'s lists know."
+			: "No pending update matches the filter.";
+
+	private bool Matches(string name) => _filter.Trim().Length == 0 || name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+
+	private void OnFilterChanged(string value)
 	{
-		"version" => _sort.Apply(packages, package => package.Version),
-		_ => _sort.Apply(packages, package => package.Name),
-	};
+		_filter = value;
+		ApplyFilter();
+	}
 
-	private IEnumerable<PackageUpdate> Sorted(IEnumerable<PackageUpdate> updates) => _sort.Key switch
+	private void ApplyFilter()
 	{
-		"source" => _sort.Apply(updates, update => update.Source),
-		_ => _sort.Apply(updates, update => update.Name),
-	};
-
-	private bool Matches(InstalledPackage package) => _filter.Trim().Length == 0 || package.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
-
-	private bool Matches(PackageUpdate update) => _filter.Trim().Length == 0 || update.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
+		_installedShown = [.. _installed.Where(package => Matches(package.Name))];
+		_updatesShown = [.. (_updates ?? []).Where(update => Matches(update.Name) && (_view != "security" || IsSecurity(update)))];
+	}
 
 	private IReadOnlyList<MokaContextMenuItem> MenuFor(InstalledPackage package) =>
 	[
-		new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(package.Name + "/" + package.Architecture, keepOpen: true) },
+		new MokaContextMenuItem { Text = "Details", OnClickSync = () => Select(KeyOf(package), keepOpen: true) },
 		new MokaContextMenuItem
 		{
 			Text = "Remove",
@@ -373,6 +377,7 @@
 			}
 
 			_updates = packages.ParseUpdates(outcome.Output);
+			ApplyFilter();
 		}
 		catch (AdminException ex)
 		{
@@ -402,6 +407,7 @@
 
 		_security = security is null ? null : new HashSet<string>(security.Select(update => update.Name), StringComparer.Ordinal);
 		_securityNote = note;
+		ApplyFilter();
 	}
 
 	private async Task LoadRebootAsync(CancellationToken cancellationToken)
@@ -425,6 +431,7 @@
 		_view = value;
 		_selected = null;
 		_installing = false;
+		ApplyFilter();
 		if (_view != "installed" && _updates is null)
 		{
 			await LoadUpdatesAsync(CancellationToken.None);
@@ -437,14 +444,6 @@
 	{
 		_installing = false;
 		_selected = _selected == key && !keepOpen ? null : key;
-	}
-
-	private void OnRowKey(KeyboardEventArgs args, string key)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(key);
-		}
 	}
 
 	private void StartInstall()

@@ -185,3 +185,43 @@
 /* The pages' own classes (mta-table, mta-row, mta-kv, mta-card, ...) live in Mokaterm.UI.Common's system-pages.css,
    which this view links, so a plugin's page draws exactly like a built-in one. */
 
+/* A list whose table shares the list area with a note, a form line or a second table: the tables take what the rest
+   leaves and scroll inside it, so the page itself never scrolls past a fixed header. */
+.mt-admin ::deep .mta-stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	height: 100%;
+	min-height: 0;
+}
+
+.mt-admin ::deep .mta-stack > * {
+	flex-shrink: 0;
+}
+
+.mt-admin ::deep .mta-stack > .mt-tool-table {
+	flex: 1 1 0;
+	height: auto;
+	min-height: 150px;
+}
+
+/* A second long column cuts its text too, so a long version, path or option list never widens the table past its box. */
+.mt-admin ::deep .mta-col-cut {
+	max-width: 16rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mt-admin ::deep .mta-col-cut--wide {
+	max-width: 24rem;
+}
+
+/* A filtered process tree keeps the parents of what matched so each match shows where it sits; those parents stay quiet. */
+.mt-admin ::deep .mta-row--context {
+	opacity: 0.55;
+}
+
+/* A line of a clickable table that leads nowhere, such as the files lying directly in a measured folder. */
+.mt-admin ::deep .mta-row--still {
+	cursor: default;
+}

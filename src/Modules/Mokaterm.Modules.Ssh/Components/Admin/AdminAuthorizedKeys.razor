@@ -50,34 +50,43 @@ else
 	{
 		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>@modes</MokaAlert>
 	}
-	@foreach (AuthorizedKey key in file.Keys)
+	@if (file.Keys.Count > 0)
 	{
-		<div class="mta-inline" @key="key.LineNumber">
-			<div class="mta-grow">
-				<MokaText Element="div" Size="MokaSize.Sm" Truncate title="@AuthorizedKeyCommands.DisplayName(key)">
-					@(key.Comment.Length > 0 ? key.Comment : key.Algorithm)
-					@if (key.Fingerprint == _login?.KeyFingerprint && UserName == Context.LoginName)
-					{
-						<span class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
-					}
-				</MokaText>
-				<MokaText Element="div" Size="MokaSize.Xs" Mono Truncate Class="mta-dim" title="@key.Fingerprint">@($"{key.Algorithm} {key.Fingerprint}")</MokaText>
-				@if (key.Options.Length > 0)
-				{
-					<MokaText Element="div" Size="MokaSize.Xs" Mono Truncate Class="mta-dim" title="@key.Options">@key.Options</MokaText>
-				}
-			</div>
-			<Hint Text="@ChangeBlocked(file)">
-				<MokaButton Variant="MokaVariant.Outlined"
-							Color="MokaColor.Error"
-							Size="MokaSize.Xs"
-							Disabled="@(!CanChange(file))"
-							OnClick="@(() => RemoveAsync(key))"
-							aria-label="@($"Remove {AuthorizedKeyCommands.DisplayName(key)}")">
-					Remove
-				</MokaButton>
-			</Hint>
-		</div>
+		<ToolTable TItem="AuthorizedKey"
+				   Items="file.Keys"
+				   ItemKey="@(key => key.LineNumber)"
+				   Label="@($"{UserName}'s SSH keys")">
+			<RowActions Context="key">
+				<Hint Text="@ChangeBlocked(file)">
+					<MokaButton Variant="MokaVariant.Outlined"
+								Color="MokaColor.Error"
+								Size="MokaSize.Xs"
+								Disabled="@(!CanChange(file))"
+								OnClick="@(() => RemoveAsync(key))"
+								aria-label="@($"Remove {AuthorizedKeyCommands.DisplayName(key)}")">
+						Remove
+					</MokaButton>
+				</Hint>
+			</RowActions>
+			<ChildContent>
+				<MokaColumn TItem="AuthorizedKey" Title="Key" Sortable="false" Resizable="false" Class="mt-col-main">
+					<CellTemplate Context="key">
+						<span title="@KeyTitle(key)">
+							<span>@(key.Comment.Length > 0 ? key.Comment : key.Algorithm)</span>
+							@if (key.Fingerprint == _login?.KeyFingerprint && UserName == Context.LoginName)
+							{
+								<span class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
+							}
+							@if (key.Options.Length > 0)
+							{
+								<span class="mta-after"><MokaTag Text="OPTIONS" Size="MokaSize.Xs" Color="MokaColor.Surface" /></span>
+							}
+							<span class="mta-mono mta-dim mta-after">@key.Fingerprint</span>
+						</span>
+					</CellTemplate>
+				</MokaColumn>
+			</ChildContent>
+		</ToolTable>
 	}
 
 	@if (file.State != AuthorizedKeysState.NoHome && !file.IsLink)
@@ -245,6 +254,10 @@ else
 		_ when file.IsCut => $"Only the first {AuthorizedKeyCommands.MaxReadBytes / 1024} KB were read; keys after that are not listed.",
 		_ => null,
 	};
+
+	private static string KeyTitle(AuthorizedKey key) => key.Options.Length > 0
+		? $"{AuthorizedKeyCommands.DisplayName(key)}\n{key.Algorithm} {key.Fingerprint}\n{key.Options}"
+		: $"{AuthorizedKeyCommands.DisplayName(key)}\n{key.Algorithm} {key.Fingerprint}";
 
 	private static string KeyLabel(CredentialInfo credential, AuthorizedKeysFile file)
 	{

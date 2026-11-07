@@ -159,47 +159,44 @@
 			<div class="mta-live-lists">
 				@if (rates.Interfaces.Count > 1)
 				{
-					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 96px 96px" role="table" aria-label="Network interfaces">
-						<div class="mta-row mta-row--head" role="row">
-							<span role="columnheader">Interface</span>
-							<span role="columnheader">In</span>
-							<span role="columnheader">Out</span>
-						</div>
-						@foreach (InterfaceRate item in rates.Interfaces.Take(MaxDevices))
-						{
-							<div class="mta-row" role="row" @key="item.Name">
-								<span class="mta-cell mta-mono" role="cell">
-									<Hint Text="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell">
+					bool anyDevice = rates.Interfaces.Any(other => other.IsDevice);
+					<ToolTable TItem="InterfaceRate"
+							   Items="@rates.Interfaces.Take(MaxDevices).ToList()"
+							   ItemKey="@(item => item.Name)"
+							   Label="Network interfaces">
+						<MokaColumn TItem="InterfaceRate" Title="Interface" Field="@(item => item.Name)" Class="mt-col-main">
+							<CellTemplate Context="item">
+								<Hint Text="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
 									@item.Name
-									@if (!item.IsDevice && rates.Interfaces.Any(other => other.IsDevice))
+									@if (!item.IsDevice && anyDevice)
 									{
 										<span class="mta-dim mta-after">virtual</span>
 									}
-									</Hint>
-								</span>
-								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.ReceivedPerSecond)</span>
-								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.SentPerSecond)</span>
-							</div>
-						}
-					</div>
+								</Hint>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="InterfaceRate" Title="In" Field="@(item => item.ReceivedPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+							<CellTemplate Context="item">@AdminFormat.Rate(item.ReceivedPerSecond)</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="InterfaceRate" Title="Out" Field="@(item => item.SentPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+							<CellTemplate Context="item">@AdminFormat.Rate(item.SentPerSecond)</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 				}
 				@if (rates.Disks.Count > 1)
 				{
-					<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 96px 96px" role="table" aria-label="Disks">
-						<div class="mta-row mta-row--head" role="row">
-							<span role="columnheader">Disk</span>
-							<span role="columnheader">Read</span>
-							<span role="columnheader">Write</span>
-						</div>
-						@foreach (DiskRate item in rates.Disks.Take(MaxDevices))
-						{
-							<div class="mta-row" role="row" @key="item.Name">
-								<span class="mta-cell mta-mono" role="cell">@item.Name</span>
-								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.ReadPerSecond)</span>
-								<span class="mta-cell mta-mono" role="cell">@AdminFormat.Rate(item.WrittenPerSecond)</span>
-							</div>
-						}
-					</div>
+					<ToolTable TItem="DiskRate"
+							   Items="@rates.Disks.Take(MaxDevices).ToList()"
+							   ItemKey="@(item => item.Name)"
+							   Label="Disks">
+						<MokaColumn TItem="DiskRate" Title="Disk" Field="@(item => item.Name)" Mono Class="mt-col-main" />
+						<MokaColumn TItem="DiskRate" Title="Read" Field="@(item => item.ReadPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+							<CellTemplate Context="item">@AdminFormat.Rate(item.ReadPerSecond)</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="DiskRate" Title="Write" Field="@(item => item.WrittenPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+							<CellTemplate Context="item">@AdminFormat.Rate(item.WrittenPerSecond)</CellTemplate>
+						</MokaColumn>
+					</ToolTable>
 				}
 			</div>
 		}

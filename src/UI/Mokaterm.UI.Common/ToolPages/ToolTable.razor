@@ -1,0 +1,38 @@
+@namespace Mokaterm.UI.Common.ToolPages
+@typeparam TItem
+@using Moka.Red.Data.Table
+
+<div class="mt-tool-table" style="@RowStyle">
+	<MokaTable TItem="TItem"
+			   Items="Items"
+			   ItemKey="ItemKey"
+			   Label="@Label"
+			   ShowToolbar="false"
+			   ShowPagination="false"
+			   Dense="true"
+			   FixedHeader="true"
+			   Height="100%"
+			   Virtualize="Virtualize"
+			   VirtualRowHeight="RowPixels"
+			   SelectedItems="SelectedSet"
+			   OnRowClick="OnRowClick"
+			   OnRowContextMenu="OnRowMenu"
+			   RowClass="RowClass"
+			   RowActions="RowActions"
+			   ActionsColumnTitle=""
+			   ActionsColumnWidth="@ActionsWidth"
+			   GroupBy="GroupBy"
+			   GroupHeaderTemplate="GroupHeader"
+			   InitiallyCollapsedGroups="CollapsedGroups"
+			   OnGroupToggled="GroupToggled"
+			   SortColumn="@SortColumn"
+			   SortColumnChanged="SortColumnChanged"
+			   SortDirection="SortDirection"
+			   SortDirectionChanged="SortDirectionChanged"
+			   Loading="Loading"
+			   EmptyIcon="EmptyIcon"
+			   EmptyTitle="@EmptyTitle"
+			   EmptyText="@EmptyText">
+		@ChildContent
+	</MokaTable>
+</div>

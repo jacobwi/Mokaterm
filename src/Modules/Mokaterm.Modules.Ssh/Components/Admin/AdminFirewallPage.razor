@@ -5,7 +5,7 @@
 <ToolPageFrame Title="Firewall"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter rules"
 				PrimaryText="@(Capabilities.Firewall?.CanChange == true && _status is not null ? "Add rule" : null)"
 				PrimaryIcon="MokaIcons.Action.Add"
@@ -61,66 +61,75 @@
 		}
 		else if (_status is { } status)
 		{
-			@if (status.Summary.Count > 0)
-			{
-				<dl class="mta-kv" style="margin-bottom:var(--moka-spacing-sm)">
-					@foreach ((string key, string value) in status.Summary)
-					{
-						<dt>@key</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
-					}
-				</dl>
-			}
-
 			@if (status.Rules.Count > 0)
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1.4fr) 104px minmax(0, 1fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) 90px var(--moka-button-height-sm)">
-					<div class="mta-row mta-row--head">
-						<span>Rule</span>
-						<span>Action</span>
-						<span class="mta-wide">From</span>
-						<span></span>
-					</div>
-					@foreach ((FirewallRule rule, int index) in status.Rules.Select((rule, index) => (rule, index)).Where(pair => Matches(pair.rule)))
-					{
-						<div class="@(index == _selected && !_adding ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-							 @key="index"
-							 role="button"
-							 tabindex="0"
-							 @onclick="@(() => Select(index))"
-							 @onkeydown="@(args => OnRowKey(args, index))"
-							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(rule, index, firewall, status)))"
-							 @oncontextmenu:preventDefault="true">
-							<span class="mta-cell mta-mono" title="@rule.Target">@rule.Target</span>
-							<span class="mta-cell mta-mono" style="@ActionStyle(rule.Action)">@rule.Action</span>
-							<span class="mta-cell mta-mono mta-dim mta-wide" title="@rule.From">@rule.From</span>
-							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-								<IconButton Size="MokaSize.Xs"
-											Icon="MokaIcons.Navigation.MoreHorizontal"
-											OnClick="@(args => ShowRowMenu(args, MenuFor(rule, index, firewall, status)))"
-											Label="More actions"
-											AriaLabel="@($"Actions for {rule.Target}")"
-											Position="MokaTooltipPosition.BottomEnd" />
-							</span>
-						</div>
-					}
+				<div class="mta-stack">
+					@Policies(status)
+					<ToolTable TItem="AdminRow<FirewallRule>"
+							   Items="_rulesShown"
+							   ItemKey="@(row => row.Index)"
+							   Label="Firewall rules"
+							   IsSelected="@(row => row.Index == _selected && !_adding)"
+							   OnRowClick="@(row => Select(row.Index))"
+							   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item.Item, args.Item.Index, firewall, status)))"
+							   ActionsWidth="var(--moka-button-height-sm)"
+							   EmptyIcon="MokatermIcons.Shield"
+							   EmptyTitle="Nothing matches"
+							   EmptyText="No rule matches the filter.">
+						<RowActions Context="row">
+							<IconButton Size="MokaSize.Xs"
+										Icon="MokaIcons.Navigation.MoreHorizontal"
+										OnClick="@(args => ShowRowMenu(args, MenuFor(row.Item, row.Index, firewall, status)))"
+										Label="More actions"
+										AriaLabel="@($"Actions for {row.Item.Target}")"
+										Position="MokaTooltipPosition.BottomEnd" />
+						</RowActions>
+						<ChildContent>
+							<MokaColumn TItem="AdminRow<FirewallRule>" Title="#" Field="@(row => row.Item.Number)" Visible="@(status.Rules.Any(rule => rule.Number is not null))" Mono>
+								<CellTemplate Context="row">
+									<span class="mta-dim">@row.Item.Number</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<FirewallRule>" Title="Rule" Field="@(row => row.Item.Target)" Mono Class="mt-col-main">
+								<CellTemplate Context="row">
+									<span title="@row.Item.Target">@row.Item.Target</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<FirewallRule>" Title="Action" Field="@(row => row.Item.Action)" Mono>
+								<CellTemplate Context="row">
+									<span style="@ActionStyle(row.Item.Action)">@row.Item.Action</span>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="AdminRow<FirewallRule>" Title="From" Field="@(row => row.Item.From)" Mono Class="mt-col-wide mta-col-cut">
+								<CellTemplate Context="row">
+									<span class="mta-dim" title="@row.Item.From">@row.Item.From</span>
+								</CellTemplate>
+							</MokaColumn>
+						</ChildContent>
+					</ToolTable>
 				</div>
-			}
-			else if (status.Raw.Length > 0)
-			{
-				<pre class="mta-pre mta-pre--fill">@status.Raw</pre>
-				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"Read only: {firewall.DisplayName} rule sets are shown as the tool prints them.")</MokaText>
 			}
 			else
 			{
-				<MokaEmptyState Icon="MokatermIcons.Shield"
-								Title="@(status.Active == true ? "No rules" : $"{firewall.DisplayName} is off")"
-								Description="@(status.Active == true ? "Only the default policies apply." : "Nothing is filtered. Turn it on from the line above; the port this session uses is allowed first.")">
-					@if (firewall.CanChange)
+				<div class="mta-stack">
+					@Policies(status)
+					@if (status.Raw.Length > 0)
 					{
-						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="Busy" OnClick="StartAdd">Add rule</MokaButton>
+						<pre class="mta-pre mta-pre--fill">@status.Raw</pre>
+						<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"Read only: {firewall.DisplayName} rule sets are shown as the tool prints them.")</MokaText>
 					}
-				</MokaEmptyState>
+					else
+					{
+						<MokaEmptyState Icon="MokatermIcons.Shield"
+										Title="@(status.Active == true ? "No rules" : $"{firewall.DisplayName} is off")"
+										Description="@(status.Active == true ? "Only the default policies apply." : "Nothing is filtered. Turn it on from the line above; the port this session uses is allowed first.")">
+							@if (firewall.CanChange)
+							{
+								<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="Busy" OnClick="StartAdd">Add rule</MokaButton>
+							}
+						</MokaEmptyState>
+					}
+				</div>
 			}
 		}
 	</ChildContent>
@@ -128,6 +137,7 @@
 
 @code {
 	private FirewallStatus? _status;
+	private List<AdminRow<FirewallRule>> _rulesShown = [];
 	private string _filter = "";
 	private bool _adding;
 	private int _formVersion;
@@ -172,7 +182,33 @@
 		// Rules move up when one before them goes, so the selection follows the rule, not the line.
 		int found = selected is null ? -1 : _status.Rules.ToList().FindIndex(rule => rule.Target == selected.Target && rule.Action == selected.Action && rule.From == selected.From);
 		_selected = found < 0 ? null : found;
+		ApplyFilter();
 	}
+
+	private static RenderFragment Policies(FirewallStatus status) => __builder =>
+	{
+		@if (status.Summary.Count > 0)
+		{
+			<dl class="mta-kv">
+				@foreach ((string key, string value) in status.Summary)
+				{
+					<dt>@key</dt>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
+				}
+			</dl>
+		}
+	};
+
+	private void OnFilterChanged(string value)
+	{
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter() =>
+		_rulesShown = _status is { } status
+			? [.. status.Rules.Select((rule, index) => new AdminRow<FirewallRule>(rule, index)).Where(row => Matches(row.Item))]
+			: [];
 
 	private RenderFragment RulePanel => __builder =>
 	{
@@ -255,14 +291,6 @@
 	{
 		_adding = false;
 		_selected = _selected == index && !keepOpen ? null : index;
-	}
-
-	private void OnRowKey(KeyboardEventArgs args, int index)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(index);
-		}
 	}
 
 	private async Task DeleteAsync(FirewallRule rule, FirewallCommands firewall, FirewallStatus status)

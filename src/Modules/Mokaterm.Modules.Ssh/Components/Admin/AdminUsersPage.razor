@@ -5,7 +5,7 @@
 <ToolPageFrame Title="Users"
 				Summary="@Summary"
 				Search="@_filter"
-				SearchChanged="@(value => _filter = value)"
+				SearchChanged="OnFilterChanged"
 				SearchPlaceholder="Filter by name"
 				PrimaryText="@(Capabilities.Accounts.CanChange ? _view == "groups" ? "Add group" : "Add user" : null)"
 				PrimaryIcon="MokaIcons.Action.Add"
@@ -19,7 +19,7 @@
 				ListPage
 				Detail="@DetailFragment">
 	<Chips>
-		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; _selectedGroup = null; _addingGroup = false; })" AriaLabel="Accounts to show" />
+		<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChanged" AriaLabel="Accounts to show" />
 	</Chips>
 	<ChipsEnd>
 		@if (_snapshot is { KnowsPasswords: false })
@@ -34,105 +34,100 @@
 		{
 			@if (_view == "groups")
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr) var(--moka-button-height-sm)">
-					<div class="mta-row mta-row--head">
-						<SortHeader Label="Group" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
-						<SortHeader Label="GID" Direction="@(_sort.DirectionOf("id"))" OnSort="@(() => _sort.Toggle("id", startDescending: false))" Class="mta-wide" />
-						<span>Members</span>
-						<span></span>
-					</div>
-					@foreach (GroupAccount group in SortedGroups(snapshot.Groups.Where(Matches)))
-					{
-						@* A name can repeat (a local entry and a directory one), and a repeated key ends the page on the
-						   first re-sort, so rows are keyed by name and number. *@
-						<div class="@(group.Name == _selectedGroup && !_addingGroup ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-							 @key="@($"{group.Name}|{group.Gid}")"
-							 role="button"
-							 tabindex="0"
-							 @onclick="@(() => SelectGroup(group.Name))"
-							 @onkeydown="@(args => OnGroupKey(args, group.Name))"
-							 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
-							 @oncontextmenu:preventDefault="true">
-							<span class="mta-cell mta-mono">@group.Name</span>
-							<span class="mta-cell mta-mono mta-dim mta-wide">@group.Gid</span>
-							<span class="mta-cell mta-mono mta-dim" title="@string.Join(", ", group.Members)">@string.Join(", ", group.Members)</span>
-							<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-								<IconButton Size="MokaSize.Xs"
-											Icon="MokaIcons.Navigation.MoreHorizontal"
-											OnClick="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
-											Label="More actions"
-											AriaLabel="@($"Actions for {group.Name}")"
-											Position="MokaTooltipPosition.BottomEnd" />
-							</span>
-						</div>
-					}
-				</div>
+				@* A name can repeat (a local entry and a directory one), and a repeated key ends the page on the first
+				   re-sort, so rows are keyed by name and number. *@
+				<ToolTable TItem="GroupAccount"
+						   Items="_groupsShown"
+						   ItemKey="@(group => $"{group.Name}|{group.Gid}")"
+						   Label="Groups"
+						   IsSelected="@(group => group.Name == _selectedGroup && !_addingGroup)"
+						   OnRowClick="@(group => SelectGroup(group.Name))"
+						   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item, snapshot)))"
+						   ActionsWidth="var(--moka-button-height-sm)"
+						   SortColumn="GID"
+						   SortDirection="MokaSortDirection.Ascending"
+						   EmptyIcon="SshIcons.Users"
+						   EmptyTitle="@(snapshot.Groups.Count == 0 ? "No groups" : "Nothing matches")"
+						   EmptyText="@(snapshot.Groups.Count == 0 ? "The group database listed none." : "No group or member matches the filter.")">
+					<RowActions Context="group">
+						<IconButton Size="MokaSize.Xs"
+									Icon="MokaIcons.Navigation.MoreHorizontal"
+									OnClick="@(args => ShowRowMenu(args, MenuFor(group, snapshot)))"
+									Label="More actions"
+									AriaLabel="@($"Actions for {group.Name}")"
+									Position="MokaTooltipPosition.BottomEnd" />
+					</RowActions>
+					<ChildContent>
+						<MokaColumn TItem="GroupAccount" Title="Group" Field="@(group => group.Name)" SortComparer="ByName" Mono />
+						<MokaColumn TItem="GroupAccount" Title="GID" Field="@(group => group.Gid)" Mono Class="mt-col-wide">
+							<CellTemplate Context="group">
+								<span class="mta-dim">@group.Gid</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="GroupAccount" Title="Members" Field="@(group => string.Join(", ", group.Members))" Sortable="false" Mono Class="mt-col-main">
+							<CellTemplate Context="group">
+								<span class="mta-dim" title="@string.Join(", ", group.Members)">@string.Join(", ", group.Members)</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ChildContent>
+				</ToolTable>
 			}
 			else
 			{
-				List<UserAccount> users = [.. SortedUsers(snapshot.Users.Where(user => (_view == "all" || snapshot.IsPerson(user)) && Matches(user)))];
-				@if (users.Count == 0)
-				{
-					<MokaEmptyState Icon="SshIcons.Users" Title="Nothing matches" Description="No account matches the filter.">
-						@if (Capabilities.Accounts.CanChange)
-						{
-							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Add" Disabled="@(Context.RootChangeBlocked is not null)" OnClick="StartAdd">Add user</MokaButton>
-						}
-					</MokaEmptyState>
-				}
-				else
-				{
-					<div class="mta-table" style="@UserColumns">
-						<div class="mta-row mta-row--head">
-							<SortHeader Label="User" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
-							<SortHeader Label="UID" Direction="@(_sort.DirectionOf("id"))" OnSort="@(() => _sort.Toggle("id", startDescending: false))" Class="mta-wide" />
-							<span class="mta-wide">Shell</span>
-							@if (KnowsPasswords)
-							{
-								<span>Password</span>
-							}
-							<span></span>
-						</div>
-						@foreach (UserAccount user in users)
-						{
-							@* Keyed by name and number for the same reason as the groups above. *@
-							<div class="@(user.Name == _selected && !_adding ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-								 @key="@($"{user.Name}|{user.Uid}")"
-								 role="button"
-								 tabindex="0"
-								 @onclick="@(() => Select(user.Name))"
-								 @onkeydown="@(args => OnRowKey(args, user.Name))"
-								 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(user)))"
-								 @oncontextmenu:preventDefault="true">
-								<span class="mta-cell">
-									<span class="mta-mono">@user.Name</span>
-									@if (user.Name == Context.LoginName)
-									{
-										<span class="mta-after"><MokaTag Text="YOU" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
-									}
-									@if (user.Comment.Length > 0 && user.Comment != user.Name)
-									{
-										<span class="mta-dim mta-after">@user.Comment</span>
-									}
-								</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide">@user.Uid</span>
-								<span class="mta-cell mta-mono mta-dim mta-wide" title="@user.Shell">@user.Shell</span>
-								@if (KnowsPasswords)
+				@* Keyed by name and number for the same reason as the groups above. *@
+				<ToolTable TItem="UserAccount"
+						   Items="_usersShown"
+						   ItemKey="@(user => $"{user.Name}|{user.Uid}")"
+						   Label="@(_view == "all" ? "All accounts" : "People")"
+						   IsSelected="@(user => user.Name == _selected && !_adding)"
+						   OnRowClick="@(user => Select(user.Name))"
+						   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+						   ActionsWidth="var(--moka-button-height-sm)"
+						   SortColumn="UID"
+						   SortDirection="MokaSortDirection.Ascending"
+						   EmptyIcon="SshIcons.Users"
+						   EmptyTitle="Nothing matches"
+						   EmptyText="@(Capabilities.Accounts.CanChange ? "No account matches the filter. Add user, at the top, makes a new one." : "No account matches the filter.")">
+					<RowActions Context="user">
+						<IconButton Size="MokaSize.Xs"
+									Icon="MokaIcons.Navigation.MoreHorizontal"
+									OnClick="@(args => ShowRowMenu(args, MenuFor(user)))"
+									Label="More actions"
+									AriaLabel="@($"Actions for {user.Name}")"
+									Position="MokaTooltipPosition.BottomEnd" />
+					</RowActions>
+					<ChildContent>
+						<MokaColumn TItem="UserAccount" Title="User" Field="@(user => user.Name)" SortComparer="ByName" Class="mt-col-main">
+							<CellTemplate Context="user">
+								<span class="mta-mono">@user.Name</span>
+								@if (user.Name == Context.LoginName)
 								{
-									<span class="mta-cell mta-mono @(user.Password is PasswordState.Set ? "" : "mta-dim")" style="@PasswordStyle(user.Password)">@PasswordLabel(user.Password)</span>
+									<span class="mta-after"><MokaTag Text="YOU" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
 								}
-								<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-									<IconButton Size="MokaSize.Xs"
-												Icon="MokaIcons.Navigation.MoreHorizontal"
-												OnClick="@(args => ShowRowMenu(args, MenuFor(user)))"
-												Label="More actions"
-												AriaLabel="@($"Actions for {user.Name}")"
-												Position="MokaTooltipPosition.BottomEnd" />
-								</span>
-							</div>
-						}
-					</div>
-				}
+								@if (user.Comment.Length > 0 && user.Comment != user.Name)
+								{
+									<span class="mta-dim mta-after" title="@user.Comment">@user.Comment</span>
+								}
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="UserAccount" Title="UID" Field="@(user => user.Uid)" Mono Class="mt-col-wide">
+							<CellTemplate Context="user">
+								<span class="mta-dim">@user.Uid</span>
+							</CellTemplate>
+						</MokaColumn>
+						<MokaColumn TItem="UserAccount" Title="Shell" Field="@(user => user.Shell)" Mono Class="mt-col-wide mta-col-cut">
+							<CellTemplate Context="user">
+								<span class="mta-dim" title="@user.Shell">@user.Shell</span>
+							</CellTemplate>
+						</MokaColumn>
+						@* Without root every password reads as unknown, so the column would be a row of blanks. *@
+						<MokaColumn TItem="UserAccount" Title="Password" Field="@(user => PasswordLabel(user.Password))" Visible="KnowsPasswords" Mono>
+							<CellTemplate Context="user">
+								<span class="@(user.Password is PasswordState.Set ? "" : "mta-dim")" style="@PasswordStyle(user.Password)">@PasswordLabel(user.Password)</span>
+							</CellTemplate>
+						</MokaColumn>
+					</ChildContent>
+				</ToolTable>
 			}
 		}
 	</ChildContent>
@@ -140,7 +135,8 @@
 
 @code {
 	private AccountsSnapshot? _snapshot;
-	private readonly AdminSort _sort = new("id");
+	private List<UserAccount> _usersShown = [];
+	private List<GroupAccount> _groupsShown = [];
 	private string _view = "people";
 	private string _filter = "";
 	private string? _selected;
@@ -204,6 +200,7 @@
 	{
 		AdminOutcome outcome = await ReadAsync(AccountCommands.Read(ReadAsRoot), cancellationToken);
 		_snapshot = AccountCommands.Parse(outcome.Output);
+		ApplyFilter();
 	}
 
 	protected override void Dispose(bool disposing)
@@ -261,7 +258,7 @@
 					<dt>Shell</dt>
 					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@user.Shell</MokaText></dd>
 					<dt>Password</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(user.Password == PasswordState.Unknown ? "not read (needs root mode)" : PasswordLabel(user.Password).ToLowerInvariant())</MokaText></dd>
+					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(user.Password == PasswordState.Unknown ? "not read (needs root mode)" : PasswordLabel(user.Password))</MokaText></dd>
 					<dt>Groups</dt>
 					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@string.Join(", ", user.Groups)</MokaText></dd>
 				</dl>
@@ -398,17 +395,12 @@
 
 	private bool KnowsPasswords => _snapshot?.KnowsPasswords == true;
 
-	// Without root every password reads as unknown, so the column would be a row of blanks.
-	private string UserColumns => KnowsPasswords
-		? "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 88px var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) 88px var(--moka-button-height-sm)"
-		: "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) var(--moka-button-height-sm)";
-
 	private static string PasswordLabel(PasswordState state) => state switch
 	{
-		PasswordState.Set => "SET",
-		PasswordState.Locked => "LOCKED",
-		PasswordState.Disabled => "NO LOGIN",
-		PasswordState.Empty => "EMPTY",
+		PasswordState.Set => "set",
+		PasswordState.Locked => "locked",
+		PasswordState.Disabled => "no login",
+		PasswordState.Empty => "empty",
 		_ => "",
 	};
 
@@ -424,17 +416,35 @@
 
 	private string? ValidateNewName(string name) => AdminNames.CheckAccount(name) ?? (_snapshot?.Users.Any(user => user.Name == name) == true ? "That user already exists." : null);
 
-	private IEnumerable<UserAccount> SortedUsers(IEnumerable<UserAccount> users) => _sort.Key switch
-	{
-		"name" => _sort.Apply(users, user => user.Name),
-		_ => _sort.Apply(users, user => (double)user.Uid),
-	};
+	private static int ByName(UserAccount left, UserAccount right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
 
-	private IEnumerable<GroupAccount> SortedGroups(IEnumerable<GroupAccount> groups) => _sort.Key switch
+	private static int ByName(GroupAccount left, GroupAccount right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+
+	private void OnFilterChanged(string value)
 	{
-		"name" => _sort.Apply(groups, group => group.Name),
-		_ => _sort.Apply(groups, group => (double)group.Gid),
-	};
+		_filter = value;
+		ApplyFilter();
+	}
+
+	private void OnViewChanged(string value)
+	{
+		_view = value;
+		_selected = null;
+		_selectedGroup = null;
+		_addingGroup = false;
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		if (_snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		_usersShown = [.. snapshot.Users.Where(user => (_view == "all" || snapshot.IsPerson(user)) && Matches(user))];
+		_groupsShown = [.. snapshot.Groups.Where(Matches)];
+	}
 
 	private bool Matches(UserAccount user) => _filter.Trim().Length == 0
 		|| user.Name.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)
@@ -494,14 +504,6 @@
 		_selectedGroup = _selectedGroup == name && !keepOpen ? null : name;
 	}
 
-	private void OnGroupKey(KeyboardEventArgs args, string name)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			SelectGroup(name);
-		}
-	}
-
 	private void StartAddGroup()
 	{
 		_addingGroup = true;
@@ -542,14 +544,6 @@
 		_password = "";
 		_group = null;
 		_removeHome = false;
-	}
-
-	private void OnRowKey(KeyboardEventArgs args, string name)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(name);
-		}
 	}
 
 	private void StartAdd()

@@ -50,8 +50,12 @@
 </ToolPageFrame>
 
 @code {
+
 	private SecuritySnapshot? _snapshot;
 	private IReadOnlyList<SecurityCheck> _checks = [];
+	private List<AdminRow<FailedLogin>> _loginsShown = [];
+	private List<AdminRow<ListeningSocket>> _portsShown = [];
+	private HashSet<ListeningSocket> _openToAll = [];
 	private SessionLogin? _login;
 	private int? _securityUpdates;
 	private string? _securityUpdatesNote;
@@ -103,6 +107,26 @@
 		_snapshot = SecurityCommands.Parse(outcome.Output);
 		_login = await Context.Login();
 		Rebuild();
+		ApplyFilter();
+	}
+
+	private void ApplyFilter()
+	{
+		if (_snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		_loginsShown = [.. snapshot.FailedLogins.Reverse().Select((login, index) => new AdminRow<FailedLogin>(login, index)).Where(row => Matches(row.Item))];
+		_openToAll = [.. SecurityChecks.OpenToAll(snapshot.Listening)];
+		_portsShown =
+		[
+			.. snapshot.Listening
+				.OrderByDescending(_openToAll.Contains)
+				.ThenBy(socket => socket.Port)
+				.Select((socket, index) => new AdminRow<ListeningSocket>(socket, index))
+				.Where(row => Matches(row.Item)),
+		];
 	}
 
 	private void Rebuild()
@@ -135,41 +159,43 @@
 
 	private RenderFragment ChecksView => __builder =>
 	{
-		<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) minmax(0, 0.8fr) var(--moka-button-height-sm); --mta-cols-narrow: 14px minmax(0, 1fr) minmax(0, 0.6fr) var(--moka-button-height-sm)">
-			<div class="mta-row mta-row--head">
-				<span></span>
-				<span>Check</span>
-				<span>Value</span>
-				<span></span>
-			</div>
-			@foreach (SecurityCheck check in _checks)
-			{
-				<div class="@(check.Id == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-					 @key="check.Id"
-					 role="button"
-					 tabindex="0"
-					 aria-pressed="@(check.Id == _selected ? "true" : "false")"
-					 @onclick="@(() => Select(check.Id))"
-					 @onkeydown="@(args => OnRowKey(args, check.Id))"
-					 @oncontextmenu="@(args => ShowRowMenu(args, MenuFor(check)))"
-					 @oncontextmenu:preventDefault="true">
-					<MokaStatusDot Size="MokaSize.Xs" Color="@LevelColor(check.Level)" Glow="@(check.Level is SecurityLevel.Warning)" />
-					<span class="mta-cell" title="@check.Summary">
-						<span>@check.Title</span>
-						<span class="mta-dim mta-after mta-wide">@check.Summary</span>
-					</span>
-					<span class="mta-cell mta-mono" title="@check.Value">@check.Value</span>
-					<span class="mta-cell mta-cell--end mta-row-menu" @onclick:stopPropagation="true">
-						<IconButton Size="MokaSize.Xs"
-									Icon="MokaIcons.Navigation.MoreHorizontal"
-									OnClick="@(args => ShowRowMenu(args, MenuFor(check)))"
-									Label="More actions"
-									AriaLabel="@($"Actions for {check.Title}")"
-									Position="MokaTooltipPosition.BottomEnd" />
-					</span>
-				</div>
-			}
-		</div>
+		<ToolTable TItem="SecurityCheck"
+				   Items="_checks"
+				   ItemKey="@(check => check.Id)"
+				   Label="Security checks"
+				   IsSelected="@(check => check.Id == _selected)"
+				   OnRowClick="@(check => Select(check.Id))"
+				   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
+				   ActionsWidth="var(--moka-button-height-sm)">
+			<RowActions Context="check">
+				<IconButton Size="MokaSize.Xs"
+							Icon="MokaIcons.Navigation.MoreHorizontal"
+							OnClick="@(args => ShowRowMenu(args, MenuFor(check)))"
+							Label="More actions"
+							AriaLabel="@($"Actions for {check.Title}")"
+							Position="MokaTooltipPosition.BottomEnd" />
+			</RowActions>
+			<ChildContent>
+				<MokaColumn TItem="SecurityCheck" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+					<CellTemplate Context="check">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@LevelColor(check.Level)" Glow="@(check.Level is SecurityLevel.Warning)" />
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="SecurityCheck" Title="Check" Field="@(check => check.Title)" Class="mt-col-main">
+					<CellTemplate Context="check">
+						<span title="@check.Summary">
+							<span>@check.Title</span>
+							<span class="mta-dim mta-after mta-wide">@check.Summary</span>
+						</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="SecurityCheck" Title="Value" Field="@(check => check.Value)" Mono Class="mta-col-cut">
+					<CellTemplate Context="check">
+						<span title="@check.Value">@check.Value</span>
+					</CellTemplate>
+				</MokaColumn>
+			</ChildContent>
+		</ToolTable>
 	};
 
 	private RenderFragment LoginsView(SecuritySnapshot snapshot) => __builder =>
@@ -182,40 +208,46 @@
 			return;
 		}
 
-		List<FailedLogin> shown = [.. snapshot.FailedLogins.Reverse().Where(Matches)];
-		if (shown.Count == 0)
-		{
-			<MokaEmptyState Icon="MokatermIcons.ShieldCheck"
-							Title="@(snapshot.FailedLogins.Count == 0 ? "No failed logins" : "Nothing matches")"
-							Description="@(snapshot.FailedLogins.Count == 0 ? $"None in the recent lines of {snapshot.FailedLoginSource}." : "No failed login matches the filter.")" />
-			return;
-		}
-
-		<MokaText Element="p" Size="MokaSize.Xs" Class="mta-dim">
-			@($"Most tries: {string.Join(", ", FailedLoginParser.ByAddress(snapshot.FailedLogins).Take(5).Select(entry => $"{entry.Address} ({entry.Count})"))} · from {snapshot.FailedLoginSource}, newest first")
-		</MokaText>
-		<div class="mta-table" style="--mta-cols: 170px minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 0.8fr); --mta-cols-narrow: minmax(0, 0.8fr) minmax(0, 1fr)">
-			<div class="mta-row mta-row--head">
-				<span class="mta-wide">When</span>
-				<span>User</span>
-				<span>From</span>
-				<span class="mta-wide">Method</span>
-			</div>
-			@foreach ((FailedLogin login, int index) in shown.Take(MaxRows).Select((login, index) => (login, index)))
+		<div class="mta-stack">
+			@if (snapshot.FailedLogins.Count > 0)
 			{
-				<div class="mta-row" @key="index">
-					<span class="mta-cell mta-mono mta-dim mta-wide" title="@login.Time">@login.Time</span>
-					<span class="mta-cell mta-mono" title="@login.User">
-						@login.User
-						@if (login.InvalidUser)
+				<MokaText Element="p" Size="MokaSize.Xs" Class="mta-dim">
+					@($"Most tries: {string.Join(", ", FailedLoginParser.ByAddress(snapshot.FailedLogins).Take(5).Select(entry => $"{entry.Address} ({entry.Count})"))} · from {snapshot.FailedLoginSource}, newest first")
+				</MokaText>
+			}
+			<ToolTable TItem="AdminRow<FailedLogin>"
+					   Items="_loginsShown"
+					   ItemKey="@(row => row.Index)"
+					   Label="Failed logins"
+					   Virtualize="@(_loginsShown.Count > VirtualizeAbove)"
+					   EmptyIcon="MokatermIcons.ShieldCheck"
+					   EmptyTitle="@(snapshot.FailedLogins.Count == 0 ? "No failed logins" : "Nothing matches")"
+					   EmptyText="@(snapshot.FailedLogins.Count == 0 ? $"None in the recent lines of {snapshot.FailedLoginSource}." : "No failed login matches the filter.")">
+				<MokaColumn TItem="AdminRow<FailedLogin>" Title="When" Field="@(row => row.Item.Time)" Mono Class="mt-col-wide">
+					<CellTemplate Context="row">
+						<span class="mta-dim" title="@row.Item.Time">@row.Item.Time</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<FailedLogin>" Title="User" Field="@(row => row.Item.User)" Mono Class="mta-col-cut">
+					<CellTemplate Context="row">
+						<span title="@row.Item.User">@row.Item.User</span>
+						@if (row.Item.InvalidUser)
 						{
 							<span class="mta-dim mta-after">no such user</span>
 						}
-					</span>
-					<span class="mta-cell mta-mono" title="@login.Address">@login.Address</span>
-					<span class="mta-cell mta-mono mta-dim mta-wide">@login.Method</span>
-				</div>
-			}
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<FailedLogin>" Title="From" Field="@(row => row.Item.Address)" Mono Class="mt-col-main">
+					<CellTemplate Context="row">
+						<span title="@row.Item.Address">@row.Item.Address</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<FailedLogin>" Title="Method" Field="@(row => row.Item.Method)" Mono Class="mt-col-wide">
+					<CellTemplate Context="row">
+						<span class="mta-dim">@row.Item.Method</span>
+					</CellTemplate>
+				</MokaColumn>
+			</ToolTable>
 		</div>
 	};
 
@@ -227,34 +259,41 @@
 			return;
 		}
 
-		HashSet<ListeningSocket> open = [.. SecurityChecks.OpenToAll(snapshot.Listening)];
-		List<ListeningSocket> shown = [.. snapshot.Listening.Where(Matches).OrderByDescending(open.Contains).ThenBy(socket => socket.Port)];
-		<div class="mta-table" style="--mta-cols: 56px minmax(0, 1fr) 64px minmax(0, 1fr) 130px; --mta-cols-narrow: 56px minmax(0, 1fr) 64px">
-			<div class="mta-row mta-row--head">
-				<span>Proto</span>
-				<span>Address</span>
-				<span>Port</span>
-				<span class="mta-wide">Process</span>
-				<span class="mta-wide">Reachable</span>
-			</div>
-			@foreach ((ListeningSocket socket, int index) in shown.Take(MaxRows).Select((socket, index) => (socket, index)))
+		<div class="mta-stack">
+			<ToolTable TItem="AdminRow<ListeningSocket>"
+					   Items="_portsShown"
+					   ItemKey="@(row => row.Index)"
+					   Label="Listening ports"
+					   EmptyIcon="SshIcons.Network"
+					   EmptyTitle="@(snapshot.Listening.Count == 0 ? "Nothing listens" : "Nothing matches")"
+					   EmptyText="@(snapshot.Listening.Count == 0 ? $"{snapshot.ListeningSource} listed no listening sockets." : "No port matches the filter.")">
+				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Proto" Field="@(row => row.Item.Protocol)" Mono>
+					<CellTemplate Context="row">
+						<span class="mta-dim">@row.Item.Protocol</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Address" Field="@(row => row.Item.Address)" Mono Class="mta-col-cut">
+					<CellTemplate Context="row">
+						<span title="@row.Item.Address">@row.Item.Address</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Port" Field="@(row => row.Item.Port)" Mono />
+				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Process" Field="@(row => row.Item.Process)" Mono Class="mt-col-main mt-col-wide">
+					<CellTemplate Context="row">
+						<span class="mta-dim" title="@row.Item.Process">@(row.Item.Process.Length > 0 ? row.Item.Process : snapshot.AsRoot ? "" : "(root only)")</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Reachable" Field="@(row => Reach(row.Item))" Mono Class="mt-col-wide">
+					<CellTemplate Context="row">
+						<MokaStatusDot Size="MokaSize.Xs" Color="@(_openToAll.Contains(row.Item) ? MokaColor.Warning : MokaColor.Surface)" Label="@Reach(row.Item)" />
+					</CellTemplate>
+				</MokaColumn>
+			</ToolTable>
+			@if (!snapshot.AsRoot)
 			{
-				bool everyone = open.Contains(socket);
-				<div class="mta-row" @key="index">
-					<span class="mta-cell mta-mono mta-dim">@socket.Protocol</span>
-					<span class="mta-cell mta-mono" title="@socket.Address">@socket.Address</span>
-					<span class="mta-cell mta-mono">@socket.Port</span>
-					<span class="mta-cell mta-mono mta-dim mta-wide" title="@socket.Process">@(socket.Process.Length > 0 ? socket.Process : snapshot.AsRoot ? "" : "(root only)")</span>
-					<span class="mta-cell mta-wide">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@(everyone ? MokaColor.Warning : MokaColor.Surface)" Label="@(everyone ? "EVERY ADDRESS" : IsLoopback(socket) ? "THIS MACHINE" : "ONE ADDRESS")" />
-					</span>
-				</div>
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The processes behind other users' ports show as root.</MokaText>
 			}
 		</div>
-		@if (!snapshot.AsRoot)
-		{
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The processes behind other users' ports show as root.</MokaText>
-		}
 	};
 
 	private RenderFragment Fail2BanView(SecuritySnapshot snapshot) => __builder =>
@@ -270,30 +309,29 @@
 			return;
 		}
 
-		<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 90px 90px 90px; --mta-cols-narrow: minmax(0, 1fr) 90px">
-			<div class="mta-row mta-row--head">
-				<span>Jail</span>
-				<span class="mta-wide">Failing now</span>
-				<span>Banned now</span>
-				<span class="mta-wide">Banned in all</span>
-			</div>
-			@foreach (Fail2BanJail jail in fail2ban.Jails)
-			{
-				<div class="@(jail.Name == _selected ? "mta-row mta-row--clickable mta-row--selected" : "mta-row mta-row--clickable")"
-					 @key="jail.Name"
-					 role="button"
-					 tabindex="0"
-					 @onclick="@(() => Select(jail.Name))"
-					 @onkeydown="@(args => OnRowKey(args, jail.Name))">
-					<span class="mta-cell mta-mono">@jail.Name</span>
-					<span class="mta-cell mta-mono mta-dim mta-wide">@jail.CurrentlyFailed</span>
-					<span class="mta-cell mta-mono">@jail.CurrentlyBanned</span>
-					<span class="mta-cell mta-mono mta-dim mta-wide">@jail.TotalBanned</span>
-				</div>
-			}
-		</div>
+		<ToolTable TItem="Fail2BanJail"
+				   Items="fail2ban.Jails"
+				   ItemKey="@(jail => jail.Name)"
+				   Label="fail2ban jails"
+				   IsSelected="@(jail => jail.Name == _selected)"
+				   OnRowClick="@(jail => Select(jail.Name))"
+				   EmptyIcon="MokatermIcons.Shield"
+				   EmptyTitle="No jails"
+				   EmptyText="fail2ban runs no jails.">
+			<MokaColumn TItem="Fail2BanJail" Title="Jail" Field="@(jail => jail.Name)" Mono Class="mt-col-main" />
+			<MokaColumn TItem="Fail2BanJail" Title="Failing now" Field="@(jail => jail.CurrentlyFailed)" Mono Align="MokaTextAlign.Right" Class="mt-col-wide">
+				<CellTemplate Context="jail">
+					<span class="mta-dim">@jail.CurrentlyFailed</span>
+				</CellTemplate>
+			</MokaColumn>
+			<MokaColumn TItem="Fail2BanJail" Title="Banned now" Field="@(jail => jail.CurrentlyBanned)" Mono Align="MokaTextAlign.Right" />
+			<MokaColumn TItem="Fail2BanJail" Title="Banned in all" Field="@(jail => jail.TotalBanned)" Mono Align="MokaTextAlign.Right" Class="mt-col-wide">
+				<CellTemplate Context="jail">
+					<span class="mta-dim">@jail.TotalBanned</span>
+				</CellTemplate>
+			</MokaColumn>
+		</ToolTable>
 	};
-
 	private RenderFragment CheckPanel => __builder =>
 	{
 		if (Selected is not { } check || _snapshot is not { } snapshot)
@@ -399,8 +437,6 @@
 		</ToolDetailPanel>
 	};
 
-	private const int MaxRows = 400;
-
 	private static MokaColor LevelColor(SecurityLevel level) => level switch
 	{
 		SecurityLevel.Good => MokaColor.Success,
@@ -430,6 +466,9 @@
 		sshd.Sources.TryGetValue(keyword.ToLowerInvariant(), out string? file)
 			? file
 			: sshd.KnowsFiles ? "sshd's default" : "not read";
+
+	private string Reach(ListeningSocket socket) =>
+		_openToAll.Contains(socket) ? "EVERY ADDRESS" : IsLoopback(socket) ? "THIS MACHINE" : "ONE ADDRESS";
 
 	private static bool IsLoopback(ListeningSocket socket) =>
 		socket.Address.StartsWith("127.", StringComparison.Ordinal) || socket.Address is "::1" || socket.Address.Contains("%lo", StringComparison.Ordinal);
@@ -467,7 +506,11 @@
 
 	// Only the lists that grow long take a filter; the checks fit on a page.
 	private EventCallback<string> FilterChanged => _view is "logins" or "ports"
-		? EventCallback.Factory.Create<string>(this, value => _filter = value)
+		? EventCallback.Factory.Create<string>(this, value =>
+		{
+			_filter = value;
+			ApplyFilter();
+		})
 		: default;
 
 	private void OnViewChanged(string value)
@@ -475,6 +518,7 @@
 		_view = value;
 		_selected = null;
 		_filter = "";
+		ApplyFilter();
 	}
 
 	private void Show(string shows)
@@ -500,14 +544,6 @@
 	{
 		_selected = _selected == id && !keepOpen ? null : id;
 		_editProblem = null;
-	}
-
-	private void OnRowKey(KeyboardEventArgs args, string id)
-	{
-		if (args.Key is "Enter" or " ")
-		{
-			Select(id);
-		}
 	}
 
 	/// <summary>
