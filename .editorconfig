@@ -81,6 +81,11 @@ dotnet_naming_style.pascal_case.capitalization = pascal_case
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
+# MAUI 10.0.120 marks MauiWinUIApplication.Services and .Application obsolete, and the WinUI XAML compiler still writes
+# both into the type info it generates for App. Only that file: our own code keeps reporting obsolete APIs.
+[**/XamlTypeInfo.g.cs]
+dotnet_diagnostic.CS0618.severity = none
+
 [*.razor]
 indent_style = tab
 indent_size = 4
