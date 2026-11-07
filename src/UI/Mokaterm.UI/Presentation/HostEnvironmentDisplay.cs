@@ -9,12 +9,12 @@ internal static class HostEnvironmentDisplay
 	public static IReadOnlyList<HostEnvironment> All { get; } =
 		[HostEnvironment.None, HostEnvironment.Development, HostEnvironment.Staging, HostEnvironment.Production];
 
-	/// <summary>Uppercase tag text, or null for <see cref="HostEnvironment.None"/>.</summary>
+	// Plain case, because MokaTag gives its text the case the theme asks for. None has no tag.
 	public static string? Tag(HostEnvironment environment) => environment switch
 	{
-		HostEnvironment.Development => "DEV",
-		HostEnvironment.Staging => "STAGING",
-		HostEnvironment.Production => "PRODUCTION",
+		HostEnvironment.Development => "Dev",
+		HostEnvironment.Staging => "Staging",
+		HostEnvironment.Production => "Production",
 		_ => null,
 	};
 

@@ -134,10 +134,11 @@ public sealed partial class QuickConnectBox : ComponentBase, IDisposable
 		}
 	}
 
-	/// <summary>The picker's own text: short, because the icon beside it already says most of it.</summary>
+	// The picker's own text: short, because the icon beside it already says most of it. The theme sets its case, so the
+	// name stays as the module wrote it.
 	private string ProtocolLabel(string protocolId) =>
 		_descriptors.TryGetValue(protocolId, out ProtocolDescriptor? protocol) && protocol.DisplayName.Split(' ') is [var first, ..]
-			? first.ToUpperInvariant()
+			? first
 			: protocolId.ToUpperInvariant();
 
 	private async Task OnFocusAsync()

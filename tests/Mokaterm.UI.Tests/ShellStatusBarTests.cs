@@ -43,9 +43,9 @@ public sealed partial class ShellStatusBarTests
 		string html = await RenderAsync(CatalogWith(3));
 
 		Assert.Contains(">3</span><span class=\"mt-status-label\"", html, StringComparison.Ordinal);
-		Assert.Contains("HOSTS", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-status-label\"[^>]*>hosts<", html);
 		Assert.Contains("3 hosts and 3 logins saved.", html, StringComparison.Ordinal);
-		Assert.Contains("NO SESSIONS", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-status-label\"[^>]*>No sessions<", html);
 		Assert.Contains("Nothing is open.", html, StringComparison.Ordinal);
 	}
 
@@ -54,7 +54,7 @@ public sealed partial class ShellStatusBarTests
 	{
 		string html = await RenderAsync(ConnectionCatalog.Empty);
 
-		Assert.Contains("NO HOSTS SAVED", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-status-label\"[^>]*>No hosts saved<", html);
 		Assert.Contains("Nothing is saved in this vault yet.", html, StringComparison.Ordinal);
 	}
 
@@ -91,7 +91,7 @@ public sealed partial class ShellStatusBarTests
 			CatalogWith(1),
 			(manager, _, _) => manager.Add(new FakeSession(environment: HostEnvironment.Production)));
 
-		Assert.Contains("PRODUCTION", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"moka-tag-text\"[^>]*>Production<", html);
 		Assert.Contains("Host environment: Production", html, StringComparison.Ordinal);
 	}
 
@@ -120,7 +120,7 @@ public sealed partial class ShellStatusBarTests
 			broadcast.Toggle(second.Id);
 		});
 
-		Assert.Contains("TYPING INTO 2", html, StringComparison.Ordinal);
+		Assert.Contains("Typing into 2", html, StringComparison.Ordinal);
 		Assert.Contains("also goes to 1 other session.", html, StringComparison.Ordinal);
 	}
 
@@ -135,7 +135,7 @@ public sealed partial class ShellStatusBarTests
 			broadcast.Toggle(active.Id);
 		});
 
-		Assert.DoesNotContain("TYPING INTO", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Typing into", html, StringComparison.Ordinal);
 	}
 
 	// The shell knows nothing of SSH: whatever the session's module lists is drawn, one chip each, with its sentence.
@@ -169,7 +169,7 @@ public sealed partial class ShellStatusBarTests
 	{
 		string html = await RenderAsync(ConnectionCatalog.Empty, security: new SecuritySettings { AutoLockMinutes = 0 });
 
-		Assert.Contains("NO AUTO-LOCK", html, StringComparison.Ordinal);
+		Assert.Contains("no auto-lock", html, StringComparison.Ordinal);
 		Assert.Contains("The vault never locks by itself.", html, StringComparison.Ordinal);
 	}
 
@@ -178,7 +178,7 @@ public sealed partial class ShellStatusBarTests
 	{
 		string html = await RenderAsync(ConnectionCatalog.Empty);
 
-		Assert.Contains("AUTO-LOCK 15M", html, StringComparison.Ordinal);
+		Assert.Contains("auto-lock 15m", html, StringComparison.Ordinal);
 		Assert.Contains("after 15 minutes without activity", html, StringComparison.Ordinal);
 	}
 

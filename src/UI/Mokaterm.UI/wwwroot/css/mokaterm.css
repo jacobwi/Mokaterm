@@ -47,9 +47,9 @@ html[data-mt-window-caption] .moka-dialog--xl {
 	height: min(900px, 100vh - 64px - var(--mt-top-bar-height));
 }
 
-/* The theme tokens live on .moka-root; body only resolves them when a host also emits them on :root. */
-body,
-.moka-root {
+/* MokaThemeProvider colours its own root and, since the new design, sets its color-scheme too. Body sits outside the
+   root and reads the tokens the provider writes to :root. */
+body {
 	background: var(--moka-color-background);
 	color: var(--moka-color-on-background);
 	font-family: var(--moka-font-family);
@@ -57,7 +57,6 @@ body,
 
 .moka-root {
 	height: 100%;
-	color-scheme: light;
 }
 
 /*
@@ -85,11 +84,6 @@ body,
 	--mt-host-6: #b04a6a;
 	--mt-host-7: #8a7615;
 	--mt-host-8: #4a56b8;
-}
-
-/* Without it the WebView draws light native selects and date pickers on the dark theme. */
-.moka-root.moka-dark {
-	color-scheme: dark;
 }
 
 /* A tooltip reads in the interface's own type wherever it sits: one inside a monospace figure or an upper-case label

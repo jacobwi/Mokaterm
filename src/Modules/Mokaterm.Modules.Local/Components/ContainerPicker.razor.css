@@ -22,7 +22,10 @@
 	display: flex;
 	align-items: center;
 	gap: var(--moka-spacing-xs);
-	padding-top: 1.35rem;
+	/* Level with a small Moka field's input at any density: its label line and the gap under it above, the input's
+	   own height for the buttons to centre in. */
+	min-height: calc(var(--moka-font-size-sm) * 1.4 + var(--moka-spacing-sm) + var(--moka-control-height) - var(--moka-spacing-md));
+	padding-top: calc(var(--moka-font-size-sm) * 1.4 + var(--moka-spacing-sm));
 }
 
 .mt-local-pick-list {
@@ -57,7 +60,7 @@
 
 .mt-local-pick-item:focus-visible {
 	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+	box-shadow: var(--moka-focus-ring);
 }
 
 .mt-local-pick-item--selected {

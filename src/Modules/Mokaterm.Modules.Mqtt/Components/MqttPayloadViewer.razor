@@ -13,9 +13,9 @@
 	{
 		<div class="mt-mqtt-payload-head">
 			<MokaSegmentedControl AriaLabel="Payload format" Value="@_format.ToString()" ValueChanged="OnFormatChanged" Size="MokaSize.Xs">
-				<MokaSegment Value="@nameof(MqttPayloadFormat.Text)" Text="TEXT" />
+				<MokaSegment Value="@nameof(MqttPayloadFormat.Text)" Text="Text" />
 				<MokaSegment Value="@nameof(MqttPayloadFormat.Json)" Text="JSON" Disabled="@(!HasJson)" />
-				<MokaSegment Value="@nameof(MqttPayloadFormat.Hex)" Text="HEX" />
+				<MokaSegment Value="@nameof(MqttPayloadFormat.Hex)" Text="Hex" />
 			</MokaSegmentedControl>
 
 			<span class="mt-mqtt-payload-spacer"></span>
@@ -28,7 +28,7 @@
 			@if (Message.IsTruncated)
 			{
 				<Hint Text="@TruncatedTitle">
-					<MokaTag Text="CUT" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+					<MokaTag Text="Cut" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 				</Hint>
 			}
 

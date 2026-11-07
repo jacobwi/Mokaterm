@@ -82,7 +82,7 @@ public sealed partial class QuickConnectListTests
 
 		// The machine is drawn the way the tabs draw it, with the production warning beside it.
 		Assert.Contains("mt-label-host", html, StringComparison.Ordinal);
-		Assert.Contains("PRODUCTION", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"moka-tag-text\"[^>]*>Production<", html);
 		Assert.Contains(":2222", html, StringComparison.Ordinal);
 		Assert.Contains("USB adapter", html, StringComparison.Ordinal);
 		Assert.Contains("Connect and save...", html, StringComparison.Ordinal);

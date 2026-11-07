@@ -8,15 +8,16 @@ namespace Mokaterm.UI.Commands;
 /// <summary>Labels, colours and times for the hosts of a run across logins: a command run's, or the fleet overview's.</summary>
 internal static class HostRunDisplay
 {
+	// Plain case: the rows give these the theme's control case, the way Moka writes a status dot's label.
 	public static string Label(HostRunState state) => state switch
 	{
-		HostRunState.Queued => "QUEUED",
-		HostRunState.Connecting => "CONNECTING",
-		HostRunState.Running => "RUNNING",
-		HostRunState.Done => "DONE",
-		HostRunState.Failed => "FAILED",
-		HostRunState.Skipped => "SKIPPED",
-		_ => "CANCELLED",
+		HostRunState.Queued => "Queued",
+		HostRunState.Connecting => "Connecting",
+		HostRunState.Running => "Running",
+		HostRunState.Done => "Done",
+		HostRunState.Failed => "Failed",
+		HostRunState.Skipped => "Skipped",
+		_ => "Cancelled",
 	};
 
 	/// <summary>

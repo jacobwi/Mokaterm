@@ -86,7 +86,7 @@ public sealed partial class HostEditorTests
 			new TerminalSettings { ProductionThemeId = "danger" },
 			new OneTheme("danger", "Red Alert"));
 
-		Assert.Contains("PRODUCTION", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"moka-tag-text\"[^>]*>Production<", html);
 		Assert.Contains("opens its sessions in the Red Alert theme", html, StringComparison.Ordinal);
 	}
 

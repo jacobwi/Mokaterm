@@ -34,7 +34,7 @@
 
 			@if (connection.State == MqttConnectionState.Closed)
 			{
-				<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Error" Label="CLOSED" />
+				<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Error" Label="Closed" />
 			}
 
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mt-mqtt-meta mt-mqtt-client" title="@ClientTitle">
@@ -50,7 +50,7 @@
 			else
 			{
 				<Hint Text="@($"{TransportTitle}. Anyone on the path can read the login and every payload.")" Position="MokaTooltipPosition.BottomEnd">
-					<MokaTag Text="NOT ENCRYPTED"
+					<MokaTag Text="Not encrypted"
 							 Icon="MokatermIcons.Unlock"
 							 Color="MokaColor.Warning"
 							 Size="MokaSize.Xs" />

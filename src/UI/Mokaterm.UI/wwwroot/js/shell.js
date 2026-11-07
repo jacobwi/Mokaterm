@@ -9,6 +9,16 @@ let nextShellHandle = 0;
 // Cmd+Tab belongs to the operating system.
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
 
+// Blazor's reconnect states in which the server no longer holds this page, and so none of its sessions either. The
+// reconnect screen reloads on its own when the server refuses the page, and a leave prompt in front of that reload
+// would only strand the page behind a dialog with nothing left in it.
+const DROPPED_STATES = ['components-reconnect-rejected', 'components-reconnect-paused', 'components-reconnect-resume-failed'];
+
+function serverDroppedPage() {
+	const modal = document.getElementById('components-reconnect-modal');
+	return !!modal && DROPPED_STATES.some(name => modal.classList.contains(name));
+}
+
 // Letters are matched by the character they type so shortcuts follow the keyboard layout. Keys that do not type a
 // Latin letter (Tab, Comma, Cyrillic layouts) fall back to the physical key code.
 function keyId(event) {
@@ -105,7 +115,7 @@ export function attachShell(dotNetRef, options) {
 	// The browser shows its own "leave site?" prompt; the text cannot be customized.
 	let confirmLeave = false;
 	const onBeforeUnload = (event) => {
-		if (confirmLeave) {
+		if (confirmLeave && !serverDroppedPage()) {
 			event.preventDefault();
 			event.returnValue = '';
 		}

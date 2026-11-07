@@ -1,43 +1,43 @@
 /*
-	Fatal circuit error, in the look of ReconnectModal. Blazor shows it by setting an inline display: block, which beats
-	any display set here, so the card is centred without flex. The theme tokens may not exist if the first render
-	failed, so every token has a fallback.
+	Fatal circuit error, in the look of Moka's reconnect screen beside it. Blazor shows it by setting an inline
+	display: block, which beats any display set here, so the card is centred without flex. It sits outside the theme's
+	root and reads the tokens the theme writes to :root, or moka.css's own when the first render never happened.
 */
 .mokaterm-circuit-error {
 	display: none;
 	position: fixed;
 	inset: 0;
 	z-index: 10001;
-	padding: 16px;
-	background: rgba(6, 6, 8, 0.85);
-	backdrop-filter: blur(8px);
+	padding: var(--moka-spacing-xl);
+	background: var(--moka-color-backdrop);
+	backdrop-filter: blur(var(--moka-backdrop-blur));
 	overflow: auto;
 }
 
 .mokaterm-circuit-error-card {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
-	width: min(380px, 100%);
+	gap: var(--moka-spacing-md);
+	width: min(26rem, 100%);
 	margin: 20vh auto 0;
-	padding: 20px;
-	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
-	border-radius: 12px;
-	background: var(--moka-color-surface, #0c0c10);
-	box-shadow: 0 0 32px var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
-	color: var(--moka-color-on-surface, #e8e8ec);
-	font-family: var(--moka-font-family, 'Inter', 'Segoe UI', sans-serif);
-	font-size: 13px;
-	line-height: 1.5;
+	padding: var(--moka-spacing-xxl) var(--moka-spacing-xl);
+	border: var(--moka-border-width) solid var(--moka-color-outline);
+	border-radius: var(--moka-radius-popup);
+	background: var(--moka-color-surface-raised);
+	box-shadow: var(--moka-shadow-modal);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family);
+	font-size: var(--moka-font-size-base);
+	line-height: var(--moka-line-height-base);
 }
 
 .mokaterm-circuit-error-header {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	color: var(--moka-color-on-surface-tertiary, #6a6a74);
-	font-size: 10px;
-	font-weight: 600;
+	gap: var(--moka-spacing-sm);
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-bold);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 }
@@ -46,12 +46,13 @@
 	width: 8px;
 	height: 8px;
 	border-radius: 50%;
-	background: #ef5350;
-	box-shadow: 0 0 8px #ef5350;
+	background: var(--moka-color-error);
+	box-shadow: 0 0 8px var(--moka-color-error);
 }
 
 .mokaterm-circuit-error-message {
 	margin: 0;
+	color: var(--moka-color-on-surface-variant);
 }
 
 .mokaterm-circuit-error-actions {
@@ -59,26 +60,31 @@
 	justify-content: flex-end;
 }
 
+/* Reload is the only way on, so it takes the main button's look, as Reload does on the reconnect screen once a resume
+   failed. */
 .mokaterm-circuit-error-button {
-	padding: 6px 12px;
-	border: 1px solid var(--moka-color-primary-border, rgba(239, 83, 80, 0.2));
-	border-radius: 8px;
-	background: transparent;
-	color: var(--moka-color-primary, #ef5350);
+	display: inline-flex;
+	align-items: center;
+	min-height: var(--moka-control-height);
+	padding: 0 var(--moka-spacing-lg);
+	border: var(--moka-border-width) solid var(--moka-button-primary-border);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-button-primary-bg);
+	color: var(--moka-button-primary-color);
 	font: inherit;
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	font-weight: var(--moka-font-weight-semibold);
+	text-transform: var(--moka-control-case);
+	letter-spacing: var(--moka-control-tracking);
 	cursor: pointer;
-	transition: background 0.12s ease;
+	transition: border-color var(--moka-transition-normal), background-color var(--moka-transition-normal);
 }
 
 .mokaterm-circuit-error-button:hover {
-	background: var(--moka-color-primary-glow, rgba(239, 83, 80, 0.08));
+	border-color: var(--moka-button-primary-hover-border);
+	background: var(--moka-button-primary-hover-bg);
 }
 
 .mokaterm-circuit-error-button:focus-visible {
 	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow-md, rgba(239, 83, 80, 0.15));
+	box-shadow: var(--moka-focus-ring);
 }

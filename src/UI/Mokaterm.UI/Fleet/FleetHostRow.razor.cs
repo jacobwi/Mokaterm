@@ -78,7 +78,7 @@ public sealed partial class FleetHostRow : ComponentBase
 		}
 	}
 
-	private string StateLabel => Row.Result is { } result ? HostRunDisplay.Label(result.State) : "NOT READ";
+	private string StateLabel => Row.Result is { } result ? HostRunDisplay.Label(result.State) : "Not read";
 
 	private MokaColor StateColor => Row.Result is { } result ? HostRunDisplay.Color(result) : MokaColor.Surface;
 

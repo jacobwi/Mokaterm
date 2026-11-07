@@ -36,12 +36,14 @@
 	opacity: 0.7;
 }
 
+/* A status word beside its dot, so it takes the theme's control case like a Moka status dot's label. */
 .mt-run-host__state {
 	flex-shrink: 0;
 	width: 84px;
-	font-size: 10px;
-	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: 0.08em;
+	font-size: var(--moka-font-size-xs);
+	font-weight: var(--moka-font-weight-medium);
+	text-transform: var(--moka-control-case);
+	letter-spacing: var(--moka-control-tracking);
 	color: var(--moka-color-on-surface-tertiary);
 }
 

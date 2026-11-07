@@ -26,11 +26,10 @@
 				<MokaStatusBarItem Class="mt-status-session" TooltipClass="mt-status-session-slot" Tooltip="@ActiveTooltip(active)">
 					@* The machine's own colour, the one its tab and its session toolbar already carry. *@
 					<span class="mt-status-accent" style="background:@HostAccent.For(active.Host)" aria-hidden="true"></span>
-					<MokaTag Text="@active.Protocol.DisplayName.ToUpperInvariant()"
+					<MokaTag Text="@active.Protocol.DisplayName"
 							 Size="MokaSize.Xs"
 							 Variant="MokaVariant.Outlined"
-							 Color="MokaColor.Surface"
-							 Class="mt-status-protocol" />
+							 Color="MokaColor.Surface" />
 					<SessionLabel Session="active" ShowPort Mono />
 				</MokaStatusBarItem>
 

@@ -15,5 +15,8 @@
 	display: flex;
 	align-items: center;
 	gap: var(--moka-spacing-xs);
-	padding-top: 1.35rem;
+	/* Level with a small Moka field's input at any density: its label line and the gap under it above, the input's
+	   own height for the buttons to centre in. */
+	min-height: calc(var(--moka-font-size-sm) * 1.4 + var(--moka-spacing-sm) + var(--moka-control-height) - var(--moka-spacing-md));
+	padding-top: calc(var(--moka-font-size-sm) * 1.4 + var(--moka-spacing-sm));
 }

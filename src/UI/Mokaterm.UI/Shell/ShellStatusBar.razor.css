@@ -47,21 +47,22 @@
 	min-width: 0;
 }
 
-.mt-status-group ::deep .mt-status-protocol {
-	font-family: var(--moka-font-family-mono);
-	letter-spacing: 0.04em;
-}
-
 /* Typing that lands on more than one machine has to be noticeable without being read. */
 .mt-status-group ::deep .mt-status-broadcast {
 	color: var(--moka-color-warning);
+}
+
+/* The bar's own words are written in plain case and take the theme's control case, as Moka's tags beside them do. */
+.mt-status-label,
+.mt-status-group ::deep .moka-statusbar-item-text {
+	text-transform: var(--moka-control-case);
+	letter-spacing: var(--moka-control-tracking);
 }
 
 /* Reads as a label beside the mono number it belongs to, not as a second value. */
 .mt-status-label {
 	margin-inline-start: 2px;
 	color: var(--moka-color-on-surface-variant);
-	letter-spacing: 0.06em;
 }
 
 .mt-status-accent {

@@ -4,26 +4,28 @@
 	gap: var(--moka-spacing-xs);
 }
 
+/* As tall as the extra small reset button beside it, so the row follows the density setting. */
 .mt-shortcut {
 	min-width: 132px;
-	padding: 4px 10px;
-	border: 1px solid var(--moka-color-border);
+	min-height: calc(var(--moka-button-height-sm) - var(--moka-spacing-sm));
+	padding: 0 var(--moka-spacing-md);
+	border: var(--moka-border-width) solid var(--moka-color-outline);
 	border-radius: var(--moka-radius-sm);
 	background: var(--moka-color-surface-2);
 	color: var(--moka-color-on-surface);
-	font-family: var(--moka-font-mono);
+	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-xs);
 	cursor: pointer;
 }
 
 .mt-shortcut:hover {
-	border-color: var(--moka-color-primary-border);
+	border-color: var(--moka-color-outline-strong);
 }
 
 .mt-shortcut:focus-visible {
 	outline: none;
-	border-color: var(--moka-color-primary-border);
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+	border-color: var(--moka-color-primary);
+	box-shadow: var(--moka-focus-ring);
 }
 
 .mt-shortcut--recording {

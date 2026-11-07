@@ -41,7 +41,7 @@
 	margin: 0;
 	padding: var(--moka-spacing-sm);
 	overflow: auto;
-	font-family: var(--moka-font-mono);
+	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-xs);
 	line-height: 1.5;
 	color: var(--moka-color-on-surface);

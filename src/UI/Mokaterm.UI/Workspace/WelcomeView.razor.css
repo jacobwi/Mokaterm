@@ -35,16 +35,20 @@
 
 .mt-welcome-mark {
 	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-base);
+	font-size: var(--moka-font-size-dialog);
 	font-weight: var(--moka-font-weight-semibold);
 	color: var(--moka-color-primary);
 }
 
+/* Drawn like a Moka dialog title, so the theme's title font and case reach it. */
 .mt-welcome-title {
 	margin: 0;
-	font-size: var(--moka-font-size-base);
-	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: -0.01em;
+	font-family: var(--moka-font-family-display);
+	font-size: var(--moka-font-size-dialog);
+	font-weight: var(--moka-font-weight-heading);
+	line-height: var(--moka-line-height-tight);
+	text-transform: var(--moka-title-case);
+	letter-spacing: var(--moka-title-tracking);
 	color: var(--moka-color-on-surface);
 }
 

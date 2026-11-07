@@ -5,13 +5,13 @@
 	<div class="mt-rdp-toolbar">
 		<MokaSegmentedControl AriaLabel="Scaling" Value="@_scaling" ValueChanged="OnScalingChangedAsync" Size="MokaSize.Sm">
 			<Hint Text="Scale the whole desktop into the view" Position="MokaTooltipPosition.BottomStart">
-				<MokaSegment Value="fit" Text="FIT" />
+				<MokaSegment Value="fit" Text="Fit" />
 			</Hint>
 			<Hint Text="One remote pixel per pixel, with scrollbars">
 				<MokaSegment Value="actual" Text="1:1" />
 			</Hint>
 			<Hint Text="Ask the server to resize its desktop to this view">
-				<MokaSegment Value="remote" Text="SERVER" />
+				<MokaSegment Value="remote" Text="Server" />
 			</Hint>
 		</MokaSegmentedControl>
 
@@ -90,7 +90,7 @@
 		{
 			@* The desktop looks live while it ignores every key, so it says so. *@
 			<div class="mt-rdp-badge">
-				<MokaTag Text="VIEW ONLY" Icon="MokaIcons.Toggle.EyeOff" Color="MokaColor.Warning" Size="MokaSize.Xs" />
+				<MokaTag Text="View only" Icon="MokaIcons.Toggle.EyeOff" Color="MokaColor.Warning" Size="MokaSize.Xs" />
 			</div>
 		}
 

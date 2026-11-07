@@ -63,6 +63,8 @@
 }
 
 .mt-swatches {
+	/* The height of an extra small button, so the row follows the density setting with the buttons around it. */
+	--mt-swatch-size: calc(var(--moka-button-height-sm) - var(--moka-spacing-sm));
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -71,8 +73,8 @@
 }
 
 .mt-swatch {
-	width: 22px;
-	height: 22px;
+	width: var(--mt-swatch-size);
+	height: var(--mt-swatch-size);
 	padding: 0;
 	border: 1px solid var(--moka-color-outline-variant);
 	border-radius: var(--moka-radius-sm);
@@ -109,12 +111,13 @@
 	align-items: center;
 	gap: var(--moka-spacing-xs);
 	width: auto;
-	height: 22px;
 	padding: 0 var(--moka-spacing-sm);
 	background: none;
 	color: var(--moka-color-on-surface-variant);
 	font-family: inherit;
 	font-size: var(--moka-font-size-xs);
+	text-transform: var(--moka-control-case);
+	letter-spacing: var(--moka-control-tracking);
 }
 
 .mt-swatch--auto::before {

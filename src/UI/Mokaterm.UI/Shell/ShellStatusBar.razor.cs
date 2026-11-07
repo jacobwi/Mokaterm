@@ -64,9 +64,9 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 
 	private string HostsLabel => _hosts switch
 	{
-		0 => "NO HOSTS SAVED",
-		1 => "HOST",
-		_ => "HOSTS",
+		0 => "No hosts saved",
+		1 => "host",
+		_ => "hosts",
 	};
 
 	private string HostsTooltip => _hosts == 0
@@ -77,9 +77,9 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 
 	private string SessionsLabel => _sessionCount switch
 	{
-		0 => "NO SESSIONS",
-		1 => "SESSION",
-		_ => "SESSIONS",
+		0 => "No sessions",
+		1 => "session",
+		_ => "sessions",
 	};
 
 	private string SessionsTooltip
@@ -97,7 +97,7 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 		}
 	}
 
-	private string BroadcastText => string.Create(CultureInfo.CurrentCulture, $"TYPING INTO {_broadcastCount}");
+	private string BroadcastText => string.Create(CultureInfo.CurrentCulture, $"Typing into {_broadcastCount}");
 
 	private string BroadcastTooltip => string.Create(
 		CultureInfo.CurrentCulture,
@@ -106,11 +106,11 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 	private string TransfersText => _transfers switch
 	{
 		{ Active: > 0 } => _transfers.Queued > 0
-			? string.Create(CultureInfo.CurrentCulture, $"{_transfers.Active} ACTIVE · {_transfers.Queued} QUEUED")
-			: string.Create(CultureInfo.CurrentCulture, $"{_transfers.Active} ACTIVE"),
-		{ Failed: > 0 } => string.Create(CultureInfo.CurrentCulture, $"{_transfers.Failed} FAILED"),
-		{ Done: > 0 } => string.Create(CultureInfo.CurrentCulture, $"{_transfers.Done} DONE"),
-		_ => "NO TRANSFERS",
+			? string.Create(CultureInfo.CurrentCulture, $"{_transfers.Active} active · {_transfers.Queued} queued")
+			: string.Create(CultureInfo.CurrentCulture, $"{_transfers.Active} active"),
+		{ Failed: > 0 } => string.Create(CultureInfo.CurrentCulture, $"{_transfers.Failed} failed"),
+		{ Done: > 0 } => string.Create(CultureInfo.CurrentCulture, $"{_transfers.Done} done"),
+		_ => "No transfers",
 	};
 
 	private string TransfersTooltip => _transfers switch
@@ -121,8 +121,8 @@ public sealed partial class ShellStatusBar : ComponentBase, IDisposable
 	};
 
 	private string VaultText => AutoLockMinutes > 0
-		? string.Create(CultureInfo.CurrentCulture, $"UNLOCKED · AUTO-LOCK {AutoLockMinutes}M")
-		: "UNLOCKED · NO AUTO-LOCK";
+		? string.Create(CultureInfo.CurrentCulture, $"Unlocked · auto-lock {AutoLockMinutes}m")
+		: "Unlocked · no auto-lock";
 
 	private string VaultTooltip => AutoLockMinutes > 0
 		? string.Create(

@@ -46,7 +46,7 @@ public sealed class ConnectionEditorTests
 			new ConnectionEditorRequest { HostId = HostId });
 
 		Assert.Contains(Address, html, StringComparison.Ordinal);
-		Assert.Contains("PRODUCTION", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"moka-tag-text\"[^>]*>Production<", html);
 		Assert.Contains("1 login", html, StringComparison.Ordinal);
 	}
 

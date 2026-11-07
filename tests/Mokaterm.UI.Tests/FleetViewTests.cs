@@ -64,7 +64,7 @@ public sealed class FleetViewTests
 		Assert.Contains("10.0.0.20", html, StringComparison.Ordinal);
 		Assert.Contains("10.0.0.10", html, StringComparison.Ordinal);
 		Assert.DoesNotContain(">files<", html, StringComparison.Ordinal);
-		Assert.Contains("NOT READ", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-fleet-state\"[^>]*>Not read<", html);
 		Assert.Contains("Nothing read yet.", html, StringComparison.Ordinal);
 		Assert.Contains("3 logins", html, StringComparison.Ordinal);
 
@@ -131,11 +131,11 @@ public sealed class FleetViewTests
 		Assert.Contains("REBOOT", html, StringComparison.Ordinal);
 		Assert.Contains("6/8", html, StringComparison.Ordinal);
 		Assert.Contains("role=\"meter\"", html, StringComparison.Ordinal);
-		Assert.Contains("SKIPPED", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-fleet-state\"[^>]*>Skipped<", html);
 
 		// A login that was never read says why in its row, not only in its details.
 		Assert.Contains("It would ask about its host key, which is not trusted yet.</span>", html, StringComparison.Ordinal);
-		Assert.Contains("FAILED", html, StringComparison.Ordinal);
+		Assert.Matches("class=\"mt-fleet-state\"[^>]*>Failed<", html);
 		Assert.Contains("Run skipped, asking (1)", html, StringComparison.Ordinal);
 		Assert.Contains("Retry failed (1)", html, StringComparison.Ordinal);
 		Assert.Contains("Needs a look (3)", html, StringComparison.Ordinal);

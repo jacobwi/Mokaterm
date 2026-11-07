@@ -27,7 +27,7 @@ public partial class MqttSubscriptionList : ComponentBase
 
 	/// <summary>The QoS as a broker's own tools write it: <c>QOS 0</c>.</summary>
 	internal static string QosLabel(MqttQos qos) =>
-		string.Create(CultureInfo.InvariantCulture, $"QOS {(int)qos}");
+		string.Create(CultureInfo.InvariantCulture, $"QoS {(int)qos}");
 
 	private Task AddAsync(string filter)
 	{
