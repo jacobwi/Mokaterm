@@ -32,14 +32,15 @@
 	table-layout: fixed;
 }
 
-.fs-results ::deep tbody td {
+/* The cell's content takes over the theme's cell padding, so a double click anywhere in a cell reaches its handler.
+   Moka's state and skeleton cells keep their own padding, which they set as important. */
+.fs .fs-results ::deep .moka-table tbody td {
+	padding: 0;
 	user-select: none;
 }
 
-/* Cell content covers the cell padding, so a double click anywhere in a cell reaches its handler. */
 .fs-cell {
-	margin: calc(-1 * var(--moka-spacing-xs)) calc(-1 * var(--moka-spacing-sm));
-	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	padding: var(--moka-cell-padding);
 	overflow: hidden;
 	line-height: 16px;
 	text-overflow: ellipsis;
@@ -56,11 +57,6 @@
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.fs-mono {
-	font-family: var(--moka-font-family-mono);
-	letter-spacing: 0.02em;
 }
 
 @media (max-width: 560px) {

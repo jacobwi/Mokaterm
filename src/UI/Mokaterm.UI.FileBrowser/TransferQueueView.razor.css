@@ -9,10 +9,10 @@
 
 .tq-title {
 	margin-right: var(--moka-spacing-sm);
-	font-size: var(--moka-font-size-xs);
+	font-size: var(--moka-font-size-sm);
 	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	letter-spacing: var(--moka-title-tracking);
+	text-transform: var(--moka-title-case);
 	color: var(--moka-color-on-surface-variant);
 }
 
@@ -63,11 +63,17 @@
 }
 
 .tq-row--compact {
-	flex-direction: row;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	height: 28px;
+	gap: 0;
 	padding: 0 var(--moka-spacing-md);
+}
+
+.tq-row--compact > .tq-line {
+	min-height: var(--moka-button-height-sm);
+}
+
+/* A running transfer spells itself out under its line, so the panel shows how far each one has got at a glance. */
+.tq-row--compact.tq-row--running {
+	padding-bottom: var(--moka-spacing-md);
 }
 
 .tq-line {
@@ -75,6 +81,13 @@
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
+}
+
+/* Moka's tag may wrap anywhere on the new design, which in a row that gives way puts one letter on each line. */
+.tq-line ::deep .moka-tag {
+	flex-shrink: 0;
+	white-space: nowrap;
+	overflow-wrap: normal;
 }
 
 .tq-name,
@@ -116,10 +129,6 @@
 	white-space: nowrap;
 	font-family: var(--moka-font-family-mono);
 	color: var(--moka-color-on-surface-variant);
-}
-
-.tq-row--compact .tq-rate {
-	min-width: 72px;
 }
 
 .tq-error {

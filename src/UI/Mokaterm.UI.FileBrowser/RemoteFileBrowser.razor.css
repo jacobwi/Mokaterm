@@ -15,11 +15,38 @@
 	box-shadow: inset 0 2px 0 var(--moka-color-error);
 }
 
+/* The path row decides from the bar's own width, which is the browser's: a file panel beside a terminal can be narrow
+   in any window. */
+.fb ::deep .fb-nav {
+	container: fb-nav / inline-size;
+}
+
 .fb-path {
-	flex: 1;
+	flex: 1 1 0;
 	min-width: 0;
 	display: flex;
 	align-items: center;
+}
+
+/* Too narrow to share: the path takes a row of its own under the buttons, which Moka's toolbar wraps onto, and
+   Refresh and Find stay at the end of the row above as they are beside a path that fits. */
+@container fb-nav (max-width: 32rem) {
+	.fb-path {
+		order: 1;
+		flex-basis: 100%;
+	}
+
+	.fb ::deep .fb-refresh {
+		margin-inline-start: auto;
+	}
+}
+
+/* Narrower still, Find would wrap onto a row of its own above the path. It stays in the More actions menu, which a
+   browser this narrow always shows, and on Ctrl+Shift+F. */
+@container fb-nav (max-width: 17rem) {
+	.fb ::deep .fb-find {
+		display: none;
+	}
 }
 
 .fb-crumbs {
@@ -28,55 +55,47 @@
 	align-self: stretch;
 	display: flex;
 	align-items: center;
-	overflow: hidden;
-	white-space: nowrap;
+	gap: var(--moka-spacing-xxs);
 	cursor: text;
 }
 
-/* The hint fills the strip, so the empty part that takes a typed path explains itself too. */
-.fb-crumbs ::deep .fb-crumbs-hint {
+/* The hint and the well fill the strip, so the empty part that takes a typed path explains itself too. */
+.fb-crumbs ::deep .fb-crumbs-hint,
+.fb-crumbs ::deep .moka-breadcrumb {
 	flex: 1;
-	align-self: stretch;
-	align-items: center;
 	min-width: 0;
 }
 
-.fb-crumbs ::deep .moka-breadcrumb,
-.fb-crumbs ::deep .moka-breadcrumb__list {
-	display: flex;
-	flex-wrap: nowrap;
-	min-width: 0;
+/* The root crumb sits outside the scroller, so a long path never scrolls it away. Moka's gap after it is made for a
+   chip and would set the first slash apart from the rest of the path. */
+.fb-crumbs ::deep .moka-breadcrumb--path > .moka-breadcrumb__root {
+	margin-inline-end: 0;
+	color: var(--moka-color-on-surface-variant);
 }
 
-/* Long folder names shrink with an ellipsis instead of pushing the current folder out of view. */
-.fb-crumbs ::deep .moka-breadcrumb-item,
-.fb-crumbs ::deep .moka-breadcrumb-item__text {
-	min-width: 0;
-}
-
-.fb-crumbs ::deep .moka-breadcrumb-item:last-child {
-	flex-shrink: 0;
-	max-width: 70%;
-}
-
-/* The separators keep their width while the crumbs around them shrink. */
-.fb-crumbs ::deep .moka-breadcrumb-item__separator,
-.fb-crumbs ::deep .moka-breadcrumb-item__ellipsis {
+.fb-crumbs-copy {
+	display: inline-flex;
 	flex-shrink: 0;
 }
 
 .fb-crumb {
-	overflow: hidden;
 	cursor: pointer;
-	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-xs);
-	text-overflow: ellipsis;
 	white-space: nowrap;
 	transition: color var(--moka-transition-fast);
 }
 
+.fb-crumb--root {
+	padding: var(--moka-spacing-xxs);
+}
+
+.fb-crumb--current {
+	color: var(--moka-color-on-surface);
+}
+
+/* Moka's look for a link in a path, which these crumbs are without an address to go to. */
 .fb-crumb:hover {
-	color: var(--moka-color-primary);
+	color: var(--moka-color-on-surface);
+	text-decoration: underline dotted var(--moka-color-on-surface-tertiary);
 }
 
 /* Grows from nothing rather than from a width of its own: Moka's toolbar wraps, and a wider start would push the
@@ -137,7 +156,10 @@
 	table-layout: fixed;
 }
 
-.fb-list ::deep tbody td {
+/* The cell's content takes over the theme's cell padding, so a click anywhere in a row reaches a handler that sees
+   modifier keys. Moka's state and skeleton cells keep their own padding, which they set as important. */
+.fb .fb-list ::deep .moka-table tbody td {
+	padding: 0;
 	user-select: none;
 }
 
@@ -146,10 +168,8 @@
 	box-shadow: inset 0 1px 0 var(--moka-color-primary-border), inset 0 -1px 0 var(--moka-color-primary-border);
 }
 
-/* Cell content covers the cell padding, so a click anywhere in a row reaches a handler that sees modifier keys. */
 .fb-cell {
-	margin: calc(-1 * var(--moka-spacing-xs)) calc(-1 * var(--moka-spacing-sm));
-	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+	padding: var(--moka-cell-padding);
 	overflow: hidden;
 	line-height: 16px;
 	text-overflow: ellipsis;
@@ -177,19 +197,40 @@
 
 .fb-link {
 	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-mono);
 	color: var(--moka-color-on-surface-variant);
 }
 
-.fb-mono,
-.fb-account {
-	font-family: var(--moka-font-family-mono);
-	letter-spacing: 0.02em;
+/* Both sides of the footer give way with an ellipsis instead of running into each other: the counts take what the
+   account leaves, and the account never takes more than half. */
+.fb ::deep .fb-footer .moka-statusbar-start {
+	flex: 1 1 0;
+	overflow: hidden;
+}
+
+.fb ::deep .fb-footer .moka-statusbar-end {
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: 50%;
+}
+
+.fb ::deep .fb-footer .moka-statusbar-item,
+.fb ::deep .fb-footer .moka-statusbar-item-tooltip {
+	min-width: 0;
+}
+
+/* Moka's tag may wrap anywhere on the new design, which in a row that gives way puts one letter on each line. */
+.fb ::deep .fb-footer .moka-tag {
+	flex-shrink: 0;
+	white-space: nowrap;
+	overflow-wrap: normal;
 }
 
 .fb-account {
 	display: block;
 	max-width: 24ch;
 	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }

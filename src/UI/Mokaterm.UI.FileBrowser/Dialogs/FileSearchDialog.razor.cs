@@ -21,8 +21,9 @@ public sealed partial class FileSearchDialog : ComponentBase, IDisposable
 	// Beyond this many rows the table renders only the rows on screen.
 	private const int VirtualizeThreshold = 200;
 
-	// A dense row, as in the browser: the 16px line, 4px cell padding above and below, and the 1px border.
-	private const float RowHeight = 25;
+	// A first guess, as in the browser, which Virtualize corrects from the rows it draws: the 16px line, the theme's 9px
+	// cell padding above and below, and the 1px border.
+	private const float RowHeight = 35;
 
 	// A walk finds entries far faster than a circuit can carry renders, so the table takes what arrived on this beat
 	// rather than one render per match.

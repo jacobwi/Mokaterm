@@ -3,7 +3,7 @@
 
 @{
 	RenderFragment TextCell(RemoteFileEntry entry, string text, string? title) =>
-		@<div class="fs-cell fs-mono" title="@title" @ondblclick="() => Choose(entry)">@text</div>;
+		@<div class="fs-cell" title="@title" @ondblclick="() => Choose(entry)">@text</div>;
 }
 
 <DialogFrame>
@@ -65,7 +65,10 @@
 						   Virtualize="@(_results.Count > VirtualizeThreshold)"
 						   VirtualRowHeight="RowHeight"
 						   SelectedItems="_selectedItems"
-						   OnRowClick="Select">
+						   OnRowClick="Select"
+						   EmptyIcon="MokaIcons.Action.Search"
+						   EmptyTitle="@EmptyTitle"
+						   EmptyText="@EmptyDescription">
 					<ChildContent>
 						<MokaColumn TItem="RemoteFileEntry" Title="Name" Sortable="false" MinWidth="140px">
 							<CellTemplate Context="entry">
@@ -75,19 +78,16 @@
 								</div>
 							</CellTemplate>
 						</MokaColumn>
-						<MokaColumn TItem="RemoteFileEntry" Title="Folder" Sortable="false" Width="200px">
+						<MokaColumn TItem="RemoteFileEntry" Title="Folder" Sortable="false" Width="200px" Mono="true">
 							<CellTemplate Context="entry">@TextCell(entry, FolderText(entry), RemotePath.GetParent(entry.Path))</CellTemplate>
 						</MokaColumn>
-						<MokaColumn TItem="RemoteFileEntry" Title="Size" Sortable="false" Width="76px" Align="MokaTextAlign.Right">
+						<MokaColumn TItem="RemoteFileEntry" Title="Size" Sortable="false" Width="100px" Mono="true" Align="MokaTextAlign.Right">
 							<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.SizeText(entry), null)</CellTemplate>
 						</MokaColumn>
-						<MokaColumn TItem="RemoteFileEntry" Title="Modified" Sortable="false" Width="124px">
+						<MokaColumn TItem="RemoteFileEntry" Title="Modified" Sortable="false" Width="156px" Mono="true">
 							<CellTemplate Context="entry">@TextCell(entry, DisplayFormat.Timestamp(entry.LastModified), null)</CellTemplate>
 						</MokaColumn>
 					</ChildContent>
-					<EmptyContent>
-						<MokaEmptyState Icon="MokaIcons.Action.Search" Title="@EmptyTitle" Description="@EmptyDescription" />
-					</EmptyContent>
 				</MokaTable>
 			</div>
 		</div>

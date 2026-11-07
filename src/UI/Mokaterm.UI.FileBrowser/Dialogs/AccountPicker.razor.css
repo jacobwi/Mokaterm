@@ -30,7 +30,7 @@
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--moka-spacing-sm);
-	padding: 3px var(--moka-spacing-sm);
+	padding: var(--moka-item-padding);
 	cursor: pointer;
 	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-xs);
@@ -61,6 +61,6 @@
 }
 
 .ap-more {
-	padding: 3px var(--moka-spacing-sm);
+	padding: var(--moka-item-padding);
 	font-size: var(--moka-font-size-xs);
 }

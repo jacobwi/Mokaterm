@@ -18,9 +18,10 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 	// Virtualize renders no rows until its script has measured the list, so short lists render plainly.
 	private const int VirtualizeThreshold = 100;
 
-	// Row heights for virtualization: three lines of text with padding, or one dense line.
+	// First guesses for virtualization, which Virtualize corrects from the rows it draws: three lines of text with
+	// padding, or one line as tall as the theme's small button.
 	private const float RowHeight = 72;
-	private const float CompactRowHeight = 28;
+	private const float CompactRowHeight = 32;
 
 	// Estimates above this are noise from a stalled rate and would not fit the duration format.
 	private const double MaxEstimateSeconds = 100 * 3600;
@@ -189,39 +190,65 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 
 	private static string ResumedText(long offset) => "Continued from " + DisplayFormat.Bytes(offset) + " instead of starting over";
 
+	private static string CompactRowClass(ITransferItem item) =>
+		item.State == TransferState.Running ? "tq-row tq-row--compact tq-row--running" : "tq-row tq-row--compact";
+
 	// Whole percentages: the progress bar writes the value into its style with the current culture's decimal separator.
 	private static double? ProgressValue(ITransferItem item) => item.State switch
 	{
 		TransferState.Completed => 100,
 		_ when item.TotalBytes is { } total && total > 0 => Math.Round(Math.Clamp(100d * item.TransferredBytes / total, 0, 100)),
-		TransferState.Running => null,
 		_ => 0,
 	};
 
 	private static string BytesText(ITransferItem item) => item.TotalBytes is { } total
-		? DisplayFormat.Bytes(item.TransferredBytes) + " / " + DisplayFormat.Bytes(total)
+		? DisplayFormat.Bytes(item.TransferredBytes) + " of " + DisplayFormat.Bytes(total)
 		: DisplayFormat.Bytes(item.TransferredBytes);
 
-	private static string RateText(ITransferItem item)
+	private static bool IsChecking(ITransferItem item) => item.Verification == TransferVerification.Checking;
+
+	// Said again by a screen reader each time it changes, so it names the step and never the numbers.
+	private static string JobText(ITransferItem item) => IsChecking(item)
+		? "Checking the copy"
+		: item.Direction switch
+		{
+			TransferDirection.Upload => "Uploading",
+			TransferDirection.Download => "Downloading",
+			_ => "Copying",
+		};
+
+	// The server's checksum gives no number to show, so the bar slides as it does before the size is known.
+	private static double? JobPercent(ITransferItem item) =>
+		!IsChecking(item) && item.TotalBytes is { } total && total > 0
+			? Math.Clamp(100d * item.TransferredBytes / total, 0, 100)
+			: null;
+
+	// Written here rather than through the job's Bytes and BytesPerSecond, which count in thousands where every other
+	// size in the app counts in 1024s.
+	private static List<string> JobFacts(ITransferItem item)
 	{
-		if (item is { State: TransferState.Running, Verification: TransferVerification.Checking })
+		List<string> facts = [];
+		if (item.TotalBytes is not null || item.TransferredBytes > 0)
 		{
-			return "Checking the copy";
+			facts.Add(BytesText(item));
 		}
 
-		if (item.State != TransferState.Running || item.BytesPerSecond <= 0)
+		if (IsChecking(item) || item.BytesPerSecond <= 0)
 		{
-			return "";
+			return facts;
 		}
 
-		string rate = DisplayFormat.Rate(item.BytesPerSecond);
-		if (item.TotalBytes is not { } total || total <= item.TransferredBytes)
+		facts.Add(DisplayFormat.Rate(item.BytesPerSecond));
+		if (item.TotalBytes is { } total && total > item.TransferredBytes)
 		{
-			return rate;
+			double seconds = (total - item.TransferredBytes) / item.BytesPerSecond;
+			if (seconds <= MaxEstimateSeconds)
+			{
+				facts.Add(DisplayFormat.Duration(TimeSpan.FromSeconds(seconds)) + " left");
+			}
 		}
 
-		double seconds = (total - item.TransferredBytes) / item.BytesPerSecond;
-		return seconds > MaxEstimateSeconds ? rate : rate + ", " + DisplayFormat.Duration(TimeSpan.FromSeconds(seconds)) + " left";
+		return facts;
 	}
 
 	private static MokaColor StateColor(ITransferItem item) => item.State switch

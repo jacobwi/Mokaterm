@@ -37,12 +37,13 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	// Beyond this many rows the table renders only the rows on screen.
 	private const int VirtualizeThreshold = 300;
 
-	// A dense row: the 16px line of the cell content, 4px cell padding above and below, and the 1px border.
-	private const float RowHeight = 25;
+	// A first guess for the virtualized rows, which Virtualize corrects from the rows it draws: the 16px line of the cell
+	// content, the theme's 9px cell padding above and below, and the 1px border.
+	private const float RowHeight = 35;
 
 	// Widths in CSS pixels where the browser reaches BrowserWidth.Medium and BrowserWidth.Wide. Medium fits the name,
 	// size and modified columns, Wide every column, each at its set width.
-	private static readonly int[] WidthSteps = [380, 620];
+	private static readonly int[] WidthSteps = [440, 740];
 
 	private const string UserMode = "user";
 	private const string RootMode = "root";
@@ -169,6 +170,19 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	/// <summary>A file system is open and a listing is on screen.</summary>
 	private bool CanBrowse => _fileSystem is not null && _loaded;
+
+	// The table draws placeholder rows in its own columns until a connection's first listing arrives.
+	private bool IsFirstListing => _fileSystem is not null && !_loaded && _loading;
+
+	private bool ShowsList => CanBrowse || IsFirstListing;
+
+	private bool IsFiltering => _filter.Trim().Length > 0;
+
+	private bool OnlyHiddenEntries => !IsFiltering && _entries.Count > 0;
+
+	private IEnumerable<RemotePathSegment> FolderSegments => RemotePath.GetSegments(_path).Skip(1);
+
+	private string RootCrumbClass => RemotePath.IsRoot(_path) ? "fb-crumb fb-crumb--root fb-crumb--current" : "fb-crumb fb-crumb--root";
 
 	private bool IsElevated => _fileSystem?.IsElevated == true;
 

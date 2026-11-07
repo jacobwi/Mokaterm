@@ -24,8 +24,8 @@ public sealed partial class FolderCompareDialog : ComponentBase, IDisposable
 	// Beyond this many rows the table renders only the rows on screen.
 	private const int VirtualizeThreshold = 200;
 
-	// A dense row holding a small check box.
-	private const float RowHeight = 29;
+	// A first guess, which Virtualize corrects from the rows it draws: a small check box in the theme's cell padding.
+	private const float RowHeight = 37;
 
 	private static readonly TimeSpan RenderInterval = TimeSpan.FromMilliseconds(150);
 

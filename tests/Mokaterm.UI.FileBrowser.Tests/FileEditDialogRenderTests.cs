@@ -61,7 +61,7 @@ public sealed class FileEditDialogRenderTests
 		string html = await RenderAsync("alpha", ["5 B", "UTF-8", "LF"]);
 
 		Assert.Contains("1 line", html, StringComparison.Ordinal);
-		Assert.DoesNotContain("UNSAVED", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Unsaved", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("mt-edit-frame--dirty", html, StringComparison.Ordinal);
 
 		// Disabled while there is nothing to write, and the tooltip is where Ctrl+S is spelled out.

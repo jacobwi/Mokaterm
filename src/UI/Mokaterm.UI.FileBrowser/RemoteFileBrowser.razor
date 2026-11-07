@@ -2,11 +2,16 @@
 
 @{
 	RenderFragment TextCell(RemoteFileEntry entry, string text) =>
-		@<div class="fb-cell fb-mono" title="@text" draggable="true" @onclick="args => OnEntryClick(entry, args)" @ondblclick="() => OpenEntryAsync(entry)">@text</div>;
+		@<div class="fb-cell" title="@text" draggable="true" @onclick="args => OnEntryClick(entry, args)" @ondblclick="() => OpenEntryAsync(entry)">@text</div>;
+
+	RenderFragment hiddenOnly =
+		@<MokaEmptyState Icon="MokaIcons.Toggle.EyeOff" Title="Only hidden items" Description="@HiddenOnlyText" Live="true">
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Toggle.Eye" OnClick="ToggleHiddenAsync">Show hidden files</MokaButton>
+		</MokaEmptyState>;
 }
 
 <div @ref="_root" class="@RootClass" style="@Style" tabindex="-1">
-	<MokaToolbar Dense Bordered="false" Rounded="MokaRounding.None" Style="@ToolbarStyle">
+	<MokaToolbar Dense Wrap Bordered="false" Rounded="MokaRounding.None" Class="fb-nav" Style="@ToolbarStyle">
 		<IconButton Icon="MokaIcons.Navigation.ArrowLeft"
 					Disabled="@(!CanBrowse || !_history.CanGoBack)" OnClick="GoBackAsync" Label="Back" Shortcut="Alt+Left"
 					Position="MokaTooltipPosition.BottomStart" />
@@ -45,30 +50,35 @@
 			}
 			else if (_loaded)
 			{
-				@* The hint carries the whole path as well, since the crumbs fold long ones: a title beside it would show twice. *@
+				@* The hint carries the whole path as well, since a long one scrolls its start out of the well: a title
+				   beside it would show twice. Moka's own copy button writes the clipboard itself, which would slip past
+				   the schedule that clears copied secrets, so the copy is ours. *@
 				<div class="fb-crumbs" @onclick="BeginPathEdit">
 					<Hint Text="@($"{_path} (click to type a path, Ctrl+L)")" Position="MokaTooltipPosition.BottomStart" Class="fb-crumbs-hint">
-					<MokaBreadcrumb @key="_path" MaxItems="@(IsNarrow ? 3 : 6)">
-						<SeparatorContent>
-							<MokaIcon Icon="MokaIcons.Navigation.ChevronRight" SizeValue="12px" />
-						</SeparatorContent>
-						<ChildContent>
-							@foreach (RemotePathSegment segment in RemotePath.GetSegments(_path))
-							{
-								<MokaBreadcrumbItem>
-									<span class="fb-crumb" @onclick="() => NavigateAsync(segment.Path)" @onclick:stopPropagation="true">@segment.Name</span>
-								</MokaBreadcrumbItem>
-							}
-						</ChildContent>
-					</MokaBreadcrumb>
+						<MokaBreadcrumb @key="_path" Look="MokaBreadcrumbLook.Path">
+							<Root>
+								<span class="@RootCrumbClass" @onclick="() => NavigateAsync(RemotePath.Root)" @onclick:stopPropagation="true">/</span>
+							</Root>
+							<ChildContent>
+								@foreach (RemotePathSegment segment in FolderSegments)
+								{
+									<MokaBreadcrumbItem>
+										<span class="fb-crumb" @onclick="() => NavigateAsync(segment.Path)" @onclick:stopPropagation="true">@segment.Name</span>
+									</MokaBreadcrumbItem>
+								}
+							</ChildContent>
+						</MokaBreadcrumb>
 					</Hint>
+					<span class="fb-crumbs-copy" @onclick:stopPropagation="true">
+						<CopyButton Text="@_path" Label="Copy folder path" Position="MokaTooltipPosition.BottomEnd" />
+					</span>
 				</div>
 			}
 		</div>
 
-		<IconButton Icon="MokaIcons.Action.Refresh"
+		<IconButton Icon="MokaIcons.Action.Refresh" Class="fb-refresh"
 					Disabled="@(_fileSystem is null)" OnClick="() => RefreshAsync()" Label="Refresh" Shortcut="F5" />
-		<IconButton Icon="MokaIcons.Action.Search"
+		<IconButton Icon="MokaIcons.Action.Search" Class="fb-find"
 					Disabled="@(!CanBrowse)" OnClick="() => FindFilesAsync(_path)" Label="Find files" Shortcut="Ctrl+Shift+F"
 					Position="MokaTooltipPosition.BottomEnd" />
 	</MokaToolbar>
@@ -142,7 +152,7 @@
 		else if (CanElevate)
 		{
 			<MokaSpacer />
-			<MokaSegmentedControl Size="MokaSize.Xs" Style="padding:2px" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
 				<MokaSegment Value="@UserMode" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
 				<MokaSegment Value="@RootMode" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
 			</MokaSegmentedControl>
@@ -173,7 +183,7 @@
 	}
 
 	<div class="fb-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
-		@if (!CanBrowse)
+		@if (!ShowsList)
 		{
 			StateInfo state = DescribeState();
 			<div class="fb-state">
@@ -204,7 +214,12 @@
 					   SortDirection="_sortDirection"
 					   SortDirectionChanged="OnSortDirectionChanged"
 					   OnRowClick="OnRowClick"
-					   OnRowContextMenu="ShowEntryMenu">
+					   OnRowContextMenu="ShowEntryMenu"
+					   Loading="IsFirstListing"
+					   EmptyIcon="@(IsFiltering ? MokaIcons.Content.Filter : MokatermIcons.FolderOpen)"
+					   EmptyTitle="@(IsFiltering ? "No matches" : "Empty folder")"
+					   EmptyText="@(IsFiltering ? NoMatchesText : "Drop files here to upload them.")"
+					   Empty="@(OnlyHiddenEntries ? hiddenOnly : null)">
 				<ChildContent>
 					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.NameColumn" Field="NameField" SortComparer="CompareByName" MinWidth="120px">
 						<CellTemplate Context="entry">
@@ -223,38 +238,22 @@
 							</div>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.SizeColumn" Field="SizeField" SortComparer="CompareBySize" Width="84px" Align="MokaTextAlign.Right">
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.SizeColumn" Field="SizeField" SortComparer="CompareBySize" Width="100px" Mono="true" Align="MokaTextAlign.Right">
 						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.SizeText(entry))</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.ModifiedColumn" Field="ModifiedField" SortComparer="CompareByModified" Width="124px"
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.ModifiedColumn" Field="ModifiedField" SortComparer="CompareByModified" Width="156px" Mono="true"
 								Visible="@(_width >= BrowserWidth.Medium)">
 						<CellTemplate Context="entry">@TextCell(entry, DisplayFormat.Timestamp(entry.LastModified))</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.PermissionsColumn" Field="PermissionsField" SortComparer="CompareByPermissions" Width="96px"
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.PermissionsColumn" Field="PermissionsField" SortComparer="CompareByPermissions" Width="136px" Mono="true"
 								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Permissions))">
 						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.PermissionsText(entry))</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.OwnerColumn" Field="OwnerField" SortComparer="CompareByOwner" Width="112px"
+					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.OwnerColumn" Field="OwnerField" SortComparer="CompareByOwner" Width="144px" Mono="true"
 								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Ownership))">
 						<CellTemplate Context="entry">@TextCell(entry, EntryOrdering.OwnerLabel(entry))</CellTemplate>
 					</MokaColumn>
 				</ChildContent>
-				<EmptyContent>
-					@if (_filter.Trim().Length > 0)
-					{
-						<MokaEmptyState Icon="MokaIcons.Content.Filter" Title="No matches" Description="@NoMatchesText" />
-					}
-					else if (_entries.Count > 0)
-					{
-						<MokaEmptyState Icon="MokaIcons.Toggle.EyeOff" Title="Only hidden items" Description="@HiddenOnlyText">
-							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Toggle.Eye" OnClick="ToggleHiddenAsync">Show hidden files</MokaButton>
-						</MokaEmptyState>
-					}
-					else if (!_loading)
-					{
-						<MokaEmptyState Icon="MokatermIcons.FolderOpen" Title="Empty folder" Description="Drop files here to upload them." />
-					}
-				</EmptyContent>
 			</MokaTable>
 
 			@if (_dragOver)
@@ -278,7 +277,7 @@
 		}
 	</div>
 
-	<MokaStatusBar Style="position:static">
+	<MokaStatusBar Class="fb-footer" Style="position:static">
 		<StartContent>
 			@if (CanBrowse)
 			{
@@ -297,7 +296,7 @@
 		<EndContent>
 			@if (IsElevated)
 			{
-				<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
+				<MokaTag Text="Root" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
 			}
 			else if (_fileSystem is not null)
 			{

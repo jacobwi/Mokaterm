@@ -26,41 +26,55 @@
 		@<text>
 			@if (item.Elevated)
 			{
-				<MokaTag Text="ROOT" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
+				<MokaTag Text="Root" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
 			}
 			@if (item.ResumedFrom is { } resumedFrom)
 			{
 				<Hint Text="@ResumedText(resumedFrom)">
-					<MokaTag Text="RESUMED" Color="MokaColor.Info" Size="MokaSize.Xs" />
+					<MokaTag Text="Resumed" Color="MokaColor.Info" Size="MokaSize.Xs" />
 				</Hint>
 			}
 			@if (item.State == TransferState.Completed && item.Verification == TransferVerification.Verified)
 			{
 				<Hint Text="The server's checksum matches the copy">
-					<MokaTag Text="VERIFIED" Color="MokaColor.Success" Size="MokaSize.Xs" />
+					<MokaTag Text="Verified" Color="MokaColor.Success" Size="MokaSize.Xs" />
 				</Hint>
 			}
 			else if (item.State == TransferState.Completed && item.Verification == TransferVerification.Unavailable)
 			{
 				<Hint Text="The server cannot compute checksums, so this copy was not checked">
-					<MokaTag Text="UNCHECKED" Color="MokaColor.Surface" Size="MokaSize.Xs" />
+					<MokaTag Text="Unchecked" Color="MokaColor.Surface" Size="MokaSize.Xs" />
 				</Hint>
 			}
 		</text>;
 
+	RenderFragment StateDot(ITransferItem item) =>
+		@<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />;
+
+	RenderFragment Job(ITransferItem item) =>
+		@<MokaJobProgress Text="@JobText(item)" Percent="@JobPercent(item)" Facts="@JobFacts(item)" />;
+
 	RenderFragment CompactRow(ITransferItem item) =>
-		@<div @key="item.Id" class="tq-row tq-row--compact">
-			<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="@TextStyles.Muted" />
-			<span class="tq-name" title="@item.Name">@item.Name</span>
-			@Badges(item)
-			<span class="tq-route" title="@Tooltip(item)">@Route(item)</span>
-			<div class="tq-progress">
-				<MokaProgress Value="@ProgressValue(item)" />
+		@<div @key="item.Id" class="@CompactRowClass(item)">
+			<div class="tq-line">
+				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="@TextStyles.Muted" />
+				<span class="tq-name" title="@item.Name">@item.Name</span>
+				@Badges(item)
+				<span class="tq-route" title="@Tooltip(item)">@Route(item)</span>
+				@if (item.State != TransferState.Running)
+				{
+					<div class="tq-progress">
+						<MokaProgress Value="@ProgressValue(item)" />
+					</div>
+					<span class="tq-meta">@BytesText(item)</span>
+				}
+				@StateDot(item)
+				@Actions(item)
 			</div>
-			<span class="tq-meta">@BytesText(item)</span>
-			<span class="tq-meta tq-rate">@RateText(item)</span>
-			<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
-			@Actions(item)
+			@if (item.State == TransferState.Running)
+			{
+				@Job(item)
+			}
 		</div>;
 
 	RenderFragment FullRow(ITransferItem item) =>
@@ -70,17 +84,23 @@
 				<span class="tq-name" title="@item.Name">@item.Name</span>
 				@Badges(item)
 				<span class="tq-grow"></span>
-				<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />
+				@StateDot(item)
 				@Actions(item)
 			</div>
 			<div class="tq-route" title="@Tooltip(item)">@Route(item)</div>
-			<div class="tq-line">
-				<div class="tq-progress">
-					<MokaProgress Value="@ProgressValue(item)" />
+			@if (item.State == TransferState.Running)
+			{
+				@Job(item)
+			}
+			else
+			{
+				<div class="tq-line">
+					<div class="tq-progress">
+						<MokaProgress Value="@ProgressValue(item)" />
+					</div>
+					<span class="tq-meta">@BytesText(item)</span>
 				</div>
-				<span class="tq-meta">@BytesText(item)</span>
-				<span class="tq-meta tq-rate">@RateText(item)</span>
-			</div>
+			}
 			@if (item.State == TransferState.Failed && !string.IsNullOrEmpty(item.Error))
 			{
 				<div class="tq-error">@item.Error</div>

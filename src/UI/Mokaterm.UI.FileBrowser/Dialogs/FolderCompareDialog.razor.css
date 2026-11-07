@@ -58,6 +58,13 @@
 	table-layout: fixed;
 }
 
+/* Five columns in a large dialog: the theme's side padding would leave the path no room beside both copies' size and
+   time. The height still follows the theme's density. */
+.fc .fc-table ::deep .moka-table th,
+.fc .fc-table ::deep .moka-table td {
+	padding-inline: var(--moka-spacing-md);
+}
+
 .fc-cell {
 	overflow: hidden;
 	line-height: 16px;

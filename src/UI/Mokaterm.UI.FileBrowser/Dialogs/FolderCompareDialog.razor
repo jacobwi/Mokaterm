@@ -97,7 +97,10 @@
 								   FixedHeader="true"
 								   Height="320px"
 								   Virtualize="@(_shown.Count > VirtualizeThreshold)"
-								   VirtualRowHeight="RowHeight">
+								   VirtualRowHeight="RowHeight"
+								   EmptyIcon="MokaIcons.Status.CheckCircle"
+								   EmptyTitle="No differences"
+								   EmptyText="@SameText">
 							<ChildContent>
 								<MokaColumn TItem="FolderCompareRow" Sortable="false" Resizable="false" Width="36px">
 									<HeaderTemplate>
@@ -128,7 +131,7 @@
 										<div class="@StatusClass(row.Status)">@StatusLabel(row.Status)</div>
 									</CellTemplate>
 								</MokaColumn>
-								<MokaColumn TItem="FolderCompareRow" Title="Local" Sortable="false" Width="176px">
+								<MokaColumn TItem="FolderCompareRow" Title="Local" Sortable="false" Width="192px">
 									<CellTemplate Context="row">
 										@if (row.Local is { } local)
 										{
@@ -139,7 +142,7 @@
 										}
 									</CellTemplate>
 								</MokaColumn>
-								<MokaColumn TItem="FolderCompareRow" Title="Server" Sortable="false" Width="176px">
+								<MokaColumn TItem="FolderCompareRow" Title="Server" Sortable="false" Width="192px">
 									<CellTemplate Context="row">
 										@if (row.Remote is { } remote)
 										{
@@ -151,9 +154,6 @@
 									</CellTemplate>
 								</MokaColumn>
 							</ChildContent>
-							<EmptyContent>
-								<MokaEmptyState Icon="MokaIcons.Status.CheckCircle" Title="No differences" Description="@SameText" />
-							</EmptyContent>
 						</MokaTable>
 					</div>
 
