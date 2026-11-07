@@ -1,0 +1,13 @@
+/* The session card centres its other parts; the chain shares its columns out over the card's whole width. */
+.mt-connect-chain {
+	align-self: stretch;
+	min-width: 0;
+}
+
+/* Moka draws a step still to come and the one under way alike, as waiting. The one under way is the only waiting step
+   with a word under it, and it takes the accent so it reads as now rather than later. */
+.mt-connect-chain ::deep .moka-chain-check__step--wait:has(> .moka-chain-check__word) > .moka-chain-check__mark {
+	border-color: var(--moka-color-primary);
+	color: var(--moka-color-primary);
+	box-shadow: inset 0 0 12px var(--moka-color-primary-glow);
+}

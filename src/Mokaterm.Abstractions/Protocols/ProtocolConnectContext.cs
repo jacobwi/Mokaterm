@@ -34,6 +34,13 @@ public sealed class ProtocolConnectContext
 	/// <summary>Short progress messages such as "Authenticating".</summary>
 	public IProgress<string>? Status { get; init; }
 
+	/// <summary>
+	/// The attempt's steps, for a provider that reports them, from which the shell draws where a connect got to and where
+	/// it broke. Null when nothing is watching. Steps come beside <see cref="Status"/>, which stays the line that says
+	/// what is happening now.
+	/// </summary>
+	public IConnectSteps? Steps { get; init; }
+
 	/// <summary>Initial pseudo-terminal size for protocols with a terminal.</summary>
 	public TerminalSize TerminalSize { get; init; } = TerminalSize.Default;
 

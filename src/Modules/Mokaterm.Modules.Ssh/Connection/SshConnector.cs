@@ -158,6 +158,7 @@ internal sealed class SshConnector
 			IConnectionResolver resolver = context.Resolver ?? throw new ProtocolConnectException(
 				ConnectFailure.ProtocolError,
 				"This session cannot open the jump hosts of the connection, because it has no access to the saved logins.");
+			context.Steps?.Start(SshConnectSteps.JumpHosts);
 			jump = await SshJumpChain.OpenAsync(this, resolver, context, options.JumpConnectionIds, target, trail ?? new SshJumpTrail(), cancellationToken);
 			target = jump.Endpoint;
 		}
@@ -175,9 +176,20 @@ internal sealed class SshConnector
 		bool handedOver = false;
 		try
 		{
-			credentials = await context.Credentials.GetAsync(cancellationToken) ?? throw Cancelled();
-			(credentials, keySource) = await PrepareCredentialsAsync(credentials, context.Interaction, $"{credentials.Username}@{host}", options, settings, allowPrompt: true, cancellationToken);
-			credentials = await ProxyLogin.EnsurePasswordAsync(credentials, proxy, context.Interaction, cancellationToken);
+			try
+			{
+				credentials = await context.Credentials.GetAsync(cancellationToken) ?? throw Cancelled();
+				(credentials, keySource) = await PrepareCredentialsAsync(credentials, context.Interaction, $"{credentials.Username}@{host}", options, settings, allowPrompt: true, cancellationToken);
+				credentials = await ProxyLogin.EnsurePasswordAsync(credentials, proxy, context.Interaction, cancellationToken);
+			}
+			catch (ProtocolConnectException ex)
+			{
+				// The target was not dialed yet, so whatever step is under way is not the one to blame: the login could not
+				// be made from what was saved or typed.
+				context.Steps?.Fail(SshConnectSteps.Login, ex.Message);
+				throw;
+			}
+
 			string? approvedFingerprint = null;
 			int attempts = 1;
 			while (true)
@@ -193,6 +205,7 @@ internal sealed class SshConnector
 					TrustedFingerprint = approvedFingerprint,
 					Interaction = context.Interaction,
 					Status = context.Status,
+					Steps = context.Steps,
 					Settings = settings,
 					Options = options,
 					Proxy = proxy,
@@ -235,6 +248,7 @@ internal sealed class SshConnector
 
 				_logger.LogDebug("SSH session {SessionId} login attempt {Attempt} was rejected", context.SessionId, attempts);
 				string failure = outcome.AuthenticationFailure ?? "Authentication failed.";
+				context.Steps?.Fail(SshConnectSteps.Login, failure);
 				if (attempts >= settings.EffectiveAuthenticationAttempts)
 				{
 					throw new ProtocolConnectException(ConnectFailure.AuthenticationFailed, failure);
@@ -248,7 +262,16 @@ internal sealed class SshConnector
 				keySource = null;
 				credentials.Dispose();
 				credentials = retry;
-				(credentials, keySource) = await PrepareCredentialsAsync(credentials, context.Interaction, $"{credentials.Username}@{host}", options, settings, allowPrompt: true, cancellationToken);
+				try
+				{
+					(credentials, keySource) = await PrepareCredentialsAsync(credentials, context.Interaction, $"{credentials.Username}@{host}", options, settings, allowPrompt: true, cancellationToken);
+				}
+				catch (ProtocolConnectException ex)
+				{
+					context.Steps?.Fail(SshConnectSteps.Login, ex.Message);
+					throw;
+				}
+
 				attempts++;
 			}
 		}
@@ -432,11 +455,21 @@ internal sealed class SshConnector
 		where TClient : BaseClient
 	{
 		string endpoint = HostEndpoint.Format(request.Host, request.Port);
-		HostKeyCheck hostKeys = new(request.Host, request.Port, request.Verifier, request.TrustedFingerprint, request.Status, cancellationToken);
+		HostKeyCheck hostKeys = new(request.Host, request.Port, request.Verifier, request.TrustedFingerprint, request.Status, cancellationToken)
+		{
+			Steps = request.Steps,
+		};
 		ConnectWatchdog watchdog = new(request.Settings.ConnectTimeout);
 		CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, watchdog.Token);
-		EventHandler<SshIdentificationEventArgs> onServerIdentified = (_, _) => watchdog.Arm();
+
+		// The greeting ends the dial: the key exchange, and with it the host key, comes next.
+		EventHandler<SshIdentificationEventArgs> onServerIdentified = (_, _) =>
+		{
+			watchdog.Arm();
+			request.Steps?.Start(SshConnectSteps.HostKey);
+		};
 		SshLogin? login = null;
+		ConnectionInfo? connectionInfo = null;
 		TClient? client = null;
 		Task? connecting = null;
 
@@ -457,7 +490,8 @@ internal sealed class SshConnector
 		try
 		{
 			login = new SshLogin(request.Credentials, request.KeySource, request.Interaction, $"{request.Credentials.Username}@{request.Host}", request.Settings.PromptTimeout, watchdog, cancellationToken);
-			ConnectionInfo connectionInfo = SshProxyDial.CreateConnectionInfo(
+			request.Steps?.Start(SshConnectSteps.Connect);
+			connectionInfo = SshProxyDial.CreateConnectionInfo(
 				request.Dial,
 				request.Credentials.Username,
 				request.Proxy,
@@ -483,6 +517,17 @@ internal sealed class SshConnector
 		catch (Exception ex)
 		{
 			bool timedOut = watchdog.TimedOut;
+			if (login is null && ex is ProtocolConnectException unusable)
+			{
+				// What was saved cannot make a login, which is found out before anything is dialed.
+				request.Steps?.Fail(SshConnectSteps.Login, unusable.Message);
+			}
+			else if (connectionInfo?.IsAuthenticated == true)
+			{
+				// The login went through, so what failed is what the client opens on top of it, such as the SFTP subsystem.
+				request.Steps?.Start(SshConnectSteps.Open);
+			}
+
 			if (connecting is { IsCompleted: false } && client is { } abandoned)
 			{
 				// SSH.NET is still inside its synchronous key exchange or login, which ignores cancellation; clean up once it gives up.
@@ -587,6 +632,9 @@ internal sealed class SshConnector
 		public required IUserInteraction Interaction { get; init; }
 
 		public IProgress<string>? Status { get; init; }
+
+		/// <summary>Null for companion connections and jump hops, which are not steps of the session's own chain.</summary>
+		public IConnectSteps? Steps { get; init; }
 
 		public required SshSettings Settings { get; init; }
 

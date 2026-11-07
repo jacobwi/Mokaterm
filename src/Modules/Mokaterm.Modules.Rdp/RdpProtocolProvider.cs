@@ -47,7 +47,10 @@ internal sealed class RdpProtocolProvider : IProtocolProvider
 			context.Port,
 			options,
 			TimeSpan.FromSeconds(settings.ConnectTimeoutSeconds),
-			context.HostVerifier);
+			context.HostVerifier)
+		{
+			Steps = context.Steps,
+		};
 
 		LoginCredentials? credentials = await GetCredentialsAsync(context.Credentials, cancellationToken);
 		RdpTransport? transport = null;
@@ -62,6 +65,8 @@ internal sealed class RdpProtocolProvider : IProtocolProvider
 				}
 				catch (RdpAuthenticationException ex)
 				{
+					// The chain shows the refusal behind the prompt for another login, and keeps it when none comes.
+					context.Steps?.Fail(RdpConnectSteps.SignIn, ex.Message);
 					if (attempt >= settings.AuthenticationAttempts)
 					{
 						throw new ProtocolConnectException(ConnectFailure.AuthenticationFailed, ex.Message, ex);

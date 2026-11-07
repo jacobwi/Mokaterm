@@ -24,7 +24,8 @@ internal static class RdpHarness
 		IHostIdentityVerifier? verifier = null,
 		RdpConnectionOptions? options = null,
 		RecordingProgress<string>? status = null,
-		string address = "127.0.0.1") =>
+		string address = "127.0.0.1",
+		RecordingConnectSteps? steps = null) =>
 		new ConnectContext
 		{
 			ProtocolId = RdpProtocolProvider.ProtocolId,
@@ -34,6 +35,7 @@ internal static class RdpHarness
 			Verifier = verifier ?? FakeHostVerifier.Accepting(),
 			Options = (options ?? RdpConnectionOptions.Default).ApplyTo(ProtocolOptions.Empty),
 			Status = status,
+			Steps = steps,
 		}.Build();
 
 	/// <summary>A picture whose pixels are worked out from their position, so a wrong row or column shows up.</summary>

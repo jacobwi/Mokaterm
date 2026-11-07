@@ -36,6 +36,13 @@ public interface ISessionHandle
 
 	ConnectFailure? Failure { get; }
 
+	/// <summary>
+	/// The steps of the current or last connect attempt, as its protocol reported them through
+	/// <see cref="ProtocolConnectContext.Steps"/>. Empty for a protocol that reports none, and at the start of every
+	/// attempt until it plans them. When an attempt fails, the step it stopped at carries the failure.
+	/// </summary>
+	ConnectStepChain ConnectSteps => ConnectStepChain.Empty;
+
 	DateTimeOffset OpenedAt { get; }
 
 	DateTimeOffset? ConnectedAt { get; }

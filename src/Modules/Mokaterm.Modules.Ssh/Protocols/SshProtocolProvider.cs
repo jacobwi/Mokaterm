@@ -45,7 +45,9 @@ internal sealed class SshProtocolProvider : IProtocolProvider
 	public async Task<IProtocolSession> ConnectAsync(ProtocolConnectContext context, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(context);
-		if (context.Purpose != ConnectPurpose.Commands && SshConnectionOptions.FromOptions(context.Connection.Options).Forwarding.ForwardAgent)
+		SshConnectionOptions options = SshConnectionOptions.FromOptions(context.Connection.Options);
+		context.Steps?.Plan(SshConnectSteps.For(options, context.Purpose == ConnectPurpose.Commands ? null : "Shell"));
+		if (context.Purpose != ConnectPurpose.Commands && options.Forwarding.ForwardAgent)
 		{
 			// Before connecting: a connection takes SSH.NET's message table as it stands when it logs in, and a server
 			// opening an agent channel on a connection that cannot read one would end it.
@@ -61,6 +63,7 @@ internal sealed class SshProtocolProvider : IProtocolProvider
 		}
 
 		context.Status?.Report("Opening shell");
+		context.Steps?.Start(SshConnectSteps.Open);
 		return await SshSession.StartAsync(_connector, connection, context.TerminalSize, _hostKind, _logger, cancellationToken);
 	}
 }

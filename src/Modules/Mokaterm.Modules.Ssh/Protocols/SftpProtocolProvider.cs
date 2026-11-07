@@ -38,6 +38,7 @@ internal sealed class SftpProtocolProvider : IProtocolProvider
 	public async Task<IProtocolSession> ConnectAsync(ProtocolConnectContext context, CancellationToken cancellationToken)
 	{
 		ArgumentNullException.ThrowIfNull(context);
+		context.Steps?.Plan(SshConnectSteps.For(SshConnectionOptions.FromOptions(context.Connection.Options), "SFTP"));
 		SshConnection<SftpClient> connection = await _connector.ConnectAsync(context, SftpClients.Create, cancellationToken);
 		return new SftpSession(_connector, connection, _logger);
 	}

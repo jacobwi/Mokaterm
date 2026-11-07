@@ -25,6 +25,14 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 
 	private static readonly TimeSpan StepDelay = TimeSpan.FromMilliseconds(250);
 
+	private static readonly ConnectStep[] ConnectSteps =
+	[
+		new("connect", "Connect", ConnectStepKind.Dial),
+		new("host-key", "Host key", ConnectStepKind.HostIdentity),
+		new("login", "Login", ConnectStepKind.Login),
+		new("open", "Shell", ConnectStepKind.Session),
+	];
+
 	private static readonly SearchValues<char> UserNameChars =
 		SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-");
 
@@ -54,8 +62,11 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 	{
 		ArgumentNullException.ThrowIfNull(context);
 
+		context.Steps?.Plan(context.Purpose == ConnectPurpose.Commands ? ConnectSteps[..^1] : ConnectSteps);
+		context.Steps?.Start("connect");
 		context.Status?.Report("Resolving host");
 		await Task.Delay(StepDelay, _timeProvider, cancellationToken);
+		context.Steps?.Start("host-key");
 		context.Status?.Report("Negotiating keys");
 		await Task.Delay(StepDelay, _timeProvider, cancellationToken);
 
@@ -73,6 +84,7 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 			throw new ProtocolConnectException(ConnectFailure.HostIdentityRejected, "The host key of the demo server was not trusted.");
 		}
 
+		context.Steps?.Start("login");
 		context.Status?.Report("Authenticating");
 		await Task.Delay(StepDelay, _timeProvider, cancellationToken);
 
@@ -90,6 +102,8 @@ internal sealed class DemoProtocolProvider : IProtocolProvider
 				ConnectFailure.AuthenticationFailed,
 				$"The demo server has no user named '{userName}'. Use letters, digits, '.', '_' or '-'.");
 		}
+
+		context.Steps?.Start("open");
 
 		// The SSH startup command is honoured too, so the Docker manager's shell tab opens here the way it does over SSH.
 		DemoAccount account = DemoAccount.ForUser(userName);

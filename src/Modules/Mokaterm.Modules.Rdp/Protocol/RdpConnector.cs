@@ -49,6 +49,9 @@ internal sealed class RdpConnector
 
 	public IProgress<string>? Trace { get; init; }
 
+	/// <summary>Where each attempt is, step by step, for the session tab's chain (<see cref="RdpConnectSteps"/>).</summary>
+	public IConnectSteps? Steps { get; init; }
+
 	/// <summary>The desktop size asked for at connect time, before any resize.</summary>
 	public (int Width, int Height) DesktopSize => Options.DesktopSize == RdpDesktopSizeMode.Fixed
 		? (Options.Width, Options.Height)
@@ -91,12 +94,15 @@ internal sealed class RdpConnector
 		LastRoute = route;
 		LastNegotiated = null;
 
+		Steps?.Plan(RdpConnectSteps.For(route));
+
 		// The names only, for the messages: the password stays in the credentials until the config is built.
 		RdpLogin names = RdpLogin.Parse(credentials?.Username, Options.Domain, null);
 		if (route == RdpSignInRoute.NetworkLevelAuthentication && names.CredsspRefusal is { } refusal)
 		{
 			// Refused before anything is dialed, so the prompt that follows can take a name that works. An Entra ID
 			// account needs network level authentication turned off, which no other name in that prompt would change.
+			Steps?.Fail(RdpConnectSteps.SignIn, refusal);
 			throw names.IsEntraId
 				? new ProtocolConnectException(ConnectFailure.AuthenticationFailed, refusal)
 				: new RdpAuthenticationException(refusal);
@@ -114,7 +120,7 @@ internal sealed class RdpConnector
 
 		for (int attempt = 1; ; attempt++)
 		{
-			RdpConnectProgress progress = new(Host, Port, status, Trace);
+			RdpConnectProgress progress = new(Host, Port, status, Trace, Steps);
 			using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			deadline.CancelAfter(Timeout);
 			await using RdpConnectSequence sequence = new(

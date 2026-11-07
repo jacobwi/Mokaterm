@@ -330,6 +330,7 @@ internal sealed class SessionManager : ISessionManager, IDisposable
 				HostVerifier = _hostVerifier,
 				Interaction = _interaction,
 				Status = new InlineProgress<string>(message => handle.ReportStatus(attempt, message)),
+				Steps = new AttemptConnectSteps(handle, attempt),
 				TerminalSize = size,
 				Resolver = new ConnectionResolver(_repository, _credentialStore, _registry, _interaction, _logger),
 			};

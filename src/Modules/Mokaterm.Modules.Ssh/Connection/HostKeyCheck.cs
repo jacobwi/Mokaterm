@@ -1,3 +1,4 @@
+using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Renci.SshNet.Common;
 
@@ -35,6 +36,9 @@ internal sealed class HostKeyCheck
 		_status = status;
 		_cancellationToken = cancellationToken;
 	}
+
+	/// <summary>The session's chain of steps, which moves on to the login once a key is trusted. Null for companions.</summary>
+	public IConnectSteps? Steps { get; init; }
 
 	/// <summary>The fingerprint of the key this connection trusted.</summary>
 	public string? AcceptedFingerprint { get; private set; }
@@ -128,6 +132,7 @@ internal sealed class HostKeyCheck
 		if (!_pinned)
 		{
 			_status?.Report("Authenticating");
+			Steps?.Start(SshConnectSteps.Login);
 		}
 
 		return true;

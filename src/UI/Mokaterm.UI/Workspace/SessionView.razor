@@ -1,5 +1,6 @@
 @{
 	SessionLogStatus log = SessionLogs.StatusFor(Session.Id);
+	ConnectStepChain steps = Session.ConnectSteps;
 }
 
 <div class="mt-session">
@@ -115,7 +116,11 @@
 		@if (Session.State == SessionState.Connecting)
 		{
 			<div class="mt-session-overlay">
-				<div class="mt-session-card">
+				<div class="@(steps.IsEmpty ? "mt-session-card" : "mt-session-card mt-session-card--chain")">
+					@if (!steps.IsEmpty)
+					{
+						<ConnectChain Session="Session" Chain="steps" />
+					}
 					<MokaSpinner Label="@(Session.StatusMessage ?? "Connecting")" />
 					<MokaText Element="span" Size="MokaSize.Xs" Mono Style="@TextStyles.Muted">
 						@Endpoint
@@ -129,13 +134,21 @@
 		else if (Session.State == SessionState.Failed && Session.ConnectedAt is null)
 		{
 			<div class="mt-session-overlay">
-				<div class="mt-session-card mt-session-card--wide">
-					<MokaAlert Severity="MokaToastSeverity.Error" Title="@SessionStateDisplay.FailureTitle(Session.Failure)">
-						@(Session.StatusMessage ?? "The connection failed.")
-					</MokaAlert>
+				<div class="@(steps.IsEmpty ? "mt-session-card mt-session-card--wide" : "mt-session-card mt-session-card--wide mt-session-card--chain")">
+					@if (steps.IsEmpty)
+					{
+						<MokaAlert Severity="MokaToastSeverity.Error" Title="@SessionStateDisplay.FailureTitle(Session.Failure)">
+							@(Session.StatusMessage ?? "The connection failed.")
+						</MokaAlert>
+					}
+					else
+					{
+						<MokaText Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold">@SessionStateDisplay.FailureTitle(Session.Failure)</MokaText>
+						<ConnectChain Session="Session" Chain="steps" Fix="EditConnectionFix" />
+					}
 					<MokaFlexbox Direction="MokaDirection.Row" Gap="MokaSpacingScale.Sm" Justify="MokaJustify.End">
 						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="CloseAsync">Close</MokaButton>
-						@if (!Session.IsTransient)
+						@if (!Session.IsTransient && steps.IsEmpty)
 						{
 							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Edit" OnClick="EditConnection">
 								Edit connection
@@ -178,4 +191,10 @@
 						  Class="mt-fill" />
 		}
 	</text>;
+
+	private RenderFragment? EditConnectionFix => Session.IsTransient ? null : EditConnectionButton;
+
+	private RenderFragment EditConnectionButton => @<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Action.Edit" OnClick="EditConnection">
+		Edit connection
+	</MokaButton>;
 }

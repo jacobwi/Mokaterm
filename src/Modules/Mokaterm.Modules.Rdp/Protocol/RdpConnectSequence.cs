@@ -139,6 +139,12 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 					$"{_progress.Endpoint} chose CredSSP but presented no certificate, and CredSSP is bound to one.");
 			await RunCredsspAsync(publicKey, cancellationToken);
 		}
+		else
+		{
+			_progress.Skip(
+				RdpConnectStage.Login,
+				"The server chose TLS without network level authentication, so the login goes with the session.");
+		}
 
 		_progress.Enter(RdpConnectStage.Session);
 		while (true)
@@ -245,6 +251,7 @@ internal sealed class RdpConnectSequence : IAsyncDisposable
 	{
 		if (certificate is null)
 		{
+			_progress.Skip(RdpConnectStage.Certificate, "The server presented no certificate.");
 			return (null, false);
 		}
 

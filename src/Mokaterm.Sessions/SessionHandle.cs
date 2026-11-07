@@ -31,6 +31,7 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 	private SessionState _state;
 	private string? _statusMessage;
 	private ConnectFailure? _failure;
+	private ConnectStepChain _steps = ConnectStepChain.Empty;
 	private DateTimeOffset? _connectedAt;
 	private IProtocolSession? _session;
 	private IProtocolSession? _endedSession;
@@ -87,6 +88,8 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 
 	public ConnectFailure? Failure => Read(() => _failure);
 
+	public ConnectStepChain ConnectSteps => Read(() => _steps);
+
 	public DateTimeOffset? ConnectedAt => Read(() => _connectedAt);
 
 	public IProtocolSession? Session => Read(() => _session);
@@ -138,6 +141,7 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 			_state = SessionState.Connecting;
 			_statusMessage = statusMessage;
 			_failure = null;
+			_steps = ConnectStepChain.Empty;
 			_connectedAt = null;
 			_session = null;
 		}
@@ -161,6 +165,31 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 		RaiseChanged();
 	}
 
+	/// <summary>
+	/// Applies a step report from <paramref name="attempt"/>, which counts only while that attempt is the current one and
+	/// still connecting: a provider that ignored cancellation must not redraw a chain that already shows where it stopped.
+	/// </summary>
+	internal void ReportSteps(int attempt, Func<ConnectStepChain, ConnectStepChain> change)
+	{
+		lock (_lock)
+		{
+			if (!IsCurrent(attempt) || _state != SessionState.Connecting)
+			{
+				return;
+			}
+
+			ConnectStepChain next = change(_steps);
+			if (ReferenceEquals(next, _steps))
+			{
+				return;
+			}
+
+			_steps = next;
+		}
+
+		RaiseChanged();
+	}
+
 	/// <summary>True while <paramref name="attempt"/> is the current attempt and still connecting.</summary>
 	internal bool IsConnecting(int attempt) => Read(() => IsCurrent(attempt) && _state == SessionState.Connecting);
 
@@ -178,6 +207,7 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 			_connectedAt = connectedAt;
 			_statusMessage = null;
 			_failure = null;
+			_steps = _steps.CompleteAll();
 		}
 
 		RaiseChanged();
@@ -192,6 +222,12 @@ internal sealed class SessionHandle : ISessionHandle, IDisposable
 			if (!IsCurrent(attempt) || _state is not (SessionState.Connecting or SessionState.Connected))
 			{
 				return false;
+			}
+
+			// A drop after connecting says nothing about the steps, which all held.
+			if (_state == SessionState.Connecting && state == SessionState.Failed)
+			{
+				_steps = _steps.FailCurrent(statusMessage);
 			}
 
 			_state = state;

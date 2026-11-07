@@ -48,7 +48,10 @@ internal sealed class FakeSession : ISessionHandle
 
 	public string? StatusMessage { get; private set; }
 
-	public ConnectFailure? Failure => null;
+	public ConnectFailure? Failure { get; init; }
+
+	/// <summary>The connect steps the session shows; none by default, as for a protocol that reports none.</summary>
+	public ConnectStepChain ConnectSteps { get; init; } = ConnectStepChain.Empty;
 
 	public DateTimeOffset OpenedAt => DateTimeOffset.UnixEpoch;
 

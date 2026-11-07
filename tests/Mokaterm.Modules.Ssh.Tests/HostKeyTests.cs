@@ -1,4 +1,5 @@
 using System.Text;
+using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Modules.Ssh.Connection;
 using Renci.SshNet;
@@ -85,6 +86,33 @@ public sealed class HostKeyTests
 		Assert.True(args.CanTrust);
 		Assert.Equal(TestKeys.Ed25519Fingerprint, check.AcceptedFingerprint);
 		Assert.Equal(TestKeys.Ed25519Fingerprint, Assert.Single(verifier.Identities).Fingerprint);
+	}
+
+	[Fact]
+	public void Check_ATrustedKey_MovesTheChainOnToTheLogin()
+	{
+		RecordingConnectSteps steps = new();
+		steps.Plan(SshConnectSteps.For(new SshConnectionOptions(), "Shell"));
+		steps.Start(SshConnectSteps.HostKey);
+		HostKeyCheck check = new("host", 22, new RecordingVerifier(Task.FromResult(true)), null, null, CancellationToken.None) { Steps = steps };
+
+		check.OnHostKeyReceived(null, Ed25519HostKey());
+
+		Assert.Equal(ConnectStepState.Done, steps.StateOf(SshConnectSteps.HostKey));
+		Assert.Equal(SshConnectSteps.Login, steps.Chain.Current?.Step.Id);
+	}
+
+	[Fact]
+	public void Check_ARefusedKey_LeavesTheChainOnTheHostKey()
+	{
+		RecordingConnectSteps steps = new();
+		steps.Plan(SshConnectSteps.For(new SshConnectionOptions(), "Shell"));
+		steps.Start(SshConnectSteps.HostKey);
+		HostKeyCheck check = new("host", 22, new RecordingVerifier(Task.FromResult(false)), null, null, CancellationToken.None) { Steps = steps };
+
+		check.OnHostKeyReceived(null, Ed25519HostKey());
+
+		Assert.Equal(SshConnectSteps.HostKey, steps.Chain.Current?.Step.Id);
 	}
 
 	[Fact]

@@ -93,3 +93,8 @@
 	align-items: stretch;
 	width: min(480px, 100%);
 }
+
+/* Room for six steps side by side, each with a one-word label under its mark. */
+.mt-session-card--chain {
+	width: min(560px, 100%);
+}

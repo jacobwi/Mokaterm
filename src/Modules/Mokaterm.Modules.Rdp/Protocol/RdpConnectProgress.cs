@@ -3,22 +3,24 @@ using Mokaterm.Abstractions.Protocols;
 namespace Mokaterm.Modules.Rdp.Protocol;
 
 /// <summary>
-/// Which step a connect attempt is on. Every step reports its own status line, and a failure or a timeout is worded
-/// for the step it happened in.
+/// Which step a connect attempt is on. Every step reports its own status line and its place in the session tab's chain
+/// (<see cref="RdpConnectSteps"/>), and a failure or a timeout is worded for the step it happened in.
 /// </summary>
 internal sealed class RdpConnectProgress
 {
 	private readonly IProgress<string>? _status;
 	private readonly IProgress<string>? _trace;
+	private readonly IConnectSteps? _steps;
 	private volatile StageState _current = new(RdpConnectStage.Dialing, null);
 
-	public RdpConnectProgress(string host, int port, IProgress<string>? status, IProgress<string>? trace = null)
+	public RdpConnectProgress(string host, int port, IProgress<string>? status, IProgress<string>? trace = null, IConnectSteps? steps = null)
 	{
 		Host = host;
 		Port = port;
 		Endpoint = HostEndpoint.Format(host, port);
 		_status = status;
 		_trace = trace;
+		_steps = steps;
 	}
 
 	public string Host { get; }
@@ -36,12 +38,16 @@ internal sealed class RdpConnectProgress
 	/// </summary>
 	public string? Detail => _current.Detail;
 
-	/// <summary>Moves on to <paramref name="stage"/> and says so through the status line.</summary>
+	/// <summary>Moves on to <paramref name="stage"/> and says so through the status line and the chain of steps.</summary>
 	public void Enter(RdpConnectStage stage, string? detail = null)
 	{
 		_current = new StageState(stage, detail);
 		_status?.Report(StatusText(stage, detail));
+		_steps?.Start(RdpConnectSteps.Of(stage), stage == RdpConnectStage.Kerberos ? StatusText(stage, detail) : detail);
 	}
+
+	/// <summary>Says that <paramref name="stage"/> does not run in this attempt, and why.</summary>
+	public void Skip(RdpConnectStage stage, string reason) => _steps?.Skip(RdpConnectSteps.Of(stage), reason);
 
 	/// <summary>Records what the current step is doing without a new status line.</summary>
 	public void Note(string? detail) => _current = _current with { Detail = detail };

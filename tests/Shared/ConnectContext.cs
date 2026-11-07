@@ -35,8 +35,11 @@ internal sealed class ConnectContext
 	/// </summary>
 	public IProgress<string>? Status { get; init; }
 
-	/// <summary>Leaves the context without a status sink, the way the shell does when nothing is watching.</summary>
+	/// <summary>Leaves the context without a status sink or steps, the way the shell does when nothing is watching.</summary>
 	public bool WithoutStatus { get; init; }
+
+	/// <summary>Where the provider's step reports go; a recording sink by default, for the same reason as <see cref="Status"/>.</summary>
+	public IConnectSteps? Steps { get; init; }
 
 	/// <summary>The opening terminal size, for a protocol that has a terminal.</summary>
 	public TerminalSize? TerminalSize { get; init; }
@@ -63,6 +66,7 @@ internal sealed class ConnectContext
 			HostVerifier = Verifier,
 			Interaction = Interaction,
 			Status = WithoutStatus ? null : Status ?? new RecordingProgress<string>(),
+			Steps = WithoutStatus ? null : Steps ?? new RecordingConnectSteps(),
 			TerminalSize = TerminalSize ?? Abstractions.Terminal.TerminalSize.Default,
 		};
 	}
