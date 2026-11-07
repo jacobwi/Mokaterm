@@ -1,3 +1,39 @@
+## What's new in 0.3.0
+
+**Look**
+
+- **A new design: Mokaterm is built on Moka.Red 0.3.7 and its Red theme.** Controls are a little taller and easier to
+  hit, toolbars wrap onto a second line instead of cutting off, and buttons, tabs and titles follow the theme's letter
+  case. Its fonts (Inter, Space Grotesk and JetBrains Mono) come with the app. Density still applies: Compact, Cozy or
+  Comfortable in Settings, Appearance.
+- **A connection shows its steps while it connects.** SSH lists connect, host key, login and shell (jump hosts first);
+  RDP lists connect, negotiate, TLS, certificate, sign-in and session. One that fails marks the step it failed at, with
+  the reason under it and Edit connection beside it.
+- **The file browser fits narrow panels.** The path gets a row of its own when the panel is small, with its copy button
+  after it, a folder's first listing shows a loading outline, and an empty folder says so. Running transfers show a
+  progress bar with the size, speed and time left.
+- The System and Docker tools use Moka.Red's page header and tabs, and Docker's container and compose lists line up
+  their columns across every group.
+- The web host's reconnect screen is Moka.Red's, and says what each state means for the sessions the server holds.
+
+**Desktop**
+
+- **Mokaterm checks for the Microsoft Edge WebView2 Runtime before it opens.** Windows 11 and the installer bring it,
+  but the portable zip does not, and a PC without it used to fail with no explanation. It now says what is missing and
+  offers to open Microsoft's download page.
+- `MOKATERM_STARTUP_TRACE=1` writes how long each step of a start took to `Data\logs\startup-*.log`, for reporting a
+  slow start.
+
+**Plugins**
+
+- **Plugins built for 0.2 need a 0.3 build.** A plugin is tied to the Mokaterm minor version it was built against, so
+  after this update Settings, Plugins marks 0.2 plugins as incompatible and leaves them off until a 0.3 build is
+  installed. Nothing else about them changes.
+
+**Under the hood**
+
+- MAUI 10.0.120, FluentFTP 55.1.0 and Velopack 1.2.161.
+
 ## What's new in 0.2.11
 
 **Look**
