@@ -5,19 +5,11 @@
 .mt-welcome {
 	display: flex;
 	flex: 1;
-	justify-content: center;
+	flex-direction: column;
 	min-height: 0;
 	overflow-y: auto;
 	container-type: inline-size;
-}
-
-.mt-welcome-inner {
-	display: flex;
-	flex-direction: column;
-	gap: var(--moka-spacing-xl);
-	width: 100%;
-	max-width: 880px;
-	padding: var(--moka-spacing-xxl) var(--moka-spacing-xl);
+	container-name: mt-welcome;
 }
 
 .mt-welcome-loading {
@@ -26,60 +18,100 @@
 	padding: var(--moka-spacing-xxl) 0;
 }
 
-.mt-welcome-head {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr);
-	gap: 0 var(--moka-spacing-md);
-	align-items: baseline;
+.mt-welcome-column {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 1000px;
+	margin: 0 auto;
+	padding-inline: var(--moka-spacing-xxl);
+}
+
+.mt-welcome ::deep .mt-welcome-hero {
+	flex-shrink: 0;
+}
+
+.mt-welcome-hero-column {
+	padding-block: calc(var(--moka-spacing-xxl) * 1.5) var(--moka-spacing-xxl);
+}
+
+/* Moka's page header, with the mark beside the title rather than above it at any width: Moka stacks it by the window's
+   width, and this pane can be narrow in a wide window or the other way round. */
+.mt-welcome-hero-column ::deep .mt-welcome-head {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: var(--moka-spacing-xl);
+}
+
+.mt-welcome-hero-column ::deep .mt-welcome-head > .moka-page-header__titles {
+	flex: 1 1 auto;
+	gap: var(--moka-spacing-xs);
+}
+
+.mt-welcome-hero-column ::deep .mt-welcome-head > .moka-page-header__media {
+	align-self: center;
+}
+
+/* The line of counts is data, the lede is prose. */
+.mt-welcome-hero-column ::deep .mt-welcome-head .moka-page-header__lead {
+	margin: 0;
+	font-size: var(--moka-font-size-base);
+	line-height: var(--moka-line-height-relaxed);
+}
+
+.mt-welcome-hero-column ::deep .mt-welcome-head .moka-page-header__lead:not(.moka-about) {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	color: var(--moka-color-on-surface-tertiary);
 }
 
 .mt-welcome-mark {
-	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-dialog);
-	font-weight: var(--moka-font-weight-semibold);
+	display: grid;
+	place-items: center;
+	width: 3.25rem;
+	height: 3.25rem;
+	border-radius: var(--moka-radius-lg);
+	background: var(--moka-color-surface);
+	box-shadow: inset 0 0 0 1px var(--moka-color-primary-border), inset 0 0 18px var(--moka-color-primary-glow), 0 0 24px var(--moka-color-primary-glow);
 	color: var(--moka-color-primary);
+	font-family: var(--moka-font-family-mono);
+	font-size: 1.25rem;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: -0.04em;
 }
 
-/* Drawn like a Moka dialog title, so the theme's title font and case reach it. */
+/* Drawn like Moka's page title, so the theme's display font and title case reach it, one heading level down. */
 .mt-welcome-title {
 	margin: 0;
 	font-family: var(--moka-font-family-display);
-	font-size: var(--moka-font-size-dialog);
+	font-size: var(--moka-font-size-heading);
 	font-weight: var(--moka-font-weight-heading);
 	line-height: var(--moka-line-height-tight);
+	letter-spacing: var(--moka-heading-tracking);
 	text-transform: var(--moka-title-case);
-	letter-spacing: var(--moka-title-tracking);
+	overflow-wrap: anywhere;
 	color: var(--moka-color-on-surface);
 }
 
-.mt-welcome-lede {
-	grid-column: 2;
-	max-width: 68ch;
-	margin: var(--moka-spacing-xs) 0 0;
-	font-size: var(--moka-font-size-base);
-	line-height: var(--moka-line-height-relaxed);
-	color: var(--moka-color-on-surface-variant);
-}
-
-.mt-welcome-restore-actions {
+.mt-welcome-body {
 	display: flex;
-	gap: var(--moka-spacing-sm);
-	margin-top: var(--moka-spacing-sm);
-}
-
-/* min() keeps the tracks inside a pane narrower than one column, which auto-fit alone would overflow. */
-.mt-welcome-lists {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-	gap: var(--moka-spacing-lg);
-	align-items: start;
+	flex-direction: column;
+	gap: var(--moka-spacing-xxl);
+	padding-block: var(--moka-spacing-xs) calc(var(--moka-spacing-xxl) * 1.5);
 }
 
 .mt-welcome-section {
 	display: flex;
 	flex-direction: column;
-	gap: var(--moka-spacing-sm);
+	gap: var(--moka-spacing-md);
 	min-width: 0;
+}
+
+.mt-welcome-section-head {
+	display: flex;
+	align-items: baseline;
+	gap: var(--moka-spacing-sm);
+	padding-inline: var(--moka-spacing-xs);
 }
 
 .mt-welcome-label {
@@ -91,57 +123,291 @@
 	color: var(--moka-color-on-surface-tertiary);
 }
 
-.mt-welcome-action {
+.mt-welcome-count {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+.mt-welcome-more {
+	margin: 0;
+	padding-inline: var(--moka-spacing-xs);
+	font-size: var(--moka-font-size-xs);
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+/* The card holds the list; its rows get a little room from the card's rounded edge and round their own hover. */
+.mt-welcome .mt-welcome-section ::deep .mt-welcome-card > .moka-card-body > .moka-list {
+	padding: var(--moka-spacing-sm);
+}
+
+/* In a pane too narrow for the name and the time side by side, the time and the star move under the name rather than
+   squeezing it to a letter a line. */
+.mt-welcome .mt-welcome-section ::deep .mt-welcome-card .moka-list-item {
+	flex-wrap: wrap;
+	row-gap: var(--moka-spacing-xs);
+	padding-block: var(--moka-spacing-sm);
+	border-radius: var(--moka-radius-md);
+}
+
+.mt-welcome .mt-welcome-section ::deep .mt-welcome-card .moka-list-item__content {
+	flex: 1 1 10rem;
+}
+
+.mt-welcome-login {
 	display: flex;
-	flex: 1;
 	align-items: center;
-	gap: var(--moka-spacing-md);
+	gap: var(--moka-spacing-lg);
 	min-width: 0;
 }
 
-.mt-welcome-action-text {
+.mt-welcome-login-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+/* A user@host is the one thing on the row worth reading whole, so it wraps where a list row would cut it. */
+.mt-welcome-login-title {
+	font-weight: var(--moka-font-weight-medium);
+	line-height: var(--moka-line-height-tight);
+	overflow-wrap: anywhere;
+	color: var(--moka-color-on-surface);
+}
+
+.mt-welcome-login-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px var(--moka-spacing-sm);
+	font-size: var(--moka-font-size-sm);
+	line-height: var(--moka-line-height-base);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-welcome-login-meta > span:not(:first-child, .mt-welcome-login-port)::before {
+	content: "·";
+	margin-inline-end: var(--moka-spacing-sm);
+	color: var(--moka-color-on-surface-quaternary);
+}
+
+.mt-welcome-login-host {
+	overflow-wrap: anywhere;
+}
+
+.mt-welcome-login-port {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-welcome-login-end {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}
+
+.mt-welcome-when {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	color: var(--moka-color-on-surface-tertiary);
+}
+
+/* min() keeps the tracks inside a pane narrower than one tile, which auto-fill alone would overflow. */
+.mt-welcome-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+	gap: var(--moka-spacing-lg);
+}
+
+.mt-welcome-tiles--compact {
+	grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+	gap: var(--moka-spacing-md);
+}
+
+.mt-welcome-tile-body {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--moka-spacing-lg);
+	height: 100%;
+	padding: var(--moka-inner-padding) calc(var(--moka-inner-padding) + 2px);
+}
+
+.mt-welcome-tiles--compact .mt-welcome-tile-body {
+	flex-direction: row;
+	align-items: center;
+	gap: var(--moka-spacing-lg);
+	padding: var(--moka-spacing-lg);
+}
+
+.mt-welcome-tile-text {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: 1px;
+	gap: var(--moka-spacing-xs);
 	min-width: 0;
 }
 
-.mt-welcome-action-title {
-	font-weight: var(--moka-font-weight-medium);
+.mt-welcome-tile-title {
+	font-size: var(--moka-font-size-md);
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: var(--moka-line-height-tight);
+	letter-spacing: var(--moka-title-tracking);
+	text-transform: var(--moka-title-case);
+	color: var(--moka-color-on-surface);
 }
 
-/* What the action does is the point of these rows, so it wraps instead of being cut like a list's secondary line. */
-.mt-welcome-action-detail {
-	font-size: var(--moka-font-size-xs);
-	line-height: var(--moka-line-height-base);
+.mt-welcome-tiles--compact .mt-welcome-tile-title {
+	font-size: var(--moka-font-size-base);
+}
+
+/* What the action does is the point of the first-run tiles, so it wraps instead of being cut. */
+.mt-welcome-tile-detail {
+	font-size: var(--moka-font-size-sm);
+	line-height: var(--moka-line-height-relaxed);
 	color: var(--moka-color-on-surface-variant);
+}
+
+/* Keys sit at the foot of a first-run tile, so a row of tiles lines them up whatever each one says above them. */
+.mt-welcome-tile-text > .mt-welcome-keys {
+	margin-top: auto;
+	padding-top: var(--moka-spacing-xs);
+}
+
+.mt-welcome-tiles--compact .mt-welcome-tile-text > .mt-welcome-keys {
+	padding-top: 0;
+}
+
+.mt-welcome-tiles ::deep .mt-welcome-tile .mt-welcome-tile-icon {
+	transition: color var(--moka-transition-normal), background-color var(--moka-transition-normal);
+}
+
+.mt-welcome-tiles ::deep .mt-welcome-tile:hover .mt-welcome-tile-icon,
+.mt-welcome-tiles ::deep .mt-welcome-tile:focus-visible .mt-welcome-tile-icon {
+	color: var(--moka-color-on-surface);
+}
+
+/* The first step for an empty vault carries the accent: a red edge and a red glyph, never a red fill. */
+.mt-welcome .mt-welcome-tiles ::deep .mt-welcome-tile--lead {
+	border-color: var(--moka-color-primary-border-dim);
+}
+
+.mt-welcome .mt-welcome-tiles ::deep .mt-welcome-tile--lead:hover {
+	border-color: var(--moka-color-primary-border);
+}
+
+.mt-welcome .mt-welcome-tiles ::deep .mt-welcome-tile--lead .mt-welcome-tile-icon {
+	background: var(--moka-color-primary-bg);
+	color: var(--moka-color-primary-light);
 }
 
 /* inline-flex so the same keys read inside a sentence; a flex item blockifies it back to flex in a row. */
 .mt-welcome-keys {
 	display: inline-flex;
 	flex-shrink: 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 3px;
+	vertical-align: middle;
+}
+
+.mt-welcome-sentence {
+	font-size: var(--moka-font-size-sm);
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-welcome-restore-text {
+	margin: 0;
+}
+
+.mt-welcome-restore-logins {
+	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--moka-spacing-xs);
+	margin-top: var(--moka-spacing-sm);
 }
 
-/* A row this narrow cannot hold the text and the keys side by side and still read, so the keys drop under the text. */
-@container (max-width: 420px) {
-	.mt-welcome-action {
-		flex-direction: column;
+.mt-welcome-restore-more {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+}
+
+.mt-welcome-protocols {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.mt-welcome-hero-column,
+	.mt-welcome-body {
+		animation: mt-welcome-in 180ms ease-out both;
+	}
+}
+
+@keyframes mt-welcome-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+
+@container mt-welcome (max-width: 560px) {
+	.mt-welcome-column {
+		padding-inline: var(--moka-spacing-xl);
+	}
+
+	.mt-welcome-hero-column {
+		padding-block: var(--moka-spacing-xxl) var(--moka-spacing-xl);
+	}
+
+	.mt-welcome-hero-column ::deep .mt-welcome-head {
 		align-items: flex-start;
-		gap: var(--moka-spacing-xs);
-	}
-}
-
-@container (max-width: 520px) {
-	.mt-welcome-inner {
 		gap: var(--moka-spacing-lg);
-		padding: var(--moka-spacing-xl) var(--moka-spacing-md);
+	}
+
+	.mt-welcome-hero-column ::deep .mt-welcome-head > .moka-page-header__media {
+		align-self: flex-start;
+	}
+
+	.mt-welcome-mark {
+		width: 2.5rem;
+		height: 2.5rem;
+		font-size: 1rem;
+	}
+
+	.mt-welcome-title {
+		font-size: var(--moka-font-size-xl);
+	}
+
+	.mt-welcome-body {
+		gap: var(--moka-spacing-xl);
+	}
+
+	/* A first-run tile this narrow reads better as a row: the glyph beside the text, not above it. */
+	.mt-welcome-tile-body {
+		flex-direction: row;
 	}
 }
 
-.mt-welcome-more {
-	margin: 0 0 var(--moka-spacing-xs);
+/* A quarter of a window: the glyphs give their room to the names, and the mark goes above the title. */
+@container mt-welcome (max-width: 380px) {
+	.mt-welcome-hero-column ::deep .mt-welcome-head {
+		flex-direction: column;
+		gap: var(--moka-spacing-md);
+	}
+
+	.mt-welcome-section ::deep .mt-welcome-login-icon,
+	.mt-welcome-tiles ::deep .mt-welcome-tile-icon {
+		display: none;
+	}
+
+	.mt-welcome .mt-welcome-section ::deep .mt-welcome-card .moka-list-item {
+		padding-inline: var(--moka-spacing-md);
+	}
 }

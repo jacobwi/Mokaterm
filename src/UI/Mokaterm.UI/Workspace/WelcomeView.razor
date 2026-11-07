@@ -1,35 +1,58 @@
+@using Moka.Red.Layout.Card
+@using Moka.Red.Layout.GridBackground
+@using Moka.Red.Layout.PageHeader
+@using Moka.Red.Primitives.Avatar
+
 @* The workspace's home screen. A vault with no host in it is led through getting started, a filled one gets its
    favorites and recent logins back, and every action carries the keys in force for it. *@
 
 <div class="mt-welcome">
-	<div class="mt-welcome-inner">
-		@if (!Catalog.IsLoaded)
-		{
-			@* Leading with "nothing saved yet" before the catalog is read would be wrong for everyone who has hosts. *@
-			<div class="mt-welcome-loading" role="status" aria-label="Reading your connections">
-				<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+	@if (!Catalog.IsLoaded)
+	{
+		@* Leading with "nothing saved yet" before the catalog is read would be wrong for everyone who has hosts. *@
+		<div class="mt-welcome-loading" role="status" aria-label="Reading your connections">
+			<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
+		</div>
+	}
+	else
+	{
+		<MokaGridBackground Class="mt-welcome-hero"
+							Pattern="MokaGridPattern.Dots"
+							CellSize="16"
+							PatternOpacity="1"
+							FadeMask="radial-gradient(ellipse 70% 150% at 50% 0%, black 15%, transparent 80%)"
+							BackgroundColor="transparent">
+			<div class="mt-welcome-column mt-welcome-hero-column">
+				<MokaPageHeader Class="mt-welcome-head" Media="Mark" TitleContent="TitleLine" Said="@Summary" Lead="@Lede" />
 			</div>
-		}
-		else
-		{
-			<div class="mt-welcome-head">
-				<span class="mt-welcome-mark" aria-hidden="true">&gt;_</span>
-				<h2 class="mt-welcome-title">@(_hasHosts ? "Ready to connect" : "Nothing saved yet")</h2>
-				<p class="mt-welcome-lede">@Lede</p>
-			</div>
+		</MokaGridBackground>
 
-			@if (_restoreCount > 0)
+		<div class="mt-welcome-column mt-welcome-body">
+			@if (_restore.Count > 0)
 			{
-				<MokaCallout Type="MokaCalloutType.Note" Title="Where you left off">
-					@RestoreText
-					<div class="mt-welcome-restore-actions">
+				<MokaCallout Type="MokaCalloutType.Note" Icon="MokatermIcons.History" Title="Where you left off">
+					<FixAction>
 						<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="ReopenAsync">
 							Reopen
 						</MokaButton>
 						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Sm" OnClick="DismissRestore">
 							Not now
 						</MokaButton>
-					</div>
+					</FixAction>
+					<ChildContent>
+						<p class="mt-welcome-restore-text">@RestoreText</p>
+						<div class="mt-welcome-restore-logins">
+							@* No @key: two tabs of one login leave its id in the list twice. *@
+							@foreach ((HostProfile host, ConnectionProfile login) in _restore.Take(RestoreNamesShown))
+							{
+								<MokaTag Text="@login.GetTitle(host)" Icon="@Contributions.GetProtocolIcon(login.ProtocolId)" />
+							}
+							@if (_restore.Count > RestoreNamesShown)
+							{
+								<span class="mt-welcome-restore-more">@(_restore.Count - RestoreNamesShown) more</span>
+							}
+						</div>
+					</ChildContent>
 				</MokaCallout>
 			}
 
@@ -37,140 +60,201 @@
 			{
 				@if (_favorites.Count == 0 && _recent.Count == 0)
 				{
-					<MokaCallout Type="MokaCalloutType.Note" Title="Your hosts are in the connections panel">
-						A login joins Recent once you have connected to it, and a favorite stays here for good: select the
-						star beside a login.
+					<MokaEmptyState Framed
+									Icon="MokaIcons.Toggle.Star"
+									Title="Your hosts are in the connections panel"
+									Description="A login joins Recent once you have connected to it, and a favorite stays here for good: select the star beside a login.">
+						@if (Shell.ConnectionsPanelCollapsed)
+						{
+							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokatermIcons.PanelLeft" OnClick="ShowConnections">
+								Show the connections panel
+							</MokaButton>
+						}
 						@* The sentence only makes sense while the panel has a shortcut, which the user can take away. *@
 						@if (Keys(ShellCommandIds.ToggleConnections) is { } panelKeys)
 						{
-							<span>Hide that panel, or bring it back, with @panelKeys.</span>
+							<span class="mt-welcome-sentence">Hide that panel, or bring it back, with @panelKeys.</span>
 						}
-					</MokaCallout>
+					</MokaEmptyState>
+				}
+				else
+				{
+					<MokaGrid MinColumn="320px" GapValue="var(--moka-grid-gap)" AlignItems="MokaAlign.Start" Class="mt-welcome-lists">
+						@if (_favorites.Count > 0)
+						{
+							<section class="mt-welcome-section" aria-labelledby="@SectionId("favorites")">
+								@SectionHead("favorites", "Favorites", _favoritesTotal)
+								<MokaCard NoPadding Class="mt-welcome-card">
+									<MokaList Dense>
+										@foreach ((HostProfile host, ConnectionProfile login) in _favorites)
+										{
+											@LoginRow(host, login, null)
+										}
+									</MokaList>
+								</MokaCard>
+								@if (_favoritesTotal > _favorites.Count)
+								{
+									<p class="mt-welcome-more">@(_favoritesTotal - _favorites.Count) more in the connections panel.</p>
+								}
+							</section>
+						}
+
+						@if (_recent.Count > 0)
+						{
+							<section class="mt-welcome-section" aria-labelledby="@SectionId("recent")">
+								@SectionHead("recent", "Recent", null)
+								<MokaCard NoPadding Class="mt-welcome-card">
+									<MokaList Dense>
+										@foreach ((HostProfile host, ConnectionProfile login) in _recent)
+										{
+											@LoginRow(host, login, login.LastConnectedAt)
+										}
+									</MokaList>
+								</MokaCard>
+							</section>
+						}
+					</MokaGrid>
 				}
 
-				<div class="mt-welcome-lists">
-					@if (_favorites.Count > 0)
-					{
-						<section class="mt-welcome-section">
-							<h3 class="mt-welcome-label">Favorites</h3>
-						@if (_favoritesTotal > _favorites.Count)
-						{
-							<MokaText Element="p" Size="MokaSize.Xs" Style="@TextStyles.Muted" class="mt-welcome-more">
-								@(_favoritesTotal - _favorites.Count) more in the connections panel.
-							</MokaText>
-						}
-							<MokaList Dense>
-								@foreach ((HostProfile host, ConnectionProfile login) in _favorites)
-								{
-									@LoginRow(host, login, null)
-								}
-							</MokaList>
-						</section>
-					}
-
-					@if (_recent.Count > 0)
-					{
-						<section class="mt-welcome-section">
-							<h3 class="mt-welcome-label">Recent</h3>
-							<MokaList Dense>
-								@foreach ((HostProfile host, ConnectionProfile login) in _recent)
-								{
-									@LoginRow(host, login, login.LastConnectedAt)
-								}
-							</MokaList>
-						</section>
-					}
-
-					@* The same actions as the empty screen, without the explanations: this user has been here before. *@
-					<section class="mt-welcome-section">
-						<h3 class="mt-welcome-label">Actions</h3>
-						<MokaList Bordered>
-							@ActionRow(MokatermIcons.Server, "New host", null, ShellCommandIds.NewHost, () => Connections.NewHost())
-							@ActionRow(MokatermIcons.QuickConnect, "Quick connect", null, ShellCommandIds.QuickConnect, Shell.FocusQuickConnect)
-							@ActionRow(MokatermIcons.FileUpload, "Import hosts", null, ShellCommandIds.ImportConnections, () => Connections.ImportConnections())
-							@ActionRow(MokatermIcons.Keyboard, "Keyboard shortcuts", null, ShellCommandIds.Shortcuts, () => Shell.SetShortcutsOpen(true))
-						</MokaList>
-					</section>
-				</div>
+				@* The same actions as the empty screen, without the explanations: this user has been here before. *@
+				<section class="mt-welcome-section" aria-labelledby="@SectionId("start")">
+					@SectionHead("start", "Start", null)
+					<div class="mt-welcome-tiles mt-welcome-tiles--compact">
+						@ActionTile(MokatermIcons.Server, "New host", null, ShellCommandIds.NewHost, () => Connections.NewHost())
+						@ActionTile(MokatermIcons.QuickConnect, "Quick connect", null, ShellCommandIds.QuickConnect, Shell.FocusQuickConnect)
+						@ActionTile(MokatermIcons.FileUpload, "Import hosts", null, ShellCommandIds.ImportConnections, () => Connections.ImportConnections())
+						@ActionTile(MokatermIcons.Keyboard, "Keyboard shortcuts", null, ShellCommandIds.Shortcuts, () => Shell.SetShortcutsOpen(true))
+					</div>
+				</section>
 			}
 			else
 			{
-				<section class="mt-welcome-section">
-					<h3 class="mt-welcome-label">Start here</h3>
-					<MokaList Bordered>
-						@ActionRow(
+				<section class="mt-welcome-section" aria-labelledby="@SectionId("start")">
+					@SectionHead("start", "Start here", null)
+					<div class="mt-welcome-tiles">
+						@ActionTile(
 							MokatermIcons.Server,
 							"Add a host",
 							"An address, a user and a protocol, kept in the vault.",
 							ShellCommandIds.NewHost,
-							() => Connections.NewHost())
-						@ActionRow(
+							() => Connections.NewHost(),
+							lead: true)
+						@ActionTile(
 							MokatermIcons.FileUpload,
 							"Import from another client",
 							"Reads an OpenSSH config, PuTTY or WinSCP. Passwords stay where they are.",
 							ShellCommandIds.ImportConnections,
 							() => Connections.ImportConnections())
-						@ActionRow(
+						@ActionTile(
 							MokatermIcons.QuickConnect,
 							"Connect without saving",
 							"Puts the cursor in the quick connect box at the top. Type user@host; nothing is written to the vault.",
 							ShellCommandIds.QuickConnect,
 							Shell.FocusQuickConnect)
-						@ActionRow(
+						@ActionTile(
 							MokatermIcons.Keyboard,
 							"Keyboard shortcuts",
 							"Every command and the keys for it. Rebind them in Settings, Keyboard.",
 							ShellCommandIds.Shortcuts,
 							() => Shell.SetShortcutsOpen(true))
-					</MokaList>
+					</div>
 				</section>
+
+				@if (Protocols.Protocols.Count > 0)
+				{
+					<section class="mt-welcome-section" aria-labelledby="@SectionId("protocols")">
+						@SectionHead("protocols", "Connects over", null)
+						<div class="mt-welcome-protocols">
+							@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
+							{
+								<Hint @key="protocol.Id" Text="@protocol.Description">
+									<MokaTag Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" />
+								</Hint>
+							}
+						</div>
+					</section>
+				}
 			}
-		}
-	</div>
+		</div>
+	}
 </div>
 
 @code {
+	private RenderFragment Mark => @<span class="mt-welcome-mark" aria-hidden="true">&gt;_</span>;
+
+	private RenderFragment TitleLine => @<h2 class="mt-welcome-title">@(_hasHosts ? "Ready to connect" : "Nothing saved yet")</h2>;
+
+	private RenderFragment SectionHead(string id, string label, int? count) =>
+		@<div class="mt-welcome-section-head">
+			<h3 class="mt-welcome-label" id="@SectionId(id)">@label</h3>
+			@if (count is { } total)
+			{
+				<span class="mt-welcome-count">@total.ToString(CultureInfo.CurrentCulture)</span>
+			}
+		</div>;
+
 	private RenderFragment LoginRow(HostProfile host, ConnectionProfile login, DateTimeOffset? lastConnected) =>
 		@<MokaListItem @key="login.Id"
-					   Icon="@Contributions.GetProtocolIcon(login.ProtocolId)"
-					   Text="@login.GetTitle(host)"
-					   SecondaryText="@($"{Protocols.DisplayName(login.ProtocolId)} · {host.DisplayName}")"
 					   OnClick="() => Sessions.OpenAsync(login.Id, reuseExisting: true)"
 					   OnContextMenu="e => Menu.Show(e, Connections.LoginMenu(host, login))">
+			<ChildContent>
+				@* The row carries its own text rather than the list's one-line secondary text, so a long user@host wraps. *@
+				<div class="mt-welcome-login">
+					<MokaAvatar Tile Icon="@Contributions.GetProtocolIcon(login.ProtocolId)" SizeValue="2.25rem" Class="mt-welcome-login-icon" />
+					<span class="mt-welcome-login-text">
+						<span class="mt-welcome-login-title">@login.GetTitle(host)</span>
+						<span class="mt-welcome-login-meta">
+							<span class="mt-welcome-login-host" style="color:@HostAccent.For(host)">@host.DisplayName</span>
+							<span>@Protocols.DisplayName(login.ProtocolId)</span>
+							@if (PortOf(login) is { } port)
+							{
+								<span class="mt-welcome-login-port">:@port.ToString(CultureInfo.InvariantCulture)</span>
+							}
+							@if (HostEnvironmentDisplay.Tag(host.Environment) is { } environment)
+							{
+								<MokaTag Text="@environment" Size="MokaSize.Xs" Color="@HostEnvironmentDisplay.Color(host.Environment)" />
+							}
+						</span>
+					</span>
+				</div>
+			</ChildContent>
 			<EndContent>
-				@* A favorite is more than a menu item: the star is the affordance, on the row, for mouse and keyboard. *@
-				<IconButton Icon="MokaIcons.Toggle.Star"
-							Label="@(login.IsFavorite ? "Remove from favorites" : "Add to favorites")"
-							AriaLabel="@(login.IsFavorite ? $"Remove {login.GetTitle(host)} from favorites" : $"Add {login.GetTitle(host)} to favorites")"
-							Active="login.IsFavorite"
-							Pressed="login.IsFavorite"
-							Size="MokaSize.Xs"
-							OnClick="() => Connections.ToggleFavoriteAsync(login)" />
-				@if (lastConnected is { } connectedAt)
-				{
-					<Hint Text="@DisplayFormat.Timestamp(connectedAt)" Position="MokaTooltipPosition.BottomEnd">
-						<MokaText Element="span" Mono Size="MokaSize.Xs" Style="@TextStyles.Tertiary">
-							@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())
-						</MokaText>
-					</Hint>
-				}
+				@* The row opens the login on a click, and the star's click would reach it too. *@
+				<span class="mt-welcome-login-end" @onclick:stopPropagation="true">
+					@if (lastConnected is { } connectedAt)
+					{
+						<Hint Text="@DisplayFormat.Timestamp(connectedAt)" Position="MokaTooltipPosition.BottomEnd">
+							<span class="mt-welcome-when">@DisplayFormat.Relative(connectedAt, Time.GetUtcNow())</span>
+						</Hint>
+					}
+					@* A favorite is more than a menu item: the star is the affordance, on the row, for mouse and keyboard. *@
+					<IconButton Icon="MokaIcons.Toggle.Star"
+								Label="@(login.IsFavorite ? "Remove from favorites" : "Add to favorites")"
+								AriaLabel="@(login.IsFavorite ? $"Remove {login.GetTitle(host)} from favorites" : $"Add {login.GetTitle(host)} to favorites")"
+								Active="login.IsFavorite"
+								Pressed="login.IsFavorite"
+								Size="MokaSize.Xs"
+								Position="MokaTooltipPosition.BottomEnd"
+								OnClick="() => Connections.ToggleFavoriteAsync(login)" />
+				</span>
 			</EndContent>
 		</MokaListItem>;
 
-	// The detail wraps rather than being cut, so the row carries its own text instead of the list's secondary line.
-	private RenderFragment ActionRow(MokaIconDefinition icon, string title, string? detail, string commandId, Action run) =>
-		@<MokaListItem Icon="icon" OnClick="run">
-			<div class="mt-welcome-action">
-				<span class="mt-welcome-action-text">
-					<span class="mt-welcome-action-title">@title</span>
+	// The detail wraps rather than being cut: what an action does is the point of the first-run tiles.
+	private RenderFragment ActionTile(MokaIconDefinition icon, string title, string? detail, string commandId, Action run, bool lead = false) =>
+		@<MokaCard Clickable NoPadding OnClick="run" Class="@(lead ? "mt-welcome-tile mt-welcome-tile--lead" : "mt-welcome-tile")">
+			<div class="mt-welcome-tile-body">
+				<MokaAvatar Tile Icon="icon" SizeValue="@(detail is null ? "2rem" : "2.5rem")" Class="mt-welcome-tile-icon" />
+				<span class="mt-welcome-tile-text">
+					<span class="mt-welcome-tile-title">@title</span>
 					@if (detail is not null)
 					{
-						<span class="mt-welcome-action-detail">@detail</span>
+						<span class="mt-welcome-tile-detail">@detail</span>
 					}
+					@Keys(commandId)
 				</span>
-				@Keys(commandId)
 			</div>
-		</MokaListItem>;
+		</MokaCard>;
 
 	/// <summary>The keys a command answers to now, so a binding changed in settings shows here.</summary>
 	private static RenderFragment? Keys(string commandId) =>

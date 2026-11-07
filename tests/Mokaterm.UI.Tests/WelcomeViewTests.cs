@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -61,6 +62,21 @@ public sealed partial class WelcomeViewTests
 		// Nothing is saved, so there is no login to suggest and nothing to say about one.
 		Assert.DoesNotContain("Ready to connect", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Favorites", html, StringComparison.Ordinal);
+
+		// No module is loaded, so there is no protocol to name either.
+		Assert.DoesNotContain("Connects over", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_NoSavedHost_NamesTheProtocolsThisCopyConnectsOver()
+	{
+		QuickConnectProtocols protocols = new();
+
+		string html = await RenderAsync(ConnectionCatalog.Empty, new UiStateDocument(), protocols);
+
+		Assert.Contains("Connects over", html, StringComparison.Ordinal);
+		List<string> expected = [.. protocols.Protocols.Select(protocol => protocol.DisplayName)];
+		Assert.Equal(expected, ProtocolTags(html));
 	}
 
 	// A binding the user changed has to show here, so the rows are checked against the bindings in force.
@@ -99,6 +115,65 @@ public sealed partial class WelcomeViewTests
 		Assert.Contains("Quick connect", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Nothing saved yet", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Start here", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Type user@host", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_SavedLogins_SaysWhatTheVaultHolds()
+	{
+		ConnectionCatalog oneLogin = CatalogWith(Login(RecentLoginId, "deploy"));
+		ConnectionCatalog filed = new(
+			[new ConnectionFolder { Id = Guid.NewGuid(), Name = "Lab" }],
+			oneLogin.Hosts,
+			[Login(FavoriteLoginId, "root", favorite: true), Login(RecentLoginId, "deploy")]);
+
+		// The renderer writes the middle dot as an entity.
+		Assert.Contains("1 host · 1 login<", WebUtility.HtmlDecode(await RenderAsync(oneLogin)), StringComparison.Ordinal);
+		Assert.Contains("1 host · 2 logins · 1 folder<", WebUtility.HtmlDecode(await RenderAsync(filed)), StringComparison.Ordinal);
+	}
+
+	// The star sits on the row and a vault of thirty favorites would stretch the grid, so the rest are counted.
+	[Fact]
+	public async Task Render_MoreFavoritesThanTheLimit_CountsTheRest()
+	{
+		string html = await RenderAsync(
+			CatalogWith(Login(FavoriteLoginId, "root", favorite: true), Login(RecentLoginId, "deploy", favorite: true)),
+			new UiStateDocument(),
+			new NoProtocols(),
+			new GeneralSettings { RecentConnectionsLimit = 1 });
+
+		Assert.Contains("deploy@10.0.0.4", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("root@10.0.0.4", html, StringComparison.Ordinal);
+		Assert.Contains("1 more in the connections panel.", html, StringComparison.Ordinal);
+		Assert.Matches("mt-welcome-count[^>]*>2<", html);
+	}
+
+	// A port is worth showing only when it is not the one the protocol would use anyway.
+	[Fact]
+	public async Task Render_ALoginOnItsOwnPort_ShowsThePort()
+	{
+		string html = await RenderAsync(
+			CatalogWith(
+				Login(FavoriteLoginId, "root", favorite: true) with { Port = 2222 },
+				Login(RecentLoginId, "deploy", favorite: true) with { Port = 22 }),
+			new UiStateDocument(),
+			new QuickConnectProtocols());
+
+		Assert.Equal("2222", Assert.Single(LoginPort().Matches(html)).Groups[1].Value);
+	}
+
+	[Fact]
+	public async Task Render_AProductionHost_IsTaggedOnItsRows()
+	{
+		ConnectionCatalog catalog = new(
+			[],
+			[new HostProfile { Id = HostId, Name = "web-1", Address = "10.0.0.4", Environment = HostEnvironment.Production }],
+			[Login(FavoriteLoginId, "root", favorite: true)]);
+
+		string html = await RenderAsync(catalog);
+
+		Assert.Contains("Production", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Production", await RenderAsync(CatalogWith(Login(FavoriteLoginId, "root", favorite: true))), StringComparison.Ordinal);
 	}
 
 	// Hosts saved but never used: neither list has anything, so the screen says where they are instead of looking empty.
@@ -113,6 +188,20 @@ public sealed partial class WelcomeViewTests
 		IReadOnlyList<string> panelKeys = ShellShortcuts.KeysFor(ShellCommandIds.ToggleConnections);
 		Assert.NotEmpty(panelKeys);
 		Assert.Contains(KeyGroups(html), group => group.SequenceEqual(panelKeys));
+
+		// The panel is showing, so there is nothing to bring back.
+		Assert.DoesNotContain("Show the connections panel", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_SavedHostNeverConnectedTo_PanelHidden_OffersToShowIt()
+	{
+		string html = await RenderAsync(
+			CatalogWith(Login(RecentLoginId, "deploy")),
+			new UiStateDocument { ConnectionsPanelCollapsed = true },
+			new NoProtocols());
+
+		Assert.Contains("Show the connections panel", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -124,6 +213,22 @@ public sealed partial class WelcomeViewTests
 		Assert.Contains("One session was open when Mokaterm last closed.", html, StringComparison.Ordinal);
 		Assert.Contains("Reopen", html, StringComparison.Ordinal);
 		Assert.Contains("Not now", html, StringComparison.Ordinal);
+
+		// The login is in neither list, so the offer is the only place that names it.
+		Assert.Contains("deploy@10.0.0.4", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_ManySessionsWereOpenLastTime_NamesTheFirstAndCountsTheRest()
+	{
+		ConnectionProfile[] logins = [.. Enumerable.Range(1, 6).Select(n => Login(Guid.NewGuid(), $"user{n}"))];
+
+		string html = await RenderAsync(CatalogWith(logins), [.. logins.Select(login => login.Id)]);
+
+		Assert.Contains("6 sessions were open when Mokaterm last closed.", html, StringComparison.Ordinal);
+		Assert.Contains("user4@10.0.0.4", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("user5@10.0.0.4", html, StringComparison.Ordinal);
+		Assert.Contains("2 more", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -159,24 +264,35 @@ public sealed partial class WelcomeViewTests
 		return groups;
 	}
 
+	private static List<string> ProtocolTags(string html)
+	{
+		Match strip = ProtocolStrip().Match(html);
+		Assert.True(strip.Success, "The screen shows no protocol strip.");
+		return [.. TagText().Matches(strip.Groups[1].Value).Select(tag => tag.Groups[1].Value)];
+	}
+
 	/// <summary>
 	/// Renders the screen over <paramref name="catalog"/>, with <paramref name="restorePending"/> saved as the logins the
 	/// previous run had open.
 	/// </summary>
-	private static async Task<string> RenderAsync(ConnectionCatalog catalog, params Guid[] restorePending)
+	private static Task<string> RenderAsync(ConnectionCatalog catalog, params Guid[] restorePending) =>
+		RenderAsync(catalog, new UiStateDocument { RestoreConnectionIds = restorePending }, new NoProtocols());
+
+	private static async Task<string> RenderAsync(
+		ConnectionCatalog catalog,
+		UiStateDocument savedState,
+		IProtocolRegistry protocols,
+		GeneralSettings? general = null)
 	{
 		MemoryAppDataStore store = new();
-		if (restorePending.Length > 0)
-		{
-			store.Set("ui-state", new UiStateDocument { RestoreConnectionIds = restorePending });
-		}
+		store.Set("ui-state", savedState);
 
 		await using UiStateStore uiState = new(store, TimeProvider.System, NullLogger<UiStateStore>.Instance);
 		await uiState.LoadAsync(Ct).WaitAsync(Patience, Ct);
 
 		ManualSessionManager manager = new();
 		using SessionWorkspace workspace = new(manager);
-		FixedSettings settings = new();
+		FixedSettings settings = general is null ? new() : new(general);
 		using SessionRestore restore = new(
 			manager,
 			workspace,
@@ -195,7 +311,7 @@ public sealed partial class WelcomeViewTests
 				services.AddSingleton<IVault, UnlockedVault>();
 				services.AddSingleton<IConnectionRepository>(new FixedCatalog(catalog));
 				services.AddSingleton<ICredentialStore, UntouchedCredentials>();
-				services.AddSingleton<IProtocolRegistry, NoProtocols>();
+				services.AddSingleton(protocols);
 				services.AddSingleton<ISettingsService>(settings);
 				services.AddSingleton<ISessionManager>(manager);
 				services.AddSingleton(workspace);
@@ -215,6 +331,15 @@ public sealed partial class WelcomeViewTests
 
 	[GeneratedRegex("<kbd[^>]*>([^<]*)</kbd>")]
 	private static partial Regex KeyCap();
+
+	[GeneratedRegex("<div class=\"mt-welcome-protocols\"[^>]*>(.*?)</section>", RegexOptions.Singleline)]
+	private static partial Regex ProtocolStrip();
+
+	[GeneratedRegex("<span class=\"moka-tag-text\"[^>]*>([^<]*)</span>")]
+	private static partial Regex TagText();
+
+	[GeneratedRegex("<span class=\"mt-welcome-login-port\"[^>]*>:([^<]*)</span>")]
+	private static partial Regex LoginPort();
 
 	/// <summary>The catalog the screen reads, handed over as it is.</summary>
 	private sealed class FixedCatalog(ConnectionCatalog catalog) : IConnectionRepository

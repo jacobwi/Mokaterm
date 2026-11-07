@@ -17,11 +17,17 @@ namespace Mokaterm.UI.Workspace;
 /// </summary>
 public sealed partial class WelcomeView : ComponentBase, IDisposable
 {
+	private const int RestoreNamesShown = 4;
+
+	private readonly string _idPrefix = $"mt-welcome-{Guid.NewGuid():N}";
 	private List<(HostProfile Host, ConnectionProfile Login)> _favorites = [];
 	private int _favoritesTotal;
 	private List<(HostProfile Host, ConnectionProfile Login)> _recent = [];
-	private int _restoreCount;
+	private List<(HostProfile Host, ConnectionProfile Login)> _restore = [];
 	private bool _hasHosts;
+	private int _hostCount;
+	private int _loginCount;
+	private int _folderCount;
 
 	[Inject]
 	private CatalogState Catalog { get; set; } = default!;
@@ -54,19 +60,40 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 	private TimeProvider Time { get; set; } = default!;
 
 	/// <summary>The offer to reopen what was open last time, only for logins this vault still holds.</summary>
-	private string RestoreText => _restoreCount == 1
+	private string RestoreText => _restore.Count == 1
 		? "One session was open when Mokaterm last closed."
-		: string.Create(CultureInfo.CurrentCulture, $"{_restoreCount} sessions were open when Mokaterm last closed.");
+		: string.Create(CultureInfo.CurrentCulture, $"{_restore.Count} sessions were open when Mokaterm last closed.");
 
 	private string Lede => _hasHosts
 		? "Pick a login below, or start something new."
 		: "Save a host to come back to, bring your hosts over from another client, or connect once without saving anything.";
+
+	private string? Summary
+	{
+		get
+		{
+			// An empty vault says so in its title.
+			if (!_hasHosts)
+			{
+				return null;
+			}
+
+			List<string> parts = [Count(_hostCount, "host", "hosts"), Count(_loginCount, "login", "logins")];
+			if (_folderCount > 0)
+			{
+				parts.Add(Count(_folderCount, "folder", "folders"));
+			}
+
+			return string.Join(" · ", parts);
+		}
+	}
 
 	public void Dispose()
 	{
 		Catalog.Changed -= OnCatalogChanged;
 		Settings.Changed -= OnSettingsChanged;
 		Restore.Changed -= OnCatalogChanged;
+		Shell.Changed -= OnShellChanged;
 	}
 
 	protected override async Task OnInitializedAsync()
@@ -74,9 +101,28 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 		Catalog.Changed += OnCatalogChanged;
 		Settings.Changed += OnSettingsChanged;
 		Restore.Changed += OnCatalogChanged;
+		Shell.Changed += OnShellChanged;
 		Build();
 		await Catalog.EnsureLoadedAsync();
 		Build();
+	}
+
+	private static string Count(int count, string one, string many) =>
+		string.Create(CultureInfo.CurrentCulture, $"{count} {(count == 1 ? one : many)}");
+
+	private string SectionId(string section) => $"{_idPrefix}-{section}";
+
+	// A login that names its protocol's own port says nothing more than one that leaves it empty.
+	private int? PortOf(ConnectionProfile login)
+	{
+		if (login.Port is not { } port)
+		{
+			return null;
+		}
+
+		return Protocols.FindDescriptor(login.ProtocolId) is { } protocol && (!protocol.UsesPort || protocol.DefaultPort == port)
+			? null
+			: port;
 	}
 
 	private async Task ReopenAsync()
@@ -91,18 +137,26 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 		Build();
 	}
 
+	private void ShowConnections() => Shell.SetConnectionsPanelCollapsed(false);
+
 	private void Build()
 	{
 		ConnectionCatalog catalog = Catalog.Catalog;
 
 		// A host with no login cannot be connected to, but its owner is past needing the getting-started screen.
 		_hasHosts = catalog.Hosts.Count > 0;
+		_hostCount = catalog.Hosts.Count;
+		_loginCount = catalog.Connections.Count;
+		_folderCount = catalog.Folders.Count;
+
 		List<(HostProfile Host, ConnectionProfile Login)> logins = [];
+		Dictionary<Guid, (HostProfile Host, ConnectionProfile Login)> byId = new();
 		foreach (ConnectionProfile login in catalog.Connections)
 		{
 			if (catalog.FindHost(login.HostId) is { } host)
 			{
 				logins.Add((host, login));
+				byId[login.Id] = (host, login);
 			}
 		}
 
@@ -116,9 +170,8 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 		_favoritesTotal = favorites.Count();
 		_favorites = [.. favorites.Take(limit)];
 
-		// A login deleted since the last run is not worth offering, so the count only covers ones still in the vault.
-		HashSet<Guid> known = [.. catalog.Connections.Select(login => login.Id)];
-		_restoreCount = Restore.Pending.Count(known.Contains);
+		// A login deleted since the last run is not worth offering, so the offer only covers ones still in the vault.
+		_restore = [.. Restore.Pending.Where(byId.ContainsKey).Select(id => byId[id])];
 
 		_recent =
 		[
@@ -134,6 +187,9 @@ public sealed partial class WelcomeView : ComponentBase, IDisposable
 		Build();
 		StateHasChanged();
 	});
+
+	// The hint about the connections panel offers to bring it back only while it is hidden.
+	private void OnShellChanged() => _ = InvokeAsync(StateHasChanged);
 
 	/// <summary>The recent list's length is a general setting, and the keys on every row are the shortcut bindings.</summary>
 	private void OnSettingsChanged(string sectionKey)
