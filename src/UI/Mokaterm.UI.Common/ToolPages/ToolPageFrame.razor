@@ -3,50 +3,12 @@
 @using Moka.Red.Feedback.Loading
 @using Moka.Red.Feedback.Toast
 @using Moka.Red.Forms.SearchInput
-@using Moka.Red.Primitives.Typography
+@using Moka.Red.Layout.PageHeader
 
 @* Every page of a paged tool has this shape: a header (title, one-line summary, filter, one primary action, refresh),
    optional chips, then either a list with its detail panel beside it or below it, or a page that scrolls. *@
 <section class="mt-page" aria-label="@Title">
-	<header class="mt-page-head">
-		<div class="mt-page-title">
-			<MokaText Element="h3" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Truncate>@Title</MokaText>
-			@if (Summary is { Length: > 0 } summary)
-			{
-				<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mt-page-summary" title="@summary">@summary</MokaText>
-			}
-		</div>
-		<div class="mt-page-actions">
-		@if (SearchChanged.HasDelegate)
-		{
-			<div class="mt-page-search">
-				<MokaSearchInput Value="@Search" ValueChanged="SearchChanged" Placeholder="@SearchPlaceholder" Debounce="150" aria-label="@SearchPlaceholder" />
-			</div>
-		}
-		@if (PrimaryText is { Length: > 0 } primary)
-		{
-			<Hint Text="@PrimaryTitle">
-				<MokaButton Variant="MokaVariant.Outlined"
-							Size="MokaSize.Xs"
-							StartIcon="PrimaryIcon"
-							Disabled="PrimaryDisabled"
-							OnClick="OnPrimary">
-					@primary
-				</MokaButton>
-			</Hint>
-		}
-		@if (OnRefresh.HasDelegate)
-		{
-			<IconButton Size="MokaSize.Xs"
-						Icon="MokaIcons.Action.Refresh"
-						Loading="@(Loading && Loaded)"
-						Disabled="Loading"
-						OnClick="OnRefresh"
-						Label="Read again"
-						Position="MokaTooltipPosition.BottomEnd" />
-		}
-		</div>
-	</header>
+	<MokaPageHeader Class="mt-page-head" TitleContent="TitleLine" Said="@Summary" Actions="@(HasActions ? HeaderActions : null)" />
 
 	@if (Chips is not null || ChipsEnd is not null)
 	{
@@ -88,6 +50,41 @@
 </section>
 
 @code {
+	private bool HasActions => SearchChanged.HasDelegate || PrimaryText is { Length: > 0 } || OnRefresh.HasDelegate;
+
+	private RenderFragment TitleLine => @<h3 class="mt-page-title">@Title</h3>;
+
+	private RenderFragment HeaderActions => @<text>
+		@if (SearchChanged.HasDelegate)
+		{
+			<div class="mt-page-search">
+				<MokaSearchInput Value="@Search" ValueChanged="SearchChanged" Placeholder="@SearchPlaceholder" Debounce="150" Size="MokaSize.Sm" aria-label="@SearchPlaceholder" />
+			</div>
+		}
+		@if (PrimaryText is { Length: > 0 } primary)
+		{
+			<Hint Text="@PrimaryTitle">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Xs"
+							StartIcon="PrimaryIcon"
+							Disabled="PrimaryDisabled"
+							OnClick="OnPrimary">
+					@primary
+				</MokaButton>
+			</Hint>
+		}
+		@if (OnRefresh.HasDelegate)
+		{
+			<IconButton Size="MokaSize.Xs"
+						Icon="MokaIcons.Action.Refresh"
+						Loading="@(Loading && Loaded)"
+						Disabled="Loading"
+						OnClick="OnRefresh"
+						Label="Read again"
+						Position="MokaTooltipPosition.BottomEnd" />
+		}
+	</text>;
+
 	[Parameter, EditorRequired]
 	public string Title { get; set; } = "";
 

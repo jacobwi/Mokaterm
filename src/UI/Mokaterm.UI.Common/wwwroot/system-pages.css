@@ -111,14 +111,15 @@
 	border-radius: var(--moka-radius-md);
 }
 
+/* A row is as tall as the small icon button its menu holds, which follows the density. */
 .mta-row {
 	display: grid;
 	grid-template-columns: var(--mta-cols);
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 	min-width: 0;
-	min-height: 30px;
-	padding: 3px var(--moka-spacing-sm);
+	min-height: var(--moka-button-height-sm);
+	padding: 2px var(--moka-spacing-sm);
 	border-top: 1px solid var(--moka-color-outline-variant);
 	font-size: var(--moka-font-size-sm);
 }
@@ -135,7 +136,6 @@
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	min-height: 26px;
 	background: var(--moka-color-surface);
 	color: var(--moka-color-on-surface-tertiary);
 	font-size: 10px;

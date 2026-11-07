@@ -110,7 +110,8 @@
 
 .mta-run-button,
 .mta-plain-button {
-	padding: 6px var(--moka-spacing-md);
+	min-height: var(--moka-button-height-sm);
+	padding: var(--moka-spacing-xs) var(--moka-button-padding-sm);
 	border: 1px solid var(--moka-color-primary-border);
 	border-radius: var(--moka-radius-md);
 	background: transparent;
@@ -118,8 +119,8 @@
 	font: inherit;
 	font-size: var(--moka-font-size-xs);
 	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	letter-spacing: var(--moka-control-tracking);
+	text-transform: var(--moka-control-case);
 	cursor: pointer;
 	transition: background var(--moka-transition-fast), box-shadow var(--moka-transition-fast);
 }

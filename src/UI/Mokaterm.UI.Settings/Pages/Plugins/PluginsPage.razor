@@ -37,12 +37,20 @@
 		</MokaCallout>
 	}
 
-	<div class="plugins-views">
-		@if (ShowsBrowse)
-		{
-			<ViewTabs Tabs="Tabs" Active="@_tab" ActiveChanged="ShowTab" Label="Plugin views" IdPrefix="plugins-tab" />
-		}
+	@if (ShowsBrowse)
+	{
+		<ViewTabs Tabs="Tabs" Active="@_tab" ActiveChanged="ShowTab" Label="Plugin views" Panel="Views(plugins)" />
+	}
+	else
+	{
+		@Views(plugins)
+	}
+</SettingsPage>
 
+<PluginInstallDialog Open="_installOpen" OpenChanged="OnInstallOpenChanged" Package="_package" />
+
+@code {
+	private RenderFragment Views(IReadOnlyList<PluginRecord> plugins) => @<div class="plugins-views">
 		@if (UpdateCount is { } updates)
 		{
 			@* What the startup check or a Browse read already knows, said once above the rows: the cards install it. *@
@@ -64,7 +72,7 @@
 
 		@if (_tab == InstalledTab)
 		{
-			<div class="plugins-views__panel" role="@(ShowsBrowse ? "tabpanel" : null)" aria-labelledby="@(ShowsBrowse ? "plugins-tab-" + InstalledTab : null)">
+			<div class="plugins-views__panel">
 				<SettingsSection Title="Installed" Description="@InstalledDescription">
 					<Actions>
 						@if (_gallery is not null)
@@ -132,11 +140,9 @@
 		@* Kept once opened, hidden behind the other tab, so the search and the category survive a look at the list. *@
 		@if (_browseOpened && ShowsBrowse)
 		{
-			<div role="tabpanel" aria-labelledby="@("plugins-tab-" + BrowseTab)" hidden="@(_tab != BrowseTab)">
+			<div hidden="@(_tab != BrowseTab)">
 				<PluginGalleryView Installed="plugins" Busy="Busy" Downloading="@_downloading" OnInstall="InstallFromGalleryAsync" />
 			</div>
 		}
-	</div>
-</SettingsPage>
-
-<PluginInstallDialog Open="_installOpen" OpenChanged="OnInstallOpenChanged" Package="_package" />
+	</div>;
+}

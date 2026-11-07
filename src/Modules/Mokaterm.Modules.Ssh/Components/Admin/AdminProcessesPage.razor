@@ -39,7 +39,7 @@
 		else
 		{
 			IReadOnlyList<(ProcessInfo Process, int Depth)> shown = Shown();
-			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 54px 50px 40px 70px minmax(0, 2fr) 28px; --mta-cols-narrow: 54px 50px 46px minmax(0, 1fr) 28px">
+			<div class="mta-table" style="--mta-cols: 60px minmax(0, 0.7fr) 54px 50px 40px 70px minmax(0, 2fr) var(--moka-button-height-sm); --mta-cols-narrow: 54px 50px 46px minmax(0, 1fr) var(--moka-button-height-sm)">
 				<div class="mta-row mta-row--head">
 					<SortHeader Label="PID" Direction="@(_sort.DirectionOf("pid"))" OnSort="@(() => _sort.Toggle("pid", startDescending: false))" />
 					<SortHeader Label="User" Direction="@(_sort.DirectionOf("user"))" OnSort="@(() => _sort.Toggle("user", startDescending: false))" Class="mta-wide" />

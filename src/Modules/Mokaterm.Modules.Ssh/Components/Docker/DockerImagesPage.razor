@@ -5,7 +5,7 @@
 
 <div class="mt-dk-toolbar">
 	<div class="mt-dk-toolbar-search">
-		<MokaSearchInput Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, tag or id" Debounce="100" aria-label="Filter images" />
+		<MokaSearchInput Size="MokaSize.Sm" Value="@_query" ValueChanged="OnQueryChanged" Placeholder="Filter by name, tag or id" Debounce="100" aria-label="Filter images" />
 	</div>
 	<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download"
 				OnClick="TogglePull" aria-expanded="@(_pulling ? "true" : "false")">

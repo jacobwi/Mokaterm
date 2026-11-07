@@ -139,7 +139,7 @@
 			}
 			else
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) minmax(0, 1fr) 64px 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) 28px">
+				<div class="mta-table" style="--mta-cols: minmax(0, 1.3fr) minmax(0, 1fr) 64px var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1fr) var(--moka-button-height-sm)">
 					<div class="mta-row mta-row--head">
 						<SortHeader Label="Package" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
 						<SortHeader Label="Version" Direction="@(_sort.DirectionOf("version"))" OnSort="@(() => _sort.Toggle("version", startDescending: false))" />

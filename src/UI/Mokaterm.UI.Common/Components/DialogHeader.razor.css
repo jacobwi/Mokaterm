@@ -15,14 +15,16 @@
 	color: var(--moka-color-on-surface);
 }
 
+/* Moka's dialog title as the theme draws it, so a tool reads the same in its window and in its dialog. */
 .mt-dialog-head-title {
 	flex: 1;
 	min-width: 0;
 	margin: 0;
-	font-size: var(--moka-font-size-base);
+	font-family: var(--moka-font-family-display);
+	font-size: var(--moka-font-size-dialog);
 	font-weight: var(--moka-font-weight-semibold);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+	letter-spacing: var(--moka-title-tracking);
+	text-transform: var(--moka-title-case);
 }
 
 /* Moka's header actions: never shrinking, after the title. */

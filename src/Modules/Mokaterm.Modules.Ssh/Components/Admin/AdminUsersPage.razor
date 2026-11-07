@@ -34,7 +34,7 @@
 		{
 			@if (_view == "groups")
 			{
-				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr) 28px; --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr) 28px">
+				<div class="mta-table" style="--mta-cols: minmax(0, 1fr) 72px minmax(0, 2fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) minmax(0, 1.4fr) var(--moka-button-height-sm)">
 					<div class="mta-row mta-row--head">
 						<SortHeader Label="Group" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => _sort.Toggle("name", startDescending: false))" />
 						<SortHeader Label="GID" Direction="@(_sort.DirectionOf("id"))" OnSort="@(() => _sort.Toggle("id", startDescending: false))" Class="mta-wide" />
@@ -400,8 +400,8 @@
 
 	// Without root every password reads as unknown, so the column would be a row of blanks.
 	private string UserColumns => KnowsPasswords
-		? "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 88px 28px; --mta-cols-narrow: minmax(0, 1fr) 88px 28px"
-		: "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 28px; --mta-cols-narrow: minmax(0, 1fr) 28px";
+		? "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) 88px var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) 88px var(--moka-button-height-sm)"
+		: "--mta-cols: minmax(0, 1.4fr) 64px minmax(0, 1fr) var(--moka-button-height-sm); --mta-cols-narrow: minmax(0, 1fr) var(--moka-button-height-sm)";
 
 	private static string PasswordLabel(PasswordState state) => state switch
 	{

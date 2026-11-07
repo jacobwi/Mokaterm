@@ -19,6 +19,7 @@ internal static class StaticRender
 		ServiceCollection services = new();
 		services.AddLogging();
 		services.AddScoped<IJSRuntime, IdleJsRuntime>();
+		services.AddScoped<NavigationManager, StaticNavigation>();
 		configure(services);
 		await using ServiceProvider provider = services.BuildServiceProvider();
 		await using AsyncServiceScope scope = provider.CreateAsyncScope();
@@ -41,6 +42,7 @@ internal static class StaticRender
 		ServiceCollection services = new();
 		services.AddLogging();
 		services.AddScoped<IJSRuntime, IdleJsRuntime>();
+		services.AddScoped<NavigationManager, StaticNavigation>();
 		configure(services);
 		await using ServiceProvider provider = services.BuildServiceProvider();
 		await using AsyncServiceScope scope = provider.CreateAsyncScope();
@@ -64,5 +66,11 @@ internal static class StaticRender
 
 		private static InvalidOperationException NoJavaScript(string identifier) =>
 			new($"JavaScript interop calls cannot be issued during static rendering ({identifier}).");
+	}
+
+	/// <summary>Where a static render stands. Moka's tabs take navigation, which only a tab with an address uses.</summary>
+	private sealed class StaticNavigation : NavigationManager
+	{
+		public StaticNavigation() => Initialize("http://localhost/", "http://localhost/");
 	}
 }

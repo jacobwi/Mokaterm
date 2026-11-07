@@ -34,7 +34,7 @@
 		}
 		else
 		{
-			<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) 128px 84px 28px; --mta-cols-narrow: 14px minmax(0, 1fr) 84px 28px">
+			<div class="mta-table" style="--mta-cols: 14px minmax(0, 1fr) 128px 84px var(--moka-button-height-sm); --mta-cols-narrow: 14px minmax(0, 1fr) 84px var(--moka-button-height-sm)">
 				<div class="mta-row mta-row--head">
 					<span></span>
 					<SortHeader Label="Service" Direction="@(_sort.DirectionOf("name"))" OnSort="@(() => SortBy("name"))" />

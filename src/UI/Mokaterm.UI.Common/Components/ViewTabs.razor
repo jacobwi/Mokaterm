@@ -1,18 +1,6 @@
-@* Micro-label tabs: text and a glowing underline for the open one, no boxes. Arrow keys move between them. *@
-<div class="mt-view-tabs" role="tablist" aria-label="@Label">
-	@foreach ((string id, string text) in Tabs)
-	{
-		<button type="button"
-				@key="id"
-				@ref="_buttons[id]"
-				role="tab"
-				id="@TabId(id)"
-				class="@(id == Active ? "mt-view-tab mt-view-tab--active" : "mt-view-tab")"
-				aria-selected="@(id == Active ? "true" : "false")"
-				tabindex="@(id == Active ? 0 : -1)"
-				@onclick="@(() => SelectAsync(id))"
-				@onkeydown="@(args => OnKeyDownAsync(args, id))">
-			@text
-		</button>
-	}
+@using Moka.Red.Navigation.Tabs
+
+@* Moka's tabs, kept as small as a tool's other controls. The wrapper is what the scoped rules reach Moka's parts from. *@
+<div class="mt-view-tabs">
+	<MokaTabs Items="_items" Active="@Active" ActiveChanged="ActiveChanged" Label="@Label" Panel="Panel" />
 </div>

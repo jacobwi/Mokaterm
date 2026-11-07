@@ -122,89 +122,95 @@
 		{
 			<span class="mt-dk-note">No service is known: the project has no container, and its files could not be read.</span>
 		}
-		<div class="mt-dk-list" role="list" aria-label="Services">
-			@foreach (ComposeService service in _services)
-			{
-				bool open = _expanded.Contains(service.Name);
-				<div class="mt-dk-row" role="listitem" @key="service.Name">
-					<button type="button" class="mt-dk-row-main" @onclick="@(() => ToggleService(service))"
-							aria-expanded="@(service.IsScaled ? (open ? "true" : "false") : null)" aria-description="@ServiceTitle(service)">
-						<Hint Text="@ServiceTitle(service)" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
-							<MokaStatusDot Size="MokaSize.Xs" Color="@ServiceColor(service)" Pulse="@(service.Health == DockerHealth.Starting)" />
-						</Hint>
-						<span class="mt-dk-cell-name mt-dk-cell--w20">@service.Name</span>
-						@if (service.Problem.Length > 0)
-						{
-							<span class="mt-dk-cell mt-dk-cell--w12 mt-dk-cell--error">@service.Problem</span>
-						}
-						else
-						{
-							<span class="mt-dk-label mt-dk-cell--w12">@(service.Health == DockerHealth.None ? "" : DockerStateDisplay.HealthLabel(service.Health))</span>
-						}
-						<span class="mt-dk-cell mt-dk-cell--grow" title="@service.Image">@service.Image</span>
-						@LoopChip(ServiceLoop(service))
-						@UpdateChip(service.Image)
-						<span class="mt-dk-cell mt-dk-cell--optional">@string.Join(", ", service.Ports)</span>
-						<Hint Text="Containers running, of all of them" Class="mt-dk-cell mt-dk-cell--count">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</Hint>
-						<span class="mt-dk-cell mt-dk-cell--time mt-dk-cell--optional">@service.Uptime</span>
-					</button>
-					@if (_target is not null)
-					{
-						<span class="mt-dk-hover">
-							<IconButton Size="MokaSize.Xs" Icon="MokaIcons.File.FileText"
-										OnClick="@(() => ShowLogs(service.Name))" Label="Logs" AriaLabel="@($"Logs of {service.Name}")" />
-							@if (RunningContainer(service) is { } running)
-							{
-								<DockerPortLinks Session="Session" Ports="RunningPorts(service)" Name="@($"{ProjectName} {service.Name}")" />
-								<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Terminal"
-											Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="@(() => ShellAsync(running.Name))"
-											Label="Open a shell in a new tab" AriaLabel="@($"Open a shell in {service.Name}")" />
-							}
-							<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Reconnect"
-										Disabled="IsBusy" OnClick="@(() => RunAsync("restart", service.Name))" Label="Restart" AriaLabel="@($"Restart {service.Name}")" />
-							<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
-								<ChildContent>
-									<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
-												Disabled="IsBusy" Label="More actions" AriaLabel="@($"Actions for {service.Name}")" Position="MokaTooltipPosition.BottomEnd" />
-								</ChildContent>
-								<Items>
-									<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" OnClick="@(() => RunAsync("restart", service.Name))" />
-									<MokaDropdownItem Text="Stop" Icon="DockerIcons.Stop" OnClick="@(() => RunAsync("stop", service.Name))" />
-									<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => RunAsync("start", service.Name))" />
-									<MokaDropdownItem Text="Recreate this service" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate", service.Name))" />
-									<MokaDropdownItem Text="Pull its image" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull", service.Name))" />
-									<MokaDropdownItem Text="Build its image" Icon="DockerIcons.Build" Disabled="@(!_target.HasFiles || IsWorking)" OnClick="@(() => RunAsync("build", service.Name))" />
-									<MokaDropdownItem Text="Update this service (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update", service.Name))" />
-									<MokaDropdownItem Divider />
-									@if (ServiceLoop(service) is { } loop && Navigation is { } navigation)
-									{
-										<MokaDropdownItem Text="Why it keeps restarting" Icon="DockerIcons.Container"
-														  OnClick="@(() => navigation.ShowContainer(loop.Id, DockerContainerPanel.RestartsTab))" />
-									}
-									<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => ShowLogs(service.Name))" />
-									<MokaDropdownItem Text="Browse files"
-													  Icon="MokatermIcons.FolderOpen"
-													  Disabled="@(RunningContainer(service) is null)"
-													  OnClick="@(() => RunningContainer(service) is { } browsed ? BrowseFilesAsync(browsed.Name) : Task.CompletedTask)" />
-								</Items>
-							</MokaDropdown>
-						</span>
-					}
-				</div>
-				@if (open && service.IsScaled)
+		<div class="mt-dk-grid-box">
+			<div class="mt-dk-grid mt-dk-grid--services" role="list" aria-label="Services">
+				@foreach (ComposeService service in _services)
 				{
-					@foreach (ComposeContainer container in service.Containers)
+					bool open = _expanded.Contains(service.Name);
+					<div class="mt-dk-row" role="listitem" @key="service.Name">
+						<button type="button" class="mt-dk-row-main" @onclick="@(() => ToggleService(service))"
+								aria-expanded="@(service.IsScaled ? (open ? "true" : "false") : null)" aria-description="@ServiceTitle(service)">
+							<Hint Text="@ServiceTitle(service)" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
+								<MokaStatusDot Size="MokaSize.Xs" Color="@ServiceColor(service)" Pulse="@(service.Health == DockerHealth.Starting)" />
+							</Hint>
+							<span class="mt-dk-cell-name">@service.Name</span>
+							@if (service.Problem.Length > 0)
+							{
+								<span class="mt-dk-cell mt-dk-cell--error" title="@service.Problem">@service.Problem</span>
+							}
+							else
+							{
+								<span class="mt-dk-label">@(service.Health == DockerHealth.None ? "" : DockerStateDisplay.HealthLabel(service.Health))</span>
+							}
+							<span class="mt-dk-cell" title="@service.Image">@service.Image</span>
+							<span class="mt-dk-chips">
+								@LoopChip(ServiceLoop(service))
+								@UpdateChip(service.Image)
+							</span>
+							<span class="mt-dk-cell mt-dk-cell--optional" title="@string.Join(", ", service.Ports)">@string.Join(", ", service.Ports)</span>
+							<Hint Text="Containers running, of all of them" Class="mt-dk-cell mt-dk-cell--count">@service.Running.ToString(CultureInfo.InvariantCulture)/@service.Total.ToString(CultureInfo.InvariantCulture)</Hint>
+							<span class="mt-dk-cell mt-dk-cell--optional">@service.Uptime</span>
+						</button>
+						@if (_target is not null)
+						{
+							<span class="mt-dk-hover">
+								<IconButton Size="MokaSize.Xs" Icon="MokaIcons.File.FileText"
+											OnClick="@(() => ShowLogs(service.Name))" Label="Logs" AriaLabel="@($"Logs of {service.Name}")" />
+								@if (RunningContainer(service) is { } running)
+								{
+									<DockerPortLinks Session="Session" Ports="RunningPorts(service)" Name="@($"{ProjectName} {service.Name}")" />
+									<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Terminal"
+												Disabled="@(IsBusy || !CanOpenShellTab)" OnClick="@(() => ShellAsync(running.Name))"
+												Label="Open a shell in a new tab" AriaLabel="@($"Open a shell in {service.Name}")" />
+								}
+								<IconButton Size="MokaSize.Xs" Icon="MokatermIcons.Reconnect"
+											Disabled="IsBusy" OnClick="@(() => RunAsync("restart", service.Name))" Label="Restart" AriaLabel="@($"Restart {service.Name}")" />
+								<MokaDropdown Position="MokaPopoverPosition.BottomEnd">
+									<ChildContent>
+										<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.MoreHorizontal"
+													Disabled="IsBusy" Label="More actions" AriaLabel="@($"Actions for {service.Name}")" Position="MokaTooltipPosition.BottomEnd" />
+									</ChildContent>
+									<Items>
+										<MokaDropdownItem Text="Restart" Icon="MokatermIcons.Reconnect" OnClick="@(() => RunAsync("restart", service.Name))" />
+										<MokaDropdownItem Text="Stop" Icon="DockerIcons.Stop" OnClick="@(() => RunAsync("stop", service.Name))" />
+										<MokaDropdownItem Text="Start" Icon="MokatermIcons.Play" OnClick="@(() => RunAsync("start", service.Name))" />
+										<MokaDropdownItem Text="Recreate this service" Icon="MokatermIcons.Reconnect" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("recreate", service.Name))" />
+										<MokaDropdownItem Text="Pull its image" Icon="MokaIcons.Action.Download" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("pull", service.Name))" />
+										<MokaDropdownItem Text="Build its image" Icon="DockerIcons.Build" Disabled="@(!_target.HasFiles || IsWorking)" OnClick="@(() => RunAsync("build", service.Name))" />
+										<MokaDropdownItem Text="Update this service (pull, then up)" Icon="DockerIcons.Update" Disabled="@(!_target.HasFiles)" OnClick="@(() => RunAsync("update", service.Name))" />
+										<MokaDropdownItem Divider />
+										@if (ServiceLoop(service) is { } loop && Navigation is { } navigation)
+										{
+											<MokaDropdownItem Text="Why it keeps restarting" Icon="DockerIcons.Container"
+															  OnClick="@(() => navigation.ShowContainer(loop.Id, DockerContainerPanel.RestartsTab))" />
+										}
+										<MokaDropdownItem Text="Logs" Icon="MokaIcons.File.FileText" OnClick="@(() => ShowLogs(service.Name))" />
+										<MokaDropdownItem Text="Browse files"
+														  Icon="MokatermIcons.FolderOpen"
+														  Disabled="@(RunningContainer(service) is null)"
+														  OnClick="@(() => RunningContainer(service) is { } browsed ? BrowseFilesAsync(browsed.Name) : Task.CompletedTask)" />
+									</Items>
+								</MokaDropdown>
+							</span>
+						}
+					</div>
+					@if (open && service.IsScaled)
 					{
-						<div class="mt-dk-row mt-dk-row--nested" @key="container.Name">
-							<div class="mt-dk-row-main mt-dk-row-static">
-								<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(container.State, container.Health)" />
-								<span class="mt-dk-cell-name">@container.Name</span>
-								<span class="mt-dk-cell mt-dk-cell--grow">@container.Status</span>
+						@foreach (ComposeContainer container in service.Containers)
+						{
+							<div class="mt-dk-row mt-dk-row--nested" @key="container.Name">
+								<div class="mt-dk-row-main mt-dk-row-static">
+									<span class="mt-dk-nested">
+										<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(container.State, container.Health)" />
+										<span class="mt-dk-cell-name">@container.Name</span>
+									</span>
+									<span class="mt-dk-cell mt-dk-cell--rest">@container.Status</span>
+								</div>
 							</div>
-						</div>
+						}
 					}
 				}
-			}
+			</div>
 		</div>
 	</text>;
 }

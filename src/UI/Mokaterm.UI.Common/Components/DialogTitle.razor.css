@@ -19,8 +19,8 @@
 	white-space: nowrap;
 }
 
-/* The detail gives way first when the dialog is narrow. The heading is uppercase and spaced out, and a session's label
-   has to read as it was typed. */
+/* The detail gives way first when the dialog is narrow. The theme may set the heading in capitals, spaced out and in its
+   display font, and a session's label has to read as it was typed. */
 .mt-dialog-detail {
 	display: inline-flex;
 	align-items: center;
@@ -28,6 +28,7 @@
 	padding-inline-start: var(--moka-spacing-sm);
 	border-inline-start: 1px solid var(--moka-color-outline-variant);
 	overflow: hidden;
+	font-family: var(--moka-font-family);
 	font-size: var(--moka-font-size-sm);
 	font-weight: var(--moka-font-weight-normal);
 	letter-spacing: normal;

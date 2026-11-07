@@ -21,8 +21,8 @@
 }
 
 .mt-port-scheme {
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
+	text-transform: var(--moka-control-case);
+	letter-spacing: var(--moka-control-tracking);
 	font-size: 10px;
 	font-weight: var(--moka-font-weight-semibold);
 	color: var(--moka-color-on-surface-variant);

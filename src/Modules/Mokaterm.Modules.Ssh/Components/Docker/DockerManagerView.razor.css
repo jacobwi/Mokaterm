@@ -185,13 +185,14 @@
 	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
 }
 
-/* A row: no border, a raise on hover and a glow when selected. The main part is a button; actions sit beside it. */
+/* A row: no border, a raise on hover and a glow when selected. The main part is a button; actions sit beside it. A row
+   is as tall as the small icon buttons it holds, so a row without them lines up with the rest at every density. */
 .mt-dk ::deep .mt-dk-row {
 	display: flex;
 	align-items: center;
 	gap: var(--moka-spacing-xxs);
 	min-width: 0;
-	min-height: 26px;
+	min-height: var(--moka-button-height-sm);
 	padding: 0 var(--moka-spacing-xxs);
 	border-radius: var(--moka-radius-sm);
 	transition: background var(--moka-transition-fast);
@@ -203,10 +204,6 @@
 
 .mt-dk ::deep .mt-dk-row--selected {
 	box-shadow: inset 0 0 20px var(--moka-color-primary-glow), inset 2px 0 0 var(--moka-color-primary);
-}
-
-.mt-dk ::deep .mt-dk-row--nested {
-	padding-left: 22px;
 }
 
 .mt-dk ::deep .mt-dk-row-main {
@@ -553,7 +550,7 @@
 	align-items: center;
 	gap: var(--moka-spacing-xs);
 	min-width: 0;
-	min-height: 22px;
+	min-height: var(--moka-button-height-sm);
 }
 
 .mt-dk ::deep .mt-dk-variable-name {
@@ -612,10 +609,6 @@
 	flex: 0 0 30%;
 }
 
-.mt-dk ::deep .mt-dk-cell--w20 {
-	flex: 0 0 20%;
-}
-
 .mt-dk ::deep .mt-dk-cell--w12 {
 	flex: 0 0 12%;
 }
@@ -644,4 +637,92 @@
 .mt-dk ::deep .mt-dk-code textarea {
 	font-family: var(--moka-font-family-mono);
 	font-size: 12px;
+}
+
+/*
+	A list whose rows share one set of columns, so a name, an image or a port list starts at the same place on every row
+	whatever the other rows hold. Each row, and the button inside it, takes the list's columns as a subgrid, and the row's
+	actions sit in the last column against its end. The box around the list is a container, so the columns follow the
+	list's own width: beside an open panel the list is narrow even when the page is wide.
+*/
+.mt-dk ::deep .mt-dk-grid-box {
+	container-type: inline-size;
+	container-name: mt-dk-list;
+}
+
+.mt-dk ::deep .mt-dk-grid {
+	display: grid;
+	align-content: start;
+	gap: 1px var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-grid > * {
+	grid-column: 1 / -1;
+}
+
+.mt-dk ::deep .mt-dk-grid > .mt-dk-row {
+	display: grid;
+	grid-template-columns: subgrid;
+	gap: normal;
+}
+
+.mt-dk ::deep .mt-dk-grid > .mt-dk-row > .mt-dk-row-main {
+	display: grid;
+	grid-column: 1 / -2;
+	grid-template-columns: subgrid;
+	gap: normal;
+}
+
+.mt-dk ::deep .mt-dk-grid > .mt-dk-row > .mt-dk-hover {
+	grid-column: -2 / -1;
+	justify-self: end;
+}
+
+/* The update and restart loop chips share one column, which gives way before the image does. */
+.mt-dk ::deep .mt-dk-chips {
+	display: flex;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* A scaled service's containers sit under its name: the dot where the name starts, the status across the rest. */
+.mt-dk ::deep .mt-dk-nested {
+	display: flex;
+	grid-column: 2;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-cell--rest {
+	grid-column: 3 / -1;
+}
+
+/* State, name, health, image, chips, ports, actions. The image keeps a share of its own, so the ports give way first. */
+.mt-dk ::deep .mt-dk-grid--containers {
+	grid-template-columns: auto fit-content(30%) auto minmax(25%, 1fr) minmax(0, max-content) fit-content(26%) auto;
+}
+
+/* State, name, health or problem, image, chips, ports, running count, uptime, actions. */
+.mt-dk ::deep .mt-dk-grid--services {
+	grid-template-columns:
+		auto fit-content(26%) fit-content(20%) minmax(25%, 1fr) minmax(0, max-content) fit-content(22%) auto fit-content(14%)
+		auto;
+}
+
+/* Wider than the page's own fold at 520px, so whenever the page hides the optional cells their columns are gone too. */
+@container mt-dk-list (max-width: 560px) {
+	.mt-dk ::deep .mt-dk-grid .mt-dk-cell--optional {
+		display: none;
+	}
+
+	.mt-dk ::deep .mt-dk-grid--containers {
+		grid-template-columns: auto fit-content(36%) auto minmax(20%, 1fr) minmax(0, max-content) auto;
+	}
+
+	.mt-dk ::deep .mt-dk-grid--services {
+		grid-template-columns: auto fit-content(32%) fit-content(24%) minmax(20%, 1fr) minmax(0, max-content) auto auto;
+	}
 }

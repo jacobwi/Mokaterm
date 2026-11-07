@@ -168,8 +168,10 @@ public sealed partial class PluginGalleryViewTests
 		string html = await RenderPageAsync(new FakePluginManager { Plugins = [Installed("acme.proxmox", "2.0.0")] }, gallery);
 
 		Assert.Contains("role=\"tablist\"", html, StringComparison.Ordinal);
-		Assert.Matches("role=\"tab\"[^>]*aria-selected=\"true\"[^>]*>\\s*Installed\\s*<", html);
-		Assert.Matches("role=\"tab\"[^>]*aria-selected=\"false\"[^>]*>\\s*Browse\\s*<", html);
+		Match installed = Regex.Match(html, "role=\"tab\" id=\"(?<id>[^\"]+)\"[^>]*aria-selected=\"true\"[^>]*>\\s*<span[^>]*>Installed</span>");
+		Assert.True(installed.Success, "The Installed tab is not the selected one.");
+		Assert.Matches("role=\"tab\"[^>]*aria-selected=\"false\"[^>]*>\\s*<span[^>]*>Browse</span>", html);
+		Assert.Matches($"role=\"tabpanel\"[^>]*aria-labelledby=\"{installed.Groups["id"].Value}\"", html);
 		Assert.Contains(">acme.proxmox<", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("plugin-gallery", html, StringComparison.Ordinal);
 		Assert.Equal(0, gallery.Reads);

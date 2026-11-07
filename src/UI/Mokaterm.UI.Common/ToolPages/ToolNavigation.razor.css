@@ -25,13 +25,15 @@
 	flex-shrink: 0;
 }
 
+/* A menu row's height, which follows the density. */
 .mt-toolnav-item {
 	display: flex;
 	flex: 1 1 auto;
 	min-width: 0;
+	min-height: var(--moka-menu-row);
 	align-items: center;
 	gap: var(--moka-spacing-sm);
-	padding: 6px var(--moka-spacing-sm);
+	padding: var(--moka-spacing-xxs) var(--moka-spacing-sm);
 	border: 0;
 	border-radius: var(--moka-radius-sm);
 	background: transparent;
@@ -82,7 +84,8 @@
 
 	.mt-toolnav-item {
 		justify-content: center;
-		padding: 8px 0;
+		min-height: var(--moka-button-height-sm);
+		padding: var(--moka-spacing-xxs) 0;
 	}
 
 	.mt-toolnav-label {
