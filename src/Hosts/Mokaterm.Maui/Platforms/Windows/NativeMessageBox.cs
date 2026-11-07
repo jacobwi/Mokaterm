@@ -5,10 +5,14 @@ namespace Mokaterm.Maui.Platforms.Windows;
 /// <summary>A plain Win32 message box, for the few reasons not to start that turn up before WinUI has a window.</summary>
 internal static class NativeMessageBox
 {
+	private const uint YesNo = 0x4;
 	private const uint IconError = 0x10;
 	private const uint SetForeground = 0x10000;
+	private const int Yes = 6;
 
 	public static void ShowError(string message) => _ = MessageBoxW(0, message, "Mokaterm", IconError | SetForeground);
+
+	public static bool AskError(string question) => MessageBoxW(0, question, "Mokaterm", YesNo | IconError | SetForeground) == Yes;
 
 	[DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
 	[DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

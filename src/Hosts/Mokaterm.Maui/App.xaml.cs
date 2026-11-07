@@ -30,6 +30,7 @@ public partial class App : Application
 		};
 
 		window.Destroying += OnWindowDestroying;
+		StartupTrace.Mark("Window created");
 		return window;
 	}
 

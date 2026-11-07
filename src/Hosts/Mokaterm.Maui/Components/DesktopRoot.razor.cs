@@ -58,6 +58,7 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 	// a secret copied just before is cleared rather than left on the clipboard when the process ends.
 	protected override void OnInitialized()
 	{
+		StartupTrace.Mark("Blazor started");
 		_registration = Registry.Track(Sessions, Transfers, () => UI.Shell.ShellPersistence.FlushAsync(Services), PendingClipboardClear);
 		_notificationClicks = NotificationClicks.Attach(click => InvokeAsync(() => ShowSession(click)));
 	}
@@ -66,6 +67,9 @@ public sealed partial class DesktopRoot : ComponentBase, IDisposable
 	{
 		if (firstRender)
 		{
+			StartupTrace.Mark("First render");
+			StartupTrace.Write();
+
 			// The window is up with its plugins loaded, so the next start may load them again (see PluginCatalog).
 			Services.GetService<PluginCatalog>()?.ConfirmStarted();
 			Services.StartSessionLogCleanup();

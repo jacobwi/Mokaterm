@@ -1,10 +1,15 @@
 using Microsoft.AspNetCore.Components.WebView;
+using Mokaterm.Maui.Services;
 
 namespace Mokaterm.Maui;
 
 public partial class MainPage : ContentPage
 {
-	public MainPage() => InitializeComponent();
+	public MainPage()
+	{
+		InitializeComponent();
+		StartupTrace.Mark("Main page created");
+	}
 
 	private void OnBlazorWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
 	{

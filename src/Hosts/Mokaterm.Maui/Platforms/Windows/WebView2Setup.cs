@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Web.WebView2.Core;
 using Mokaterm.Maui.Services;
 
@@ -6,6 +7,8 @@ namespace Mokaterm.Maui.Platforms.Windows;
 internal static class WebView2Setup
 {
 	private const string VariablePrefix = "WEBVIEW2_";
+	private const string RuntimeDownload = "https://developer.microsoft.com/microsoft-edge/webview2/";
+	private const int FileNotFound = unchecked((int)0x80070002);
 
 	/// <summary>Runs before the first WebView2 is created, because the loader reads these variables at that point.</summary>
 	public static void PrepareEnvironment()
@@ -28,12 +31,52 @@ internal static class WebView2Setup
 		Environment.SetEnvironmentVariable(VariablePrefix + "USER_DATA_FOLDER", DesktopPaths.WebViewDirectory);
 	}
 
+	public static bool RuntimeMissing()
+	{
+		try
+		{
+			return string.IsNullOrEmpty(CoreWebView2Environment.GetAvailableBrowserVersionString());
+		}
+		catch (Exception ex) when (ex.HResult == FileNotFound)
+		{
+			return true;
+		}
+		catch (Exception ex)
+		{
+			// Only a runtime known to be missing stops the start. Anything else is left to WinUI, which meets the same
+			// runtime a moment later, and kept for the crash log in case it does fail there.
+			CrashLog.Write("CoreWebView2Environment.GetAvailableBrowserVersionString", ex, terminating: false);
+			return false;
+		}
+	}
+
+	public static void OfferRuntimeDownload()
+	{
+		bool open = NativeMessageBox.AskError(
+			"Mokaterm needs the Microsoft Edge WebView2 Runtime, and this PC does not have it. Microsoft offers it as a " +
+			"free download (the Evergreen Bootstrapper). Install it, then start Mokaterm again.\n\n" +
+			"Open the download page now?");
+		if (open)
+		{
+			try
+			{
+				using Process? _ = Process.Start(new ProcessStartInfo(RuntimeDownload) { UseShellExecute = true });
+			}
+			catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+			{
+				NativeMessageBox.ShowError($"No browser could open the page. The address is {RuntimeDownload}");
+			}
+		}
+	}
+
 	public static void Configure(Microsoft.UI.Xaml.Controls.WebView2 webView)
 	{
 		// Matches the Moka background so resizing and startup never flash white.
 		webView.DefaultBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 6, 6, 8);
 
 		CoreWebView2 core = webView.CoreWebView2;
+		StartupTrace.Mark("WebView2 ready");
+		core.DOMContentLoaded += (_, _) => StartupTrace.Mark("Page loaded");
 
 		// The terminal zooms itself with Ctrl+wheel and Ctrl+=; page zoom would scale the whole window instead.
 		core.Settings.IsZoomControlEnabled = false;

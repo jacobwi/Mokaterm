@@ -28,6 +28,7 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
+		StartupTrace.Mark("Building MAUI app");
 		MauiAppBuilder builder = MauiApp.CreateBuilder();
 		builder.UseMauiApp<App>();
 
@@ -56,6 +57,7 @@ public static class MauiProgram
 			UserManaged = true,
 			SkipAll = PluginCatalogOptions.SkipAllRequested(),
 		});
+		StartupTrace.Mark("Plugins opened");
 		builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddPlugins(plugins));
 
 		// The Plugins page's Browse tab. Nothing is fetched until it opens. MOKATERM_GALLERY_INDEX can point it at another
@@ -71,12 +73,15 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
+		StartupTrace.Mark("Services registered");
 		MauiApp app = builder.Build();
+		StartupTrace.Mark("Container built");
 		toolWindows.Prepare(
 			builder.Services,
 			MokatermUiServiceCollectionExtensions.PageServices,
 			app.Services.GetRequiredService<ILogger<DesktopToolWindows>>(),
 			ToolWindowChrome());
+		StartupTrace.Mark("Tool window services sorted");
 		return app;
 	}
 

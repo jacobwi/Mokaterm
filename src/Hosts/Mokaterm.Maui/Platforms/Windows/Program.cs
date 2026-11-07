@@ -16,12 +16,15 @@ public static class Program
 	[STAThread]
 	private static int Main()
 	{
+		StartupTrace.Mark("Main");
+
 		// First and exactly once, as Velopack requires. An install, update or uninstall hook runs in here and ends the
 		// process before the app does anything else. Uninstalling deletes the exe that the notification registration names,
 		// so that registration goes first.
 		VelopackApp.Build()
 			.OnBeforeUninstallFastCallback(_ => AppNotificationRegistration.RemoveForUninstall())
 			.Run();
+		StartupTrace.Mark("Installer hooks checked");
 
 		// A restart starts this copy before the old one has gone; it holds the key and the lock checked below.
 		DesktopRestarter.WaitForPreviousRun(Environment.GetCommandLineArgs(), DesktopPaths.Root);
@@ -90,12 +93,30 @@ public static class Program
 
 		// Before the window, so a click that started the app finds the class it activates. The app runs without system
 		// notifications when this fails.
+		StartupTrace.Mark("Single instance checked");
+
+		// The page is a WebView2, whose runtime comes with Windows 11 and with Setup, but not with the portable zip or the
+		// Store package, and some Windows 10 editions lack it. Without one WinUI fails deep inside the first page with
+		// nothing a user could act on, so this asks first. The environment is set up here, after the data folder lock,
+		// because the profile path it names can move the old data folder, and before the check, so a Release build has
+		// already dropped any WEBVIEW2_ variable that could point the check at a runtime the app will not use.
+		WebView2Setup.PrepareEnvironment();
+		if (WebView2Setup.RuntimeMissing())
+		{
+			AppNotificationRegistration.Unregister();
+			WebView2Setup.OfferRuntimeDownload();
+			return 1;
+		}
+
+		StartupTrace.Mark("WebView2 runtime found");
+
 		AppNotificationRegistration.Register();
 		if (AppNotificationRegistration.Failure is { } notificationFailure)
 		{
 			CrashLog.Write("AppNotificationManager.Register", notificationFailure, terminating: false);
 		}
 
+		StartupTrace.Mark("Starting WinUI");
 		global::Microsoft.UI.Xaml.Application.Start(parameters =>
 		{
 			DispatcherQueue queue = DispatcherQueue.GetForCurrentThread();
