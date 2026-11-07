@@ -14,14 +14,14 @@ public sealed class PluginCatalog
 	// The same cap the theme import gives a pasted or picked scheme: half a scheme parses as a theme with half its colours.
 	private const int MaxThemeBytes = 512 * 1024;
 
-	private readonly bool _wroteMarker;
+	private readonly bool _clearsMarker;
 
-	private PluginCatalog(PluginCatalogOptions options, PluginStateStore? store, bool safeStart, bool wroteMarker)
+	private PluginCatalog(PluginCatalogOptions options, PluginStateStore? store, bool safeStart, bool clearsMarker)
 	{
 		Options = options;
 		Store = store;
 		IsSafeStart = safeStart;
-		_wroteMarker = wroteMarker;
+		_clearsMarker = clearsMarker;
 	}
 
 	public PluginCatalogOptions Options { get; }
@@ -51,7 +51,7 @@ public sealed class PluginCatalog
 
 		if (!Directory.Exists(directory))
 		{
-			return new PluginCatalog(options, null, options.SkipAll, wroteMarker: false);
+			return new PluginCatalog(options, null, options.SkipAll, clearsMarker: false);
 		}
 
 		PluginStateStore? store = options.UserManaged ? new PluginStateStore(directory) : null;
@@ -62,21 +62,23 @@ public sealed class PluginCatalog
 		}
 
 		string marker = Path.Combine(directory, PluginLayout.StartMarker);
-		bool safeStart = options.SkipAll || File.Exists(marker);
+		bool markerLeft = File.Exists(marker);
+		bool safeStart = options.SkipAll || markerLeft;
 		bool wroteMarker = !safeStart && TryWriteMarker(marker);
 
-		PluginCatalog catalog = new(options, store, safeStart, wroteMarker);
+		// A safe start that comes up takes the marker it found away too, or every start after one crash would be safe.
+		PluginCatalog catalog = new(options, store, safeStart, clearsMarker: wroteMarker || markerLeft);
 		catalog.Evaluate(state);
 		return catalog;
 	}
 
 	/// <summary>
-	/// Says the app came up with its plugins: the next start loads them again. Hosts call it once the first page has
-	/// rendered (desktop) or the server listens (web).
+	/// Says the app came up, with its plugins or after a safe start without them: the next start loads them again. Hosts
+	/// call it once the first page has rendered (desktop) or the server listens (web).
 	/// </summary>
 	public void ConfirmStarted()
 	{
-		if (_wroteMarker)
+		if (_clearsMarker)
 		{
 			TryDelete(Path.Combine(Options.Directory, PluginLayout.StartMarker));
 		}

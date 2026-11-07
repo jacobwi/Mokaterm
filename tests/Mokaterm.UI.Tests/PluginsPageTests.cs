@@ -9,6 +9,7 @@ using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Settings.Pages.Plugins;
 using Mokaterm.UI.Tests.Fakes;
 
@@ -156,6 +157,24 @@ public sealed partial class PluginsPageTests
 		Assert.Contains("Plugins are off for this start", html, StringComparison.Ordinal);
 		Assert.Contains("MOKATERM_NO_PLUGINS", html, StringComparison.Ordinal);
 		Assert.Contains(">Skipped<", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Restart now", html, StringComparison.Ordinal);
+	}
+
+	// The desktop app can restart itself, so the safe start's notice offers it rather than leaving the user to close
+	// and reopen the window.
+	[Fact]
+	public async Task Render_AfterASafeStart_OnAHostThatCanRestart_OffersARestart()
+	{
+		string html = await RenderPageAsync(
+			new FakePluginManager
+			{
+				IsSafeStart = true,
+				Plugins = [Plugin("moka.on", "Running", PluginStatus.Skipped, hasCode: true, enabled: true)],
+			},
+			extra: services => services.AddSingleton<IAppRestarter, NoRestart>());
+
+		Assert.Contains("Plugins are off for this start", html, StringComparison.Ordinal);
+		Assert.Contains("Restart now", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -435,4 +454,9 @@ public sealed partial class PluginsPageTests
 
 	[GeneratedRegex("\\sdisabled(?:[\\s=>/]|$)")]
 	private static partial Regex DisabledAttribute();
+
+	private sealed class NoRestart : IAppRestarter
+	{
+		public Task<bool> RestartAsync() => Task.FromResult(false);
+	}
 }

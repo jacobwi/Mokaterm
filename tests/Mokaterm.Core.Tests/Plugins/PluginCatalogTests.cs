@@ -188,6 +188,33 @@ public sealed class PluginCatalogTests
 	}
 
 	[Fact]
+	public async Task SafeStartThatCameUp_LoadsThePluginsAgainNextTime()
+	{
+		using TempPluginsFolder temp = new();
+		await InstallAsync(temp, TestPlugins.ThemePack("moka.themes"), enable: true);
+		temp.Open();
+
+		PluginCatalog safe = temp.Open();
+		Assert.True(safe.IsSafeStart);
+		safe.ConfirmStarted();
+
+		PluginCatalog next = temp.Open();
+		Assert.False(next.IsSafeStart);
+		Assert.Equal(PluginStatus.Enabled, Assert.Single(next.Records).Status);
+	}
+
+	[Fact]
+	public async Task SafeStartThatDiedToo_StaysSafe()
+	{
+		using TempPluginsFolder temp = new();
+		await InstallAsync(temp, TestPlugins.ThemePack("moka.themes"), enable: true);
+		temp.Open();
+
+		Assert.True(temp.Open().IsSafeStart);
+		Assert.True(temp.Open().IsSafeStart);
+	}
+
+	[Fact]
 	public async Task SkipAll_LoadsNothing_AndLeavesTheNextStartAlone()
 	{
 		using TempPluginsFolder temp = new();

@@ -14,6 +14,7 @@
 			{
 				<text>If one of them stopped the app, turn it off before you restart.</text>
 			}
+			@RestartButton
 		</MokaCallout>
 	}
 
@@ -21,19 +22,7 @@
 	{
 		<MokaCallout Type="MokaCalloutType.Note" Title="Restart Mokaterm to apply">
 			Plugin changes take effect at the next start, because a plugin that is loaded cannot be unloaded.
-			@if (Restarter is not null)
-			{
-				<MokaFlexbox Direction="MokaDirection.Row" Style="margin-top: var(--moka-spacing-xs)">
-					<MokaButton Variant="MokaVariant.Outlined"
-								Size="MokaSize.Sm"
-								StartIcon="MokatermIcons.Reconnect"
-								Loading="_restarting"
-								Disabled="Busy"
-								OnClick="RestartAsync">
-						Restart now
-					</MokaButton>
-				</MokaFlexbox>
-			}
+			@RestartButton
 		</MokaCallout>
 	}
 
@@ -50,6 +39,24 @@
 <PluginInstallDialog Open="_installOpen" OpenChanged="OnInstallOpenChanged" Package="_package" />
 
 @code {
+	// Both notices offer the same restart, only where the host can restart itself (the desktop app).
+	private RenderFragment RestartButton => __builder =>
+	{
+		@if (Restarter is not null)
+		{
+			<MokaFlexbox Direction="MokaDirection.Row" Style="margin-top: var(--moka-spacing-xs)">
+				<MokaButton Variant="MokaVariant.Outlined"
+							Size="MokaSize.Sm"
+							StartIcon="MokatermIcons.Reconnect"
+							Loading="_restarting"
+							Disabled="Busy"
+							OnClick="RestartAsync">
+					Restart now
+				</MokaButton>
+			</MokaFlexbox>
+		}
+	};
+
 	private RenderFragment Views(IReadOnlyList<PluginRecord> plugins) => @<div class="plugins-views">
 		@if (UpdateCount is { } updates)
 		{
