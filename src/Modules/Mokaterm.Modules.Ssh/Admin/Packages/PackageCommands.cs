@@ -139,6 +139,19 @@ internal sealed class PackageCommands
 	internal static bool IsSecuritySource(string source) =>
 		source.Split(',').Any(suite => suite.EndsWith("-security", StringComparison.Ordinal) || suite.EndsWith("/updates", StringComparison.Ordinal));
 
+	/// <summary>
+	/// What an upgrade would leave for later because Ubuntu is still releasing it to a share of its machines. A simulated
+	/// upgrade, since only apt's own resolver knows which side of a rollout this machine is on. Null for the other managers.
+	/// </summary>
+	public AdminScript? ListDeferredUpdates() => Kind == PackageManagerKind.Apt
+		? new AdminScript
+		{
+			Name = "packages.deferred",
+			Timeout = UpdateCheckTimeout,
+			Body = "apt-get -s --with-new-pkgs upgrade 2>/dev/null",
+		}
+		: null;
+
 	/// <summary>Fetches the repositories' current lists, so the next check sees what is new. Null for pacman, see <see cref="HasRefresh"/>.</summary>
 	public AdminAction? RefreshIndex()
 	{

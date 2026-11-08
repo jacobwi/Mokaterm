@@ -101,6 +101,10 @@
 							{
 								<span class="mta-after"><MokaTag Text="SECURITY" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
 							}
+							@if (IsDeferred(update))
+							{
+								<span class="mta-after"><Hint Text="@RolloutExplained"><MokaTag Text="Held by rollout" Size="MokaSize.Xs" Color="MokaColor.Info" /></Hint></span>
+							}
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="PackageUpdate" Title="Installed" Field="@(update => update.CurrentVersion)" Mono Class="mt-col-wide mta-col-cut">
@@ -175,6 +179,7 @@
 	private List<PackageUpdate> _updatesShown = [];
 	private string? _updatesError;
 	private HashSet<string>? _security;
+	private HashSet<string> _deferred = [];
 	private string? _securityNote;
 	private RebootStatus? _reboot;
 	private string _view = "installed";
@@ -194,6 +199,7 @@
 
 			string updates = _updates is { } list ? $", {AdminFormat.Count(list.Count)} upgradable" : "";
 			updates += _security is { Count: > 0 } security ? $", {AdminFormat.Count(security.Count)} for security" : "";
+			updates += HeldCount > 0 ? $", {AdminFormat.Count(HeldCount)} held by rollout" : "";
 			return $"{AdminFormat.Count(_installed.Count)} installed{updates} · {packages.DisplayName}";
 		}
 	}
@@ -307,6 +313,10 @@
 					<MokaStat Tile Value="@(reboot.Required switch { true => "Required", false => "Not needed", _ => "Unknown" })" Label="Reboot" HelpText="@AdminUpdateReads.RebootText(reboot)" Color="@(reboot.Required == true ? MokaColor.Error : reboot.Required == false ? MokaColor.Success : MokaColor.Surface)" />
 				}
 			</div>
+			@if (HeldCount > 0)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs">@(HeldCount == 1 ? "1 update is" : $"{AdminFormat.Count(HeldCount)} updates are") held back. @RolloutExplained</MokaText>
+			}
 			<section class="mta-section" aria-label="Updates by repository">
 				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">By repository</MokaText>
 				<MokaDonutChart Segments="SourceShares(updates)" Thickness="30" Size="MokaSize.Sm" Label="Pending updates by repository" Class="mta-donut">
@@ -465,6 +475,31 @@
 		}
 
 		await LoadSecurityAsync(packages, _updates, cancellationToken);
+		await LoadDeferredAsync(packages, cancellationToken);
+	}
+
+	private async Task LoadDeferredAsync(PackageCommands packages, CancellationToken cancellationToken)
+	{
+		_deferred = [];
+		if (_updates is not { Count: > 0 } || packages.ListDeferredUpdates() is not { } script)
+		{
+			return;
+		}
+
+		try
+		{
+			AdminOutcome outcome = await ReadAsync(script, cancellationToken);
+			if (outcome.Succeeded)
+			{
+				_deferred = PackageListParser.ParseAptDeferred(outcome.Output);
+				ApplyFilter();
+			}
+		}
+		catch (AdminException)
+		{
+			// Only a marking on rows the page already has.
+			return;
+		}
 	}
 
 	/// <summary>Which pending updates fix security problems: read off apt's own list, asked of dnf and yum separately.</summary>
@@ -504,6 +539,12 @@
 	}
 
 	private bool IsSecurity(PackageUpdate update) => _security?.Contains(update.Name) == true;
+
+	private bool IsDeferred(PackageUpdate update) => _deferred.Contains(update.Name);
+
+	private int HeldCount => _updates?.Count(IsDeferred) ?? 0;
+
+	private const string RolloutExplained = "Ubuntu releases some updates to machines gradually, and Upgrade all installs these once this machine's turn comes, usually within a few days.";
 
 	private async Task OnViewChangedAsync(string value)
 	{

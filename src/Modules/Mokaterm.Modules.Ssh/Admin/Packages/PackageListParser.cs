@@ -90,6 +90,30 @@ internal static partial class PackageListParser
 		return SortedUpdates(updates);
 	}
 
+	/// <summary>The packages under apt's "deferred due to phasing" heading, whose names wrap over indented lines.</summary>
+	public static HashSet<string> ParseAptDeferred(string output)
+	{
+		HashSet<string> names = new(StringComparer.Ordinal);
+		bool inList = false;
+		foreach (string line in AdminSections.Lines(output))
+		{
+			if (line.StartsWith("The following upgrades have been deferred", StringComparison.Ordinal))
+			{
+				inList = true;
+			}
+			else if (inList && line.StartsWith(' '))
+			{
+				names.UnionWith(line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(name => name.Split(':')[0]));
+			}
+			else
+			{
+				inList = false;
+			}
+		}
+
+		return names;
+	}
+
 	/// <summary>
 	/// <c>dnf</c> and <c>yum check-update</c>: <c>name.arch version repo</c> columns. Everything after "Obsoleting
 	/// Packages" lists replacements, not updates, and metadata or security notices have another shape.

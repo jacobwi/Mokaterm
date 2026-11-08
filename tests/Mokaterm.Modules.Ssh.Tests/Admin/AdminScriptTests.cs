@@ -263,6 +263,11 @@ public sealed class AdminScriptTests
 			yield return packages.UpgradeAll().Script;
 			yield return packages.Install("htop").Script;
 			yield return packages.Remove("htop").Script;
+			if (packages.ListDeferredUpdates() is { } deferred)
+			{
+				yield return deferred;
+			}
+
 			if (packages.RefreshIndex() is { } refresh)
 			{
 				yield return refresh.Script;

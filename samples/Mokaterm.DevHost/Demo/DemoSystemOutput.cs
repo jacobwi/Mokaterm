@@ -119,6 +119,15 @@ internal static partial class DemoSystemOutput
 				libssl3t64/noble-security 3.0.13-0ubuntu3.4 amd64 [upgradable from: 3.0.13-0ubuntu3.3]
 				linux-image-generic/noble-updates 6.8.0-47.47 amd64 [upgradable from: 6.8.0-45.45]
 				""",
+			"packages.deferred" => """
+				Reading package lists...
+				Calculating upgrade...
+				The following upgrades have been deferred due to phasing:
+				  curl
+				The following packages will be upgraded:
+				  libssl3t64 linux-image-generic
+				2 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+				""",
 			"cron.read" => account.IsRoot
 				? "# m h  dom mon dow   command\n15 4 * * * /usr/local/sbin/rotate-backups\n"
 				: "# m h  dom mon dow   command\nMAILTO=ops@example.com\n0 3 * * * /home/" + account.Name + "/bin/backup.sh >/dev/null 2>&1\n*/15 * * * 1-5 /usr/bin/curl -fsS https://health.example.com/ping\n@reboot /home/" + account.Name + "/bin/start-agent\n",

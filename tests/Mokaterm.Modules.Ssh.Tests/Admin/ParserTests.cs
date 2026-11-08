@@ -157,6 +157,28 @@ public sealed class ParserTests
 	}
 
 	[Fact]
+	public void Packages_AptDeferred_ReadsWrappedNamesAndStopsAtTheNextHeading()
+	{
+		HashSet<string> names = PackageListParser.ParseAptDeferred("""
+			Calculating upgrade...
+			The following packages will be upgraded:
+			  curl
+			The following upgrades have been deferred due to phasing:
+			  python3-software-properties software-properties-common
+			  libfoo:i386
+			The following packages have been kept back:
+			  linux-generic
+			0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+			""");
+
+		Assert.Equal(["libfoo", "python3-software-properties", "software-properties-common"], names.Order(StringComparer.Ordinal));
+	}
+
+	[Fact]
+	public void Packages_AptDeferred_NothingHeldIsEmpty() =>
+		Assert.Empty(PackageListParser.ParseAptDeferred("0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."));
+
+	[Fact]
 	public void Packages_DnfCheckUpdate_StopsAtObsoletes()
 	{
 		IReadOnlyList<PackageUpdate> updates = PackageListParser.ParseCheckUpdate("""
