@@ -1,26 +1,9 @@
 @namespace Mokaterm.UI.FileBrowser
+@using Moka.Red.Data.Pagination
+@using Moka.Red.Feedback.JobList
 
 @{
 	QueueSnapshot snapshot = TakeSnapshot();
-
-	RenderFragment Actions(ITransferItem item) =>
-		@<div class="tq-actions">
-			@if (item.State is TransferState.Queued or TransferState.Running)
-			{
-				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Navigation.Close"
-							OnClick="() => Cancel(item.Id)" Label="Cancel" />
-			}
-			@if (item.State is TransferState.Failed or TransferState.Canceled)
-			{
-				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
-							OnClick="() => Retry(item.Id)" Label="Retry" />
-			}
-			@if (item.State != TransferState.Running)
-			{
-				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Remove"
-							OnClick="() => Remove(item.Id)" Label="Remove from the list" AriaLabel="Remove" />
-			}
-		</div>;
 
 	RenderFragment Badges(ITransferItem item) =>
 		@<text>
@@ -47,65 +30,6 @@
 				</Hint>
 			}
 		</text>;
-
-	RenderFragment StateDot(ITransferItem item) =>
-		@<MokaStatusDot Size="MokaSize.Xs" Color="@StateColor(item)" Pulse="@(item.State == TransferState.Running)" Label="@StateLabel(item)" />;
-
-	RenderFragment Job(ITransferItem item) =>
-		@<MokaJobProgress Text="@JobText(item)" Percent="@JobPercent(item)" Facts="@JobFacts(item)" />;
-
-	RenderFragment CompactRow(ITransferItem item) =>
-		@<div @key="item.Id" class="@CompactRowClass(item)">
-			<div class="tq-line">
-				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Xs" Style="@TextStyles.Muted" />
-				<span class="tq-name" title="@item.Name">@item.Name</span>
-				@Badges(item)
-				<span class="tq-route" title="@Tooltip(item)">@Route(item)</span>
-				@if (item.State != TransferState.Running)
-				{
-					<div class="tq-progress">
-						<MokaProgress Value="@ProgressValue(item)" />
-					</div>
-					<span class="tq-meta">@BytesText(item)</span>
-				}
-				@StateDot(item)
-				@Actions(item)
-			</div>
-			@if (item.State == TransferState.Running)
-			{
-				@Job(item)
-			}
-		</div>;
-
-	RenderFragment FullRow(ITransferItem item) =>
-		@<div @key="item.Id" class="tq-row">
-			<div class="tq-line">
-				<MokaIcon Icon="@DirectionIcon(item)" Size="MokaSize.Sm" Style="@TextStyles.Muted" />
-				<span class="tq-name" title="@item.Name">@item.Name</span>
-				@Badges(item)
-				<span class="tq-grow"></span>
-				@StateDot(item)
-				@Actions(item)
-			</div>
-			<div class="tq-route" title="@Tooltip(item)">@Route(item)</div>
-			@if (item.State == TransferState.Running)
-			{
-				@Job(item)
-			}
-			else
-			{
-				<div class="tq-line">
-					<div class="tq-progress">
-						<MokaProgress Value="@ProgressValue(item)" />
-					</div>
-					<span class="tq-meta">@BytesText(item)</span>
-				</div>
-			}
-			@if (item.State == TransferState.Failed && !string.IsNullOrEmpty(item.Error))
-			{
-				<div class="tq-error">@item.Error</div>
-			}
-		</div>;
 }
 
 <div class="@RootClass" style="@Style">
@@ -132,6 +56,14 @@
 			<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Label="@CountLabel(snapshot.Completed, "done")" />
 		}
 		<MokaSpacer />
+		@if (snapshot.Items.Count > PagedAbove)
+		{
+			<MokaPagination Compact
+							TotalItems="snapshot.Items.Count"
+							PageSize="JobsPerPage"
+							CurrentPage="_page"
+							CurrentPageChanged="page => _page = page" />
+		}
 		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.Eraser"
 					Disabled="@(snapshot.Finished == 0)" OnClick="ClearFinished">Clear finished</MokaButton>
 	</MokaToolbar>
@@ -154,20 +86,17 @@
 	}
 	else
 	{
-		<div class="tq-list moka-thin-scrollbar">
-			@if (snapshot.Items.Count > VirtualizeThreshold)
-			{
-				<Virtualize Items="snapshot.Items" Context="item" ItemSize="@(Compact ? CompactRowHeight : RowHeight)" OverscanCount="6">
-					@(Compact ? CompactRow(item) : FullRow(item))
-				</Virtualize>
-			}
-			else
-			{
-				@foreach (ITransferItem item in snapshot.Items)
-				{
-					@(Compact ? CompactRow(item) : FullRow(item))
-				}
-			}
-		</div>
+		@* A new list per page: the list says a job failed when it first sees it failed, and a page holds jobs it has not seen. *@
+		<MokaJobList @key="_page"
+					 Class="tq-jobs"
+					 Jobs="snapshot.Jobs"
+					 ShowHeader="false"
+					 ByteFormatter="WriteBytes"
+					 Text="Words"
+					 OnCancel="Cancel"
+					 OnRetry="Retry"
+					 OnRemove="Remove">
+			<EndContent Context="job">@Badges(snapshot.Shown[job.Id])</EndContent>
+		</MokaJobList>
 	}
 </div>

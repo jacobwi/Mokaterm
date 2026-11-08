@@ -1,8 +1,8 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
-using Moka.Red.Core.Enums;
 using Moka.Red.Core.Icons;
+using Moka.Red.Feedback.JobList;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
@@ -10,25 +10,33 @@ using Mokaterm.UI.Common.Icons;
 namespace Mokaterm.UI.FileBrowser;
 
 /// <summary>
-/// Lists the transfer queue newest first, with progress, rate, cancel, retry and remove. Progress events are coalesced
-/// so the view renders about four times a second at most.
+/// Lists the transfer queue newest first, with progress, rate, cancel, retry and remove, through a Moka job list. Progress
+/// events are coalesced so the view renders about four times a second at most.
 /// </summary>
 public partial class TransferQueueView : ComponentBase, IDisposable
 {
-	// Virtualize renders no rows until its script has measured the list, so short lists render plainly.
-	private const int VirtualizeThreshold = 100;
-
-	// First guesses for virtualization, which Virtualize corrects from the rows it draws: three lines of text with
-	// padding, or one line as tall as the theme's small button.
-	private const float RowHeight = 72;
-	private const float CompactRowHeight = 32;
+	// A list with slots redraws every row each time it draws, and a folder upload queues thousands, so a long list goes a
+	// page at a time. MaxVisible would not do: its button shows all the rest at once.
+	private const int PagedAbove = 100;
+	private const int JobsPerPage = 25;
 
 	// Estimates above this are noise from a stalled rate and would not fit the duration format.
 	private const double MaxEstimateSeconds = 100 * 3600;
 
 	private static readonly TimeSpan RenderInterval = TimeSpan.FromMilliseconds(250);
 
+	// One instance each: the list draws every row again when either of these changes.
+	private static readonly Func<double, string> WriteBytes = bytes => DisplayFormat.Bytes((long)bytes);
+
+	private static readonly MokaJobListText Words = new()
+	{
+		ListLabel = "Transfers",
+		Remove = name => "Remove " + name + " from the list",
+		TimeLeft = left => DisplayFormat.Duration(left) + " left",
+	};
+
 	private readonly CancellationTokenSource _lifetime = new();
+	private int _page = 1;
 	private int _renderScheduled;
 	private long _lastRenderTimestamp;
 	private bool _disposed;
@@ -42,7 +50,7 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 	[Inject]
 	private ILogger<TransferQueueView> Logger { get; set; } = default!;
 
-	/// <summary>Single-line rows for the bottom panel.</summary>
+	/// <summary>Tighter rows and a one-line empty state, for the bottom panel.</summary>
 	[Parameter]
 	public bool Compact { get; set; }
 
@@ -147,14 +155,33 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 			}
 		}
 
-		return new QueueSnapshot(items, running, queued, failed, completed, canceled);
+		List<ITransferItem> shown = ShownPage(items);
+		return new QueueSnapshot(items, [.. shown.Select(ToJob)], shown.ToDictionary(JobId), running, queued, failed, completed, canceled);
 	}
 
-	private void Cancel(Guid id) => Run(() => Queue.Cancel(id));
+	private List<ITransferItem> ShownPage(List<ITransferItem> items)
+	{
+		if (items.Count <= PagedAbove)
+		{
+			_page = 1;
+			return items;
+		}
 
-	private void Retry(Guid id) => Run(() => Queue.Retry(id));
+		// A queue runs from its oldest, which is listed last, so what needs a look would otherwise be many pages in. That
+		// includes a canceled transfer, whose Retry is how it picks up again.
+		List<ITransferItem> ordered = [.. items.Where(NeedsALook), .. items.Where(item => !NeedsALook(item))];
+		_page = Math.Clamp(_page, 1, ((ordered.Count - 1) / JobsPerPage) + 1);
+		int first = (_page - 1) * JobsPerPage;
+		return ordered.GetRange(first, Math.Min(JobsPerPage, ordered.Count - first));
+	}
 
-	private void Remove(Guid id) => Run(() => Queue.Remove(id));
+	private static bool NeedsALook(ITransferItem item) => item.State is TransferState.Running or TransferState.Failed or TransferState.Canceled;
+
+	private void Cancel(MokaJob job) => Run(() => Queue.Cancel(Guid.Parse(job.Id)));
+
+	private void Retry(MokaJob job) => Run(() => Queue.Retry(Guid.Parse(job.Id)));
+
+	private void Remove(MokaJob job) => Run(() => Queue.Remove(Guid.Parse(job.Id)));
 
 	private void ClearFinished() => Run(Queue.ClearFinished);
 
@@ -180,97 +207,75 @@ public partial class TransferQueueView : ComponentBase, IDisposable
 		_ => MokatermIcons.Transfers,
 	};
 
-	private static string Route(ITransferItem item) => item.Source + " -> " + item.Destination;
+	private static string JobId(ITransferItem item) => item.Id.ToString("N");
 
-	private static string Tooltip(ITransferItem item)
+	private static MokaJob ToJob(ITransferItem item)
 	{
-		string route = string.IsNullOrEmpty(item.Group) ? Route(item) : item.Group + ": " + Route(item);
-		return item.State == TransferState.Failed && !string.IsNullOrEmpty(item.Error) ? route + "\n" + item.Error : route;
+		bool checking = item.Verification == TransferVerification.Checking;
+		return new MokaJob(JobId(item), item.Name, StateOf(item))
+		{
+			Icon = DirectionIcon(item),
+			Detail = checking ? Route(item) + Words.Separator + "checking the copy" : Route(item),
+
+			// The server's checksum gives no number to show, so with no figure for what is done the bar slides, as it does
+			// before the size is known.
+			Bytes = checking && item.TotalBytes is not null ? null : item.TransferredBytes,
+			TotalBytes = item.TotalBytes,
+			BytesPerSecond = checking || item.BytesPerSecond <= 0 ? null : item.BytesPerSecond,
+			TimeRemaining = checking ? null : Remaining(item),
+			Error = item.State == TransferState.Failed ? FailureText(item) : null,
+		};
 	}
 
-	private static string ResumedText(long offset) => "Continued from " + DisplayFormat.Bytes(offset) + " instead of starting over";
-
-	private static string CompactRowClass(ITransferItem item) =>
-		item.State == TransferState.Running ? "tq-row tq-row--compact tq-row--running" : "tq-row tq-row--compact";
-
-	// Whole percentages: the progress bar writes the value into its style with the current culture's decimal separator.
-	private static double? ProgressValue(ITransferItem item) => item.State switch
+	private static MokaJobState StateOf(ITransferItem item) => item.State switch
 	{
-		TransferState.Completed => 100,
-		_ when item.TotalBytes is { } total && total > 0 => Math.Round(Math.Clamp(100d * item.TransferredBytes / total, 0, 100)),
-		_ => 0,
+		TransferState.Queued => MokaJobState.Queued,
+		TransferState.Running => MokaJobState.Running,
+		TransferState.Completed => MokaJobState.Done,
+		TransferState.Failed => MokaJobState.Failed,
+		_ => MokaJobState.Canceled,
 	};
+
+	private static string Route(ITransferItem item)
+	{
+		string route = item.Source + " -> " + item.Destination;
+		return string.IsNullOrEmpty(item.Group) || route.Contains(item.Group, StringComparison.Ordinal) ? route : item.Group + ": " + route;
+	}
+
+	// A failed job's second line is its error alone, so the rest of what a row says goes after it: several failures can
+	// share a file name, and only the route tells them apart.
+	private static string FailureText(ITransferItem item) => string.Join(
+		Words.Separator,
+		string.IsNullOrEmpty(item.Error) ? Words.NoReason : item.Error,
+		Route(item),
+		BytesText(item));
+
+	private static string ResumedText(long offset) => "Continued from " + DisplayFormat.Bytes(offset) + " instead of starting over";
 
 	private static string BytesText(ITransferItem item) => item.TotalBytes is { } total
 		? DisplayFormat.Bytes(item.TransferredBytes) + " of " + DisplayFormat.Bytes(total)
 		: DisplayFormat.Bytes(item.TransferredBytes);
 
-	private static bool IsChecking(ITransferItem item) => item.Verification == TransferVerification.Checking;
-
-	// Said again by a screen reader each time it changes, so it names the step and never the numbers.
-	private static string JobText(ITransferItem item) => IsChecking(item)
-		? "Checking the copy"
-		: item.Direction switch
-		{
-			TransferDirection.Upload => "Uploading",
-			TransferDirection.Download => "Downloading",
-			_ => "Copying",
-		};
-
-	// The server's checksum gives no number to show, so the bar slides as it does before the size is known.
-	private static double? JobPercent(ITransferItem item) =>
-		!IsChecking(item) && item.TotalBytes is { } total && total > 0
-			? Math.Clamp(100d * item.TransferredBytes / total, 0, 100)
-			: null;
-
-	// Written here rather than through the job's Bytes and BytesPerSecond, which count in thousands where every other
-	// size in the app counts in 1024s.
-	private static List<string> JobFacts(ITransferItem item)
+	private static TimeSpan? Remaining(ITransferItem item)
 	{
-		List<string> facts = [];
-		if (item.TotalBytes is not null || item.TransferredBytes > 0)
+		if (item.BytesPerSecond <= 0 || item.TotalBytes is not { } total || total <= item.TransferredBytes)
 		{
-			facts.Add(BytesText(item));
+			return null;
 		}
 
-		if (IsChecking(item) || item.BytesPerSecond <= 0)
-		{
-			return facts;
-		}
-
-		facts.Add(DisplayFormat.Rate(item.BytesPerSecond));
-		if (item.TotalBytes is { } total && total > item.TransferredBytes)
-		{
-			double seconds = (total - item.TransferredBytes) / item.BytesPerSecond;
-			if (seconds <= MaxEstimateSeconds)
-			{
-				facts.Add(DisplayFormat.Duration(TimeSpan.FromSeconds(seconds)) + " left");
-			}
-		}
-
-		return facts;
+		double seconds = (total - item.TransferredBytes) / item.BytesPerSecond;
+		return seconds <= MaxEstimateSeconds ? TimeSpan.FromSeconds(seconds) : null;
 	}
 
-	private static MokaColor StateColor(ITransferItem item) => item.State switch
-	{
-		TransferState.Running => MokaColor.Primary,
-		TransferState.Completed => MokaColor.Success,
-		TransferState.Failed => MokaColor.Error,
-		TransferState.Queued => MokaColor.Info,
-		_ => MokaColor.Surface,
-	};
-
-	private static string StateLabel(ITransferItem item) => item.State switch
-	{
-		TransferState.Queued => "Queued",
-		TransferState.Running when item.Verification == TransferVerification.Checking => "Verifying",
-		TransferState.Running => "Running",
-		TransferState.Completed => "Done",
-		TransferState.Failed => "Failed",
-		_ => "Canceled",
-	};
-
-	private sealed record QueueSnapshot(List<ITransferItem> Items, int Running, int Queued, int Failed, int Completed, int Canceled)
+	private sealed record QueueSnapshot(
+		List<ITransferItem> Items,
+		IReadOnlyList<MokaJob> Jobs,
+		Dictionary<string, ITransferItem> Shown,
+		int Running,
+		int Queued,
+		int Failed,
+		int Completed,
+		int Canceled)
 	{
 		public int Finished => Failed + Completed + Canceled;
 	}

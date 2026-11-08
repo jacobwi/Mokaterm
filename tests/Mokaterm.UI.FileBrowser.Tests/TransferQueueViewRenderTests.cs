@@ -7,8 +7,8 @@ using Mokaterm.Abstractions.Transfers;
 namespace Mokaterm.UI.FileBrowser.Tests;
 
 /// <summary>
-/// A transfer row's full route and error are the title of the route text, which is what gets cut off. The row itself
-/// carries none, so the browser's own tooltip never shows over the row's buttons and status hints, which have Moka's.
+/// A failed job's second line is its error alone, so a failed transfer's route and how far it got are written after the
+/// error: several failures can share a file name, and only the route tells them apart.
 /// </summary>
 public sealed partial class TransferQueueViewRenderTests
 {
@@ -17,18 +17,17 @@ public sealed partial class TransferQueueViewRenderTests
 	[Theory]
 	[InlineData(true)]
 	[InlineData(false)]
-	public async Task TheRouteCarriesTheTitle_NotTheRow(bool compact)
+	public async Task AFailedTransfer_SaysWhy_Where_AndHowFar(bool compact)
 	{
 		string html = await RenderAsync(compact);
 
-		Assert.All(RowTag().Matches(html), row => Assert.DoesNotContain(" title=", row.Value, StringComparison.Ordinal));
-		Match route = RouteTitle().Match(html);
-		Assert.True(route.Success, "The route has no title.");
+		Match error = ErrorLine().Match(html);
+		Assert.True(error.Success, "The row has no error line.");
 		Assert.Equal(
-			"web-1: web-1:/srv/backup.tar -> backup.tar\nPermission denied",
-			WebUtility.HtmlDecode(route.Groups["title"].Value).ReplaceLineEndings("\n"));
-		Assert.Matches("class=\"tq-name\"[^>]*title=\"backup.tar\"", html);
-		Assert.Contains("Retry", Tooltips.Texts(html));
+			"Permission denied, web-1:/srv/backup.tar -> backup.tar, 1 KB of 4 KB",
+			WebUtility.HtmlDecode(error.Groups["text"].Value));
+		Assert.Matches("class=\"moka-job-list__name\"[^>]*title=\"backup.tar\"", html);
+		Assert.Contains("Retry backup.tar", Tooltips.Texts(html));
 	}
 
 	private static Task<string> RenderAsync(bool compact) =>
@@ -42,11 +41,8 @@ public sealed partial class TransferQueueViewRenderTests
 			new Dictionary<string, object?> { [nameof(TransferQueueView.Compact)] = compact })
 			.WaitAsync(Patience, TestContext.Current.CancellationToken);
 
-	[GeneratedRegex("<div[^>]*class=\"tq-row[^\"]*\"[^>]*>")]
-	private static partial Regex RowTag();
-
-	[GeneratedRegex("class=\"tq-route\"[^>]*title=\"(?<title>[^\"]*)\"")]
-	private static partial Regex RouteTitle();
+	[GeneratedRegex("class=\"moka-job-list__error\"[^>]*>(?<text>[^<]*)<")]
+	private static partial Regex ErrorLine();
 
 	private sealed class OneItemQueue(ITransferItem item) : ITransferQueue
 	{

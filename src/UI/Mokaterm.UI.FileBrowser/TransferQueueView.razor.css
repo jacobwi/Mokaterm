@@ -16,10 +16,25 @@
 	color: var(--moka-color-on-surface-variant);
 }
 
-.tq-list {
+.tq ::deep .tq-jobs {
 	flex: 1;
 	min-height: 0;
-	overflow-y: auto;
+}
+
+/* The docked panel is short, so a job takes the least the list allows. */
+.tq--compact ::deep .moka-job-list__item {
+	padding-block: var(--moka-spacing-xs);
+}
+
+.tq--compact ::deep .moka-job-list__main {
+	gap: var(--moka-spacing-xxs);
+}
+
+/* Moka's tag may wrap anywhere on the new design, which in a row that gives way puts one letter on each line. */
+.tq ::deep .moka-job-list__end .moka-tag {
+	flex-shrink: 0;
+	white-space: nowrap;
+	overflow-wrap: normal;
 }
 
 .tq-state {
@@ -46,98 +61,4 @@
 .tq-empty ::deep svg {
 	flex-shrink: 0;
 	color: var(--moka-color-on-surface-tertiary);
-}
-
-.tq-row {
-	display: flex;
-	flex-direction: column;
-	gap: var(--moka-spacing-xxs);
-	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
-	border-bottom: 1px solid var(--moka-color-outline-variant);
-	font-size: var(--moka-font-size-xs);
-	transition: background var(--moka-transition-fast);
-}
-
-.tq-row:hover {
-	background: var(--moka-color-surface-hover);
-}
-
-.tq-row--compact {
-	gap: 0;
-	padding: 0 var(--moka-spacing-md);
-}
-
-.tq-row--compact > .tq-line {
-	min-height: var(--moka-button-height-sm);
-}
-
-/* A running transfer spells itself out under its line, so the panel shows how far each one has got at a glance. */
-.tq-row--compact.tq-row--running {
-	padding-bottom: var(--moka-spacing-md);
-}
-
-.tq-line {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
-	min-width: 0;
-}
-
-/* Moka's tag may wrap anywhere on the new design, which in a row that gives way puts one letter on each line. */
-.tq-line ::deep .moka-tag {
-	flex-shrink: 0;
-	white-space: nowrap;
-	overflow-wrap: normal;
-}
-
-.tq-name,
-.tq-route {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-family: var(--moka-font-family-mono);
-}
-
-.tq-row--compact .tq-name {
-	flex: 0 1 auto;
-	max-width: 30%;
-}
-
-.tq-route {
-	color: var(--moka-color-on-surface-variant);
-}
-
-.tq-row--compact .tq-route {
-	flex: 1 1 0;
-}
-
-.tq-grow {
-	flex: 1;
-}
-
-.tq-progress {
-	flex: 1;
-	min-width: 60px;
-}
-
-.tq-row--compact .tq-progress {
-	flex: 0 0 120px;
-}
-
-.tq-meta {
-	white-space: nowrap;
-	font-family: var(--moka-font-family-mono);
-	color: var(--moka-color-on-surface-variant);
-}
-
-.tq-error {
-	color: var(--moka-color-error);
-	overflow-wrap: anywhere;
-}
-
-.tq-actions {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-xxs);
 }
