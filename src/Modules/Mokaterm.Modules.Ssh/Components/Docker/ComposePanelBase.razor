@@ -34,7 +34,7 @@
 				</div>
 				@if (refused.Output is { Length: > 0 } output && output != problem)
 				{
-					<pre class="mt-dk-box mt-dk-box--short">@output</pre>
+					<MokaCodeBlock Code="@output" ShowLineNumbers="false" ShowCopyButton="false" Wrap="true" MaxHeight="160px" Class="mt-dk-code-block" />
 				}
 			</MokaAlert>
 		}

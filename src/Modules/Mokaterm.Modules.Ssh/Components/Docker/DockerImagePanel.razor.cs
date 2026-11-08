@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
-using Moka.Red.Primitives.DataList;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Modules.Ssh.Docker;
@@ -70,30 +69,7 @@ public sealed partial class DockerImagePanel : DockerManagerPageBase
 
 	private string RegistryDisplay => DockerRegistryNames.IsDockerHub(Registry) ? $"{DockerRegistryNames.DockerHubName} (docker.io)" : Registry;
 
-	private List<MokaDataListItem> Facts
-	{
-		get
-		{
-			List<MokaDataListItem> facts = [];
-			if (Size.Length > 0)
-			{
-				facts.Add(new("Size", Size));
-			}
-
-			if (Created.Length > 0)
-			{
-				facts.Add(new("Created", Created));
-			}
-
-			if (Containers is { } containers)
-			{
-				facts.Add(new("Containers", containers.ToString(CultureInfo.CurrentCulture)));
-			}
-
-			facts.Add(new("Tagged", Tagged ? $"yes, {RepositoryTags.Count} local {(RepositoryTags.Count == 1 ? "tag" : "tags")} of {Repository}" : "no, so it can be tagged but not pushed"));
-			return facts;
-		}
-	}
+	private string TagCount => Tagged ? RepositoryTags.Count.ToString("N0", CultureInfo.CurrentCulture) : "0";
 
 	protected override async Task OnParametersSetAsync()
 	{

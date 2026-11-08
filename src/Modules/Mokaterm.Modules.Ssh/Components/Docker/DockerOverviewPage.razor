@@ -1,4 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Data.Chart
 @inherits DockerManagerPageBase
 
 <ToolPageFrame Title="Overview"
@@ -38,25 +39,54 @@
 				}
 			</div>
 
-			<div class="mt-dk-columns">
-				<div class="mt-dk-section">
-					<span class="mt-dk-label">Engine</span>
-					<MokaDataList Items="EngineFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
-				</div>
+			<div class="mt-dk-cards">
+				@if (status.Info is { Containers: > 0 } counts)
+				{
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">Containers by state</span></Header>
+						<ChildContent>
+							<MokaDonutChart Segments="StateSegments(counts)" Size="MokaSize.Sm" Thickness="26" Label="Containers by state" Class="mt-dk-donut">
+								<span class="mt-dk-donut-total">@Count(counts.Containers)</span>
+							</MokaDonutChart>
+						</ChildContent>
+					</MokaCard>
+				}
+				@if (SpaceSegments() is { Count: > 0 } space)
+				{
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">Space by kind</span></Header>
+						<ChildContent>
+							<MokaDonutChart Segments="space" Size="MokaSize.Sm" Thickness="26" Label="Disk space docker uses, by kind" Class="mt-dk-donut">
+								<span class="mt-dk-donut-total">@DisplayFormat.Bytes((long)space.Sum(segment => segment.Value))</span>
+							</MokaDonutChart>
+						</ChildContent>
+					</MokaCard>
+				}
+			</div>
 
-				<div class="mt-dk-section">
-					<span class="mt-dk-label">Compose</span>
-					<MokaDataList Items="ComposeFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
-					<div class="mt-dk-toolbar">
-						<span class="mt-dk-note">Compose commands use</span>
-						<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
-							<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
-							<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
-							<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
-						</MokaSegmentedControl>
-					</div>
-					<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>
-				</div>
+			<div class="mt-dk-cards">
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Engine</span></Header>
+					<ChildContent>
+						<MokaDataList Items="EngineFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+					</ChildContent>
+				</MokaCard>
+
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Compose</span></Header>
+					<ChildContent>
+						<MokaDataList Items="ComposeFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+						<div class="mt-dk-toolbar">
+							<span class="mt-dk-note">Compose commands use</span>
+							<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
+								<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
+								<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
+								<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
+							</MokaSegmentedControl>
+						</div>
+						<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>
+					</ChildContent>
+				</MokaCard>
 			</div>
 		}
 
@@ -81,16 +111,15 @@
 			}
 			else if (!IsFirstLoad)
 			{
-				<span class="mt-dk-note">This docker printed no disk usage.</span>
+				<MokaEmptyState Icon="DockerIcons.Prune" Title="No disk usage" Description="This docker printed nothing for docker system df." />
 			}
 		</div>
 
 		@if (Navigation is { } images)
 		{
-			<div class="mt-dk-section">
-				<div class="mt-dk-section-head">
-					<span class="mt-dk-label">Build and push</span>
-					<span class="mt-dk-spacer"></span>
+			<MokaCard Inner Class="mt-dk-card">
+				<Header><span class="mt-dk-label">Build and push</span></Header>
+				<HeaderActions>
 					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Build" OnClick="images.BuildImage">
 						Build image
 					</MokaButton>
@@ -98,9 +127,11 @@
 								OnClick="@(() => images.Navigate(DockerPageIds.Registries))">
 						Registries
 					</MokaButton>
-				</div>
-				<span class="mt-dk-note">Builds and pushes show their output while they run, and carry on when the page changes.</span>
-			</div>
+				</HeaderActions>
+				<ChildContent>
+					<span class="mt-dk-note">Builds and pushes show their output while they run, and carry on when the page changes.</span>
+				</ChildContent>
+			</MokaCard>
 		}
 	</ChildContent>
 </ToolPageFrame>

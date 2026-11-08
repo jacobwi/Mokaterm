@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
-using Moka.Red.Primitives.DataList;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.UI.Common.Platform;
@@ -72,15 +71,6 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 
 	private static bool IsAlive(DockerContainerDetails details) => details.Status is "running" or "paused" or "restarting";
 
-	private static string Or(string value, string fallback) => value.Length > 0 ? value : fallback;
-
-	private static string When(DateTimeOffset? value) =>
-		value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "never";
-
-	private static string HealthText(DockerHealthCheck health) => health.FailingStreak > 0
-		? string.Create(CultureInfo.CurrentCulture, $"{DockerStateDisplay.HealthLabel(health.Status).ToLowerInvariant()}, {health.FailingStreak} failing in a row")
-		: DockerStateDisplay.HealthLabel(health.Status).ToLowerInvariant();
-
 	/// <summary>Image, short id, compose project and service, and when it started: the facts the list leaves out.</summary>
 	private static string MetaLine(DockerContainerDetails details)
 	{
@@ -92,7 +82,7 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 
 		if (details.Status == "running" && details.StartedAt is { } started)
 		{
-			parts.Add("up since " + When(started));
+			parts.Add("up since " + DockerInspectSummary.When(started));
 		}
 
 		return string.Join(" · ", parts);
@@ -116,73 +106,6 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 
 		return details.OomKilled ? state + ", killed out of memory" : state;
 	}
-
-	private static List<MokaDataListItem> InspectFacts(DockerContainerDetails details)
-	{
-		List<MokaDataListItem> facts =
-		[
-			new("Status", details.Status
-				+ (details.ExitCode is { } exit && details.Status != "running" ? string.Create(CultureInfo.InvariantCulture, $" (exit {exit})") : "")
-				+ (details.OomKilled ? ", killed out of memory" : "")),
-		];
-		if (details.Error.Length > 0)
-		{
-			facts.Add(new("Error", details.Error));
-		}
-
-		facts.Add(new("Created", When(details.Created)));
-		facts.Add(new("Started", When(details.StartedAt)));
-		if (details.Status != "running")
-		{
-			facts.Add(new("Finished", When(details.FinishedAt)));
-		}
-
-		facts.Add(new("Restart", string.Create(CultureInfo.CurrentCulture, $"{details.RestartPolicy}, restarted {details.RestartCount} {(details.RestartCount == 1 ? "time" : "times")}")));
-		if (details.Health is { } health)
-		{
-			facts.Add(new("Health", HealthText(health)));
-		}
-
-		facts.Add(new("Image", details.Image));
-		if (details.Entrypoint.Count > 0)
-		{
-			facts.Add(new("Entrypoint", string.Join(' ', details.Entrypoint)));
-		}
-
-		if (details.Command.Count > 0)
-		{
-			facts.Add(new("Command", string.Join(' ', details.Command)));
-		}
-
-		facts.Add(new("Working dir", Or(details.WorkingDirectory, "/")));
-		facts.Add(new("User", Or(details.User, "the image's own (root unless it says otherwise)")));
-		facts.Add(new("Hostname", details.Hostname));
-		facts.Add(new("Network mode", details.NetworkMode));
-		if (details.Pid is { } pid)
-		{
-			facts.Add(new("PID", pid.ToString(CultureInfo.InvariantCulture)));
-		}
-
-		if (details.Privileged)
-		{
-			facts.Add(new("Privileged", "yes, with every capability and every device"));
-		}
-
-		return facts;
-	}
-
-	private static List<MokaDataListItem> PortFacts(DockerContainerDetails details) =>
-		[.. details.Ports.Select(port => new MokaDataListItem(
-			$"{port.ContainerPort}/{port.Protocol}",
-			port.HostPort is { } hostPort ? $"{Or(port.HostAddress, "0.0.0.0")}:{hostPort}" : "not published"))];
-
-	private static List<MokaDataListItem> NetworkFacts(DockerContainerDetails details) =>
-		[.. details.Networks.Select(network => new MokaDataListItem(
-			network.Network,
-			string.Join(" · ", new[] { network.IpAddress, network.Ipv6Address, string.Join(", ", network.Aliases) }.Where(part => part.Length > 0))))];
-
-	private static List<MokaDataListItem> LabelFacts(DockerContainerDetails details) =>
-		[.. details.Labels.OrderBy(label => label.Key, StringComparer.Ordinal).Select(label => new MokaDataListItem(label.Key, label.Value))];
 
 	private string RawJson(DockerContainerDetails details) => DockerInspectParser.RawJson(details.Raw, _revealRaw);
 

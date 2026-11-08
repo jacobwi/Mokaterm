@@ -103,11 +103,6 @@
 							<span class="mt-dk-name" title="@container.Name">@ShortName(container)</span>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="DockerContainer" Title="Health" Field="@(container => container.Health)" SortComparer="ByHealth" Class="mt-col-wider">
-						<CellTemplate Context="container">
-							<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-flag mt-dk-flag--bad" : "mt-dk-flag")">@DockerStateDisplay.HealthLabel(container.Health)</span>
-						</CellTemplate>
-					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Image" Field="@(container => container.Image)" SortComparer="ByImage" Mono Class="mt-col-main">
 						<CellTemplate Context="container">
 							<span class="mt-dk-dim" title="@container.Image">@container.Image</span>
@@ -119,6 +114,15 @@
 								@LoopChip(LoopOf(container.Id, container.Name))
 								@UpdateChip(container.Image)
 							</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerContainer" Title="Status" Field="@(container => container.Health)" SortComparer="ByHealth" Class="mt-col-wider">
+						<CellTemplate Context="container">
+							<span class="mt-dk-dim mt-dk-clip" title="@container.Status">@container.StatusText</span>
+							@if (container.Health != DockerHealth.None)
+							{
+								<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-flag mt-dk-flag--bad mt-dk-after" : "mt-dk-flag mt-dk-after")">@DockerStateDisplay.HealthLabel(container.Health)</span>
+							}
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Ports" Field="Ports" SortComparer="ByPorts" Mono Class="mt-col-wider">

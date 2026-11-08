@@ -1,11 +1,13 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Moka.Red.Core.Enums;
 
 namespace Mokaterm.UI.Common.Components;
 
 /// <summary>
-/// How much of something is used, as a bar that turns to the warning colour at <see cref="WarnPercent"/> and to the
-/// error colour at <see cref="FullPercent"/>.
+/// How much of something is used, as a thin Moka.Red meter that turns to the warning colour at
+/// <see cref="WarnPercent"/> and to the error colour at <see cref="FullPercent"/>. With a <see cref="Label"/> it is a
+/// meter a screen reader can read; without one it only repeats a number shown beside it, and hides.
 /// </summary>
 public sealed partial class UsageBar : ComponentBase
 {
@@ -27,9 +29,16 @@ public sealed partial class UsageBar : ComponentBase
 
 	private double Clamped => Percent is { } percent && double.IsFinite(percent) ? Math.Clamp(percent, 0, 100) : 0;
 
+	private string? NamedLabel => Label is { Length: > 0 } label ? label : null;
+
 	private string ValueText => Clamped.ToString("0.#", CultureInfo.InvariantCulture);
 
-	private string WidthStyle => $"width:{ValueText}%";
+	private MokaColor LevelColor => LevelOf(Clamped) switch
+	{
+		UsageLevel.Full => MokaColor.Error,
+		UsageLevel.Warn => MokaColor.Warning,
+		_ => MokaColor.Success,
+	};
 
 	private string CssClass
 	{

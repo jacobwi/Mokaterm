@@ -34,6 +34,8 @@ internal sealed record DockerContainerStats
 
 	public double? MemoryPercentValue => DockerSizes.ParsePercent(MemoryPercent);
 
+	public string MemoryLimit => Memory.Split('/', 2, StringSplitOptions.TrimEntries) is [_, var limit] && DockerSizes.Parse(limit) is not null ? limit : "";
+
 	/// <summary>The memory in use, the first half of <see cref="Memory"/>.</summary>
 	public long? MemoryBytes => DockerSizes.ParsePair(Memory).First;
 

@@ -34,15 +34,37 @@ public sealed class SampleHistoryTests
 	public void RefusesNoRoom() => Assert.Throws<ArgumentOutOfRangeException>(() => new SampleHistory(0));
 
 	[Fact]
+	public void AWindow_PadsTheFrontWithGaps_AndKeepsTheValuesAsTheyAre()
+	{
+		SampleHistory history = new(4);
+		history.Add(3);
+		history.Add(double.NaN);
+
+		double[] window = SampleHistory.Window(history, history.Capacity);
+
+		Assert.Equal(4, window.Length);
+		Assert.True(double.IsNaN(window[0]) && double.IsNaN(window[1]));
+		Assert.Equal(3, window[2]);
+		Assert.True(double.IsNaN(window[3]));
+
+		// A window never cuts samples: more than the slots are all there.
+		Assert.Equal([1d, 2d, 3d], SampleHistory.Window([1, 2, 3], 2));
+		Assert.Empty(SampleHistory.Window([], 0));
+	}
+
+	[Fact]
 	public async Task ASparkline_TakesItAsItsValues()
 	{
 		SampleHistory history = new(4);
 		history.Add(0);
 		history.Add(10);
 
-		string before = await StaticRender.RenderAsync<Sparkline>(_ => { }, new() { ["Values"] = history, ["Max"] = 10.0, ["Slots"] = history.Capacity })
+		string html = await StaticRender.RenderAsync<Sparkline>(_ => { }, new() { ["Values"] = history, ["Max"] = 10.0, ["Slots"] = history.Capacity })
 			.WaitAsync(Wait, TestContext.Current.CancellationToken);
 
-		Assert.Contains($"points=\"{Sparkline.Points([0, 10], 10, 4)}\"", before, StringComparison.Ordinal);
+		// The two samples sit in the right half of the four slots: from x 80 of Moka's 120 wide box to its right edge.
+		Assert.Contains("moka-sparkline-line", html, StringComparison.Ordinal);
+		Assert.Contains("M 80.00", html, StringComparison.Ordinal);
+		Assert.Contains("L 120.00", html, StringComparison.Ordinal);
 	}
 }

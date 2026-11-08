@@ -73,13 +73,23 @@ else
 			<span class="mt-dk-change-command mt-dk-mono" title="@result.Command">$ @result.Command</span>
 			@if (result.Output.Length > 0 || result.Error.Length == 0)
 			{
-				<span class="mt-dk-label">stdout</span>
-				<pre class="mt-dk-box">@(result.Output.Length == 0 ? "(nothing)" : TerminalTextFilter.Plain(result.Output))</pre>
+				<MokaCodeBlock Code="@(result.Output.Length == 0 ? "(nothing)" : TerminalTextFilter.Plain(result.Output))"
+							   Language="stdout"
+							   ShowLineNumbers="false"
+							   ShowCopyButton="false"
+							   Wrap="true"
+							   MaxHeight="360px"
+							   Class="mt-dk-code-block" />
 			}
 			@if (result.Error.Length > 0)
 			{
-				<span class="mt-dk-label">stderr</span>
-				<pre class="mt-dk-box mt-dk-box--short mt-dk-box--error">@TerminalTextFilter.Plain(result.Error)</pre>
+				<MokaCodeBlock Code="@TerminalTextFilter.Plain(result.Error)"
+							   Language="stderr"
+							   ShowLineNumbers="false"
+							   ShowCopyButton="false"
+							   Wrap="true"
+							   MaxHeight="160px"
+							   Class="mt-dk-code-block mt-dk-code-block--error" />
 			}
 			@if (result.OutputTruncated || result.ErrorTruncated)
 			{

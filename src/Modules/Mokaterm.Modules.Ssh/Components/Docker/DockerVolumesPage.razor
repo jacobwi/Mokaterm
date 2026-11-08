@@ -130,33 +130,37 @@
 			<div class="mt-dk-scroll">
 				@if (_details is { } details && details.Name == selected)
 				{
-					<div class="mt-dk-section">
-						<span class="mt-dk-label">On the docker host</span>
-						@if (details.Mountpoint.Length > 0)
-						{
-							@PathLine(details.Mountpoint, "Copy the host path")
-						}
-						else
-						{
-							<span class="mt-dk-note">The @details.Driver driver names no path on this host.</span>
-						}
-					</div>
-					<div class="mt-dk-section">
-						<span class="mt-dk-label">Mounted by</span>
-						@if (details.UsedBy.Count == 0)
-						{
-							<span class="mt-dk-note">No container, running or stopped.</span>
-						}
-						@foreach (DockerVolumeUse use in details.UsedBy)
-						{
-							<div class="mt-dk-variable" @key="use.Container + use.Destination">
-								<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(use.State)" />
-								<span class="mt-dk-variable-name">@use.Container</span>
-								<span class="mt-dk-variable-value">@use.Destination</span>
-								<span class="mt-dk-flag">@(use.ReadWrite ? "rw" : "ro")</span>
-							</div>
-						}
-					</div>
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">On the docker host</span></Header>
+						<ChildContent>
+							@if (details.Mountpoint.Length > 0)
+							{
+								@PathLine(details.Mountpoint, "Copy the host path")
+							}
+							else
+							{
+								<span class="mt-dk-note">The @details.Driver driver names no path on this host.</span>
+							}
+						</ChildContent>
+					</MokaCard>
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">Mounted by</span></Header>
+						<ChildContent>
+							@if (details.UsedBy.Count == 0)
+							{
+								<span class="mt-dk-note">No container, running or stopped.</span>
+							}
+							@foreach (DockerVolumeUse use in details.UsedBy)
+							{
+								<div class="mt-dk-variable" @key="use.Container + use.Destination">
+									<MokaStatusDot Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(use.State)" />
+									<span class="mt-dk-variable-name">@use.Container</span>
+									<span class="mt-dk-variable-value">@use.Destination</span>
+									<MokaTag Text="@(use.ReadWrite ? "RW" : "RO")" Size="MokaSize.Xs" Color="@(use.ReadWrite ? MokaColor.Surface : MokaColor.Info)" />
+								</div>
+							}
+						</ChildContent>
+					</MokaCard>
 					@if (details.Mountpoint.StartsWith('/'))
 					{
 						<div class="mt-dk-section">

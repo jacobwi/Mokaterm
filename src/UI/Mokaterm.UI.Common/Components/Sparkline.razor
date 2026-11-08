@@ -1,16 +1,12 @@
 @namespace Mokaterm.UI.Common.Components
+@using Moka.Red.Data.Chart
 
-@* A line of recent values in an SVG that stretches to its box: no axes, no script. The stroke keeps its width however
-   far the box stretches it. *@
-@if (Label is { Length: > 0 } label)
-{
-	<svg class="@CssClass" style="@HeightStyle" viewBox="0 0 @ViewWidth @ViewHeight" preserveAspectRatio="none" role="img" aria-label="@label">
-		<polyline points="@_points" />
-	</svg>
-}
-else
-{
-	<svg class="@CssClass" style="@HeightStyle" viewBox="0 0 @ViewWidth @ViewHeight" preserveAspectRatio="none" aria-hidden="true">
-		<polyline points="@_points" />
-	</svg>
-}
+<div class="@CssClass" style="@HeightStyle" aria-hidden="@(Label is { Length: > 0 } ? null : "true")">
+	<MokaSparkline Values="_window"
+				   Min="0"
+				   Max="_top"
+				   ShowArea="true"
+				   ShowLastPoint="false"
+				   Label="@Label"
+				   ColorValue="var(--mt-sparkline-color, var(--moka-color-primary))" />
+</div>

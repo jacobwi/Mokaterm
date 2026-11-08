@@ -231,21 +231,45 @@ internal sealed partial class DemoDockerEngine
 			double cpu = running ? container.CpuBase * (1.4 + Math.Sin(phase + container.Name.Length)) : 0;
 			long memory = container.IsAlive ? container.MemoryBytes + (long)(container.MemoryBytes * 0.05 * Math.Sin(phase / 3)) : 0;
 			const double Limit = 8_201_457_664d;
+			// Totals that grow at a rate that rises and falls, so the stats page has traffic to measure.
+			double up = (_time.GetUtcNow() - _started).TotalSeconds + 600;
+			double traffic = container.CpuBase * 9_000;
+			string netIo = $"{DockerSize(Grown(traffic, up, 23))} / {DockerSize(Grown(traffic * 0.45, up, 31))}";
+			string blockIo = $"{DockerSize(Grown(traffic * 2.5, up, 17))} / {DockerSize(Grown(traffic * 1.2, up, 41))}";
 			output.Append(Line(new Dictionary<string, string>
 			{
-				["BlockIO"] = running ? "12.4MB / 3.1MB" : "0B / 0B",
+				["BlockIO"] = running ? blockIo : "0B / 0B",
 				["CPUPerc"] = string.Create(CultureInfo.InvariantCulture, $"{cpu:0.00}%"),
 				["Container"] = container.Id,
 				["ID"] = container.Id,
 				["MemPerc"] = string.Create(CultureInfo.InvariantCulture, $"{memory * 100 / Limit:0.00}%"),
 				["MemUsage"] = string.Create(CultureInfo.InvariantCulture, $"{memory / 1048576d:0.##}MiB / 7.638GiB"),
 				["Name"] = container.Name,
-				["NetIO"] = running ? "1.85MB / 920kB" : "0B / 0B",
+				["NetIO"] = running ? netIo : "0B / 0B",
 				["PIDs"] = running ? "12" : "0",
 			})).Append('\n');
 		}
 
 		return DemoDockerResult.Ok(output.ToString());
+	}
+
+	/// <summary>A total after <paramref name="seconds"/> at a rate that swings between 0.3 and 1.7 times <paramref name="rate"/>.</summary>
+	private static long Grown(double rate, double seconds, double period) =>
+		(long)(rate * (seconds + (0.7 * period * Math.Sin(seconds / period))));
+
+	/// <summary>A size the way docker stats prints it: three figures, decimal units.</summary>
+	private static string DockerSize(long bytes)
+	{
+		string[] units = ["B", "kB", "MB", "GB", "TB"];
+		double value = bytes;
+		int unit = 0;
+		while (value >= 999.5 && unit < units.Length - 1)
+		{
+			value /= 1000;
+			unit++;
+		}
+
+		return value.ToString("G3", CultureInfo.InvariantCulture) + units[unit];
 	}
 
 	/// <summary>

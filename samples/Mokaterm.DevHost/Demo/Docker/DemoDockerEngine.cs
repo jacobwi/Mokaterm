@@ -21,6 +21,7 @@ internal sealed partial class DemoDockerEngine
 
 	private readonly Lock _lock = new();
 	private readonly TimeProvider _time;
+	private readonly DateTimeOffset _started;
 	private readonly Func<string, string?> _readFile;
 	private readonly Func<string, byte[]?> _readBytes;
 	private readonly List<DemoDockerContainer> _containers = [];
@@ -33,6 +34,7 @@ internal sealed partial class DemoDockerEngine
 	public DemoDockerEngine(TimeProvider time, Func<string, string?> readFile, Func<string, byte[]?>? readBytes = null)
 	{
 		_time = time;
+		_started = time.GetUtcNow();
 		_readFile = readFile;
 		_readBytes = readBytes ?? (_ => null);
 		DateTimeOffset now = time.GetUtcNow();

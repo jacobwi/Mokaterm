@@ -1,22 +1,51 @@
+/* Tiles and charts over the table. The table keeps the rest of the list's height, and room for a few rows at least:
+   below that the list scrolls as a whole. */
+.mt-dks {
+	container-type: inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-height: 100%;
+}
+
+.mt-dks > * {
+	flex-shrink: 0;
+}
+
+.mt-dks-table {
+	display: flex;
+	flex: 1 0 220px;
+	flex-direction: column;
+	min-height: 220px;
+}
+
 /* A figure with its recent line or its bar beside it, the figure in a fixed width so the lines start in one place. */
-.mt-dks-cpu,
-.mt-dks-memory {
+.mt-dks-cell,
+.mt-dks-bar {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--moka-spacing-xs);
+	gap: var(--moka-spacing-sm);
 }
 
 .mt-dks-figure {
 	display: inline-block;
-	min-width: 52px;
+	min-width: 60px;
 }
 
-.mt-dks-cpu ::deep .mt-dks-spark {
-	flex: 0 0 72px;
-	width: 72px;
+.mt-dks-cell ::deep .mt-dks-spark {
+	flex: 0 0 96px;
+	width: 96px;
 }
 
-.mt-dks-memory ::deep .mt-usage {
-	flex: 0 0 56px;
-	width: 56px;
+.mt-dks-bar ::deep .mt-usage {
+	flex: 0 0 64px;
+	width: 64px;
+}
+
+/* A list narrowed by the panel keeps its room for names: the line and the bar go, the figures stay. */
+@container mt-tool-table (max-width: 699px) {
+	.mt-dks-cell ::deep .mt-dks-spark,
+	.mt-dks-bar {
+		display: none;
+	}
 }

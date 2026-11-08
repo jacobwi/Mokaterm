@@ -62,9 +62,14 @@
 			}
 			else
 			{
-				@foreach (DotEnvVariable variable in file.Variables)
+				@if (file.Variables.Count > 0)
 				{
-					<DockerVariableRow @key="variable.Line" Name="@variable.Name" Value="@variable.Value" />
+					<div class="mt-dk-variables">
+						@foreach (DotEnvVariable variable in file.Variables)
+						{
+							<DockerVariableRow @key="variable.Line" Name="@variable.Name" Value="@variable.Value" />
+						}
+					</div>
 				}
 				@if (file.IsCut)
 				{

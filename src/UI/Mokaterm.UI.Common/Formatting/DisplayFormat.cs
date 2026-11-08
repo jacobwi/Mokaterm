@@ -7,6 +7,12 @@ public static class DisplayFormat
 {
 	private static readonly string[] SizeUnits = ["B", "KB", "MB", "GB", "TB", "PB"];
 
+	/// <summary>
+	/// The sizes <see cref="Bytes"/> moves to its next unit at, for a Moka.Red chart's <c>ScaleUnits</c>: with them its
+	/// ticks fall on round values in the unit they are written in (256 KB, 1.5 MB) rather than on round byte counts.
+	/// </summary>
+	public static IReadOnlyList<double> ByteUnits { get; } = [1, 1024, 1024d * 1024, 1024d * 1024 * 1024, 1024d * 1024 * 1024 * 1024];
+
 	/// <summary><c>0 B</c>, <c>512 B</c>, <c>12.4 MB</c>. Binary multiples, one decimal above bytes.</summary>
 	public static string Bytes(long bytes)
 	{

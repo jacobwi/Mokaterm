@@ -27,6 +27,16 @@ internal sealed record DockerContainer
 
 	public string Status => Row.Status;
 
+	// Without the health in brackets, which the list shows in a column of its own.
+	public string StatusText
+	{
+		get
+		{
+			int health = Health == DockerHealth.None ? -1 : Status.LastIndexOf(" (", StringComparison.Ordinal);
+			return health > 0 ? Status[..health] : Status;
+		}
+	}
+
 	public bool IsRunning => Row.State == "running";
 
 	public bool IsPaused => Row.State == "paused";

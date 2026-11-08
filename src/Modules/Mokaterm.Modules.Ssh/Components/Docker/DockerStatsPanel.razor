@@ -6,37 +6,22 @@
 
 	@if (_stats is { } stats)
 	{
-		<div class="mt-dk-stats">
-			<div class="mt-dk-stat">
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">CPU</MokaText>
-				<span class="mt-dk-stat-value">@stats.Cpu</span>
-				<UsageBar Percent="stats.CpuShare(CoreCount)" />
-				<Sparkline Values="_history.Cpu(stats.Id)" Max="CpuScale" Slots="DockerStatsHistory.Length" Label="Recent CPU samples" />
-			</div>
-			<div class="mt-dk-stat">
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Memory</MokaText>
-				<span class="mt-dk-stat-value">@stats.MemoryPercent</span>
-				<UsageBar Percent="stats.MemoryPercentValue" />
-				<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mt-dk-muted">@stats.Memory</MokaText>
-				<Sparkline Values="_history.Memory(stats.Id)" Max="100" Slots="DockerStatsHistory.Length" Label="Recent memory samples" />
-			</div>
-			<div class="mt-dk-stat">
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Network in / out</MokaText>
-				<span class="mt-dk-stat-value">@stats.NetworkIo</span>
-			</div>
-			<div class="mt-dk-stat">
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Block read / write</MokaText>
-				<span class="mt-dk-stat-value">@stats.BlockIo</span>
-			</div>
-			<div class="mt-dk-stat">
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mt-dk-label">Processes</MokaText>
-				<span class="mt-dk-stat-value">@stats.Pids</span>
-			</div>
-		</div>
-		<MokaText Element="span" Size="MokaSize.Xs" Style="@TextStyles.Muted">
-			One sample every few seconds while this tab is open, from docker stats. CPU counts every core, so a busy
-			container on a machine with @CoreCount cores can reach @(CoreCount * 100)%.
-		</MokaText>
+		<DockerStatsCharts Cpu="_history.Cpu(stats.Id)"
+						   MemoryBytes="_history.MemoryBytes(stats.Id)"
+						   Received="_history.Received(stats.Id)"
+						   Sent="_history.Sent(stats.Id)"
+						   Read="_history.Read(stats.Id)"
+						   Written="_history.Written(stats.Id)"
+						   Cores="CoreCount"
+						   MemoryPercent="@stats.MemoryPercent"
+						   MemoryLimit="@stats.MemoryLimit"
+						   Pids="@stats.Pids"
+						   ChartHeight="120px" />
+		<span class="mt-dk-note">
+			Sampled every @DockerStatsHistory.SampleInterval.TotalSeconds.ToString("0", CultureInfo.CurrentCulture) s while this tab is
+			open, from docker stats. Docker prints its network and disk totals to three figures, so the rates are measured over
+			the last half minute.
+		</span>
 	}
 	else if (IsFirstLoad)
 	{

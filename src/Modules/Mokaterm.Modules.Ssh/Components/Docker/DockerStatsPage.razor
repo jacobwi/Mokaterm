@@ -11,50 +11,112 @@
 			   Error="@LoadError"
 			   LoadingText="Sampling every running container"
 			   OnRefresh="@(() => RefreshByHandAsync(RefreshAsync))"
-			   ListPage>
-	<ToolTable TItem="DockerContainerStats"
-			   Items="_rows"
-			   ItemKey="@(row => row.Id)"
-			   Label="Container figures"
-			   SortColumn="CPU"
-			   SortDirection="MokaSortDirection.Descending"
-			   EmptyIcon="DockerIcons.Stats"
-			   EmptyTitle="@(_samples.Count == 0 ? "Nothing is running" : "Nothing matches")"
-			   EmptyText="@(_samples.Count == 0 ? "docker stats reports only running containers." : "No running container matches the filter.")">
-		<MokaColumn TItem="DockerContainerStats" Title="Container" Field="@(row => row.Name)" SortComparer="ByName" Mono Class="mt-col-main">
-			<CellTemplate Context="row">
-				<span class="mt-dk-name" title="@row.Name">@row.Name</span>
-			</CellTemplate>
-		</MokaColumn>
-		<MokaColumn TItem="DockerContainerStats" Title="CPU" Field="@(row => row.CpuValue)" SortComparer="ByCpu" SortDescendingFirst Mono>
-			<CellTemplate Context="row">
-				<span class="mt-dks-cpu">
-					<span class="mt-dks-figure">@row.Cpu</span>
-					<Sparkline Values="_history.Cpu(row.Id)" Max="CpuScale" Slots="DockerStatsHistory.Length" Height="16" Class="mt-dks-spark" Label="@($"Recent CPU of {row.Name}")" />
-				</span>
-			</CellTemplate>
-		</MokaColumn>
-		<MokaColumn TItem="DockerContainerStats" Title="Memory" Field="@(row => row.MemoryBytes)" SortComparer="ByMemory" SortDescendingFirst Mono>
-			<CellTemplate Context="row">
-				<span class="mt-dks-memory">
-					<span class="mt-dks-figure">@row.MemoryPercent</span>
-					<span class="mt-dk-dim">@MemoryUsed(row)</span>
-					<UsageBar Percent="row.MemoryPercentValue" />
-				</span>
-			</CellTemplate>
-		</MokaColumn>
-		<MokaColumn TItem="DockerContainerStats" Title="Net in / out" Field="@(row => row.NetworkBytes)" SortComparer="ByNetwork" SortDescendingFirst Mono Class="mt-col-wide">
-			<CellTemplate Context="row">
-				<span class="mt-dk-dim">@row.NetworkIo</span>
-			</CellTemplate>
-		</MokaColumn>
-		<MokaColumn TItem="DockerContainerStats" Title="Block read / write" Field="@(row => row.BlockBytes)" SortComparer="ByBlock" SortDescendingFirst Mono Class="mt-col-wider">
-			<CellTemplate Context="row">
-				<span class="mt-dk-dim">@row.BlockIo</span>
-			</CellTemplate>
-		</MokaColumn>
-		<MokaColumn TItem="DockerContainerStats" Title="PIDs" Field="@(row => row.PidCount)" SortComparer="ByPids" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-			<CellTemplate Context="row">@row.Pids</CellTemplate>
-		</MokaColumn>
-	</ToolTable>
+			   ListPage
+			   Detail="@DetailFragment">
+	<div class="mt-dks">
+		@if (_samples.Count > 0)
+		{
+			<div class="mt-dk-tiles mt-dk-tiles--small">
+				<MokaStat Tile Value="@_rows.Count.ToString("N0", CultureInfo.CurrentCulture)" Label="@(_query.Length == 0 ? "Running" : "Shown")" HelpText="@RunningHelp" />
+				<MokaStat Tile Value="@DockerChartFormat.Percent(TotalCpu)" Label="CPU" HelpText="@($"of {CpuScale:0}%, {CoreCount} cores")" />
+				<MokaStat Tile Value="@DockerChartFormat.Bytes(TotalMemory)" Label="Memory" HelpText="@MemoryHelp" />
+				<MokaStat Tile Value="@DockerChartFormat.Rate(Latest(_received))" Label="Network in" HelpText="@($"{DockerChartFormat.Rate(Latest(_sent))} out")" />
+				<MokaStat Tile Value="@DockerChartFormat.Rate(Latest(_read))" Label="Disk read" HelpText="@($"{DockerChartFormat.Rate(Latest(_written))} written")" />
+			</div>
+
+			<div class="mt-dk-charts">
+				@foreach (DockerChart chart in _charts)
+				{
+					<DockerLiveChart @key="chart.Title" Chart="chart" Height="130px" />
+				}
+			</div>
+		}
+
+		<div class="mt-dks-table">
+			<ToolTable TItem="DockerContainerStats"
+					   Items="_rows"
+					   ItemKey="@(row => row.Id)"
+					   Label="Container figures"
+					   IsSelected="@(row => row.Id == _selected)"
+					   OnRowClick="Select"
+					   SortColumn="CPU"
+					   SortDirection="MokaSortDirection.Descending"
+					   EmptyIcon="DockerIcons.Stats"
+					   EmptyTitle="@(_samples.Count == 0 ? "Nothing is running" : "Nothing matches")"
+					   EmptyText="@(_samples.Count == 0 ? "docker stats reports only running containers." : "No running container matches the filter.")">
+				<MokaColumn TItem="DockerContainerStats" Title="Container" Field="@(row => row.Name)" SortComparer="ByName" Mono Class="mt-col-main">
+					<CellTemplate Context="row">
+						<span class="mt-dk-name" title="@row.Name">@row.Name</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerContainerStats" Title="CPU" Field="@(row => row.CpuValue)" SortComparer="ByCpu" SortDescendingFirst Mono>
+					<CellTemplate Context="row">
+						<span class="mt-dks-cell">
+							<span class="mt-dks-figure">@row.Cpu</span>
+							<Sparkline Values="_history.Cpu(row.Id)" Max="SparkTop" Slots="DockerStatsHistory.Length" Height="18" Class="mt-dks-spark" Label="@($"Recent CPU of {row.Name}")" />
+						</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerContainerStats" Title="Memory" Field="@(row => row.MemoryBytes)" SortComparer="ByMemory" SortDescendingFirst Mono>
+					<CellTemplate Context="row">
+						<span class="mt-dks-cell">
+							<span class="mt-dks-figure">@MemoryUsed(row)</span>
+							<span class="mt-dks-bar">
+								<UsageBar Percent="row.MemoryPercentValue" />
+								<span class="mt-dk-dim">@row.MemoryPercent</span>
+							</span>
+						</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerContainerStats" Title="Net in / out" Field="@(row => row.NetworkBytes)" SortComparer="ByNetwork" SortDescendingFirst Mono Class="mt-col-wide">
+					<CellTemplate Context="row">
+						<span class="mt-dk-dim" title="@($"{row.NetworkIo} since it started")">@RatePair(_history.RatesOf(row.Id).Received, _history.RatesOf(row.Id).Sent)</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerContainerStats" Title="Disk read / write" Field="@(row => row.BlockBytes)" SortComparer="ByBlock" SortDescendingFirst Mono Class="mt-col-wider">
+					<CellTemplate Context="row">
+						<span class="mt-dk-dim" title="@($"{row.BlockIo} since it started")">@RatePair(_history.RatesOf(row.Id).Read, _history.RatesOf(row.Id).Written)</span>
+					</CellTemplate>
+				</MokaColumn>
+				<MokaColumn TItem="DockerContainerStats" Title="PIDs" Field="@(row => row.PidCount)" SortComparer="ByPids" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+					<CellTemplate Context="row">@row.Pids</CellTemplate>
+				</MokaColumn>
+			</ToolTable>
+		</div>
+	</div>
 </ToolPageFrame>
+
+@code {
+	private RenderFragment? DetailFragment => SelectedRow is { } row ? DetailPanel(row) : null;
+
+	private RenderFragment DetailPanel(DockerContainerStats row) => @<ToolDetailPanel Title="@row.Name"
+																					   Subtitle="@($"{row.Cpu} CPU · {row.Memory}")"
+																					   DotColor="MokaColor.Success"
+																					   DotGlow="true"
+																					   OnClose="ClosePanel">
+		<Actions>
+			@if (Navigation is { } navigation)
+			{
+				<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Container"
+							OnClick="@(() => navigation.ShowContainer(row.Id, "logs"))">
+					Open container
+				</MokaButton>
+			}
+		</Actions>
+		<ChildContent>
+			<div class="mt-dk-scroll">
+				<DockerStatsCharts Cpu="_history.Cpu(row.Id)"
+								   MemoryBytes="_history.MemoryBytes(row.Id)"
+								   Received="_history.Received(row.Id)"
+								   Sent="_history.Sent(row.Id)"
+								   Read="_history.Read(row.Id)"
+								   Written="_history.Written(row.Id)"
+								   Cores="CoreCount"
+								   MemoryPercent="@row.MemoryPercent"
+								   MemoryLimit="@row.MemoryLimit"
+								   Pids="@row.Pids"
+								   ChartHeight="120px" />
+			</div>
+		</ChildContent>
+	</ToolDetailPanel>;
+}

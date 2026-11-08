@@ -239,35 +239,6 @@
 	font-size: 11px;
 }
 
-.mt-dk ::deep .mt-dk-box {
-	margin: 0;
-	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
-	max-height: 360px;
-	overflow: auto;
-	border: 1px solid var(--moka-color-outline-variant);
-	border-radius: var(--moka-radius-sm);
-	background: var(--moka-color-background);
-	color: var(--moka-color-on-surface);
-	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-xs);
-	line-height: 1.5;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
-
-.mt-dk ::deep .mt-dk-box--short {
-	max-height: 160px;
-}
-
-.mt-dk ::deep .mt-dk-box--nowrap {
-	white-space: pre;
-	overflow-wrap: normal;
-}
-
-.mt-dk ::deep .mt-dk-box--error {
-	color: var(--moka-color-warning);
-}
-
 /* The last change: a line on the left in its outcome's colour, the command, and its output folded away. */
 .mt-dk ::deep .mt-dk-change {
 	display: flex;
@@ -354,34 +325,130 @@
 	overflow-wrap: anywhere;
 }
 
+/* Facts in groups (MokaCard Inner): two side by side once the panel has room for both, one under the other otherwise. */
+.mt-dk ::deep .mt-dk-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	align-items: start;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-card {
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+}
+
+.mt-dk ::deep .mt-dk-card .moka-card-header {
+	align-items: center;
+	min-height: var(--moka-button-height-sm);
+}
+
+/* What a card holds stacks: a name over the note about it, a list over the remark under it. */
+.mt-dk ::deep .mt-dk-card > .moka-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* A card whose title is data with tags beside it, such as a mount. */
+.mt-dk ::deep .mt-dk-card-title {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* A donut with its legend beside it, the total in its middle. */
+.mt-dk ::deep .mt-dk-donut {
+	align-items: center;
+}
+
+.mt-dk ::deep .mt-dk-donut-total {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-sm);
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+/* Raw output (MokaCodeBlock, its own copy button off): the manager's data size, and a tighter frame. */
+.mt-dk ::deep .mt-dk-code-block {
+	flex-shrink: 0;
+	min-width: 0;
+	font-size: 11px;
+	line-height: 1.55;
+}
+
+.mt-dk ::deep .mt-dk-code-block .moka-code-block__pre {
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
+}
+
+.mt-dk ::deep .mt-dk-code-block .moka-code-block__header {
+	padding: 2px var(--moka-spacing-sm);
+}
+
+.mt-dk ::deep .mt-dk-code-block--error .moka-code-block__code {
+	color: var(--moka-color-warning);
+}
+
 .mt-dk ::deep .mt-dk-tiles {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 	gap: var(--moka-spacing-sm);
 }
 
-/* A container's own figures, drawn like the overview's MokaStat tiles but with a line or a bar under the value. */
-.mt-dk ::deep .mt-dk-stats {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-	gap: var(--moka-spacing-sm);
+/* Tiles in a side panel or over a chart grid, where five have to share a narrower row. */
+.mt-dk ::deep .mt-dk-tiles--small {
+	grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
 }
 
-.mt-dk ::deep .mt-dk-stat {
+/* Figures are data: the tile's value reads in mono, like every other figure in the manager. */
+.mt-dk ::deep .mt-dk-tiles .moka-stat__value {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0;
+	overflow-wrap: anywhere;
+}
+
+/* A container's figures: tiles, then its live charts. A container of its own, so the charts follow its width. */
+.mt-dk ::deep .mt-dk-stats {
+	container-type: inline-size;
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: var(--moka-spacing-sm);
 	min-width: 0;
-	padding: 0.5625rem 0.625rem;
-	border-radius: var(--moka-radius-md);
-	background: var(--moka-color-surface-variant);
 }
 
-.mt-dk ::deep .mt-dk-stat-value {
-	font-size: 1.0625rem;
-	font-weight: var(--moka-font-weight-semibold);
-	line-height: var(--moka-line-height-tight);
-	overflow-wrap: anywhere;
+/* Live charts: one under the other in a side panel, two by two, then the four in a row. Fixed steps rather than
+   auto-fit, which leaves the fourth alone on a row of its own at in-between widths. The nearest container decides. */
+.mt-dk ::deep .mt-dk-charts {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+@container (min-width: 520px) {
+	.mt-dk ::deep .mt-dk-charts {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@container (min-width: 940px) {
+	.mt-dk ::deep .mt-dk-charts {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+.mt-dk ::deep .mt-dk-chart {
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+}
+
+.mt-dk ::deep .mt-dk-chart .moka-linechart-legend {
+	font-family: var(--moka-font-family-mono);
+	font-size: 11px;
 }
 
 .mt-dk ::deep .mt-dk-form {
@@ -396,6 +463,24 @@
 .mt-dk ::deep .mt-dk-form-field {
 	flex: 1 1 200px;
 	min-width: 0;
+}
+
+/* Variables as one framed list, a line between them. */
+.mt-dk ::deep .mt-dk-variables {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-variant);
+}
+
+.mt-dk ::deep .mt-dk-variables .mt-dk-variable {
+	padding: 0 var(--moka-spacing-xxs) 0 var(--moka-spacing-sm);
+}
+
+.mt-dk ::deep .mt-dk-variables .mt-dk-variable + .mt-dk-variable {
+	border-top: 1px solid var(--moka-color-outline-variant);
 }
 
 .mt-dk ::deep .mt-dk-variable {

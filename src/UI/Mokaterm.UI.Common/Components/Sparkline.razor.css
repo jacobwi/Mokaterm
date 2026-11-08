@@ -1,13 +1,17 @@
 .mt-sparkline {
 	display: block;
 	width: 100%;
-	overflow: visible;
 }
 
-.mt-sparkline polyline {
-	fill: none;
-	stroke: var(--mt-sparkline-color, var(--moka-color-primary));
-	stroke-width: 1.5;
-	stroke-linejoin: round;
+/* Moka's sparkline sizes itself by MokaSize; here it fills the box the caller sized. */
+.mt-sparkline ::deep .moka-sparkline {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* The box stretches the chart's viewBox unevenly, so the stroke is held to its width in pixels. */
+.mt-sparkline ::deep .moka-sparkline-line {
+	stroke-width: 1.5px;
 	vector-effect: non-scaling-stroke;
 }

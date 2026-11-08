@@ -54,19 +54,32 @@
 		@ChangePanel
 
 		<div class="mt-dk-scroll">
-			<div class="mt-dk-section">
-				<span class="mt-dk-label">Image id</span>
-				@PathLine(ImageId, "Copy the image id")
+			<div class="mt-dk-tiles mt-dk-tiles--small">
+				@if (Size.Length > 0)
+				{
+					<MokaStat Tile Value="@Size" Label="Size" />
+				}
+				@if (Created.Length > 0)
+				{
+					<MokaStat Tile Value="@Created" Label="Created" />
+				}
+				@if (Containers is { } containers)
+				{
+					<MokaStat Tile Value="@containers.ToString("N0", CultureInfo.CurrentCulture)" Label="Containers" />
+				}
+				<MokaStat Tile Value="@TagCount" Label="Local tags" HelpText="@(Tagged ? Repository : "tag it to push it")" />
 			</div>
-			<MokaDataList Items="Facts" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+
+			<MokaCard Inner Class="mt-dk-card">
+				<Header><span class="mt-dk-label">Image id</span></Header>
+				<ChildContent>@PathLine(ImageId, "Copy the image id")</ChildContent>
+			</MokaCard>
 
 			@if (Tagged)
 			{
-				<div class="mt-dk-section">
-					<div class="mt-dk-section-head">
-						<span class="mt-dk-label">Pushes to</span>
-						<span class="mt-dk-mono">@RegistryDisplay</span>
-						<span class="mt-dk-spacer"></span>
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Pushes to</span></Header>
+					<HeaderActions>
 						@if (Navigation is { } registries)
 						{
 							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Registry"
@@ -74,20 +87,23 @@
 								Registries
 							</MokaButton>
 						}
-					</div>
-					@if (_configProblem is { } configProblem)
-					{
-						<span class="mt-dk-note">@configProblem</span>
-					}
-					else if (Feature?.ClientConfig is { } config)
-					{
-						<span class="mt-dk-note">@DockerRegistryWording.LoginState(config, Registry)</span>
-					}
-					else
-					{
-						<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
-					}
-				</div>
+					</HeaderActions>
+					<ChildContent>
+						<span class="mt-dk-name mt-dk-mono">@RegistryDisplay</span>
+						@if (_configProblem is { } configProblem)
+						{
+							<span class="mt-dk-note">@configProblem</span>
+						}
+						else if (Feature?.ClientConfig is { } config)
+						{
+							<span class="mt-dk-note">@DockerRegistryWording.LoginState(config, Registry)</span>
+						}
+						else
+						{
+							<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Xs" />
+						}
+					</ChildContent>
+				</MokaCard>
 			}
 		</div>
 	</ChildContent>

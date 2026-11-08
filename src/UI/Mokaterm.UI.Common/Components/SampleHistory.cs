@@ -3,8 +3,9 @@ using System.Collections;
 namespace Mokaterm.UI.Common.Components;
 
 /// <summary>
-/// The newest samples of one figure, oldest first, as a <see cref="Sparkline"/> draws them: a container's CPU, a
-/// machine's memory or network traffic. Past <see cref="Capacity"/> the oldest sample makes room for the new one.
+/// The newest samples of one figure, oldest first, as a <see cref="Sparkline"/> or a live <c>MokaLineChart</c> draws
+/// them (the chart through <see cref="Window"/>): a container's CPU, a machine's memory or network traffic. Past
+/// <see cref="Capacity"/> the oldest sample makes room for the new one.
 /// </summary>
 /// <remarks>
 /// Hand the same instance to the <see cref="Sparkline"/> on every render: a parameter of this type counts as changed
@@ -56,6 +57,27 @@ public sealed class SampleHistory : IReadOnlyList<double>
 	{
 		_start = 0;
 		Count = 0;
+	}
+
+	/// <summary>
+	/// <paramref name="values"/> as the window a live Moka.Red chart draws, at least <paramref name="slots"/> long and
+	/// newest last. While there are fewer values the front is <see cref="double.NaN"/>, which those charts leave as a
+	/// gap, so a line that has only started grows in from the right edge instead of stretching over the width. The
+	/// values themselves are copied as they are.
+	/// </summary>
+	public static double[] Window(IReadOnlyList<double> values, int slots)
+	{
+		ArgumentNullException.ThrowIfNull(values);
+		int length = Math.Max(Math.Max(slots, 0), values.Count);
+		double[] window = new double[length];
+		int gap = length - values.Count;
+		Array.Fill(window, double.NaN, 0, gap);
+		for (int index = 0; index < values.Count; index++)
+		{
+			window[gap + index] = values[index];
+		}
+
+		return window;
 	}
 
 	public IEnumerator<double> GetEnumerator()

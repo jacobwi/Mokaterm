@@ -100,70 +100,114 @@
 
 		@if (_raw)
 		{
-			<pre class="mt-dk-box mt-dk-box--nowrap">@RawJson(details)</pre>
+			<MokaCodeBlock Code="@RawJson(details)" Language="json" ShowCopyButton="false" Class="mt-dk-code-block" />
 		}
 		else
 		{
-			<MokaDataList Items="InspectFacts(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
-
-			@if (details.Health is { Probes.Count: > 0 } checks && checks.Probes[^1] is { Output.Length: > 0 } last)
-			{
-				<div class="mt-dk-section">
-					<span class="mt-dk-label">Last health check</span>
-					<pre class="mt-dk-box mt-dk-box--short">@last.Output</pre>
-				</div>
-			}
-
-			<div class="mt-dk-section">
-				<span class="mt-dk-label">Ports</span>
-				@if (details.Ports.Count == 0)
+			<div class="mt-dk-tiles mt-dk-tiles--small">
+				@foreach (InspectTile tile in DockerInspectSummary.Tiles(details, Time.GetUtcNow()))
 				{
-					<span class="mt-dk-note">None published or exposed.</span>
-				}
-				else
-				{
-					<MokaDataList Items="PortFacts(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
-					@if (details.Ports.Any(port => !port.IsPublished))
-					{
-						<span class="mt-dk-note">
-							A port that is not published answers only on the container's docker networks. Publish it (ports: in
-							compose, -p for docker run) to open it in the browser from here.
-						</span>
-					}
+					<MokaStat Tile Value="@tile.Value" Label="@tile.Label" HelpText="@tile.Help" Color="@tile.Color" />
 				}
 			</div>
 
-			<div class="mt-dk-section">
-				<span class="mt-dk-label">Networks</span>
-				@if (details.Networks.Count == 0)
+			<div class="mt-dk-cards">
+				@FactCard("Runtime", DockerInspectSummary.Runtime(details))
+				@FactCard("Image and command", DockerInspectSummary.Command(details))
+
+				@if (details.Health is { Probes.Count: > 0 } checks && checks.Probes[^1] is { Output.Length: > 0 } last)
 				{
-					<span class="mt-dk-note">None.</span>
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">Last health check</span></Header>
+						<ChildContent>
+							<MokaCodeBlock Code="@last.Output" ShowLineNumbers="false" ShowCopyButton="false" Wrap="true" MaxHeight="160px" Class="mt-dk-code-block" />
+						</ChildContent>
+					</MokaCard>
 				}
-				else
+
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Ports</span></Header>
+					<ChildContent>
+						@if (details.Ports.Count == 0)
+						{
+							<span class="mt-dk-note">None published or exposed.</span>
+						}
+						else
+						{
+							<MokaDataList Items="DockerInspectSummary.Ports(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
+							@if (details.Ports.Any(port => !port.IsPublished))
+							{
+								<span class="mt-dk-note">
+									A port that is not published answers only on the container's docker networks. Publish it (ports: in
+									compose, -p for docker run) to open it in the browser from here.
+								</span>
+							}
+						}
+					</ChildContent>
+				</MokaCard>
+
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Networks</span></Header>
+					<ChildContent>
+						@if (details.Networks.Count == 0)
+						{
+							<span class="mt-dk-note">Not attached to any network.</span>
+						}
+						else
+						{
+							<MokaDataList Items="DockerInspectSummary.Networks(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
+						}
+					</ChildContent>
+				</MokaCard>
+
+				<MokaCard Inner Class="mt-dk-card">
+					<Header><span class="mt-dk-label">Mounts</span></Header>
+					<ChildContent>
+						@if (details.Mounts.Count == 0)
+						{
+							<span class="mt-dk-note">Nothing is mounted into this container.</span>
+						}
+						else
+						{
+							<MokaDataList Items="DockerInspectSummary.Mounts(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
+						}
+					</ChildContent>
+				</MokaCard>
+
+				@if (details.Labels.Count > 0)
 				{
-					<MokaDataList Items="NetworkFacts(details)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
+					<MokaCard Inner Class="mt-dk-card">
+						<Header><span class="mt-dk-label">Labels</span></Header>
+						<ChildContent>
+							<MokaDataList Items="DockerInspectSummary.Labels(details)" Orientation="MokaDirection.Column" Dense Class="mt-dk-facts mt-dk-facts--data" />
+						</ChildContent>
+					</MokaCard>
 				}
 			</div>
-
-			@if (details.Labels.Count > 0)
-			{
-				<div class="mt-dk-section">
-					<span class="mt-dk-label">Labels</span>
-					<MokaDataList Items="LabelFacts(details)" Orientation="MokaDirection.Column" Dense Class="mt-dk-facts mt-dk-facts--data" />
-				</div>
-			}
 		}
 	</text>;
 
+	private static RenderFragment FactCard(string title, IReadOnlyList<MokaDataListItem> facts) => @<MokaCard Inner Class="mt-dk-card">
+		<Header><span class="mt-dk-label">@title</span></Header>
+		<ChildContent>
+			<MokaDataList Items="facts" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+		</ChildContent>
+	</MokaCard>;
+
 	private RenderFragment EnvironmentContent(DockerContainerDetails details) => @<text>
-		<span class="mt-dk-note">Values are hidden until shown one at a time; copying one clears the clipboard again shortly.</span>
 		@if (details.Environment.Count == 0)
 		{
-			<span class="mt-dk-note">No variables.</span>
+			<MokaEmptyState Icon="DockerIcons.Container" Title="No variables" Description="docker inspect lists no environment for this container." />
 		}
-		@foreach ((DockerVariable variable, int index) in details.Environment.Select((variable, index) => (variable, index)))
+		else
 		{
-			<DockerVariableRow @key="index" Name="@variable.Name" Value="@variable.Value" />
+			<span class="mt-dk-note">Values are hidden until shown one at a time; copying one clears the clipboard again shortly.</span>
+			<div class="mt-dk-variables">
+				@foreach ((DockerVariable variable, int index) in details.Environment.Select((variable, index) => (variable, index)))
+				{
+					<DockerVariableRow @key="index" Name="@variable.Name" Value="@variable.Value" />
+				}
+			</div>
 		}
 	</text>;
 }

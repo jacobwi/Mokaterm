@@ -1,19 +1,16 @@
 using System.Globalization;
-using System.Text;
 using Microsoft.AspNetCore.Components;
 
 namespace Mokaterm.UI.Common.Components;
 
 /// <summary>
 /// A small line of recent samples, oldest on the left: a container's CPU, a host's load in a status bar or a fleet
-/// row. It fills the width it is given and is <see cref="Height"/> pixels tall.
+/// row. It fills the width it is given and is <see cref="Height"/> pixels tall, drawn with Moka.Red's sparkline.
 /// </summary>
 public sealed partial class Sparkline : ComponentBase
 {
-	internal const int ViewWidth = 100;
-	internal const int ViewHeight = 24;
-
-	private string _points = "";
+	private double[] _window = [];
+	private double _top = 1;
 
 	/// <summary>The samples, oldest first. Negative values draw as zero; fewer than two draw nothing.</summary>
 	[Parameter, EditorRequired]
@@ -41,8 +38,8 @@ public sealed partial class Sparkline : ComponentBase
 	public int Height { get; set; } = 24;
 
 	/// <summary>
-	/// A class of the caller's own on the SVG, for its place in a layout. The line takes its colour from
-	/// <c>--mt-sparkline-color</c>, which a caller sets on any element around it.
+	/// A class of the caller's own on the line's box, for its place in a layout. The line takes its colour from
+	/// <c>--mt-sparkline-color</c>, which a caller sets on any element around it or through this class.
 	/// </summary>
 	[Parameter]
 	public string? Class { get; set; }
@@ -51,34 +48,29 @@ public sealed partial class Sparkline : ComponentBase
 
 	private string HeightStyle => string.Create(CultureInfo.InvariantCulture, $"height:{Math.Max(1, Height)}px");
 
-	/// <summary>The polyline's points in a <see cref="ViewWidth"/> by <see cref="ViewHeight"/> box, with a pixel of room at the top and the bottom.</summary>
-	internal static string Points(IReadOnlyList<double> values, double? max, int? slots)
+	internal static double[] Window(IReadOnlyList<double> values, int? slots)
 	{
 		ArgumentNullException.ThrowIfNull(values);
-		if (values.Count < 2)
-		{
-			return "";
-		}
-
-		int count = values.Count;
-		int width = Math.Max(slots ?? count, count);
-		double top = max is { } fixedTop && fixedTop > 0 ? fixedTop : values.Max();
-		StringBuilder points = new();
-		for (int index = 0; index < count; index++)
-		{
-			double share = top > 0 && double.IsFinite(values[index]) ? Math.Clamp(values[index] / top, 0, 1) : 0;
-			double x = (double)ViewWidth * (width - count + index) / (width - 1);
-			double y = ViewHeight - 1 - ((ViewHeight - 2) * share);
-			if (index > 0)
-			{
-				points.Append(' ');
-			}
-
-			points.Append(CultureInfo.InvariantCulture, $"{x:0.##},{y:0.##}");
-		}
-
-		return points.ToString();
+		double[] cleaned = [.. values.Select(value => double.IsFinite(value) ? Math.Max(0, value) : 0)];
+		return SampleHistory.Window(cleaned, slots ?? cleaned.Length);
 	}
 
-	protected override void OnParametersSet() => _points = Points(Values, Max, Slots);
+	// 1 when nothing is above zero: Moka's sparkline draws a flat line through the middle, and zeros belong on the bottom.
+	internal static double Top(IReadOnlyList<double> values, double? max)
+	{
+		ArgumentNullException.ThrowIfNull(values);
+		if (max is { } fixedTop && fixedTop > 0 && double.IsFinite(fixedTop))
+		{
+			return fixedTop;
+		}
+
+		double largest = values.Where(double.IsFinite).DefaultIfEmpty(0).Max();
+		return largest > 0 ? largest : 1;
+	}
+
+	protected override void OnParametersSet()
+	{
+		_window = Window(Values, Slots);
+		_top = Top(Values, Max);
+	}
 }

@@ -109,6 +109,85 @@ public sealed class DockerPageRenderTests
 		Assert.Contains("aria-label=\"Container figures\"", html, StringComparison.Ordinal);
 		Assert.Contains(">shop-web-1<", html, StringComparison.Ordinal);
 		Assert.Contains("0.52%", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Recent CPU of shop-web-1\"", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task TheStats_PutTilesAndLiveCharts_OverTheTable()
+	{
+		string html = await RenderAsync<DockerStatsPage>();
+
+		Assert.Contains("moka-stat--tile", html, StringComparison.Ordinal);
+		Assert.Contains(">Running<", html, StringComparison.Ordinal);
+		Assert.Contains("10.2 MB", html, StringComparison.Ordinal);
+		Assert.Equal(4, Count(html, "class=\"moka-linechart-plot\""));
+		Assert.Contains(">CPU by container<", html, StringComparison.Ordinal);
+		Assert.Contains(">Network, all shown<", html, StringComparison.Ordinal);
+
+		// One sample is all there is, so the rates wait for the next one rather than reading zero.
+		Assert.Contains("Waiting for the next sample", html, StringComparison.Ordinal);
+		Assert.True(
+			html.IndexOf(">CPU by container<", StringComparison.Ordinal) < html.IndexOf("aria-label=\"Container figures\"", StringComparison.Ordinal),
+			"the charts come before the table");
+	}
+
+	[Fact]
+	public async Task AContainersStatsTab_DrawsItsTiles_AndFourLiveCharts()
+	{
+		_shell.Answer(Line(DockerCommands.Stats(["0a1b2c3d4e5f"])), 0, DockerFixtures.Stats.Split('\n')[0].TrimEnd('\r'));
+
+		string html = await RenderAsync<DockerStatsPanel>(new() { [nameof(DockerStatsPanel.ContainerId)] = "0a1b2c3d4e5f" });
+
+		Assert.Equal(4, Count(html, "class=\"moka-linechart-plot\""));
+		Assert.Contains(">Block I/O<", html, StringComparison.Ordinal);
+		Assert.Contains("1.23% of 7.6GiB", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Memory in use over the last two minutes", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("mt-dk-stat-value", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task TheInspectTab_SummarisesInTilesAndCards_WithoutTheEnvironment()
+	{
+		_shell.Answer(Line(DockerCommands.Inspect("f27c9f265ce1aa")), 0, DockerFixtures.Inspect);
+
+		string html = await RenderAsync<DockerContainerPanel>(new()
+		{
+			[nameof(DockerContainerPanel.ContainerId)] = "f27c9f265ce1aa",
+			[nameof(DockerContainerPanel.Tab)] = "inspect",
+		});
+
+		Assert.Contains("moka-stat--tile", html, StringComparison.Ordinal);
+		Assert.Contains(">Running<", html, StringComparison.Ordinal);
+		Assert.Contains(">Unhealthy<", html, StringComparison.Ordinal);
+		Assert.Contains("3 failing in a row", html, StringComparison.Ordinal);
+		Assert.Contains("policy on-failure", html, StringComparison.Ordinal);
+		foreach (string card in (string[])["Runtime", "Image and command", "Last health check", "Ports", "Networks", "Mounts", "Labels"])
+		{
+			Assert.Contains($">{card}<", html, StringComparison.Ordinal);
+		}
+
+		Assert.Contains("/docker-entrypoint-initdb.d", html, StringComparison.Ordinal);
+		Assert.Contains("pg_isready: no response", html, StringComparison.Ordinal);
+		Assert.Contains("moka-code-block", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("moka-code-block__copy", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("s3cr3t-demo", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task TheEnvTab_KeepsEveryValueHidden()
+	{
+		_shell.Answer(Line(DockerCommands.Inspect("f27c9f265ce1aa")), 0, DockerFixtures.Inspect);
+
+		string html = await RenderAsync<DockerContainerPanel>(new()
+		{
+			[nameof(DockerContainerPanel.ContainerId)] = "f27c9f265ce1aa",
+			[nameof(DockerContainerPanel.Tab)] = "env",
+		});
+
+		Assert.Contains("POSTGRES_PASSWORD", html, StringComparison.Ordinal);
+		Assert.Contains(DockerInspectParser.Mask, System.Net.WebUtility.HtmlDecode(html), StringComparison.Ordinal);
+		Assert.DoesNotContain("s3cr3t-demo", html, StringComparison.Ordinal);
+		Assert.Contains("mt-dk-variables", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -119,6 +198,17 @@ public sealed class DockerPageRenderTests
 		Assert.Contains("aria-label=\"Disk usage\"", html, StringComparison.Ordinal);
 		Assert.Contains(">Build Cache<", html, StringComparison.Ordinal);
 		Assert.Contains("282.3MB (13%)", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Disk space docker uses, by kind\"", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task TheContainers_ShowDockersStatus_WithoutTheHealthTheirColumnShows()
+	{
+		string html = await RenderAsync<DockerContainersPage>();
+
+		Assert.Contains(">Up 2 days<", html, StringComparison.Ordinal);
+		Assert.Contains("title=\"Up 2 days (healthy)\"", html, StringComparison.Ordinal);
+		Assert.Contains(">Exited (137) 3 hours ago<", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -135,7 +225,18 @@ public sealed class DockerPageRenderTests
 
 	private static string Line(DockerCall call) => DockerCommandLine.Build(call);
 
-	private Task<string> RenderAsync<TComponent>()
+	private static int Count(string html, string text)
+	{
+		int count = 0;
+		for (int at = html.IndexOf(text, StringComparison.Ordinal); at >= 0; at = html.IndexOf(text, at + text.Length, StringComparison.Ordinal))
+		{
+			count++;
+		}
+
+		return count;
+	}
+
+	private Task<string> RenderAsync<TComponent>(Dictionary<string, object?>? parameters = null)
 		where TComponent : IComponent =>
 		StaticRender.RenderAsync<TComponent>(
 			services =>
@@ -150,6 +251,6 @@ public sealed class DockerPageRenderTests
 				services.AddSingleton(UnusedService.Of<ISessionTabs>());
 				services.AddSingleton(UnusedService.Of<IFileBrowserDialog>());
 			},
-			new Dictionary<string, object?> { [nameof(DockerContainersPage.Session)] = _session })
+			new Dictionary<string, object?>(parameters ?? new()) { [nameof(DockerContainersPage.Session)] = _session })
 			.WaitAsync(TimeSpan.FromSeconds(10), Ct);
 }

@@ -43,7 +43,7 @@
 		@if (_warning is { } warning)
 		{
 			<MokaCallout Type="MokaCalloutType.Warning" Title="docker said">
-				<pre class="mt-dk-box mt-dk-box--short">@warning</pre>
+				<MokaCodeBlock Code="@warning" ShowLineNumbers="false" ShowCopyButton="false" Wrap="true" MaxHeight="160px" Class="mt-dk-code-block" />
 				<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" OnClick="@(() => _warning = null)">Dismiss</MokaButton>
 			</MokaCallout>
 		}

@@ -2,6 +2,7 @@
 @using Moka.Red.Feedback.Alert
 @using Moka.Red.Feedback.Loading
 @using Moka.Red.Feedback.Toast
+@using Moka.Red.Primitives.CodeBlock
 @using Moka.Red.Primitives.Tag
 @using Mokaterm.UI.Common.Components
 
@@ -53,7 +54,7 @@
 				<span class="mt-dk-change-command mt-dk-mono" title="@change.Command">$ @change.Command</span>
 				@if (ChangeOutputShown && change.Text.Length > 0)
 				{
-					<pre class="mt-dk-box mt-dk-box--short">@ChangeTail(change)</pre>
+					<MokaCodeBlock Code="@ChangeTail(change)" ShowLineNumbers="false" ShowCopyButton="false" Wrap="true" MaxHeight="160px" Class="mt-dk-code-block" />
 				}
 			</div>
 		}

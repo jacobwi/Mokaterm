@@ -12,35 +12,42 @@
 }
 else if (Mounts.Count == 0)
 {
-	<span class="mt-dk-note">Nothing is mounted into this container.</span>
+	<MokaEmptyState Icon="DockerIcons.Volume" Title="Nothing mounted" Description="This container has no volume, bind mount or tmpfs." />
 }
 else
 {
-	@foreach (DockerMount mount in Mounts)
-	{
-		<div class="mt-dk-section" @key="mount.Destination">
-			<div class="mt-dk-section-head">
-				<span class="mt-dk-label">@mount.Type</span>
-				<span class="mt-dk-mono">@mount.Destination</span>
-				<MokaTag Text="@(mount.ReadWrite ? "RW" : "RO")" Size="MokaSize.Xs" Color="@(mount.ReadWrite ? MokaColor.Surface : MokaColor.Info)" />
-				@if (mount.Name.Length > 0)
-				{
-					<span class="mt-dk-mono mt-dk-muted">volume @mount.Name</span>
-				}
-				<span class="mt-dk-spacer"></span>
-				@if (CanView(mount))
-				{
-					<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Toggle.Eye" OnClick="@(() => View(mount))">
-						View
-					</MokaButton>
-				}
-			</div>
-			@if (mount.Source.Length > 0)
-			{
-				@PathLine(mount.Source, "Copy the host path")
-			}
-		</div>
-	}
+	<div class="mt-dk-cards">
+		@foreach (DockerMount mount in Mounts)
+		{
+			<MokaCard Inner Class="mt-dk-card" @key="mount.Destination">
+				<Header>
+					<div class="mt-dk-card-title">
+						<MokaTag Text="@mount.Type" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+						<span class="mt-dk-name mt-dk-clip mt-dk-clip--long" title="@mount.Destination">@mount.Destination</span>
+						<MokaTag Text="@(mount.ReadWrite ? "RW" : "RO")" Size="MokaSize.Xs" Color="@(mount.ReadWrite ? MokaColor.Surface : MokaColor.Info)" />
+					</div>
+				</Header>
+				<HeaderActions>
+					@if (CanView(mount))
+					{
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokaIcons.Toggle.Eye" OnClick="@(() => View(mount))">
+							View
+						</MokaButton>
+					}
+				</HeaderActions>
+				<ChildContent>
+					@if (mount.Name.Length > 0)
+					{
+						<MokaDataList Items="@([new MokaDataListItem("Volume", mount.Name)])" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
+					}
+					@if (mount.Source.Length > 0)
+					{
+						@PathLine(mount.Source, "Copy the host path")
+					}
+				</ChildContent>
+			</MokaCard>
+		}
+	</div>
 	<span class="mt-dk-note">The view is read-only. Docker's own folders usually need root, which goes through sudo.</span>
 }
 

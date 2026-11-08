@@ -1,0 +1,37 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Data.Chart
+
+<MokaCard Inner Class="mt-dk-chart">
+	<Header><span class="mt-dk-label">@Chart.Title</span></Header>
+	<ChildContent>
+		<MokaLineChart Series="Chart.Series"
+					   Label="@Chart.Label"
+					   Formatter="Chart.Format"
+					   AutoScale="true"
+					   ScaleUnits="Chart.Units"
+					   SuggestedMax="Chart.SuggestedMax"
+					   ShowPoints="false"
+					   ShowArea="true"
+					   Smooth="true"
+					   ShowLastPoint="true"
+					   ShowCurrent="true"
+					   ShowPeak="Chart.ShowPeak"
+					   ShowXLabels="false"
+					   Live="true"
+					   LiveInterval="Slide"
+					   Height="@Height"
+					   EmptyText="Waiting for the next sample" />
+	</ChildContent>
+</MokaCard>
+
+@code {
+	// Samples come every three seconds or a little later, so the lines glide most of the way and then wait.
+	private static readonly TimeSpan Slide = TimeSpan.FromSeconds(2);
+
+	[Parameter, EditorRequired]
+	public DockerChart Chart { get; set; } = default!;
+
+	/// <summary>The plot's height as a CSS length; a card keeps it whatever its width.</summary>
+	[Parameter]
+	public string Height { get; set; } = "150px";
+}

@@ -30,7 +30,7 @@
 	@LoadErrorPanel(LoadViewAsync)
 	@if (_text is { } text)
 	{
-		<pre class="mt-dk-box mt-dk-box--nowrap">@text</pre>
+		<MokaCodeBlock Code="@text" ShowCopyButton="false" Class="mt-dk-code-block" />
 	}
 }
 

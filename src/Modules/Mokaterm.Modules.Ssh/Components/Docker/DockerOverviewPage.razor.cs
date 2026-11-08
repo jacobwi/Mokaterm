@@ -1,4 +1,6 @@
 using System.Globalization;
+using Moka.Red.Core.Enums;
+using Moka.Red.Data.Chart;
 using Moka.Red.Primitives.DataList;
 using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.UI.Common.Formatting;
@@ -35,6 +37,26 @@ public sealed partial class DockerOverviewPage : DockerManagerPageBase
 	private static string? ContainerSplit(DockerEngineStatus status) => status.Info is { } info
 		? string.Create(CultureInfo.CurrentCulture, $"{info.Running} running, {info.Paused} paused, {info.Stopped} stopped")
 		: null;
+
+	internal static List<MokaDonutSegment> StateSegments(DockerEngineInfo info) =>
+	[
+		.. new (string Name, int Count, MokaColor Color)[]
+		{
+			("Running", info.Running, MokaColor.Success),
+			("Paused", info.Paused, MokaColor.Warning),
+			("Stopped", info.Stopped, MokaColor.Secondary),
+		}
+		.Where(state => state.Count > 0)
+		.Select(state => new MokaDonutSegment { Name = state.Name, Value = state.Count, Color = state.Color }),
+	];
+
+	internal List<MokaDonutSegment> SpaceSegments() =>
+	[
+		.. _usage
+			.Select(row => (row.Type, Bytes: DockerSizes.Parse(row.Size) ?? 0))
+			.Where(row => row.Bytes > 0)
+			.Select(row => new MokaDonutSegment { Name = row.Type, Value = row.Bytes }),
+	];
 
 	private static string Join(params string?[] parts) =>
 		string.Join(" · ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));

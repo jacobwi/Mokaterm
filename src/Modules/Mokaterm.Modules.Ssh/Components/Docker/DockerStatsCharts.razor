@@ -1,0 +1,21 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+
+<div class="mt-dk-stats">
+	<div class="mt-dk-tiles mt-dk-tiles--small">
+		<MokaStat Tile Value="@CpuText" Label="CPU" HelpText="@CpuHelp" Color="@CpuColor" />
+		<MokaStat Tile Value="@MemoryText" Label="Memory" HelpText="@MemoryHelp" Color="@MemoryColor" />
+		<MokaStat Tile Value="@DockerChartFormat.Rate(Latest(Received))" Label="Network in" HelpText="@($"{DockerChartFormat.Rate(Latest(Sent))} out")" />
+		<MokaStat Tile Value="@DockerChartFormat.Rate(Latest(Read))" Label="Disk read" HelpText="@($"{DockerChartFormat.Rate(Latest(Written))} written")" />
+		@if (Pids is { Length: > 0 } pids)
+		{
+			<MokaStat Tile Value="@pids" Label="Processes" />
+		}
+	</div>
+
+	<div class="mt-dk-charts">
+		@foreach (DockerChart chart in _charts)
+		{
+			<DockerLiveChart @key="chart.Title" Chart="chart" Height="@ChartHeight" />
+		}
+	</div>
+</div>
