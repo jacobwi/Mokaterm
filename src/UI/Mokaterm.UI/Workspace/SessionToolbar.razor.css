@@ -1,9 +1,33 @@
+/*
+	Moka's toolbar measures this row and drops whole groups, lowest priority first, but what it opens for them is more rows,
+	which would resize the terminal. The overflow menu reaches every action without that, so its button stands in for
+	Moka's, and shows on the same signal.
+*/
 .mt-tb {
 	display: flex;
-	flex-shrink: 0;
-	align-items: center;
+	flex: 1 1 14rem;
+
+	/* Disconnect, close and the menu, whatever the name beside the bar would take. */
+	min-width: 5.75rem;
+}
+
+.mt-tb ::deep .moka-toolbar.moka-toolbar--expandable {
+	flex: 1;
 	gap: 2px;
 	min-width: 0;
+	min-height: 0;
+	padding: 0;
+	background: none;
+}
+
+/* Until the script has measured the row Moka lets it wrap, which here would spill over the terminal. */
+.mt-tb ::deep .moka-toolbar:not([data-moka-fitted]) > .moka-toolbar__items {
+	flex-wrap: nowrap;
+	overflow: hidden;
+}
+
+.mt-tb ::deep .moka-toolbar[data-moka-has-more] > .moka-toolbar__more {
+	display: none;
 }
 
 .mt-tb-item {
@@ -11,36 +35,10 @@
 	flex-shrink: 0;
 }
 
-/* A thin line between groups, the height of an icon rather than the bar. */
-.mt-tb-divider {
-	flex-shrink: 0;
-	width: 1px;
-	height: 14px;
-	margin: 0 var(--moka-spacing-xs);
-	background: var(--moka-color-outline-variant);
-}
-
 .mt-tb-more--fold {
 	display: none;
 }
 
-/*
-	The bar folds by its own width, not the window's: a session in half a window folds like one in a small window. The
-	view and session groups go first, panels and tools next; reconnect, disconnect and close stay. What folds is still
-	in the overflow menu, whose button appears once anything has.
-*/
-@container mt-session-toolbar (max-width: 760px) {
-	.mt-tb-fold-1 {
-		display: none;
-	}
-
-	.mt-tb-more--fold {
-		display: inline-flex;
-	}
-}
-
-@container mt-session-toolbar (max-width: 460px) {
-	.mt-tb-fold-2 {
-		display: none;
-	}
+.mt-tb ::deep .moka-toolbar[data-moka-has-more] .mt-tb-more--fold {
+	display: inline-flex;
 }

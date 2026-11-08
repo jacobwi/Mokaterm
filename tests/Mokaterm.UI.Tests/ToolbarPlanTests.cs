@@ -7,7 +7,7 @@ using Mokaterm.UI.Workspace;
 namespace Mokaterm.UI.Tests;
 
 /// <summary>
-/// The session toolbar's three layouts, the hidden list and the folding classes, as plain data: what becomes a button,
+/// The session toolbar's three layouts, the hidden list and the order groups leave in, as plain data: what becomes a button,
 /// in which order, where the lines go, and that nothing ever becomes unreachable.
 /// </summary>
 public sealed class ToolbarPlanTests
@@ -31,8 +31,8 @@ public sealed class ToolbarPlanTests
 	{
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), []);
 
-		Assert.DoesNotContain(plan.Slots, slot => SessionToolbarButtons.IsTool(slot.Action.Id));
-		Assert.Contains(plan.Slots, slot => slot.Action.Id == SessionToolbarButtons.ToolsMenu);
+		Assert.DoesNotContain(Actions(plan), action => SessionToolbarButtons.IsTool(action.Id));
+		Assert.Contains(Actions(plan), action => action.Id == SessionToolbarButtons.ToolsMenu);
 	}
 
 	[Fact]
@@ -50,7 +50,7 @@ public sealed class ToolbarPlanTests
 	{
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Compact, Everything(), []);
 
-		Assert.Empty(plan.Slots);
+		Assert.Empty(plan.Runs);
 		Assert.True(plan.MoreAlways);
 	}
 
@@ -68,7 +68,7 @@ public sealed class ToolbarPlanTests
 	{
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), [Docker, Tunnels]);
 
-		Assert.DoesNotContain(plan.Slots, slot => slot.Action.Id == SessionToolbarButtons.ToolsMenu);
+		Assert.DoesNotContain(Actions(plan), action => action.Id == SessionToolbarButtons.ToolsMenu);
 		Assert.True(plan.MoreAlways);
 	}
 
@@ -77,7 +77,7 @@ public sealed class ToolbarPlanTests
 	{
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), [Docker]);
 
-		Assert.Contains(plan.Slots, slot => slot.Action.Id == SessionToolbarButtons.ToolsMenu);
+		Assert.Contains(Actions(plan), action => action.Id == SessionToolbarButtons.ToolsMenu);
 		Assert.True(plan.MoreAlways);
 	}
 
@@ -87,7 +87,7 @@ public sealed class ToolbarPlanTests
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Flat, Everything(), [SessionToolbarButtons.ToolsMenu]);
 
 		Assert.False(plan.MoreAlways);
-		Assert.Contains(plan.Slots, slot => slot.Action.Id == Docker);
+		Assert.Contains(Actions(plan), action => action.Id == Docker);
 	}
 
 	[Fact]
@@ -97,31 +97,41 @@ public sealed class ToolbarPlanTests
 
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, actions, [SessionToolbarButtons.Reconnect]);
 
-		ToolbarSlot reconnect = Assert.Single(plan.Slots, slot => slot.Action.Id == SessionToolbarButtons.Reconnect);
-		Assert.Null(reconnect.FoldClass);
+		Assert.Contains(Actions(plan), action => action.Id == SessionToolbarButtons.Reconnect);
+		Assert.True(RunOf(plan, SessionToolbarButtons.Reconnect).Priority > RunOf(plan, "find").Priority);
 	}
 
+	// Moka drops the lowest priority first.
 	[Fact]
-	public void Folding_ViewAndSessionGoFirst_PanelsAndToolsNext_ConnectionNever()
+	public void Priorities_ViewAndSessionLeaveFirst_PanelsAndToolsNext_ThenConnection_AndTheMenuLast()
 	{
 		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), []);
 
-		Assert.Equal(ToolbarPlan.FoldFirst, Slot(plan, "find").FoldClass);
-		Assert.Equal(ToolbarPlan.FoldFirst, Slot(plan, "record").FoldClass);
-		Assert.Equal(ToolbarPlan.FoldSecond, Slot(plan, "files").FoldClass);
-		Assert.Equal(ToolbarPlan.FoldSecond, Slot(plan, "tools").FoldClass);
-		Assert.Null(Slot(plan, "close").FoldClass);
+		Assert.Equal(RunOf(plan, "find").Priority, RunOf(plan, "record").Priority);
+		Assert.Equal(RunOf(plan, "files").Priority, RunOf(plan, "tools").Priority);
+		Assert.True(RunOf(plan, "find").Priority < RunOf(plan, "files").Priority);
+		Assert.True(RunOf(plan, "files").Priority < RunOf(plan, "close").Priority);
+		Assert.True(RunOf(plan, "close").Priority < ToolbarPlan.MorePriority);
 	}
 
-	// A line must never be left at the start of the bar or next to another one once groups fold away.
 	[Fact]
-	public void Folding_TheLineBeforeConnection_GoesOnceEverythingBeforeItHas()
+	public void Flat_LeavesInTheSameOrder_ThoughItsGroupsAreSplitUp()
 	{
-		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), []);
+		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Flat, Everything(), []);
 
-		Assert.Equal(ToolbarPlan.FoldFirst, Slot(plan, "find").DividerFoldClass);
-		Assert.Equal(ToolbarPlan.FoldSecond, Slot(plan, "tools").DividerFoldClass);
-		Assert.Equal(ToolbarPlan.FoldSecond, Slot(plan, "disconnect").DividerFoldClass);
+		Assert.True(RunOf(plan, "broadcast").Priority < RunOf(plan, "files").Priority);
+		Assert.True(RunOf(plan, Docker).Priority < RunOf(plan, "close").Priority);
+		Assert.All(plan.Runs, run => Assert.False(run.Divider));
+	}
+
+	// Moka tidies the lines as groups leave, but only ever starts from a bar that has them between groups.
+	[Fact]
+	public void Lines_StandOnlyBetweenGroups()
+	{
+		ToolbarPlan plan = ToolbarPlan.Build(SessionToolbarLayout.Grouped, Everything(), ["files", "commands"]);
+
+		Assert.False(plan.Runs[0].Divider);
+		Assert.All(plan.Runs.Skip(1), run => Assert.True(run.Divider));
 	}
 
 	[Fact]
@@ -179,19 +189,21 @@ public sealed class ToolbarPlanTests
 		Run = _ => Task.CompletedTask,
 	};
 
-	private static ToolbarSlot Slot(ToolbarPlan plan, string id) => plan.Slots.Single(slot => slot.Action.Id == id);
+	private static IEnumerable<ToolbarAction> Actions(ToolbarPlan plan) => plan.Runs.SelectMany(run => run.Actions);
+
+	private static ToolbarRun RunOf(ToolbarPlan plan, string id) => plan.Runs.Single(run => run.Actions.Any(action => action.Id == id));
 
 	private static List<string> Row(ToolbarPlan plan)
 	{
 		List<string> row = [];
-		foreach (ToolbarSlot slot in plan.Slots)
+		foreach (ToolbarRun run in plan.Runs)
 		{
-			if (slot.Divider)
+			if (run.Divider)
 			{
 				row.Add("|");
 			}
 
-			row.Add(slot.Action.Id);
+			row.AddRange(run.Actions.Select(action => action.Id));
 		}
 
 		return row;

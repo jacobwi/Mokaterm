@@ -16,13 +16,15 @@
 	border-bottom: 1px solid var(--moka-color-outline-variant);
 }
 
-/* A container for its own width, which is what SessionToolbar folds its buttons by. */
 .mt-session-toolbar {
 	/* Scaled by the density the Appearance page sets, like every other measure the theme owns. */
 	height: calc(var(--moka-height-toolbar-dense) * var(--moka-density, 1));
 	background: var(--moka-color-surface);
-	container-type: inline-size;
-	container-name: mt-session-toolbar;
+}
+
+/* The bar keeps room for its last buttons, and a label cut to nothing would otherwise run under them. */
+.mt-session-toolbar ::deep .mt-label {
+	overflow: hidden;
 }
 
 .mt-session-banner {

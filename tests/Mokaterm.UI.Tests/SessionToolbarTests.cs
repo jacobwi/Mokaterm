@@ -22,7 +22,7 @@ public sealed partial class SessionToolbarTests
 		string html = await RenderAsync(SessionToolbarLayout.Grouped, Actions(), []);
 
 		Assert.Equal(["files", "find", "record", "tools", "close", "more"], Buttons(html));
-		Assert.Equal(4, Regex.Count(html, "class=\"mt-tb-divider"));
+		Assert.Equal(4, Regex.Count(html, "role=\"separator\""));
 	}
 
 	[Fact]
@@ -31,7 +31,7 @@ public sealed partial class SessionToolbarTests
 		string html = await RenderAsync(SessionToolbarLayout.Flat, Actions(), []);
 
 		Assert.Equal(["files", "find", "record", "tool.docker", "close", "more"], Buttons(html));
-		Assert.DoesNotContain("mt-tb-divider", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("role=\"separator\"", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -61,6 +61,17 @@ public sealed partial class SessionToolbarTests
 		string html = await RenderAsync(SessionToolbarLayout.Grouped, Actions(), []);
 
 		Assert.Contains("mt-tb-more mt-tb-more--fold", html, StringComparison.Ordinal);
+	}
+
+	// Moka measures the bar, so what leaves when is its priorities, and the menu's button has to outlast them all.
+	[Fact]
+	public async Task TheBar_FitsItsWidth_AndTheOverflowButtonLeavesLast()
+	{
+		string html = await RenderAsync(SessionToolbarLayout.Grouped, Actions(), []);
+
+		Assert.Contains("moka-toolbar--expandable", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Session actions\"", html, StringComparison.Ordinal);
+		Assert.Contains($"data-button=\"more\" data-moka-priority=\"{ToolbarPlan.MorePriority}\"", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

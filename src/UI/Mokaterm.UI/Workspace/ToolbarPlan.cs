@@ -9,20 +9,21 @@ namespace Mokaterm.UI.Workspace;
 /// Which of a session's toolbar actions become buttons, in what order and with which lines between them, for one
 /// layout and one hidden list. Kept apart from the component so each layout's rules can be tested as plain data.
 /// </summary>
-/// <param name="Slots">The buttons, left to right.</param>
+/// <param name="Runs">The buttons, left to right, in the groups that leave the bar together when it runs out of room.</param>
 /// <param name="MoreAlways">
 /// The overflow menu's button shows at every width, because something only it reaches is hidden, or because the
-/// layout is that menu. Otherwise it only appears once the toolbar is narrow enough to fold buttons into it.
+/// layout is that menu. Otherwise it only appears once the toolbar has run out of room for something.
 /// </param>
-internal sealed record ToolbarPlan(IReadOnlyList<ToolbarSlot> Slots, bool MoreAlways)
+internal sealed record ToolbarPlan(IReadOnlyList<ToolbarRun> Runs, bool MoreAlways)
 {
-	/// <summary>Hides a button once the toolbar is under the first width step: the view and session groups go first.</summary>
-	public const string FoldFirst = "mt-tb-fold-1";
+	/// <summary>The overflow menu's button leaves last of all, since it is the way to everything that left before it.</summary>
+	public const int MorePriority = 50;
 
-	/// <summary>Hides a button under the second, narrower step: panels and tools follow. Connection buttons stay.</summary>
-	public const string FoldSecond = "mt-tb-fold-2";
-
-	private const int NeverFolds = int.MaxValue;
+	// The higher, the longer a group stays. Among equals Moka drops the last one first.
+	private const int ViewAndSession = 10;
+	private const int PanelsAndTools = 20;
+	private const int Connection = 30;
+	private const int Pinned = 40;
 
 	// The grouped layout reads left to right by group; the flat one keeps the order the toolbar has always had.
 	private static readonly string[] GroupedOrder =
@@ -69,7 +70,7 @@ internal sealed record ToolbarPlan(IReadOnlyList<ToolbarSlot> Slots, bool MoreAl
 		{
 			// Everything goes behind the menu except what is happening rather than what can be clicked: the
 			// recording's dot and the pinned reconnect.
-			return new ToolbarPlan([.. actions.Where(action => action.Pinned || action.Dot != ToolbarDot.None).Select(action => new ToolbarSlot(action, Divider: false, FoldClass: null, DividerFoldClass: null))], MoreAlways: true);
+			return new ToolbarPlan(RunsOf(actions.Where(action => action.Pinned || action.Dot != ToolbarDot.None), dividers: false), MoreAlways: true);
 		}
 
 		bool grouped = layout == SessionToolbarLayout.Grouped;
@@ -98,24 +99,7 @@ internal sealed record ToolbarPlan(IReadOnlyList<ToolbarSlot> Slots, bool MoreAl
 		}
 
 		string[] order = grouped ? GroupedOrder : FlatOrder;
-		List<ToolbarAction> ordered = [.. shown.OrderBy(action => Rank(action, order))];
-		List<ToolbarSlot> slots = new(ordered.Count);
-		int widestEarlier = -1;
-		ToolbarGroup? previous = null;
-		foreach (ToolbarAction action in ordered)
-		{
-			int level = action.Pinned ? NeverFolds : FoldLevel(action.Group);
-			bool divider = grouped && previous is { } last && last != action.Group;
-
-			// A line goes once the group after it does, or once every group before it has, so the toolbar never starts
-			// with one or shows two side by side.
-			int dividerLevel = Math.Min(level, widestEarlier);
-			slots.Add(new ToolbarSlot(action, divider, FoldClass(level), divider ? FoldClass(dividerLevel) : null));
-			widestEarlier = Math.Max(widestEarlier, level);
-			previous = action.Group;
-		}
-
-		return new ToolbarPlan(slots, anyHidden);
+		return new ToolbarPlan(RunsOf(shown.OrderBy(action => Rank(action, order)), grouped), anyHidden);
 	}
 
 	/// <summary>
@@ -149,18 +133,36 @@ internal sealed record ToolbarPlan(IReadOnlyList<ToolbarSlot> Slots, bool MoreAl
 		return items;
 	}
 
-	private static int FoldLevel(ToolbarGroup group) => group switch
+	private static List<ToolbarRun> RunsOf(IEnumerable<ToolbarAction> ordered, bool dividers)
 	{
-		ToolbarGroup.View or ToolbarGroup.Session => 1,
-		ToolbarGroup.Panels or ToolbarGroup.Tools => 2,
-		_ => NeverFolds,
-	};
+		List<ToolbarRun> runs = [];
+		List<ToolbarAction> run = [];
+		foreach (ToolbarAction action in ordered)
+		{
+			if (run.Count > 0 && run[^1].Group != action.Group)
+			{
+				runs.Add(Finish(run, dividers && runs.Count > 0));
+				run = [];
+			}
 
-	private static string? FoldClass(int level) => level switch
+			run.Add(action);
+		}
+
+		if (run.Count > 0)
+		{
+			runs.Add(Finish(run, dividers && runs.Count > 0));
+		}
+
+		return runs;
+	}
+
+	private static ToolbarRun Finish(List<ToolbarAction> run, bool divider) => new(run, divider, run.Max(PriorityOf));
+
+	private static int PriorityOf(ToolbarAction action) => action.Pinned ? Pinned : action.Group switch
 	{
-		1 => FoldFirst,
-		2 => FoldSecond,
-		_ => null,
+		ToolbarGroup.View or ToolbarGroup.Session => ViewAndSession,
+		ToolbarGroup.Panels or ToolbarGroup.Tools => PanelsAndTools,
+		_ => Connection,
 	};
 
 	// A tool sits where the tools menu would, in the order the module registered it.
