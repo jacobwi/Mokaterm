@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
+using Moka.Red.Core.Theming;
 using Moka.Red.Icons;
+using Moka.Red.ThemeGen.Appearance;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Presentation;
 using Mokaterm.Abstractions.Settings;
@@ -20,12 +22,6 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 
 	private static readonly string[] AccentPresets =
 		[AppearanceSettings.DefaultAccentColor, "#42a5f5", "#00e676", "#ffab40", "#ce93d8", "#ffd54f"];
-
-	private static readonly IReadOnlyList<EnumOption<ThemeMode>> ModeOptions =
-	[
-		new(ThemeMode.Dark, "Dark", MokaIcons.Action.Moon),
-		new(ThemeMode.Light, "Light", MokaIcons.Action.Sun),
-	];
 
 	private static readonly IReadOnlyList<EnumOption<UiDensity>> DensityOptions =
 	[
@@ -53,6 +49,8 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 	];
 
 	private string _previewHost = "";
+	private string? _previewAccentColor;
+	private IReadOnlyList<MokaAccent> _previewAccents = [];
 
 	[Inject]
 	private IUiContributions Contributions { get; set; } = default!;
@@ -62,6 +60,21 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 
 	/// <summary>The shell's buttons, then one per tool the loaded modules add.</summary>
 	private IReadOnlyList<SessionToolbarButton> ToolbarButtons => SessionToolbarButtons.All(Contributions);
+
+	// Kept from one render to the next: the panel rebuilds its pictures' themes whenever it is handed another list.
+	private IReadOnlyList<MokaAccent> PreviewAccents(AppearanceSettings settings)
+	{
+		if (!string.Equals(_previewAccentColor, settings.AccentColor, StringComparison.Ordinal))
+		{
+			_previewAccentColor = settings.AccentColor;
+			_previewAccents = AppearanceChoice.AccentsFor(settings);
+		}
+
+		return _previewAccents;
+	}
+
+	private Task SetModeAsync(MokaAppearance appearance) =>
+		UpdateAsync(s => s with { Mode = AppearanceChoice.ModeFrom(appearance.Mode, s.Mode) });
 
 	private static string? SelectedPreset(string accent) =>
 		Array.Find(AccentPresets, preset => string.Equals(preset, accent, StringComparison.OrdinalIgnoreCase));

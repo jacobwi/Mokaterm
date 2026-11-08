@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Moka.Red.Core.Theming;
 using Moka.Red.Extensions;
+using Moka.Red.ThemeGen.Appearance;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Abstractions.Settings;
@@ -27,6 +29,71 @@ public sealed class AppearanceSettingsPageTests
 
 		Assert.Contains("Use #rgb or #rrggbb.", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Only complete", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_ModeIsARowTheSearchCanFind_WithTheStoredModePicked()
+	{
+		string html = await RenderAsync(new AppearanceSettings { Mode = ThemeMode.Light });
+
+		Assert.Contains("data-setting=\"mode\"", html, StringComparison.Ordinal);
+		Assert.Matches("<input[^>]*value=\"Light\"[^>]*checked", html);
+		Assert.DoesNotMatch("<input[^>]*value=\"Dark\"[^>]*checked", html);
+	}
+
+	// The app has only the design ThemeFactory builds, so the panel must not offer the others.
+	[Fact]
+	public async Task Render_OffersNoPalette()
+	{
+		string html = await RenderAsync(new AppearanceSettings());
+
+		Assert.DoesNotContain("value=\"gate\"", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("value=\"matrix\"", html, StringComparison.Ordinal);
+	}
+
+	// The page's stylesheet hides this card by that value, because the app has no mode to save it as.
+	[Fact]
+	public async Task Render_TheCardForFollowingTheDevice_CanStillBeFoundToHide()
+	{
+		string html = await RenderAsync(new AppearanceSettings());
+
+		Assert.Matches("<label[^>]*moka-radio-item[^>]*>\\s*<input[^>]*value=\"System\"", html);
+	}
+
+	[Fact]
+	public void Choice_APickWithNoStoredMode_ChangesNothing()
+	{
+		Assert.Equal(ThemeMode.Light, AppearanceChoice.ModeFrom(MokaColorMode.System, ThemeMode.Light));
+		Assert.Equal(ThemeMode.Dark, AppearanceChoice.ModeFrom(MokaColorMode.System, ThemeMode.Dark));
+		Assert.Equal(ThemeMode.Light, AppearanceChoice.ModeFrom(MokaColorMode.Light, ThemeMode.Dark));
+		Assert.Equal(ThemeMode.Dark, AppearanceChoice.ModeFrom(MokaColorMode.Dark, ThemeMode.Light));
+	}
+
+	// ThemeFactory leaves the default accent to Red's own tuned shades, so the pictures have to as well.
+	[Theory]
+	[InlineData("#ef5350")]
+	[InlineData("#EF5350")]
+	[InlineData("not a color")]
+	public void Choice_TheDefaultAccent_IsNoAccent(string stored)
+	{
+		AppearanceSettings settings = new() { AccentColor = stored };
+
+		IReadOnlyList<MokaAccent> accents = AppearanceChoice.AccentsFor(settings);
+
+		Assert.Empty(accents);
+		Assert.Null(AppearanceChoice.ValueFor(settings, accents).Accent);
+	}
+
+	[Theory]
+	[InlineData("#42a5f5")]
+	[InlineData("#abc")]
+	public void Choice_AnyOtherAccent_TintsThePictures(string stored)
+	{
+		AppearanceSettings settings = new() { AccentColor = stored };
+
+		MokaAccent accent = Assert.Single(AppearanceChoice.AccentsFor(settings));
+
+		Assert.Equal(accent.Id, AppearanceChoice.ValueFor(settings, [accent]).Accent);
 	}
 
 	[Fact]

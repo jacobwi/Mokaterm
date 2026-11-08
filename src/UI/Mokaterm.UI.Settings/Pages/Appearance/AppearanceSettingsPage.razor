@@ -1,3 +1,4 @@
+@using Moka.Red.ThemeGen.Appearance
 @using Mokaterm.Abstractions.Platform
 @using Mokaterm.Abstractions.Presentation
 @using Mokaterm.UI.Common.Contributions
@@ -11,12 +12,15 @@
 			  OnReset="ResetAsync"
 			  ResetMessage="Put the theme, accent color, density, font scale, status bar, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
-		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms.">
-			<EnumSegmentedControl TEnum="ThemeMode"
-								  Value="settings.Mode"
-								  ValueChanged="value => UpdateAsync(s => s with { Mode = value })"
-								  Options="ModeOptions"
-								  AriaLabel="Theme mode" />
+		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms." Stacked>
+			<div class="appearance-mode">
+				<MokaAppearancePanel Value="@AppearanceChoice.ValueFor(settings, PreviewAccents(settings))"
+									 ValueChanged="SetModeAsync"
+									 Rows="MokaAppearanceRows.ColorMode"
+									 Palettes="AppearanceChoice.Palettes"
+									 Accents="@PreviewAccents(settings)"
+									 Text="AppearanceChoice.Words" />
+			</div>
 		</SettingsRow>
 		<SettingsRow Label="Accent color" Description="@AccentHelp">
 			<div class="accent-picker">

@@ -34,8 +34,9 @@
 	display: block;
 }
 
+/* No wrapping: a wrapping column measures each child at its narrowest, so a grid that fits its width comes out too tall. */
 .settings-row--stacked {
-	flex-direction: column;
+	flex-flow: column nowrap;
 	align-items: stretch;
 }
 

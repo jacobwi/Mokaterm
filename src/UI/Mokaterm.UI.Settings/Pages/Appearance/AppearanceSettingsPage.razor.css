@@ -1,3 +1,14 @@
+/* The row above already names this. */
+.appearance-mode ::deep .moka-micro-label {
+	display: none;
+}
+
+/* The panel always offers following the device, and the app has no such mode to save it as. AppearanceSettingsPageTests
+   fails if this card stops carrying the value this rule looks for. */
+.appearance-mode ::deep .moka-radio-item:has(input[value="System"]) {
+	display: none;
+}
+
 .accent-picker {
 	display: flex;
 	flex-wrap: wrap;
