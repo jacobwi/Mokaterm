@@ -168,7 +168,8 @@ internal sealed class PackageCommands
 		Title = "Upgrade all packages",
 		Script = Root("packages.upgrade", Kind switch
 		{
-			PackageManagerKind.Apt => $"set -e\n{AptPrefix}\napt-get update\n{AptGet} upgrade",
+			// Without --with-new-pkgs apt-get keeps back any update that needs a new package, which is every new kernel.
+			PackageManagerKind.Apt => $"set -e\n{AptPrefix}\napt-get update\n{AptGet} --with-new-pkgs upgrade",
 			PackageManagerKind.Dnf => "dnf -y upgrade",
 			PackageManagerKind.Yum => "yum -y update",
 			PackageManagerKind.Zypper => "zypper --non-interactive update",

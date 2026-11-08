@@ -61,7 +61,7 @@ public sealed class CommandBuilderTests
 		Assert.NotNull(new PackageCommands(PackageManagerKind.Apt).Remove(name).Warning);
 
 	[Theory]
-	[InlineData(nameof(PackageManagerKind.Apt), "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update\n" + AptGet + " upgrade")]
+	[InlineData(nameof(PackageManagerKind.Apt), "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update\n" + AptGet + " --with-new-pkgs upgrade")]
 	[InlineData(nameof(PackageManagerKind.Dnf), "dnf -y upgrade")]
 	[InlineData(nameof(PackageManagerKind.Yum), "yum -y update")]
 	[InlineData(nameof(PackageManagerKind.Zypper), "zypper --non-interactive update")]
