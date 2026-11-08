@@ -1,3 +1,22 @@
+## What's new in 0.3.8
+
+**File browser**
+
+- **Rename in place**: F2 edits the name right in the list. A name that is taken or not allowed is refused under the field,
+  and clicking away saves.
+- The second toolbar collapses into a button when the panel is narrow, instead of wrapping onto two rows.
+
+**Transfers**
+
+- A new transfer list with two lines per job, and long queues in pages with running and failed transfers first.
+
+**Interface**
+
+- The session toolbar drops whole groups of buttons as it narrows, and everything stays in its menu.
+- Light and dark are picture cards in Settings, Appearance.
+- Most icons now come from Moka.Red, so they match the rest of the design.
+- Fixed: status bar text could draw over its neighbours in a very narrow window.
+
 ## What's new in 0.3.7
 
 **System**
