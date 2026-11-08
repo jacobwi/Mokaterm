@@ -56,10 +56,15 @@
 	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
 }
 
-.mt-toolnav-item--active {
-	background: var(--moka-color-surface-2);
-	color: var(--moka-color-on-surface);
-	box-shadow: inset 2px 0 0 var(--moka-color-primary), inset 0 0 20px var(--moka-color-primary-glow);
+.mt-toolnav-item--active,
+.mt-toolnav-item--active:hover {
+	background: var(--moka-current-bg);
+	color: var(--moka-current-color);
+	box-shadow: var(--moka-current-shadow);
+}
+
+.mt-toolnav-item--active ::deep .moka-icon {
+	color: var(--moka-current-icon);
 }
 
 /* Greyed, never hidden: the page still opens and says why it has nothing to drive. */
