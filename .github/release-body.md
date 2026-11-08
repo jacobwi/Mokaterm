@@ -1,3 +1,12 @@
+## What's new in 0.3.5
+
+**Docker**
+
+- Command output, compose messages and health check results now wrap at spaces instead of splitting words at the end of a
+  line.
+
+Built on Moka.Red 0.3.14.
+
 ## What's new in 0.3.4
 
 **System and Docker**
