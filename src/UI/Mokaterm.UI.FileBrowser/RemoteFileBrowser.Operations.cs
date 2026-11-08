@@ -1,4 +1,3 @@
-using Moka.Red.Icons;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.UI.Common.Icons;
 using System.Globalization;
@@ -371,28 +370,37 @@ public partial class RemoteFileBrowser
 		}
 	}
 
-	private async Task RenameAsync(RemoteFileEntry entry)
+	private void BeginRename(RemoteFileEntry entry)
 	{
-		if (!BeginOperation())
+		if (!CanBrowse || _operationRunning || _view.IndexOf(entry.Path) is not (>= 0 and var index))
 		{
 			return;
 		}
 
+		_renamingPath = entry.Path;
+		_scrollToIndex = index;
+
+		// Also reached from the context menu, whose click belongs to another component.
+		StateHasChanged();
+	}
+
+	private void EndRename()
+	{
+		_renamingPath = null;
+		_restoreFocus = true;
+		StateHasChanged();
+	}
+
+	private async Task SaveRenameAsync(RemoteFileEntry entry, string name)
+	{
+		// Thrown to the field, which shows it and stays open with what was typed.
+		if (!BeginOperation())
+		{
+			throw new InvalidOperationException("Another change is still running. Try again once it is done.");
+		}
+
 		try
 		{
-			string? name = await Dialogs.AskNameAsync(
-				"Rename",
-				MokaIcons.Action.Edit,
-				entry.IsDirectoryLike ? "Folder name" : "File name",
-				entry.Name,
-				"Rename",
-				TakenNames(except: entry.Name),
-				selectBaseName: !entry.IsDirectoryLike);
-			if (name is null || name == entry.Name)
-			{
-				return;
-			}
-
 			string target = RemotePath.Combine(RemotePath.GetParent(entry.Path), name);
 			await RunChangeAsync(
 				"Could not rename " + entry.Name,

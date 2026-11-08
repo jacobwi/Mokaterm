@@ -14,6 +14,18 @@ internal static partial class EntryNames
 	/// <summary>What a copy adds when its name is taken: <c>report copy.txt</c>, then <c>report copy 2.txt</c>.</summary>
 	public const string CopySuffix = " copy";
 
+	public const string BlankName = "A name cannot be blank.";
+
+	public static string? ProblemWith(string name, IReadOnlySet<string> taken)
+	{
+		ArgumentNullException.ThrowIfNull(taken);
+		return string.IsNullOrWhiteSpace(name) ? BlankName
+			: name is "." or ".." ? "That name is reserved."
+			: !RemotePath.IsValidName(name) ? "Names cannot contain '/'."
+			: taken.Contains(name) ? "Something with that name already exists here."
+			: null;
+	}
+
 	/// <summary><paramref name="name"/> itself when it is free, else the first of <c>name 2</c>, <c>name 3</c> and on that is.</summary>
 	public static string Unique(string name, IReadOnlySet<string> taken, bool isFolder)
 	{

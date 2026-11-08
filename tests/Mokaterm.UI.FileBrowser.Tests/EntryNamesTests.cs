@@ -16,6 +16,21 @@ public sealed class EntryNamesTests
 	public void Split_KeepsTheExtensionAFileOpensWith(string name, bool isFolder, string stem, string extension) =>
 		Assert.Equal((stem, extension), EntryNames.Split(name, isFolder));
 
+	[Theory]
+	[InlineData("fresh.txt", null)]
+	[InlineData(" padded ", null)]
+	[InlineData("   ", EntryNames.BlankName)]
+	[InlineData(".", "That name is reserved.")]
+	[InlineData("..", "That name is reserved.")]
+	[InlineData("a/b", "Names cannot contain '/'.")]
+	[InlineData("taken.txt", "Something with that name already exists here.")]
+	public void ProblemWith_SaysWhyANameCannotBeUsed(string name, string? problem)
+	{
+		HashSet<string> taken = new(StringComparer.Ordinal) { "taken.txt" };
+
+		Assert.Equal(problem, EntryNames.ProblemWith(name, taken));
+	}
+
 	[Fact]
 	public void Unique_NumbersBeforeTheExtension()
 	{

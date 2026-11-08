@@ -79,7 +79,7 @@ public partial class RemoteFileBrowser
 			case "rename":
 				if (FocusedOrOnlySelected() is { } entry)
 				{
-					await RenameAsync(entry);
+					BeginRename(entry);
 				}
 
 				break;
@@ -98,6 +98,8 @@ public partial class RemoteFileBrowser
 				UpdateSelectedItems();
 				break;
 			case "clear":
+				// A name that was refused keeps its field open after the focus has left it, where its own Escape cannot reach.
+				_renamingPath = null;
 				_selection.Clear();
 				UpdateSelectedItems();
 				break;
@@ -352,7 +354,7 @@ public partial class RemoteFileBrowser
 			Shortcut = "F2",
 			Disabled = !single,
 			DividerBefore = true,
-			OnClick = () => RenameAsync(entry),
+			OnClickSync = () => BeginRename(entry),
 		});
 		items.Add(new MokaContextMenuItem { Text = "Delete", Icon = MokaIcons.Action.Delete, Shortcut = "Del", OnClick = () => DeleteAsync(selected) });
 

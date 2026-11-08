@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Components;
 using Moka.Red.Feedback.Dialog;
-using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.UI.FileBrowser.Browsing;
 
 namespace Mokaterm.UI.FileBrowser.Dialogs;
 
-/// <summary>Asks for a file or folder name, for renaming, new entries and archives. Closes with the name as a string.</summary>
+/// <summary>Asks for a name that has no row to be typed into yet, for new entries and archives. Closes with the name as a string.</summary>
 public sealed partial class NameDialog : ComponentBase
 {
 	private string _name = "";
@@ -33,13 +32,7 @@ public sealed partial class NameDialog : ComponentBase
 
 	private bool IsValid => _name.Length > 0 && Error is null;
 
-	private string? Error =>
-		_name.Length == 0 ? null
-		: string.IsNullOrWhiteSpace(_name) ? "The name cannot be only spaces."
-		: _name is "." or ".." ? "That name is reserved."
-		: !RemotePath.IsValidName(_name) ? "Names cannot contain '/'."
-		: TakenNames.Contains(_name) ? "Something with that name already exists here."
-		: null;
+	private string? Error => _name.Length == 0 ? null : EntryNames.ProblemWith(_name, TakenNames);
 
 	protected override void OnInitialized()
 	{

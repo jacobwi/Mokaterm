@@ -1,0 +1,16 @@
+@namespace Mokaterm.UI.FileBrowser.Browsing
+@using Moka.Red.Forms.InlineEdit
+
+@* Moka's Stem selection stops at the last dot, which would leave only .gz of site.tar.gz, so filebrowser.js moves the
+   selection to data-name-end once this field has focus. *@
+<MokaInlineEdit Value="@Entry.Name"
+				Editing="true"
+				Trigger="MokaInlineEditTrigger.Manual"
+				Label="@FieldLabel"
+				BlankText="@EntryNames.BlankName"
+				Trim="false"
+				Validate="Validate"
+				Save="Save"
+				EditingChanged="OnEditingChanged"
+				spellcheck="false"
+				data-name-end="@StemLength" />

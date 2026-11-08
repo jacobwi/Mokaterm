@@ -97,6 +97,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private bool _switchingMode;
 	private bool _dragOver;
 	private bool _editingPath;
+	private string? _renamingPath;
 	private BrowserWidth _width = BrowserWidth.Narrow;
 	private string _pathText = "";
 
@@ -492,6 +493,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_loading = false;
 		_dragOver = false;
 		_editingPath = false;
+		_renamingPath = null;
 		StateHasChanged();
 
 		if (live is not null && _feature is not null)
@@ -919,6 +921,12 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			_foldersFirst);
 		_selection.Retain(_view);
 		UpdateSelectedItems();
+
+		// Gone from the list (filtered out, deleted, another folder), so nothing can be typed into any more.
+		if (_view.IndexOf(_renamingPath) < 0)
+		{
+			_renamingPath = null;
+		}
 	}
 
 	// The table ignores changes made to the set it was given, so every change hands it a new one.

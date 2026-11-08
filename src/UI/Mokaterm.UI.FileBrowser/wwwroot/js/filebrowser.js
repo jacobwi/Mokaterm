@@ -238,6 +238,18 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 		setDropRow(null);
 	};
 
+	// The select event of the selection Moka's field makes when it opens, and only that one, so a selection the user
+	// makes afterwards stays. Focus events would be no use: a page without the window's focus never gets them.
+	const nameFieldsDone = new WeakSet();
+	const onSelect = event => {
+		const field = event.target;
+		const end = isElement(field) ? field.getAttribute('data-name-end') : null;
+		if (end !== null && !nameFieldsDone.has(field)) {
+			nameFieldsDone.add(field);
+			field.setSelectionRange(0, Number(end));
+		}
+	};
+
 	// Only crossing a step reaches .NET, so dragging a panel splitter costs a call per step, not per frame. A hidden
 	// browser (display: none in a background tab) measures 0 and keeps the layout it had.
 	const steps = Array.isArray(widthSteps) ? widthSteps : [];
@@ -263,6 +275,7 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 	root.addEventListener('dragleave', onDragLeave);
 	root.addEventListener('drop', onDrop);
 	root.addEventListener('dragend', onDragEnd);
+	root.addEventListener('select', onSelect);
 
 	return {
 		setActive(value) {
@@ -298,7 +311,7 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			}
 
 			const cell = row.querySelector('td[data-col-index]');
-			if (cell && root.contains(document.activeElement)) {
+			if (cell && root.contains(document.activeElement) && !isEditable(document.activeElement)) {
 				cell.focus({ preventScroll: true });
 			}
 		},
@@ -330,6 +343,7 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			root.removeEventListener('dragleave', onDragLeave);
 			root.removeEventListener('drop', onDrop);
 			root.removeEventListener('dragend', onDragEnd);
+			root.removeEventListener('select', onSelect);
 			clearTimeout(typeAheadTimer);
 			setDropRow(null);
 		},

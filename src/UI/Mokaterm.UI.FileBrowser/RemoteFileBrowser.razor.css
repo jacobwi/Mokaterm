@@ -98,11 +98,11 @@
 	text-decoration: underline dotted var(--moka-color-on-surface-tertiary);
 }
 
-/* Grows from nothing rather than from a width of its own: Moka's toolbar wraps, and a wider start would push the
-   buttons beside the filter onto a line of their own. */
+/* Grows from nothing rather than from a width of its own, so the buttons beside it stay on the row. Moka's toolbar holds
+   a field at 8rem, which in a narrow panel would drop the buttons first. */
 .fb-filter {
 	flex: 1 1 0;
-	min-width: 88px;
+	min-width: 88px !important;
 	max-width: 280px;
 }
 
@@ -180,6 +180,22 @@
 	display: flex;
 	align-items: center;
 	gap: var(--moka-spacing-sm);
+}
+
+/* An error under the field may grow the row rather than be cut off. */
+.fb-name--renaming {
+	overflow: visible;
+	white-space: normal;
+}
+
+.fb-name--renaming ::deep .moka-inline-edit {
+	flex: 1;
+}
+
+/* The field is taller than the 16px line it replaces, and the cell's padding takes the difference so the row keeps its
+   height. A folder has no size text to hold the row open. */
+.fb-name--renaming ::deep .moka-inline-edit__field {
+	margin-block: -4px;
 }
 
 .fb-name-text,
