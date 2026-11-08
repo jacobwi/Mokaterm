@@ -39,6 +39,7 @@
 .mt-status-group ::deep .mt-status-session,
 .mt-status-group ::deep .mt-status-session-slot {
 	min-width: 0;
+	overflow: hidden;
 }
 
 .mt-status-group ::deep .mt-status-remote-item,
