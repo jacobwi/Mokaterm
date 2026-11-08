@@ -1,0 +1,55 @@
+@using Mokaterm.Modules.Ssh.Admin.Network
+@using Mokaterm.Modules.Ssh.Admin.Security
+
+@code {
+	// The listening sockets summed up beside their list, on the Network page and on Security's. A method rather than a
+	// component, because a component's parameters are public and the socket record is the module's own.
+	internal static RenderFragment Panel(IReadOnlyList<ListeningSocket> sockets, string source, int? sessionPort, RenderFragment? note) => __builder =>
+	{
+		int every = SecurityChecks.OpenToAll(sockets).Count();
+		<ToolDetailPanel Title="Listening sockets"
+						  Subtitle="@(source.Length > 0 ? $"As {source} lists them" : null)"
+						  Mono="false"
+						  DotColor="@(every > 0 ? MokaColor.Warning : MokaColor.Success)"
+						  DotGlow="@(every > 0)">
+			<div class="mta-tiles">
+				<MokaStat Tile Value="@AdminFormat.Count(sockets.Count(socket => !socket.IsUdp))" Label="TCP" HelpText="@Ports(sockets, udp: false)" />
+				<MokaStat Tile Value="@AdminFormat.Count(sockets.Count(socket => socket.IsUdp))" Label="UDP" HelpText="@Ports(sockets, udp: true)" />
+				<MokaStat Tile Value="@AdminFormat.Count(every)" Label="Every address" HelpText="anyone who reaches it" Color="@(every > 0 ? MokaColor.Warning : MokaColor.Surface)" />
+			</div>
+			@if (sockets.Count > 0)
+			{
+				<section class="mta-section" aria-label="Sockets by reach">
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Who can reach them</MokaText>
+					<MokaDonutChart Segments="Shares(sockets, every)" Thickness="30" Size="MokaSize.Sm" Label="Listening sockets by who can reach them" Class="mta-donut">
+						<span class="mta-donut-total">@AdminFormat.Count(sockets.Count)</span>
+					</MokaDonutChart>
+				</section>
+			}
+			@if (sessionPort is { } port && sockets.Any(socket => socket.Port == port && !socket.IsUdp))
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"This session arrived on port {port}.")</MokaText>
+			}
+			@note
+		</ToolDetailPanel>
+	};
+
+	internal static ListeningReach ReachOf(ListeningSocket socket) =>
+		SecurityChecks.OpenToAll([socket]).Any() ? ListeningReach.Every : IsLoopback(socket) ? ListeningReach.Loopback : ListeningReach.One;
+
+	private static bool IsLoopback(ListeningSocket socket) =>
+		socket.Address.StartsWith("127.", StringComparison.Ordinal) || socket.Address is "::1" || socket.Address.Contains("%lo", StringComparison.Ordinal);
+
+	private static IReadOnlyList<MokaDonutSegment> Shares(IReadOnlyList<ListeningSocket> sockets, int every) =>
+	[
+		new MokaDonutSegment { Name = "Every address", Value = every, Color = MokaColor.Warning },
+		new MokaDonutSegment { Name = "One address", Value = sockets.Count(socket => ReachOf(socket) == ListeningReach.One), Color = MokaColor.Info },
+		new MokaDonutSegment { Name = "This machine", Value = sockets.Count(socket => ReachOf(socket) == ListeningReach.Loopback), Color = MokaColor.Success },
+	];
+
+	private static string Ports(IReadOnlyList<ListeningSocket> sockets, bool udp)
+	{
+		int ports = sockets.Where(socket => socket.IsUdp == udp).Select(socket => socket.Port).Distinct().Count();
+		return ports == 1 ? "1 port" : $"{AdminFormat.Count(ports)} ports";
+	}
+}

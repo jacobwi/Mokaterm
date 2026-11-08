@@ -97,7 +97,7 @@
 							</MokaColumn>
 							<MokaColumn TItem="AdminRow<FirewallRule>" Title="Action" Field="@(row => row.Item.Action)" Mono>
 								<CellTemplate Context="row">
-									<span style="@ActionStyle(row.Item.Action)">@row.Item.Action</span>
+									<MokaTag Text="@row.Item.Action" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="@ActionColor(row.Item.Action)" />
 								</CellTemplate>
 							</MokaColumn>
 							<MokaColumn TItem="AdminRow<FirewallRule>" Title="From" Field="@(row => row.Item.From)" Mono Class="mt-col-wide mta-col-cut">
@@ -115,8 +115,7 @@
 					@Policies(status)
 					@if (status.Raw.Length > 0)
 					{
-						<pre class="mta-pre mta-pre--fill">@status.Raw</pre>
-						<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"Read only: {firewall.DisplayName} rule sets are shown as the tool prints them.")</MokaText>
+						<AdminOutput Label="@($"{firewall.DisplayName} rule set, read only")" Text="@status.Raw" CopyLabel="Copy the rule set" Fill Wrap="false" />
 					}
 					else
 					{
@@ -189,13 +188,7 @@
 	{
 		@if (status.Summary.Count > 0)
 		{
-			<dl class="mta-kv">
-				@foreach ((string key, string value) in status.Summary)
-				{
-					<dt>@key</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
-				}
-			</dl>
+			<AdminFacts Items="@([.. status.Summary.Select(pair => new MokaDataListItem(pair.Key, pair.Value))])" />
 		}
 	};
 
@@ -235,22 +228,14 @@
 				}
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@rule.Action" Label="Action" HelpText="@(rule.From.Length > 0 ? $"from {rule.From}" : "from anywhere")" Color="@ActionColor(rule.Action)" />
 					@if (rule.Number is { } number)
 					{
-						<dt>Number</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@number</MokaText></dd>
+						<MokaStat Tile Value="@number.ToString(CultureInfo.InvariantCulture)" Label="Order" HelpText="first match wins" />
 					}
-					<dt>Rule</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.Target</MokaText></dd>
-					<dt>Action</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.Action</MokaText></dd>
-					@if (rule.From.Length > 0)
-					{
-						<dt>From</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@rule.From</MokaText></dd>
-					}
-				</dl>
+				</div>
+				<AdminFacts Items="RuleFacts(rule)" />
 				@if (firewall.AllowsSsh(rule))
 				{
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"This rule lets in port {firewall.SshPort}, which this session arrived on.")</MokaText>
@@ -328,12 +313,24 @@
 		return problem;
 	}
 
-	private static string? ActionStyle(string action) => action switch
+	private static MokaColor ActionColor(string action) => action switch
 	{
-		_ when action.StartsWith("ALLOW", StringComparison.Ordinal) => "color:var(--moka-color-success)",
-		_ when action.StartsWith("DENY", StringComparison.Ordinal) || action.StartsWith("REJECT", StringComparison.Ordinal) => "color:var(--moka-color-error)",
-		_ => null,
+		_ when action.StartsWith("ALLOW", StringComparison.Ordinal) => MokaColor.Success,
+		_ when action.StartsWith("DENY", StringComparison.Ordinal) || action.StartsWith("REJECT", StringComparison.Ordinal) => MokaColor.Error,
+		_ when action.StartsWith("LIMIT", StringComparison.Ordinal) => MokaColor.Warning,
+		_ => MokaColor.Surface,
 	};
+
+	private static IReadOnlyList<MokaDataListItem> RuleFacts(FirewallRule rule)
+	{
+		List<MokaDataListItem> facts = [new("Rule", rule.Target)];
+		if (rule.From.Length > 0)
+		{
+			facts.Add(new("From", rule.From));
+		}
+
+		return facts;
+	}
 
 	private bool Matches(FirewallRule rule) => _filter.Trim().Length == 0
 		|| rule.Target.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)

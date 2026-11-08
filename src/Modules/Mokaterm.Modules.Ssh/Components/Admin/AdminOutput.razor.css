@@ -1,0 +1,65 @@
+.mta-output {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+.mta-output-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: var(--moka-button-height-sm);
+}
+
+/* Moka's block at the size of the rest of a panel: small mono text on the darker surface. */
+.mta-output ::deep .mta-output-code {
+	min-width: 0;
+	border-color: var(--moka-color-outline-variant);
+	background: var(--moka-color-surface-2);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mta-output ::deep .mta-output-code .moka-code-block__pre {
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+}
+
+.mta-output ::deep .mta-output-code .moka-code-block__code {
+	color: var(--moka-color-on-surface-variant);
+	tab-size: 4;
+}
+
+/* Moka breaks a wrapped line anywhere, which splits words of prose such as systemctl's hints; words break only when
+   one is longer than the line. */
+.mta-output ::deep .mta-output-code.moka-code-block--wrap .moka-code-block__line {
+	overflow-wrap: anywhere;
+	word-break: normal;
+}
+
+.mta-output--commands ::deep .mta-output-code {
+	border-left: 3px solid var(--moka-color-primary);
+}
+
+.mta-output--commands ::deep .mta-output-code .moka-code-block__code {
+	color: var(--moka-color-on-surface);
+}
+
+/* In a panel that hands it the rest of its height, the block scrolls inside that rather than growing the panel. */
+.mta-output--fill {
+	flex: 1 1 0;
+	min-height: 140px;
+}
+
+.mta-output--fill ::deep .mta-output-code {
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.mta-output--fill ::deep .mta-output-code .moka-code-block__pre {
+	flex: 1 1 0;
+	min-height: 0;
+}

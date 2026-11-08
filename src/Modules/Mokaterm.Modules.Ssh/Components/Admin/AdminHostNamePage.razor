@@ -4,33 +4,18 @@
 <ToolPageFrame Title="Hostname" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
 	@if (_info is { } info)
 	{
-		<dl class="mta-kv">
-			<dt>Current</dt>
-			<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@info.Current</MokaText></dd>
-			<dt>At boot</dt>
-			<dd>
-				<MokaText Element="span" Size="MokaSize.Sm" Mono>@(info.Static.Length > 0 ? info.Static : "not set")</MokaText>
-				@if (info.Static.Length > 0 && info.Static != info.Current)
-				{
-					<Hint Text="The name changes at the next boot." Class="mta-after"><MokaTag Text="DIFFERS" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
-				}
-			</dd>
-			@if (info.Pretty.Length > 0)
-			{
-				<dt>Pretty name</dt>
-				<dd>@info.Pretty</dd>
-			}
-			@foreach ((string key, string value) in info.Details)
-			{
-				<dt>@key</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
-			}
-		</dl>
+		bool differs = info.Static.Length > 0 && info.Static != info.Current;
+		<div class="mta-board">
+			<MokaCard Outlined Elevation="0" Title="Names" Subtitle="@(Capabilities.HostName.UsesHostnamectl ? "From hostnamectl" : "From hostname and /etc/hostname")" Class="mta-board-card">
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@info.Current" Label="Now" HelpText="the kernel's name" />
+					<MokaStat Tile Value="@(info.Static.Length > 0 ? info.Static : "not set")" Label="At boot" HelpText="@(differs ? "changes at the next boot" : "the same")" Color="@(differs ? MokaColor.Warning : MokaColor.Surface)" />
+				</div>
+				<AdminFacts Items="NameFacts(info, differs)" Class="mta-facts--plain" />
+			</MokaCard>
 
-		<section class="mta-section">
-			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Rename the machine</MokaText>
-			<div class="mta-inline">
-				<div class="mta-grow">
+			<MokaCard Outlined Elevation="0" Title="Rename the machine" Subtitle="@(Capabilities.HostName.UsesHostnamectl ? "hostnamectl set-hostname" : "/etc/hostname and hostname(1)")" Class="mta-board-card">
+				<div class="mta-section">
 					<TextSetting Value="@_name"
 								 ValueChanged="@(value => _name = value)"
 								 Validate="AdminNames.CheckHostName"
@@ -38,22 +23,24 @@
 								 AriaLabel="New host name"
 								 Disabled="@(Context.RootChangeBlocked is not null)"
 								 @key="_formVersion" />
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+						@(Capabilities.HostName.UsesHostnamectl
+							? "Set with hostnamectl, now and for the next boot. /etc/hosts is left alone."
+							: "Written to /etc/hostname and set with hostname(1). /etc/hosts is left alone.")
+					</MokaText>
+					<div class="mta-form-actions">
+						<Hint Text="@Context.RootChangeBlocked">
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Sm"
+										Disabled="@(Busy || _name.Length == 0 || _name == info.Current || Context.RootChangeBlocked is not null)"
+										OnClick="RenameAsync">
+								Rename
+							</MokaButton>
+						</Hint>
+					</div>
 				</div>
-				<Hint Text="@Context.RootChangeBlocked">
-					<MokaButton Variant="MokaVariant.Outlined"
-								Size="MokaSize.Sm"
-								Disabled="@(Busy || _name.Length == 0 || _name == info.Current || Context.RootChangeBlocked is not null)"
-								OnClick="RenameAsync">
-						Rename
-					</MokaButton>
-				</Hint>
-			</div>
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
-				@(Capabilities.HostName.UsesHostnamectl
-					? "Set with hostnamectl, now and for the next boot. /etc/hosts is left alone."
-					: "Written to /etc/hostname and set with hostname(1). /etc/hosts is left alone.")
-			</MokaText>
-		</section>
+			</MokaCard>
+		</div>
 	}
 </ToolPageFrame>
 
@@ -65,6 +52,26 @@
 	private string Summary => _info is { } info
 		? $"{info.Current} · {(Capabilities.HostName.UsesHostnamectl ? "hostnamectl" : "/etc/hostname")}"
 		: "";
+
+	private static IReadOnlyList<MokaDataListItem> NameFacts(HostNameInfo info, bool differs)
+	{
+		List<MokaDataListItem> facts = [];
+		if (differs)
+		{
+			facts.Add(new("At boot", ValueContent: @<span class="mta-facts-line">
+				<span>@info.Static</span>
+				<Hint Text="The name changes at the next boot."><MokaTag Text="Differs" Size="MokaSize.Xs" Color="MokaColor.Warning" /></Hint>
+			</span>));
+		}
+
+		if (info.Pretty.Length > 0)
+		{
+			facts.Add(new("Pretty name", ValueContent: @<span class="mta-facts-text">@info.Pretty</span>));
+		}
+
+		facts.AddRange(info.Details.Select(detail => new MokaDataListItem(detail.Key, detail.Value)));
+		return facts;
+	}
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{

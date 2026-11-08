@@ -18,7 +18,7 @@
 				Error="@LoadError"
 				OnRefresh="ReloadAsync"
 				ListPage
-				Detail="@(_view == "devices" && SelectedDevice is not null ? DevicePanel : null)">
+				Detail="@DetailFragment">
 	<Chips>
 		<AdminChips Items="Chips" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Disk details to show" />
 	</Chips>
@@ -123,7 +123,7 @@
 								<Hint Text="@($"{AdminFormat.Kb(item.UsedKb)} used, {AdminFormat.Kb(item.AvailableKb)} free")">
 									<span class="mta-used">
 										<span class="mta-mono mta-used-figure">@AdminFormat.Percent(item.UsedPercent)</span>
-										<UsageBar Percent="item.UsedPercent" Class="mta-used-bar" />
+										<MokaMeter Value="item.UsedPercent" ShowValue="false" Color="@AdminFormat.LevelColor(item.UsedPercent)" Size="MokaSize.Xs" Class="mta-used-bar" aria-label="@($"{item.MountPoint} used")" />
 										<span class="mta-mono mta-dim">@AdminFormat.Kb(item.AvailableKb) free</span>
 									</span>
 								</Hint>
@@ -356,7 +356,7 @@
 						<CellTemplate Context="row">
 							@if (row.Mount is null)
 							{
-								<UsageBar Percent="row.Share" Class="mta-share-bar" />
+								<MokaMeter Value="row.Share" ShowValue="false" Color="MokaColor.Info" Size="MokaSize.Xs" Class="mta-share-bar" aria-label="@($"{row.Name}'s share")" />
 							}
 						</CellTemplate>
 					</MokaColumn>
@@ -411,7 +411,7 @@
 								</MokaColumn>
 								<MokaColumn TItem="SpaceEntry" Title="Share" Field="@(file => file.Kb)" Sortable="false" Class="mt-col-wide">
 									<CellTemplate Context="file">
-										<UsageBar Percent="@(file.Kb * 100.0 / largest)" Class="mta-share-bar" />
+										<MokaMeter Value="@(file.Kb * 100.0 / largest)" ShowValue="false" Color="MokaColor.Info" Size="MokaSize.Xs" Class="mta-share-bar" aria-label="@($"{file.Path} against the largest")" />
 									</CellTemplate>
 								</MokaColumn>
 							</ToolTable>
@@ -452,32 +452,17 @@
 				}
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
-					<dt>Type</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(device.Type.Length > 0 ? device.Type : "unknown")</MokaText></dd>
-					@if (device.SizeBytes is { } size)
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@(device.SizeBytes is { } size ? DisplayFormat.Bytes(size) : "?")" Label="Size" HelpText="@(device.Type.Length > 0 ? device.Type : "type unknown")" />
+					<MokaStat Tile Value="@(device.FileSystem.Length > 0 ? device.FileSystem : "none")" Label="File system" HelpText="@(device.Label.Length > 0 ? device.Label : "no label")" />
+					@if (_smart.TryGetValue(device.Name, out SmartReport? health) && health.Passed is { } passed)
 					{
-						<dt>Size</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@DisplayFormat.Bytes(size)</MokaText></dd>
+						<MokaStat Tile Value="@(passed && !health.NeedsAttention ? "Healthy" : passed ? "Check" : "Failing")" Label="Health" HelpText="@($"SMART {(passed ? health.HealthText : "FAILED")}")" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : passed ? MokaColor.Warning : MokaColor.Error)" />
 					}
-					@if (device.FileSystem.Length > 0)
-					{
-						<dt>File system</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{device.FileSystem}{(device.Label.Length > 0 ? $" · {device.Label}" : "")}")</MokaText></dd>
-					}
-					@if (device.MountPoint.Length > 0)
-					{
-						<dt>Mounted on</dt>
-						<dd><button type="button" class="mta-link" @onclick="@(() => OpenSpaceAsync(device.MountPoint))">@device.MountPoint</button></dd>
-					}
-					@if (device.ReadOnly || device.Removable)
-					{
-						<dt>Flags</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm">@string.Join(", ", new[] { device.ReadOnly ? "read only" : "", device.Removable ? "removable" : "" }.Where(part => part.Length > 0))</MokaText></dd>
-					}
-				</dl>
+				</div>
+				<AdminFacts Items="DeviceFacts(device)" />
 
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Health (SMART)</MokaText>
+				<MokaText Element="h5" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label mta-panel-heading">Health (SMART)</MokaText>
 				@if (SmartUnavailable(device) is { } unavailable)
 				{
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@unavailable</MokaText>
@@ -522,48 +507,25 @@
 			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@problem</MokaText>
 		}
 
-		<dl class="mta-kv">
-			@if (report.Model.Length > 0)
-			{
-				<dt>Model</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Model</MokaText></dd>
-			}
-			@if (report.Serial.Length > 0)
-			{
-				<dt>Serial</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Serial</MokaText></dd>
-			}
-			@if (report.Firmware.Length > 0)
-			{
-				<dt>Firmware</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@report.Firmware</MokaText></dd>
-			}
-			@if (KindOf(report) is { Length: > 0 } kind)
-			{
-				<dt>Kind</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@kind</MokaText></dd>
-			}
-			@if (report.TemperatureCelsius is { } temperature)
-			{
-				<dt>Temperature</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{temperature} °C")</MokaText></dd>
-			}
-			@if (report.PowerOnHours is { } hours)
-			{
-				<dt>Powered on</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@PowerOn(hours)</MokaText></dd>
-			}
-			@if (report.PowerCycles is { } cycles)
-			{
-				<dt>Power cycles</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@cycles.ToString("N0", CultureInfo.CurrentCulture)</MokaText></dd>
-			}
-			@foreach ((string label, string value) in report.NvmeHealth)
-			{
-				<dt>@label</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@value</MokaText></dd>
-			}
-		</dl>
+		@if (report.TemperatureCelsius is not null || report.PowerOnHours is not null || report.PowerCycles is not null)
+		{
+			<div class="mta-tiles">
+				@if (report.TemperatureCelsius is { } temperature)
+				{
+					<MokaStat Tile Value="@($"{temperature} °C")" Label="Temperature" HelpText="as the disk reads it" Color="@(temperature >= 60 ? MokaColor.Error : temperature >= 50 ? MokaColor.Warning : MokaColor.Surface)" />
+				}
+				@if (report.PowerOnHours is { } hours)
+				{
+					<MokaStat Tile Value="@PowerOnShort(hours)" Label="Powered on" HelpText="@($"{hours.ToString("N0", CultureInfo.CurrentCulture)} hours")" />
+				}
+				@if (report.PowerCycles is { } cycles)
+				{
+					<MokaStat Tile Value="@cycles.ToString("N0", CultureInfo.CurrentCulture)" Label="Power cycles" HelpText="times switched on" />
+				}
+			</div>
+		}
+
+		<AdminFacts Items="SmartFacts(report)" />
 
 		@if (report.Attributes.Count > 0)
 		{
@@ -610,6 +572,115 @@
 		}
 		<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@($"smartctl {report.Version}{(report.ExitStatus is { } exit && exit != 0 ? $" · exit status {exit}" : "")}")</MokaText>
 	};
+
+	private RenderFragment? DetailFragment => _view switch
+	{
+		"devices" when SelectedDevice is not null => DevicePanel,
+		SpaceTab when _space is { Entries.Count: > 0 } && !_measuring => SpacePanel,
+		_ => null,
+	};
+
+	private RenderFragment SpacePanel => __builder =>
+	{
+		if (_space is not { } report)
+		{
+			return;
+		}
+
+		<ToolDetailPanel Title="@_spacePath" Subtitle="@(ReadAsRoot ? "Measured as root" : $"Measured as {Context.LoginName}")" DotColor="@(report.Unreadable > 0 ? MokaColor.Warning : MokaColor.Success)">
+			<div class="mta-tiles">
+				<MokaStat Tile Value="@(report.TotalKb is { } total ? AdminFormat.Kb(total) : "?")" Label="In this folder" HelpText="on this file system" />
+				<MokaStat Tile Value="@AdminFormat.Count(report.Entries.Count)" Label="Folders" HelpText="directly in it" />
+				<MokaStat Tile Value="@AdminFormat.Count(report.Unreadable)" Label="Unreadable" HelpText="@(report.Unreadable > 0 ? "count as empty" : "every folder read")" Color="@(report.Unreadable > 0 ? MokaColor.Warning : MokaColor.Surface)" />
+			</div>
+			<section class="mta-section" aria-label="Biggest folders">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Biggest folders</MokaText>
+				<MokaDonutChart Segments="SpaceShares(report)" Thickness="30" Size="MokaSize.Sm" Label="@($"What takes the space in {_spacePath}")" Class="mta-donut">
+					<span class="mta-donut-total">@(report.TotalKb is { } sum ? AdminFormat.Kb(sum) : "")</span>
+				</MokaDonutChart>
+			</section>
+			@if (report.Unreadable > 0 && !ReadAsRoot && Context.RootChangeBlocked is null)
+			{
+				<div><MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Lock" OnClick="Context.EnableRoot">Turn on root mode to read them</MokaButton></div>
+			}
+		</ToolDetailPanel>
+	};
+
+	// The five biggest folders, then the rest and the files lying in the folder itself, so the ring stays readable.
+	private static IReadOnlyList<MokaDonutSegment> SpaceShares(SpaceReport report)
+	{
+		List<SpaceEntry> biggest = [.. report.Entries.OrderByDescending(entry => entry.Kb).Take(5)];
+		List<MokaDonutSegment> segments = [.. biggest.Select(entry => new MokaDonutSegment { Name = entry.Name + "/", Value = entry.Kb })];
+		long rest = report.Entries.Sum(entry => entry.Kb) - biggest.Sum(entry => entry.Kb) + (report.FilesHereKb ?? 0);
+		if (rest > 0)
+		{
+			segments.Add(new MokaDonutSegment { Name = "everything else", Value = rest, Color = MokaColor.Surface });
+		}
+
+		return segments;
+	}
+
+	private IReadOnlyList<MokaDataListItem> DeviceFacts(BlockDevice device)
+	{
+		List<MokaDataListItem> facts = [];
+		if (device.Model.Length > 0 && device.Type.Length > 0)
+		{
+			facts.Add(new("Type", device.Type));
+		}
+
+		if (device.FileSystem.Length > 0)
+		{
+			facts.Add(new("File system", device.Label.Length > 0 ? $"{device.FileSystem} · {device.Label}" : device.FileSystem));
+		}
+
+		if (device.MountPoint.Length > 0)
+		{
+			facts.Add(new("Mounted on", ValueContent: @<button type="button" class="mta-link mta-mono" @onclick="@(() => OpenSpaceAsync(device.MountPoint))">@device.MountPoint</button>));
+		}
+
+		if (device.ReadOnly || device.Removable)
+		{
+			facts.Add(new("Flags", ValueContent: @<span class="mta-facts-line">
+				@if (device.ReadOnly)
+				{
+					<MokaTag Text="Read only" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				}
+				@if (device.Removable)
+				{
+					<MokaTag Text="Removable" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="MokaColor.Surface" />
+				}
+			</span>));
+		}
+
+		return facts;
+	}
+
+	private static IReadOnlyList<MokaDataListItem> SmartFacts(SmartReport report)
+	{
+		List<MokaDataListItem> facts = [];
+		if (report.Model.Length > 0)
+		{
+			facts.Add(new("Model", report.Model));
+		}
+
+		if (report.Serial.Length > 0)
+		{
+			facts.Add(new("Serial", report.Serial));
+		}
+
+		if (report.Firmware.Length > 0)
+		{
+			facts.Add(new("Firmware", report.Firmware));
+		}
+
+		if (KindOf(report) is { Length: > 0 } kind)
+		{
+			facts.Add(new("Kind", kind));
+		}
+
+		facts.AddRange(report.NvmeHealth.Select(pair => new MokaDataListItem(pair.Label, pair.Value)));
+		return facts;
+	}
 
 	private IReadOnlyList<AdminChip> LargeChoices =>
 		[.. SpaceCommands.LargeFileSizesKb.Select(kb => new AdminChip(kb.ToString(CultureInfo.InvariantCulture), $"over {AdminFormat.Kb(kb)}"))];
@@ -752,11 +823,11 @@
 		_ => report.Protocol,
 	};
 
-	private static string PowerOn(long hours) => hours >= 24 * 365
-		? string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h, about {hours / (24.0 * 365):0.#} years")
+	private static string PowerOnShort(long hours) => hours >= 24 * 365
+		? string.Create(CultureInfo.CurrentCulture, $"{hours / (24.0 * 365):0.#} years")
 		: hours >= 48
-			? string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h, about {hours / 24} days")
-			: string.Create(CultureInfo.CurrentCulture, $"{hours:N0} h");
+			? string.Create(CultureInfo.CurrentCulture, $"{hours / 24} days")
+			: string.Create(CultureInfo.CurrentCulture, $"{hours} h");
 
 	private bool Matches(string value) => _filter.Trim().Length == 0 || value.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase);
 

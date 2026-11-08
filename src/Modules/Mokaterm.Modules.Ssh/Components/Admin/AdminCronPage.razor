@@ -52,7 +52,7 @@
 				{
 					@if (_showRaw)
 					{
-						<pre class="mta-pre mta-pre--fill">@(_loaded.Length == 0 ? "(empty)" : _loaded)</pre>
+						<AdminOutput Label="@($"{Owner}'s crontab as crontab -l prints it")" Text="@(_loaded.Length == 0 ? "(empty)" : _loaded)" CopyLabel="Copy the crontab" Fill Wrap="false" />
 					}
 					else
 					{
@@ -149,18 +149,7 @@
 								</CellTemplate>
 							</MokaColumn>
 						</ToolTable>
-						<dl class="mta-kv">
-							@foreach ((string period, IReadOnlyList<string> scripts) in _systemFolders)
-							{
-								<dt>@period</dt>
-								<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@(scripts.Count == 0 ? "nothing in /etc/cron." + period : string.Join("  ", scripts))</MokaText></dd>
-							}
-							@foreach (SystemCronFile unreadable in files.Where(file => !file.Readable))
-							{
-								<dt>Unreadable</dt>
-								<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@unreadable.Path</MokaText><span class="mta-dim mta-after">only root can read it</span></dd>
-							}
-						</dl>
+						<AdminFacts Title="Scripts run by run-parts" Items="FolderFacts(files)" />
 					</div>
 				}
 				break;
@@ -349,8 +338,8 @@
 				</Hint>
 			</Actions>
 			<ChildContent>
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command</MokaText>
-				<pre class="mta-pre mta-pre--commands">@entry.Command</pre>
+				<AdminFacts Items="EntryFacts(entry, Owner)" />
+				<AdminOutput Label="Command" Text="@entry.Command" CopyLabel="Copy the command" Commands />
 				@NextRunsFragment(entry.Schedule)
 			</ChildContent>
 		</ToolDetailPanel>
@@ -390,14 +379,13 @@
 			}
 			@if (CronSchedule.TryParse(CurrentSchedule, out _) is { } schedule)
 			{
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Preview</MokaText>
 				<div class="mta-inline">
 					<MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow />
 					<MokaText Element="span" Size="MokaSize.Sm">@schedule.Describe()</MokaText>
 				</div>
 				@if (draft is not null)
 				{
-					<pre class="mta-pre mta-pre--commands">@draft.Format()</pre>
+					<AdminOutput Label="The line written to the crontab" Text="@draft.Format()" CopyLabel="Copy the line" Commands />
 				}
 				@NextRunsFragment(schedule)
 			}
@@ -418,33 +406,63 @@
 
 	private RenderFragment NextRunsFragment(CronSchedule schedule) => __builder =>
 	{
-		<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Next runs</MokaText>
-		@if (schedule.IsReboot)
-		{
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">At every boot, so there is no time to show.</MokaText>
-		}
-		else if (_serverNow is { } now)
-		{
-			IReadOnlyList<DateTime> runs = schedule.NextRuns(now, 3);
-			@if (runs.Count == 0)
+		<section class="mta-section" aria-label="Next runs">
+			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Next runs</MokaText>
+			@if (schedule.IsReboot)
 			{
-				<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-warning)">This schedule never comes round within five years.</MokaText>
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">At every boot, so there is no time to show.</MokaText>
+			}
+			else if (_serverNow is { } now)
+			{
+				IReadOnlyList<DateTime> runs = schedule.NextRuns(now, 3);
+				@if (runs.Count == 0)
+				{
+					<MokaText Element="span" Size="MokaSize.Xs" Style="color:var(--moka-color-warning)">This schedule never comes round within five years.</MokaText>
+				}
+				else
+				{
+					<MokaTimeline role="list" Class="mta-timeline">
+						@for (int index = 0; index < runs.Count; index++)
+						{
+							DateTime run = runs[index];
+							<MokaTimelineItem role="listitem"
+											  Title="@run.ToString("ddd d MMM yyyy, HH:mm", CultureInfo.InvariantCulture)"
+											  Timestamp="@($"in {AdminFormat.Span(run - now)}, server time{(_serverZone.Length > 0 ? $" ({_serverZone})" : "")}")"
+											  Icon="@(index == 0 ? SshIcons.Clock : (MokaIconDefinition?)null)"
+											  DotColor="@(index == 0 ? MokaColor.Primary : MokaColor.Surface)" />
+						}
+					</MokaTimeline>
+				}
 			}
 			else
 			{
-				<ul class="mta-runs">
-					@foreach (DateTime run in runs)
-					{
-						<li>@run.ToString("ddd d MMM yyyy  HH:mm", CultureInfo.InvariantCulture)<span class="mta-dim mta-after">in @AdminFormat.Span(run - now)</span></li>
-					}
-				</ul>
+				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The server's clock was not read, so the next times are not known.</MokaText>
 			}
-		}
-		else
-		{
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The server's clock was not read, so the next times are not known.</MokaText>
-		}
+		</section>
 	};
+
+	private static IReadOnlyList<MokaDataListItem> EntryFacts(CrontabEntry entry, string owner) =>
+	[
+		new("Schedule", entry.Schedule.Text),
+		new("Runs as", owner),
+	];
+
+	private IReadOnlyList<MokaDataListItem> FolderFacts(IReadOnlyList<SystemCronFile> files)
+	{
+		List<MokaDataListItem> facts =
+		[
+			.. _systemFolders.Select(folder => new MokaDataListItem(
+				folder.Period,
+				folder.Scripts.Count == 0 ? $"nothing in /etc/cron.{folder.Period}" : string.Join("  ", folder.Scripts))),
+		];
+		facts.AddRange(files
+			.Where(file => !file.Readable)
+			.Select(file => new MokaDataListItem("Unreadable", ValueContent: @<span class="mta-facts-line">
+				<span>@file.Path</span>
+				<span class="mta-facts-text mta-dim">only root can read it</span>
+			</span>)));
+		return facts;
+	}
 
 	private string CurrentSchedule => _nickname ?? string.Join(' ', _fields);
 

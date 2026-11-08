@@ -12,7 +12,7 @@
 		{
 			<Hint Text="@(SampleError ?? "CPU, memory, load, network and disk figures are read again every two seconds while this page is shown.")" Style="min-width: 0">
 				<span class="mta-live">
-					<MokaStatusDot Size="MokaSize.Xs" Color="@(SampleError is null ? MokaColor.Success : MokaColor.Warning)" Glow="@(SampleError is null)" />
+					<MokaStatusDot Size="MokaSize.Xs" Color="@(SampleError is null ? MokaColor.Success : MokaColor.Warning)" Glow="@(SampleError is null)" Pulse="@(SampleError is null)" />
 					<span class="mta-label">@(SampleError is null ? "Live" : "Live figures paused")</span>
 					@if (SampleError is { } error)
 					{
@@ -28,185 +28,153 @@
 		SystemSample? sample = History.Latest;
 		SystemRates? rates = History.Rates;
 		MemoryInfo memory = sample?.Memory ?? MemoryInfo.Unknown;
-		<div class="mta-cards">
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.HostName))">
-				<span class="mta-card-label">System</span>
-				<span class="mta-stat mta-stat--small" title="@Profile.DisplayName">@Profile.DisplayName</span>
-				<span class="mta-card-sub" title="@Profile.Facts.Kernel">@Profile.Facts.Kernel</span>
-			</button>
-
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Logs))">
-				<span class="mta-card-label">Uptime</span>
-				<span class="mta-stat">@(AdminFormat.Span(Uptime(sample) ?? snapshot.Uptime) is { Length: > 0 } up ? up : "?")</span>
-				<span class="mta-card-sub">@(snapshot.BootedAt is { } booted ? $"booted {DisplayFormat.Timestamp(booted)}" : "boot time unknown")</span>
-			</button>
-
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
-				<span class="mta-card-label">CPU</span>
-				<span class="mta-stat">@(rates?.CpuPercent is { } cpu ? AdminFormat.Percent(cpu) : "...")</span>
-				<UsageBar Percent="rates?.CpuPercent" />
-				<Sparkline Values="History.Cpu" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="CPU busy over the last two minutes" />
-				<span class="mta-card-sub">@CpuText(rates, snapshot)</span>
-			</button>
-
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
-				<span class="mta-card-label">CPU load</span>
-				<span class="mta-stat">@(sample?.Load is { } load ? AdminFormat.Number(load.One) : "?")</span>
-				@if (LoadPercent(sample, snapshot) is { } loadPercent)
+		FileSystemUsage? root = RootDisk(sample, snapshot);
+		double? loadPercent = LoadPercent(sample, snapshot);
+		<div class="mta-ov">
+			<section class="mta-ov-gauges" aria-label="Now">
+				@GaugeCard("CPU", "CPU busy", rates?.CpuPercent, "0'%'", 0, 100, rates?.CpuPercent, [CpuText(rates), CoresText(snapshot)], () => Context.Navigate(AdminPageIds.Processes))
+				@GaugeCard("Load", "Load over one minute", sample?.Load?.One, "0.00", 0, snapshot.Cores is { } cores and > 0 ? cores : 1, loadPercent, LoadLines(sample, snapshot), () => Context.Navigate(AdminPageIds.Processes))
+				@if (memory.TotalKb is { } total && total > 0)
 				{
-					<UsageBar Percent="loadPercent" />
+					@GaugeCard("Memory", "Memory used", memory.UsedPercent, "0'%'", 0, 100, memory.UsedPercent, [$"{AdminFormat.Kb(memory.UsedKb)} of {AdminFormat.Kb(total)}", SwapText(memory)], () => Context.Navigate(AdminPageIds.Processes))
 				}
-				<Sparkline Values="History.Load" Max="@(snapshot.Cores is { } cores ? cores : null)" Slots="MonitorHistory.Capacity" Height="28" Label="Load over the last two minutes" />
-				<span class="mta-card-sub">@LoadText(sample, snapshot)</span>
-			</button>
+				@if (root is not null)
+				{
+					@GaugeCard("Disk /", "Root file system used", root.UsedPercent, "0'%'", 0, 100, root.UsedPercent, [$"{AdminFormat.Kb(root.AvailableKb)} free", $"of {AdminFormat.Kb(root.TotalKb)}"], () => Context.Navigate(AdminPageIds.Disks))
+				}
+			</section>
 
-			@if (memory.TotalKb is { } total && total > 0)
-			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
-					<span class="mta-card-label">Memory</span>
-					<span class="mta-stat">@AdminFormat.Percent(memory.UsedPercent ?? 0)</span>
-					<UsageBar Percent="memory.UsedPercent" />
-					<Sparkline Values="History.Memory" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="Memory used over the last two minutes" />
-					<span class="mta-card-sub">@AdminFormat.Kb(memory.UsedKb) of @AdminFormat.Kb(total)</span>
-				</button>
-			}
+			<section class="mta-ov-charts" aria-label="The last two minutes">
+				<MokaCard Outlined Elevation="0" Title="CPU" Subtitle="Busy and waiting on disks" Class="mta-ov-card">
+					<MokaLineChart Series="CpuSeries" Label="CPU over the last two minutes" Formatter="PercentText" Min="0" Max="100" YTicks="2" Height="@ChartHeight"
+								   ShowArea ShowPoints="false" ShowLastPoint ShowCurrent Smooth Live LiveInterval="MonitorCommands.Interval" ShowXLabels="false" EmptyText="Measuring" />
+				</MokaCard>
+				<MokaCard Outlined Elevation="0" Title="Memory" Subtitle="@(memory.SwapTotalKb > 0 ? "Used and swap" : "Used")" Class="mta-ov-card">
+					<MokaLineChart Series="MemorySeries(memory)" Label="Memory over the last two minutes" Formatter="PercentText" Min="0" Max="100" YTicks="2" Height="@ChartHeight"
+								   ShowArea ShowPoints="false" ShowLastPoint ShowCurrent Smooth Live LiveInterval="MonitorCommands.Interval" ShowXLabels="false" EmptyText="Measuring" />
+				</MokaCard>
+				@if (sample?.Interfaces.Count > 0)
+				{
+					<MokaCard Outlined Elevation="0" Title="Network" Subtitle="@NetworkTitle(rates)" Class="mta-ov-card">
+						<MokaLineChart Series="NetworkSeries" Label="Network traffic over the last two minutes" Formatter="RateText" AutoScale ScaleUnits="DisplayFormat.ByteUnits" SuggestedMax="1024" YTicks="2" Height="@ChartHeight"
+									   ShowArea ShowPoints="false" ShowLastPoint ShowCurrent ShowPeak Smooth Live LiveInterval="MonitorCommands.Interval" ShowXLabels="false" EmptyText="Measuring" />
+					</MokaCard>
+				}
+				@if (sample?.Disks.Count > 0)
+				{
+					<MokaCard Outlined Elevation="0" Title="Disk I/O" Subtitle="@DiskTitle(rates)" Class="mta-ov-card">
+						<MokaLineChart Series="DiskSeries" Label="Disk reads and writes over the last two minutes" Formatter="RateText" AutoScale ScaleUnits="DisplayFormat.ByteUnits" SuggestedMax="1024" YTicks="2" Height="@ChartHeight"
+									   ShowArea ShowPoints="false" ShowLastPoint ShowCurrent ShowPeak Smooth Live LiveInterval="MonitorCommands.Interval" ShowXLabels="false" EmptyText="Measuring" />
+					</MokaCard>
+				}
+			</section>
 
-			@if (memory.SwapTotalKb is { } swap && swap > 0)
-			{
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Processes))">
-					<span class="mta-card-label">Swap</span>
-					<span class="mta-stat">@AdminFormat.Percent(memory.SwapUsedPercent ?? 0)</span>
-					<UsageBar Percent="memory.SwapUsedPercent" />
-					<Sparkline Values="History.Swap" Max="100" Slots="MonitorHistory.Capacity" Height="28" Label="Swap used over the last two minutes" />
-					<span class="mta-card-sub">@AdminFormat.Kb(memory.SwapUsedKb) of @AdminFormat.Kb(swap)</span>
+			<section class="mta-ov-tiles" aria-label="State">
+				<button type="button" class="mta-ov-tile" @onclick="@(() => Context.Navigate(AdminPageIds.Logs))">
+					<MokaStat Tile Value="@(AdminFormat.Span(Uptime(sample) ?? snapshot.Uptime) is { Length: > 0 } up ? up : "?")" Label="Uptime" HelpText="@(snapshot.BootedAt is { } booted ? $"booted {DisplayFormat.Timestamp(booted)}" : "boot time unknown")" />
 				</button>
-			}
-
-			@if (sample?.Interfaces.Count > 0)
-			{
-				<Hint Text="@NetworkTitle(rates)" Class="mta-card-hint">
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Network))">
-					<span class="mta-card-label">Network</span>
-					<span class="mta-stat">@(rates?.ReceivedPerSecond is { } received ? AdminFormat.Rate(received) : "...")</span>
-					<span class="mta-spark-pair">
-						<Sparkline Values="History.Received" Max="@Top(History.Received, History.Sent)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-in" Label="Received over the last two minutes" />
-						<Sparkline Values="History.Sent" Max="@Top(History.Received, History.Sent)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-out" Label="Sent over the last two minutes" />
-					</span>
-					<span class="mta-card-sub">
-						<span class="mta-key mta-key--in">in</span>
-						<span class="mta-key mta-key--out">out @AdminFormat.Rate(rates?.SentPerSecond)</span>
-					</span>
+				<button type="button" class="mta-ov-tile" disabled="@(Capabilities.Services is null)" @onclick="OpenFailedServices">
+					<MokaStat Tile Value="@(_services is null ? ServicesPending : AdminFormat.Count(_failed))" Label="Failed services" HelpText="@ServicesText" Color="@(_failed > 0 ? MokaColor.Error : MokaColor.Surface)" />
 				</button>
+				<Hint Text="@_updatesError" Class="mta-ov-tile-hint">
+					<button type="button" class="mta-ov-tile" disabled="@(Capabilities.Packages is null)" @onclick="OpenUpdates">
+						<MokaStat Tile Value="@UpdatesValue" Label="Pending updates" HelpText="@UpdatesText" Color="@(_updates > 0 ? MokaColor.Warning : MokaColor.Surface)" />
+					</button>
 				</Hint>
-			}
-
-			@if (sample?.Disks.Count > 0)
-			{
-				<Hint Text="@DiskTitle(rates)" Class="mta-card-hint">
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">
-					<span class="mta-card-label">Disk I/O</span>
-					<span class="mta-stat">@(rates?.ReadPerSecond is { } read ? AdminFormat.Rate(read) : "...")</span>
-					<span class="mta-spark-pair">
-						<Sparkline Values="History.Read" Max="@Top(History.Read, History.Written)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-in" Label="Read from disk over the last two minutes" />
-						<Sparkline Values="History.Written" Max="@Top(History.Read, History.Written)" Slots="MonitorHistory.Capacity" Height="28" Class="mta-spark-out" Label="Written to disk over the last two minutes" />
-					</span>
-					<span class="mta-card-sub">
-						<span class="mta-key mta-key--in">read</span>
-						<span class="mta-key mta-key--out">write @AdminFormat.Rate(rates?.WrittenPerSecond)</span>
-					</span>
+				<AdminUpdateCards />
+				<button type="button" class="mta-ov-tile" @onclick="@(() => Context.Navigate(AdminPageIds.Time))">
+					<MokaStat Tile Value="@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")" Label="Time zone" HelpText="@ClockText" Color="@(_clock?.Synchronized == false ? MokaColor.Warning : MokaColor.Surface)" />
 				</button>
-				</Hint>
-			}
+			</section>
 
-			<button type="button" class="mta-card" @onclick="OpenFailedServices" disabled="@(Capabilities.Services is null)">
-				<span class="mta-card-label">Failed services</span>
-				<span class="@(_failed > 0 ? "mta-stat mta-stat--alert" : "mta-stat")">@(_services is null ? ServicesPending : AdminFormat.Count(_failed))</span>
-				<span class="mta-card-sub">@ServicesText</span>
-			</button>
+			<section class="mta-ov-facts">
+				<MokaCard Outlined Elevation="0" Title="System" Subtitle="@Profile.Facts.HostName" Class="mta-ov-card">
+					<HeaderActions>
+						<button type="button" class="mta-link" @onclick="@(() => Context.Navigate(AdminPageIds.HostName))">hostname</button>
+					</HeaderActions>
+					<ChildContent>
+						<AdminFacts Items="SystemFacts(snapshot)" Class="mta-facts--plain" />
+					</ChildContent>
+				</MokaCard>
+				@if (snapshot.Disks.Count > 0)
+				{
+					<MokaCard Outlined Elevation="0" Title="File systems" Subtitle="@FileSystemsText(snapshot)" Class="mta-ov-card">
+						<HeaderActions>
+							<button type="button" class="mta-link" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">disks</button>
+						</HeaderActions>
+						<ChildContent>
+							<div class="mta-ov-fs-list">
+								@foreach (FileSystemUsage disk in snapshot.Disks.Select(item => item.MountPoint == "/" && root is not null ? root : item))
+								{
+									<Hint @key="disk.MountPoint" Text="@($"{disk.Source} on {disk.MountPoint}, {AdminFormat.Kb(disk.UsedKb)} used")" Class="mta-ov-fs-hint">
+										<button type="button" class="mta-ov-fs" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">
+											<MokaMeter Value="disk.UsedPercent" Label="@disk.MountPoint" Format="0'%'" Color="@AdminFormat.LevelColor(disk.UsedPercent)" Size="MokaSize.Sm" />
+											<span class="mta-ov-fs-sub">@($"{AdminFormat.Kb(disk.AvailableKb)} free of {AdminFormat.Kb(disk.TotalKb)}")</span>
+										</button>
+									</Hint>
+								}
+							</div>
+						</ChildContent>
+					</MokaCard>
+				}
+			</section>
 
-			<button type="button" class="mta-card" @onclick="OpenUpdates" disabled="@(Capabilities.Packages is null)">
-				<span class="mta-card-label">Pending updates</span>
-				<span class="mta-stat">@(_updates is { } updates ? AdminFormat.Count(updates) : Capabilities.Packages is null ? "none" : _updatesError is null ? "..." : "?")</span>
-				<Hint Text="@_updatesError" Class="mta-card-sub">@UpdatesText</Hint>
-			</button>
-
-			<AdminUpdateCards />
-
-			<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Time))">
-				<span class="mta-card-label">Time zone</span>
-				<Hint Text="@_clock?.LocalTime" Class="mta-stat mta-stat--small">@(_clock is { TimeZone.Length: > 0 } clock ? clock.TimeZone : "...")</Hint>
-				<span class="mta-card-sub">
-					<MokaStatusDot Size="MokaSize.Xs" Color="@AdminFormat.Dot(_clock?.Synchronized)" Glow="@(_clock?.Synchronized == true)" />
-					@(_clock?.Synchronized switch { true => " NTP synchronized", false => " not synchronized", _ => " sync unknown" })
-				</span>
-			</button>
-
-			@foreach (FileSystemUsage disk in snapshot.Disks)
+			@if (rates is not null && (rates.Interfaces.Count > 1 || rates.Disks.Count > 1))
 			{
-				<Hint @key="disk.MountPoint" Text="@($"{disk.Source} on {disk.MountPoint}")" Class="mta-card-hint">
-				<button type="button" class="mta-card" @onclick="@(() => Context.Navigate(AdminPageIds.Disks))">
-					<span class="mta-card-label">@($"Disk {disk.MountPoint}")</span>
-					<span class="mta-stat">@AdminFormat.Percent(disk.UsedPercent)</span>
-					<UsageBar Percent="disk.UsedPercent" />
-					<span class="mta-card-sub">@AdminFormat.Kb(disk.AvailableKb) free of @AdminFormat.Kb(disk.TotalKb)</span>
-				</button>
-				</Hint>
+				<section class="mta-live-lists" aria-label="By device">
+					@if (rates.Interfaces.Count > 1)
+					{
+						bool anyDevice = rates.Interfaces.Any(other => other.IsDevice);
+						<ToolTable TItem="InterfaceRate"
+								   Items="@rates.Interfaces.Take(MaxDevices).ToList()"
+								   ItemKey="@(item => item.Name)"
+								   Label="Network interfaces">
+							<MokaColumn TItem="InterfaceRate" Title="Interface" Field="@(item => item.Name)" Class="mt-col-main">
+								<CellTemplate Context="item">
+									<Hint Text="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
+										@item.Name
+										@if (!item.IsDevice && anyDevice)
+										{
+											<span class="mta-dim mta-after">virtual</span>
+										}
+									</Hint>
+								</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="InterfaceRate" Title="In" Field="@(item => item.ReceivedPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+								<CellTemplate Context="item">@AdminFormat.Rate(item.ReceivedPerSecond)</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="InterfaceRate" Title="Out" Field="@(item => item.SentPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+								<CellTemplate Context="item">@AdminFormat.Rate(item.SentPerSecond)</CellTemplate>
+							</MokaColumn>
+						</ToolTable>
+					}
+					@if (rates.Disks.Count > 1)
+					{
+						<ToolTable TItem="DiskRate"
+								   Items="@rates.Disks.Take(MaxDevices).ToList()"
+								   ItemKey="@(item => item.Name)"
+								   Label="Disks">
+							<MokaColumn TItem="DiskRate" Title="Disk" Field="@(item => item.Name)" Mono Class="mt-col-main" />
+							<MokaColumn TItem="DiskRate" Title="Read" Field="@(item => item.ReadPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+								<CellTemplate Context="item">@AdminFormat.Rate(item.ReadPerSecond)</CellTemplate>
+							</MokaColumn>
+							<MokaColumn TItem="DiskRate" Title="Write" Field="@(item => item.WrittenPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
+								<CellTemplate Context="item">@AdminFormat.Rate(item.WrittenPerSecond)</CellTemplate>
+							</MokaColumn>
+						</ToolTable>
+					}
+				</section>
 			}
 		</div>
-
-		@if (rates is not null && (rates.Interfaces.Count > 1 || rates.Disks.Count > 1))
-		{
-			<div class="mta-live-lists">
-				@if (rates.Interfaces.Count > 1)
-				{
-					bool anyDevice = rates.Interfaces.Any(other => other.IsDevice);
-					<ToolTable TItem="InterfaceRate"
-							   Items="@rates.Interfaces.Take(MaxDevices).ToList()"
-							   ItemKey="@(item => item.Name)"
-							   Label="Network interfaces">
-						<MokaColumn TItem="InterfaceRate" Title="Interface" Field="@(item => item.Name)" Class="mt-col-main">
-							<CellTemplate Context="item">
-								<Hint Text="@(item.IsDevice ? "A network device" : "A virtual interface: a bridge, a veth pair or a tunnel. Its traffic also crosses a device, so the total leaves it out.")" Position="MokaTooltipPosition.BottomStart" Class="mta-cell mta-mono">
-									@item.Name
-									@if (!item.IsDevice && anyDevice)
-									{
-										<span class="mta-dim mta-after">virtual</span>
-									}
-								</Hint>
-							</CellTemplate>
-						</MokaColumn>
-						<MokaColumn TItem="InterfaceRate" Title="In" Field="@(item => item.ReceivedPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-							<CellTemplate Context="item">@AdminFormat.Rate(item.ReceivedPerSecond)</CellTemplate>
-						</MokaColumn>
-						<MokaColumn TItem="InterfaceRate" Title="Out" Field="@(item => item.SentPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-							<CellTemplate Context="item">@AdminFormat.Rate(item.SentPerSecond)</CellTemplate>
-						</MokaColumn>
-					</ToolTable>
-				}
-				@if (rates.Disks.Count > 1)
-				{
-					<ToolTable TItem="DiskRate"
-							   Items="@rates.Disks.Take(MaxDevices).ToList()"
-							   ItemKey="@(item => item.Name)"
-							   Label="Disks">
-						<MokaColumn TItem="DiskRate" Title="Disk" Field="@(item => item.Name)" Mono Class="mt-col-main" />
-						<MokaColumn TItem="DiskRate" Title="Read" Field="@(item => item.ReadPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-							<CellTemplate Context="item">@AdminFormat.Rate(item.ReadPerSecond)</CellTemplate>
-						</MokaColumn>
-						<MokaColumn TItem="DiskRate" Title="Write" Field="@(item => item.WrittenPerSecond)" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-							<CellTemplate Context="item">@AdminFormat.Rate(item.WrittenPerSecond)</CellTemplate>
-						</MokaColumn>
-					</ToolTable>
-				}
-			</div>
-		}
 	}
 	</ChildContent>
 </ToolPageFrame>
 
 @code {
-	/// <summary>The busiest interfaces and disks listed under the cards; the totals count them all.</summary>
+	// The busiest interfaces and disks listed under the charts; the totals count them all.
 	private const int MaxDevices = 8;
+
+	private const string ChartHeight = "132px";
 
 	private OverviewSnapshot? _snapshot;
 	private HostMonitor? _monitor;
@@ -227,15 +195,43 @@
 		? "no service manager"
 		: _services is { } services ? $"of {AdminFormat.Count(services.Count)} services" : "reading";
 
+	private string UpdatesValue => _updates is { } updates
+		? AdminFormat.Count(updates)
+		: Capabilities.Packages is null ? "none" : _updatesError is null ? "..." : "?";
+
 	private string UpdatesText => Capabilities.Packages is not { } packages
 		? "no package manager"
 		: _updatesError is not null ? "could not check" : _updates is null ? $"asking {packages.DisplayName}" : packages.DisplayName;
+
+	private string ClockText => _clock?.Synchronized switch
+	{
+		true => "NTP synchronized",
+		false => "not synchronized",
+		_ => _clock is null ? "reading" : "sync unknown",
+	};
 
 	private MonitorHistory History => Context.Monitor.History;
 
 	private string? SampleError => Context.Monitor.State.Problem;
 
-	/// <summary>Follows the session's sampler while the view is shown; the parameters come round again whenever it is hidden or shown.</summary>
+	private IReadOnlyList<MokaLineSeries> CpuSeries =>
+	[
+		new MokaLineSeries { Name = "Busy", Values = Window(History.Cpu), Color = MokaColor.Primary },
+		new MokaLineSeries { Name = "I/O wait", Values = Window(History.IoWait), Color = MokaColor.Warning },
+	];
+
+	private IReadOnlyList<MokaLineSeries> NetworkSeries =>
+	[
+		new MokaLineSeries { Name = "In", Values = Window(History.Received), Color = MokaColor.Primary },
+		new MokaLineSeries { Name = "Out", Values = Window(History.Sent), Color = MokaColor.Info },
+	];
+
+	private IReadOnlyList<MokaLineSeries> DiskSeries =>
+	[
+		new MokaLineSeries { Name = "Read", Values = Window(History.Read), Color = MokaColor.Primary },
+		new MokaLineSeries { Name = "Write", Values = Window(History.Written), Color = MokaColor.Info },
+	];
+
 	protected override void OnParametersSet() => Follow();
 
 	protected override void Dispose(bool disposing)
@@ -250,7 +246,7 @@
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
-		// The slow ones (a dnf metadata check can take a minute) fill their cards in as they arrive.
+		// The slow ones (a dnf metadata check can take a minute) fill their tiles in as they arrive.
 		_ = LoadServicesAsync(cancellationToken);
 		_ = LoadUpdatesAsync(cancellationToken);
 		_ = LoadClockAsync(cancellationToken);
@@ -260,45 +256,111 @@
 		Follow();
 	}
 
+	private RenderFragment GaugeCard(string title, string label, double? value, string format, double min, double max, double? percent, string[] lines, Action open) => __builder =>
+	{
+		<MokaCard Outlined Elevation="0" Clickable OnClick="open" Class="mta-ov-card mta-ov-gauge" aria-label="@($"{label}: {(value is { } known ? known.ToString(format, CultureInfo.InvariantCulture) : "measuring")}")">
+			<MokaGauge Value="@(value ?? min)"
+					   Min="min"
+					   Max="max"
+					   ShowValue="@(value is not null)"
+					   Format="@format"
+					   Word="@AdminFormat.LevelWord(percent)"
+					   Color="@AdminFormat.LevelColor(percent)"
+					   Label="@label"
+					   SizeValue="104px" />
+			<div class="mta-ov-gauge-text">
+				<span class="mta-ov-gauge-title">@title</span>
+				@foreach (string line in lines.Where(line => line.Length > 0))
+				{
+					<span class="mta-ov-gauge-line">@line</span>
+				}
+			</div>
+		</MokaCard>
+	};
+
+	private static double[] Window(SampleHistory history) => SampleHistory.Window(history, MonitorHistory.Capacity);
+
+	private IReadOnlyList<MokaLineSeries> MemorySeries(MemoryInfo memory) => memory.SwapTotalKb > 0
+		?
+		[
+			new MokaLineSeries { Name = "Used", Values = Window(History.Memory), Color = MokaColor.Primary },
+			new MokaLineSeries { Name = "Swap", Values = Window(History.Swap), Color = MokaColor.Secondary },
+		]
+		: [new MokaLineSeries { Name = "Used", Values = Window(History.Memory), Color = MokaColor.Primary }];
+
+	private static string PercentText(double value) => string.Create(CultureInfo.InvariantCulture, $"{value:0}%");
+
+	private static string RateText(double value) => AdminFormat.Rate(value);
+
+	private IReadOnlyList<MokaDataListItem> SystemFacts(OverviewSnapshot snapshot)
+	{
+		List<MokaDataListItem> facts =
+		[
+			new("System", Profile.DisplayName),
+			new("Kernel", Profile.Facts.Kernel),
+		];
+		if (snapshot.CpuModel.Length > 0)
+		{
+			facts.Add(new("Processor", snapshot.Cores is { } cores ? $"{snapshot.CpuModel} · {cores} cores" : snapshot.CpuModel));
+		}
+
+		if (snapshot.MemoryTotalKb is { } memory)
+		{
+			facts.Add(new("Memory", snapshot.SwapTotalKb is { } swap and > 0 ? $"{AdminFormat.Kb(memory)} · swap {AdminFormat.Kb(swap)}" : AdminFormat.Kb(memory)));
+		}
+
+		facts.Add(new("Booted", snapshot.BootedAt is { } booted ? DisplayFormat.Timestamp(booted) : "unknown"));
+		facts.Add(new("Logged in as", Profile.Facts.IsRoot ? $"{Profile.Facts.UserName} (root)" : Profile.Facts.UserName));
+		return facts;
+	}
+
+	private static string FileSystemsText(OverviewSnapshot snapshot)
+	{
+		int full = snapshot.Disks.Count(disk => UsageBar.LevelOf(disk.UsedPercent) == UsageLevel.Full);
+		string count = snapshot.Disks.Count == 1 ? "1 mounted" : $"{snapshot.Disks.Count} mounted";
+		return full > 0 ? $"{count}, {full} nearly full" : count;
+	}
+
+	private static FileSystemUsage? RootDisk(SystemSample? sample, OverviewSnapshot snapshot) =>
+		sample?.RootDisk ?? snapshot.Disks.FirstOrDefault(disk => disk.MountPoint == "/");
+
 	private static TimeSpan? Uptime(SystemSample? sample) =>
 		sample?.UptimeSeconds is { } seconds ? TimeSpan.FromSeconds(Math.Floor(seconds)) : null;
 
 	private static double? LoadPercent(SystemSample? sample, OverviewSnapshot snapshot) =>
 		sample?.Load is { } load && snapshot.Cores is { } cores && cores > 0 ? load.One * 100 / cores : null;
 
-	private static string LoadText(SystemSample? sample, OverviewSnapshot snapshot) =>
-		$"5m {AdminFormat.Number(sample?.Load?.Five)} · 15m {AdminFormat.Number(sample?.Load?.Fifteen)}{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+	private static string[] LoadLines(SystemSample? sample, OverviewSnapshot snapshot) => sample?.Load is { } load
+		? [$"5m {AdminFormat.Number(load.Five)}", $"15m {AdminFormat.Number(load.Fifteen)}", snapshot.Cores is { } cores ? $"of {cores} cores" : ""]
+		: ["not read"];
 
-	private static string CpuText(SystemRates? rates, OverviewSnapshot snapshot) => rates?.CpuPercent is null
+	private static string CoresText(OverviewSnapshot snapshot) => snapshot.Cores is { } cores ? $"{cores} cores" : "";
+
+	private static string CpuText(SystemRates? rates) => rates?.CpuPercent is null
 		? "measuring"
-		: $"iowait {AdminFormat.Number(rates.IoWaitPercent, "0.0")}%{(snapshot.Cores is { } cores ? $" · {cores} cores" : "")}";
+		: $"iowait {AdminFormat.Number(rates.IoWaitPercent, "0.0")}%";
 
-	/// <summary>One scale for both lines of a pair, so in and out can be compared by height.</summary>
-	private static double? Top(SampleHistory first, SampleHistory second)
-	{
-		double top = Math.Max(first.Count > 0 ? first.Max() : 0, second.Count > 0 ? second.Max() : 0);
-		return top > 0 ? top : null;
-	}
+	private static string SwapText(MemoryInfo memory) => memory.SwapTotalKb is { } swap && swap > 0
+		? $"swap {AdminFormat.Percent(memory.SwapUsedPercent ?? 0)} of {AdminFormat.Kb(swap)}"
+		: "no swap";
 
 	private static string NetworkTitle(SystemRates? rates) => rates is null
 		? "Measuring"
 		: rates.Interfaces.Any(item => item.IsDevice) && rates.Interfaces.Any(item => !item.IsDevice)
-			? "Summed over network devices; bridges, veth pairs and tunnels carry the same traffic again and are left out."
-			: "Summed over every interface but loopback.";
+			? "Network devices; bridges and veth pairs are left out"
+			: "Every interface but loopback";
 
 	private static string DiskTitle(SystemRates? rates) => rates is null
 		? "Measuring"
-		: $"Summed over {rates.Disks.Count} whole {(rates.Disks.Count == 1 ? "disk" : "disks")}; partitions and volumes on them are not counted twice.";
+		: $"Summed over {rates.Disks.Count} whole {(rates.Disks.Count == 1 ? "disk" : "disks")}";
 
 	private void OpenFailedServices() => Context.Navigate(AdminPageIds.Services, "failed");
 
 	private void OpenUpdates() => Context.Navigate(AdminPageIds.Packages, "updates");
 
-	/// <summary>
-	/// Watches at the overview's pace while the view is shown and lets go while it is hidden, so a hidden System view
-	/// reads nothing of its own. The first read already brings a sample, so watching starts once it is in, and the next
-	/// sample comes an interval after it. A reconnect brings a new session and with it a new sampler.
-	/// </summary>
+	// Watches at the overview's pace while the view is shown and lets go while it is hidden, so a hidden System view
+	// reads nothing of its own. The first read already brings a sample, so watching starts once it is in. A reconnect
+	// brings a new session and with it a new sampler.
 	private void Follow()
 	{
 		if (IsDisposed)

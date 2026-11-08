@@ -1,0 +1,39 @@
+@namespace Mokaterm.Modules.Ssh.Components.Admin
+
+<section class="@CssClass" aria-label="@Title">
+	@if (Title is { Length: > 0 } title || HeaderEnd is not null)
+	{
+		<header class="mta-facts-head">
+			@if (Title is { Length: > 0 } heading)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@heading</MokaText>
+			}
+			<span class="mta-spacer"></span>
+			@HeaderEnd
+		</header>
+	}
+	@if (Items.Count > 0)
+	{
+		<MokaDataList Items="Items" Orientation="MokaDirection.Row" Dense Bordered Class="mta-facts-list" />
+	}
+	@ChildContent
+</section>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<MokaDataListItem> Items { get; set; } = [];
+
+	[Parameter]
+	public string? Title { get; set; }
+
+	[Parameter]
+	public RenderFragment? HeaderEnd { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	[Parameter]
+	public string? Class { get; set; }
+
+	private string CssClass => Class is { Length: > 0 } extra ? $"mta-facts {extra}" : "mta-facts";
+}

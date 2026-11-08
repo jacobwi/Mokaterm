@@ -181,12 +181,10 @@
 				}
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
-					<dt>State</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(unit.StateText.Length > 0 ? unit.StateText : "unknown")</MokaText></dd>
-					<dt>At boot</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@BootText(unit)</MokaText></dd>
-				</dl>
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@StateWord(unit.State)" Label="State" HelpText="@(unit.StateText.Length > 0 ? unit.StateText : "not reported")" Color="@StateColor(unit.State)" />
+					<MokaStat Tile Value="@(BootText(unit) is { Length: > 0 } boot ? boot : "unknown")" Label="At boot" HelpText="@BootMeaning(unit)" Color="@(unit.Enabled == true ? MokaColor.Success : MokaColor.Surface)" />
+				</div>
 				@if (_overrideSaved == unit.Name)
 				{
 					<MokaAlert Severity="MokaToastSeverity.Success" Dense Closable OnClose="@(() => _overrideSaved = null)">
@@ -198,29 +196,28 @@
 				{
 					<MokaAlert Severity="MokaToastSeverity.Error" Dense Closable OnClose="@(() => _overrideProblem = null)">@overrideProblem</MokaAlert>
 				}
-				<div class="mta-inline">
-					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">
-						@(_showUnitFile ? "Unit file and overrides" : Capabilities.Services?.StatusIncludesLog == true ? "Status and recent log" : "Status")
-					</MokaText>
-					<span class="mta-spacer"></span>
-					@if (Capabilities.Services?.HasUnitFiles == true)
-					{
-						<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => ToggleUnitFileAsync(unit.Name))">@(_showUnitFile ? "status" : "unit file")</button>
-					}
-					<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => LoadStatusAsync(unit.Name))">read again</button>
-				</div>
-				@if (_statusError is { } statusError)
-				{
-					<MokaAlert Severity="MokaToastSeverity.Error" Dense>@statusError</MokaAlert>
-				}
-				else if (_status is { } status)
-				{
-					<pre class="mta-pre mta-pre--fill">@status</pre>
-				}
-				else
-				{
-					<MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" />
-				}
+				<AdminOutput Label="@(_showUnitFile ? "Unit file and overrides" : Capabilities.Services?.StatusIncludesLog == true ? "Status and recent log" : "Status")"
+							 Text="@(_statusError is null ? _status : null)"
+							 CopyLabel="@(_showUnitFile ? "Copy the unit file" : "Copy the status")"
+							 Fill>
+					<Actions>
+						@if (Capabilities.Services?.HasUnitFiles == true)
+						{
+							<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => ToggleUnitFileAsync(unit.Name))">@(_showUnitFile ? "status" : "unit file")</button>
+						}
+						<button type="button" class="mta-link" disabled="@_statusLoading" @onclick="@(() => LoadStatusAsync(unit.Name))">read again</button>
+					</Actions>
+					<ChildContent>
+						@if (_statusError is { } statusError)
+						{
+							<MokaAlert Severity="MokaToastSeverity.Error" Dense>@statusError</MokaAlert>
+						}
+						else if (_status is null)
+						{
+							<div class="mta-loading"><MokaSpinner SpinnerStyle="MokaSpinnerStyle.Dots" Size="MokaSize.Sm" Label="@(_showUnitFile ? "Reading the unit file" : "Reading the status")" /></div>
+						}
+					</ChildContent>
+				</AdminOutput>
 			</ChildContent>
 		</ToolDetailPanel>
 	};
@@ -231,6 +228,24 @@
 		ServiceState.Changing => MokaColor.Warning,
 		ServiceState.Failed => MokaColor.Error,
 		_ => MokaColor.Surface,
+	};
+
+	private static string StateWord(ServiceState state) => state switch
+	{
+		ServiceState.Running => "Running",
+		ServiceState.Exited => "Ran",
+		ServiceState.Changing => "Changing",
+		ServiceState.Failed => "Failed",
+		ServiceState.Stopped => "Stopped",
+		_ => "Unknown",
+	};
+
+	private static string BootMeaning(ServiceUnit unit) => unit.EnabledText switch
+	{
+		"static" => "started by others, not on its own",
+		"masked" => "cannot be started at all",
+		"indirect" or "generated" or "transient" => "managed by systemd",
+		_ => unit.Enabled switch { true => "starts with the machine", false => "stays off at boot", _ => "not reported" },
 	};
 
 	private static string InitName(InitSystem init) => init switch

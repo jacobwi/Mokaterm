@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Moka.Red.Core.Enums;
+using Moka.Red.Core.Icons;
+using Moka.Red.Icons;
+using Moka.Red.Primitives.ChainCheck;
 using Mokaterm.Abstractions.Commands;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
@@ -21,6 +24,7 @@ using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Editing;
 using Mokaterm.UI.Common.Formatting;
+using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.ToolPages;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
@@ -502,6 +506,32 @@ public sealed partial class SystemAdminView : SessionViewBase, IAsyncDisposable
 		_ when watch.Attempts > 0 => string.Create(CultureInfo.CurrentCulture, $"The server did not let the session in yet ({watch.Attempts} tries). Trying again shortly, until {watch.StartedAt.ToLocalTime() + watch.Times.Down + watch.Times.Back:HH:mm}."),
 		_ => "The session reconnects as soon as the server answers SSH again.",
 	};
+
+	// The steps a reboot goes through on the way back to a working session; the one under way says what it waits for.
+	private static IReadOnlyList<MokaChainStep> RebootSteps(RebootWatch watch)
+	{
+		int reached = watch.State switch
+		{
+			RebootWatchState.WaitingForDown => 1,
+			RebootWatchState.WaitingForServer => 2,
+			RebootWatchState.Reconnecting => 3,
+			_ => 4,
+		};
+		string now = RebootText(watch);
+		return
+		[
+			new(MokaIcons.Action.Refresh, "Reboot", MokaChainTone.Ok, "Sent", ""),
+			Step(1, MokatermIcons.Disconnect, "Going down", "Gone", "Waiting"),
+			Step(2, MokatermIcons.Server, "Coming back", "Answers", "Asking"),
+			Step(3, MokaIcons.Status.CheckCircle, "Session", "Back", "Logging in"),
+		];
+
+		MokaChainStep Step(int index, MokaIconDefinition icon, string label, string done, string waiting) => index < reached
+			? new(icon, label, MokaChainTone.Ok, done, "")
+			: index == reached
+				? new(icon, label, MokaChainTone.Wait, waiting, now)
+				: new(icon, label, MokaChainTone.Off, "Not yet", "");
+	}
 
 	private void OnRebootChanged() => _ = InvokeAsync(StateHasChanged);
 

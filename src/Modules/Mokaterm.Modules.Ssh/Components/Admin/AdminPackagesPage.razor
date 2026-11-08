@@ -223,7 +223,9 @@
 		? "Up to date"
 		: _view == "security" && _security is { Count: 0 } ? "No security updates" : "Nothing matches";
 
-	private RenderFragment? DetailFragment => _view != "installed" ? null : _installing ? InstallPanel : Selected is null ? null : PackagePanel;
+	private RenderFragment? DetailFragment => _view != "installed"
+		? _updates is { Count: > 0 } ? UpdatesPanel : null
+		: _installing ? InstallPanel : Selected is null ? null : PackagePanel;
 
 	protected override void OnInitialized()
 	{
@@ -263,7 +265,11 @@
 		}
 
 		PackageUpdate? update = _updates?.FirstOrDefault(candidate => candidate.Name == package.Name);
-		<ToolDetailPanel Title="@package.Name" OnClose="@(() => _selected = null)">
+		<ToolDetailPanel Title="@package.Name"
+						  Subtitle="@(update is not null ? "An update is waiting" : _updates is null ? "Updates not checked yet" : "Up to date")"
+						  DotColor="@(update is null ? _updates is null ? MokaColor.Surface : MokaColor.Success : IsSecurity(update) ? MokaColor.Error : MokaColor.Warning)"
+						  DotGlow="@(update is not null)"
+						  OnClose="@(() => _selected = null)">
 			<Actions>
 				<Hint Text="@Context.RootChangeBlocked">
 					<MokaButton Variant="MokaVariant.Outlined"
@@ -277,20 +283,41 @@
 				</Hint>
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
-					<dt>Version</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@package.Version</MokaText></dd>
-					@if (package.Architecture.Length > 0)
-					{
-						<dt>Architecture</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@package.Architecture</MokaText></dd>
-					}
-					<dt>Update</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(update is null ? _updates is null ? "not checked" : "none" : $"{update.NewVersion} from {update.Source}")</MokaText></dd>
-					<dt>Manager</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@packages.DisplayName</MokaText></dd>
-				</dl>
+				<AdminFacts Items="PackageFacts(package, update, packages)" />
 			</ChildContent>
+		</ToolDetailPanel>
+	};
+
+	private RenderFragment UpdatesPanel => __builder =>
+	{
+		if (_updates is not { Count: > 0 } updates || Capabilities.Packages is not { } packages)
+		{
+			return;
+		}
+
+		<ToolDetailPanel Title="Pending updates" Subtitle="@($"From {packages.DisplayName}'s lists")" Mono="false" DotColor="@(_security is { Count: > 0 } ? MokaColor.Error : MokaColor.Warning)" DotGlow>
+			<div class="mta-tiles">
+				<MokaStat Tile Value="@AdminFormat.Count(updates.Count)" Label="Upgradable" HelpText="@($"of {AdminFormat.Count(_installed.Count)} installed")" Color="MokaColor.Warning" />
+				@if (packages.KnowsSecurityUpdates)
+				{
+					<MokaStat Tile Value="@(_security is { } security ? AdminFormat.Count(security.Count) : "?")" Label="For security" HelpText="@(_security is null ? _securityNote ?? "asking" : "fix known problems")" Color="@(_security is { Count: > 0 } ? MokaColor.Error : MokaColor.Surface)" />
+				}
+				@if (_reboot is { } reboot)
+				{
+					<MokaStat Tile Value="@(reboot.Required switch { true => "Required", false => "Not needed", _ => "Unknown" })" Label="Reboot" HelpText="@AdminUpdateReads.RebootText(reboot)" Color="@(reboot.Required == true ? MokaColor.Error : reboot.Required == false ? MokaColor.Success : MokaColor.Surface)" />
+				}
+			</div>
+			<section class="mta-section" aria-label="Updates by repository">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">By repository</MokaText>
+				<MokaDonutChart Segments="SourceShares(updates)" Thickness="30" Size="MokaSize.Sm" Label="Pending updates by repository" Class="mta-donut">
+					<span class="mta-donut-total">@AdminFormat.Count(updates.Count)</span>
+				</MokaDonutChart>
+			</section>
+			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+				@(packages.RefreshIndex() is not null
+					? "These come from the package lists as they were last fetched. Refresh them to ask the repositories again."
+					: "These come from the package manager's own check.")
+			</MokaText>
 		</ToolDetailPanel>
 	};
 
@@ -317,6 +344,58 @@
 	};
 
 	private static string KeyOf(InstalledPackage package) => package.Name + "/" + package.Architecture;
+
+	// The five repositories with the most updates, and the rest as one share, so the ring stays readable.
+	private static IReadOnlyList<MokaDonutSegment> SourceShares(IReadOnlyList<PackageUpdate> updates)
+	{
+		List<(string Source, int Count)> sources =
+		[
+			.. updates
+				.GroupBy(update => update.Source.Length > 0 ? update.Source : "unnamed")
+				.Select(group => (group.Key, group.Count()))
+				.OrderByDescending(pair => pair.Item2)
+				.ThenBy(pair => pair.Key, StringComparer.Ordinal),
+		];
+		List<MokaDonutSegment> segments = [.. sources.Take(5).Select(pair => new MokaDonutSegment { Name = pair.Source, Value = pair.Count })];
+		if (sources.Count > 5)
+		{
+			segments.Add(new MokaDonutSegment { Name = "others", Value = sources.Skip(5).Sum(pair => pair.Count), Color = MokaColor.Surface });
+		}
+
+		return segments;
+	}
+
+	private IReadOnlyList<MokaDataListItem> PackageFacts(InstalledPackage package, PackageUpdate? update, PackageCommands packages)
+	{
+		List<MokaDataListItem> facts = [new("Version", package.Version)];
+		if (package.Architecture.Length > 0)
+		{
+			facts.Add(new("Architecture", package.Architecture));
+		}
+
+		if (update is not null)
+		{
+			bool security = IsSecurity(update);
+			facts.Add(new("Update", ValueContent: @<span class="mta-facts-line">
+				<span>@update.NewVersion</span>
+				@if (security)
+				{
+					<MokaTag Text="Security" Size="MokaSize.Xs" Color="MokaColor.Error" />
+				}
+			</span>));
+			if (update.Source.Length > 0)
+			{
+				facts.Add(new("From", update.Source));
+			}
+		}
+		else
+		{
+			facts.Add(new("Update", _updates is null ? "not checked" : "none"));
+		}
+
+		facts.Add(new("Manager", packages.DisplayName));
+		return facts;
+	}
 
 	private static int ByName(InstalledPackage left, InstalledPackage right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
 

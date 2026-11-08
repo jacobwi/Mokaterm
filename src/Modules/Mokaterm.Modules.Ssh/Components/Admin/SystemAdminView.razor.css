@@ -33,15 +33,13 @@
 	border-bottom: 1px solid var(--moka-color-outline-variant);
 }
 
-.mta-strip-part {
+.mt-admin ::deep .mta-strip-part {
 	flex-shrink: 0;
-	padding: 1px 6px;
-	border: 1px solid var(--moka-color-outline-variant);
-	border-radius: var(--moka-radius-sm);
 	color: var(--moka-color-on-surface-variant);
 	font-family: var(--moka-font-family-mono);
-	font-size: 10px;
+	font-weight: var(--moka-font-weight-normal);
 	letter-spacing: 0.02em;
+	text-transform: none;
 }
 
 /* Size containment: the pages fill exactly this box, and their list and detail panel scroll inside it. */
@@ -64,7 +62,7 @@
 
 /* And to a dropdown here, with the strip down to the distribution. */
 @container mt-admin (max-width: 559px) {
-	.mta-strip-part {
+	.mt-admin ::deep .mta-strip-part {
 		display: none;
 	}
 }
@@ -224,4 +222,114 @@
 /* A line of a clickable table that leads nowhere, such as the files lying directly in a measured folder. */
 .mt-admin ::deep .mta-row--still {
 	cursor: default;
+}
+
+/* A detail panel's headline figures: Moka's fact tiles, as many to a row as fit. */
+.mt-admin ::deep .mta-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+	gap: 6px;
+}
+
+.mt-admin ::deep .mta-tiles .moka-stat--tile {
+	border: 1px solid var(--moka-color-outline-variant);
+}
+
+.mt-admin ::deep .mta-tiles .moka-stat__value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Two lines at most, so a tile in a narrow panel keeps its sentence and the row keeps one height. */
+.mt-admin ::deep .mta-tiles .moka-stat__help {
+	display: -webkit-box;
+	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+/* A page that is not a list, such as Time or Hostname: Moka cards side by side while they fit, at a tool's density. */
+.mt-admin ::deep .mta-board {
+	--moka-card-padding: var(--moka-spacing-md);
+	--moka-card-gap: var(--moka-spacing-sm);
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: var(--moka-spacing-md);
+	align-items: start;
+}
+
+.mt-admin ::deep .mta-board-card {
+	min-width: 0;
+}
+
+.mt-admin ::deep .mta-board-card .moka-card-title {
+	font-size: var(--moka-font-size-sm);
+}
+
+.mt-admin ::deep .mta-board-card .moka-card-subtitle {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-admin ::deep .mta-board-card .moka-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* A donut's legend reads as data, and the figure in its middle as one. */
+.mt-admin ::deep .mta-donut .moka-donutchart-legend {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+.mt-admin ::deep .mta-donut-total {
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-md);
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+/* Moka's timeline at a panel's size: the events are times and steps, read in mono. */
+.mt-admin ::deep .mta-timeline .moka-timeline-item__title {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+}
+
+/* A heading inside a panel that starts a second part of it, such as a disk's health under its facts. */
+.mt-admin ::deep .mta-panel-heading {
+	margin: var(--moka-spacing-xs) 0 0;
+}
+
+/* Moka's meters in a panel, one under another in a quiet inner panel, figures in mono. */
+.mt-admin ::deep .mta-meters {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	padding: var(--moka-spacing-sm) var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+.mt-admin ::deep .mta-meter-hint {
+	display: grid;
+	min-width: 0;
+}
+
+.mt-admin ::deep :is(.mta-meters, .mta-meter-row) .moka-meter__value,
+.mt-admin ::deep .mta-meter-row .moka-meter__label {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
 }

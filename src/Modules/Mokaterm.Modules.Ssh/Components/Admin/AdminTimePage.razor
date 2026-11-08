@@ -4,58 +4,19 @@
 <ToolPageFrame Title="Time" Summary="@Summary" Loading="Loading" Loaded="Loaded" Error="@LoadError" OnRefresh="ReloadAsync">
 	@if (_clock is { } clock)
 	{
-		<dl class="mta-kv">
-			<dt>Server time</dt>
-			<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@clock.LocalTime</MokaText></dd>
-			@if (Offset(clock) is { } offset)
-			{
-				<dt>This computer</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@offset</MokaText></dd>
-			}
-			<dt>Time zone</dt>
-			<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(clock.TimeZone.Length > 0 ? clock.TimeZone : "not set")</MokaText></dd>
-			<dt>In sync</dt>
-			<dd>
-				<MokaStatusDot Size="MokaSize.Xs"
-							   Color="@AdminFormat.Dot(clock.Synchronized)"
-							   Glow="@(clock.Synchronized == true)"
-							   Label="@(clock.Synchronized switch { true => "SYNCHRONIZED", false => "NOT SYNCHRONIZED", _ => "UNKNOWN" })" />
-				@if (clock.SyncSource.Length > 0)
-				{
-					<MokaText Element="span" Size="MokaSize.Xs" Mono Class="mta-dim mta-after">from @clock.SyncSource</MokaText>
-				}
-			</dd>
-			@if (clock.NtpEnabled is { } ntp)
-			{
-				<dt>Time sync</dt>
-				<dd>
-					@if (Capabilities.Clock.CanSwitchNtp && clock.CanSwitchNtp != false)
-					{
-						<Hint Text="@Context.RootChangeBlocked">
-							<MokaSwitch Value="ntp"
-										ValueChanged="SetNtpAsync"
-										Label="@(ntp ? "On" : "Off")"
-										Disabled="@(Busy || Context.RootChangeBlocked is not null)"
-										aria-label="Time synchronisation" />
-						</Hint>
-					}
-					else
-					{
-						<MokaText Element="span" Size="MokaSize.Sm">@(ntp ? "On" : "Off")</MokaText>
-					}
-				</dd>
-			}
-			@if (clock.RtcInLocalTime == true)
-			{
-				<dt>Hardware clock</dt>
-				<dd>Keeps local time, which breaks around daylight saving changes. <MokaText Element="span" Size="MokaSize.Xs" Mono>timedatectl set-local-rtc 0</MokaText> puts it back on UTC.</dd>
-			}
-		</dl>
+		(string offsetText, long? offsetSeconds) = Offset(clock);
+		<div class="mta-board">
+			<MokaCard Outlined Elevation="0" Title="Clock" Subtitle="@(clock.LocalTime.Length > 0 ? clock.LocalTime : "not read")" Class="mta-board-card">
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@TimeOf(clock)" Label="Server time" HelpText="@DateOf(clock)" />
+					<MokaStat Tile Value="@offsetText" Label="This computer" HelpText="@(offsetSeconds is null ? "not compared" : "against the server")" Color="@OffsetColor(offsetSeconds)" />
+					<MokaStat Tile Value="@SyncWord(clock.Synchronized)" Label="Sync" HelpText="@(clock.SyncSource.Length > 0 ? $"from {clock.SyncSource}" : "no source said")" Color="@(clock.Synchronized switch { true => MokaColor.Success, false => MokaColor.Warning, _ => MokaColor.Surface })" />
+				</div>
+				<AdminFacts Items="ClockFacts(clock)" Class="mta-facts--plain" />
+			</MokaCard>
 
-		<section class="mta-section">
-			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Change the time zone</MokaText>
-			<div class="mta-inline">
-				<div class="mta-grow">
+			<MokaCard Outlined Elevation="0" Title="Time zone" Subtitle="@(clock.TimeZone.Length > 0 ? clock.TimeZone : "not set")" Class="mta-board-card">
+				<div class="mta-section">
 					<MokaSelect TValue="string"
 								Items="_zones"
 								Value="@_zone"
@@ -67,22 +28,24 @@
 								Size="MokaSize.Sm"
 								Disabled="@(Context.RootChangeBlocked is not null)"
 								aria-label="Time zone" />
+					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
+						@(Capabilities.Clock.UsesTimedatectl
+							? "Set with timedatectl. Programs that read the zone at start keep the old one until they restart."
+							: "Set by linking /etc/localtime, and /etc/timezone where it exists. Programs that read the zone at start keep the old one until they restart.")
+					</MokaText>
+					<div class="mta-form-actions">
+						<Hint Text="@Context.RootChangeBlocked">
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Sm"
+										Disabled="@(Busy || string.IsNullOrEmpty(_zone) || _zone == clock.TimeZone || Context.RootChangeBlocked is not null)"
+										OnClick="SetZoneAsync">
+								Set time zone
+							</MokaButton>
+						</Hint>
+					</div>
 				</div>
-				<Hint Text="@Context.RootChangeBlocked">
-					<MokaButton Variant="MokaVariant.Outlined"
-								Size="MokaSize.Sm"
-								Disabled="@(Busy || string.IsNullOrEmpty(_zone) || _zone == clock.TimeZone || Context.RootChangeBlocked is not null)"
-								OnClick="SetZoneAsync">
-						Set time zone
-					</MokaButton>
-				</Hint>
-			</div>
-			<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
-				@(Capabilities.Clock.UsesTimedatectl
-					? "Set with timedatectl. Programs that read the zone at start keep the old one until they restart."
-					: "Set by linking /etc/localtime, and /etc/timezone where it exists. Programs that read the zone at start keep the old one until they restart.")
-			</MokaText>
-		</section>
+			</MokaCard>
+		</div>
 	}
 </ToolPageFrame>
 
@@ -113,21 +76,88 @@
 		}
 	}
 
-	/// <summary>How far the server's clock is from this computer's, which is what makes TLS and logins fail.</summary>
-	private string? Offset(ClockInfo clock)
+	// How far the server's clock is from this computer's, which is what makes TLS and logins fail.
+	private (string Text, long? Seconds) Offset(ClockInfo clock)
 	{
 		if (clock.Epoch is not { } epoch)
 		{
-			return null;
+			return ("unknown", null);
 		}
 
 		long difference = epoch - _readAt.ToUnixTimeSeconds();
-		return Math.Abs(difference) switch
+		string text = Math.Abs(difference) switch
 		{
-			< 3 => "agrees with the server",
-			< 120 => $"{Math.Abs(difference)} s {(difference > 0 ? "behind" : "ahead of")} the server",
-			_ => $"{AdminFormat.Span(TimeSpan.FromSeconds(Math.Abs(difference)))} {(difference > 0 ? "behind" : "ahead of")} the server",
+			< 3 => "In step",
+			< 120 => $"{Math.Abs(difference)} s {(difference > 0 ? "behind" : "ahead")}",
+			_ => $"{AdminFormat.Span(TimeSpan.FromSeconds(Math.Abs(difference)))} {(difference > 0 ? "behind" : "ahead")}",
 		};
+		return (text, difference);
+	}
+
+	private static MokaColor OffsetColor(long? seconds) => seconds switch
+	{
+		null => MokaColor.Surface,
+		{ } value when Math.Abs(value) < 3 => MokaColor.Success,
+		{ } value when Math.Abs(value) < 120 => MokaColor.Warning,
+		_ => MokaColor.Error,
+	};
+
+	private static string SyncWord(bool? synchronized) => synchronized switch
+	{
+		true => "Synchronized",
+		false => "Not in sync",
+		_ => "Unknown",
+	};
+
+	// timedatectl prints "2026-11-08 06:28:29 UTC (+0000)"; the tile shows the time and its help the date.
+	private static string TimeOf(ClockInfo clock) => clock.LocalTime.Length >= 19 ? clock.LocalTime[11..19] : clock.LocalTime;
+
+	private static string DateOf(ClockInfo clock) => clock.LocalTime.Length >= 19 ? clock.LocalTime[..10] : "";
+
+	private IReadOnlyList<MokaDataListItem> ClockFacts(ClockInfo clock)
+	{
+		List<MokaDataListItem> facts =
+		[
+			new("Time zone", clock.TimeZone.Length > 0 ? clock.TimeZone : "not set"),
+			new("In sync", ValueContent: @<span class="mta-facts-line">
+				<MokaStatusDot Size="MokaSize.Xs"
+							   Color="@AdminFormat.Dot(clock.Synchronized)"
+							   Glow="@(clock.Synchronized == true)"
+							   Label="@(clock.Synchronized switch { true => "Synchronized", false => "Not synchronized", _ => "Unknown" })"
+							   Uppercase="false" />
+				@if (clock.SyncSource.Length > 0)
+				{
+					<span class="mta-dim">from @clock.SyncSource</span>
+				}
+			</span>),
+		];
+		if (clock.NtpEnabled is { } ntp)
+		{
+			facts.Add(new("Time sync", ValueContent: @<span class="mta-facts-line">
+				@if (Capabilities.Clock.CanSwitchNtp && clock.CanSwitchNtp != false)
+				{
+					<Hint Text="@Context.RootChangeBlocked">
+						<MokaSwitch Value="ntp"
+									ValueChanged="SetNtpAsync"
+									Label="@(ntp ? "On" : "Off")"
+									Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+									aria-label="Time synchronisation" />
+					</Hint>
+				}
+				else
+				{
+					<span class="mta-facts-text">@(ntp ? "On" : "Off")</span>
+				}
+			</span>));
+		}
+
+		if (clock.RtcInLocalTime == true)
+		{
+			facts.Add(new("Hardware clock", ValueContent: @<span class="mta-facts-text">Keeps local time, which breaks around daylight saving changes. <span class="mta-mono">timedatectl set-local-rtc 0</span> puts it back on UTC.</span>));
+		}
+
+		facts.Add(new("Set with", Capabilities.Clock.UsesTimedatectl ? "timedatectl" : "/etc/localtime"));
+		return facts;
 	}
 
 	private async Task LoadZonesAsync()

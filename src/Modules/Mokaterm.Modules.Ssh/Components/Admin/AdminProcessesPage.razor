@@ -190,64 +190,82 @@
 			<ChildContent>
 				@if (process.Pid <= 1)
 				{
-					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">PID 1 is the init process and cannot be ended here.</MokaText>
+					<MokaAlert Severity="MokaToastSeverity.Info" Dense>PID 1 is the init process and cannot be ended here.</MokaAlert>
 				}
-				<dl class="mta-kv">
-					<dt>State</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@process.State</MokaText></dd>
-					<dt>CPU, memory</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"{CpuText(process)}% · {AdminFormat.Number(process.Memory, "0.0")}% · {AdminFormat.Kb(process.ResidentKb)}")</MokaText></dd>
-					@if (process.ParentPid is { } parent)
-					{
-						<dt>Parent</dt>
-						<dd>
-							@if (_processes.FirstOrDefault(item => item.Pid == parent) is { } up)
-							{
-								<button type="button" class="mta-link" @onclick="@(() => Select(up.Pid))">@($"{up.Name} ({up.Pid})")</button>
-							}
-							else
-							{
-								<MokaText Element="span" Size="MokaSize.Sm" Mono>@parent</MokaText>
-							}
-						</dd>
-					}
-					<dt>Runs as</dt>
-					<dd>
-						<MokaText Element="span" Size="MokaSize.Sm" Mono>@process.User</MokaText>
-						@if (NeedsRoot(process))
-						{
-							<span class="mta-dim mta-after">ending it needs root</span>
-						}
-					</dd>
-					<dt>Nice</dt>
-					<dd>
-						<div class="mta-inline">
-							<div class="mta-nice">
-								<MokaNumericField TValue="int"
-												  Value="_nice"
-												  ValueChanged="@(value => _nice = Math.Clamp(value, ProcessCommands.MinNice, ProcessCommands.MaxNice))"
-												  Min="ProcessCommands.MinNice"
-												  Max="ProcessCommands.MaxNice"
-												  Step="1"
-												  Size="MokaSize.Sm"
-												  aria-label="New nice value" />
-							</div>
-							<Hint Text="@(reniceBlocked ?? "Set this nice value; -20 runs first, 19 last")">
-								<MokaButton Variant="MokaVariant.Outlined"
-											Size="MokaSize.Xs"
-											Disabled="@(Busy || reniceBlocked is not null || _nice == process.Nice)"
-											OnClick="@(() => ReniceAsync(process, _nice))">
-									Renice
-								</MokaButton>
-							</Hint>
-							<span class="mta-dim">@($"now {process.Nice?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}{(reniceAsRoot ? ", as root" : "")}")</span>
+				<div class="mta-meters">
+					<MokaMeter Value="@(process.Cpu ?? 0)" Max="@Math.Max(100, process.Cpu ?? 0)" Label="@(process.CpuSampled ? "CPU, share of one core" : "CPU, average over its life")" Format="0.0'%'" Color="@AdminFormat.LevelColor(process.Cpu)" Size="MokaSize.Sm" />
+					<MokaMeter Value="@(process.Memory ?? 0)" Label="@($"Memory, {AdminFormat.Kb(process.ResidentKb)} resident")" Format="0.0'%'" Color="@AdminFormat.LevelColor(process.Memory)" Size="MokaSize.Sm" />
+				</div>
+				<AdminFacts Items="ProcessFacts(process)" />
+				<section class="mta-section" aria-label="Priority">
+					<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Priority</MokaText>
+					<div class="mta-inline">
+						<div class="mta-nice">
+							<MokaNumericField TValue="int"
+											  Value="_nice"
+											  ValueChanged="@(value => _nice = Math.Clamp(value, ProcessCommands.MinNice, ProcessCommands.MaxNice))"
+											  Min="ProcessCommands.MinNice"
+											  Max="ProcessCommands.MaxNice"
+											  Step="1"
+											  Size="MokaSize.Sm"
+											  aria-label="New nice value" />
 						</div>
-					</dd>
-				</dl>
-				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Command line</MokaText>
-				<pre class="mta-pre">@process.Command</pre>
+						<Hint Text="@(reniceBlocked ?? "Set this nice value; -20 runs first, 19 last")">
+							<MokaButton Variant="MokaVariant.Outlined"
+										Size="MokaSize.Xs"
+										Disabled="@(Busy || reniceBlocked is not null || _nice == process.Nice)"
+										OnClick="@(() => ReniceAsync(process, _nice))">
+								Renice
+							</MokaButton>
+						</Hint>
+						<span class="mta-dim">@($"now {process.Nice?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}{(reniceAsRoot ? ", as root" : "")}")</span>
+					</div>
+				</section>
+				<AdminOutput Label="Command line" Text="@process.Command" CopyLabel="Copy the command line" Commands />
 			</ChildContent>
 		</ToolDetailPanel>
+	};
+
+	private IReadOnlyList<MokaDataListItem> ProcessFacts(ProcessInfo process)
+	{
+		List<MokaDataListItem> facts =
+		[
+			new("State", ValueContent: @<span class="mta-facts-line">
+				<span>@process.State</span>
+				@if (StateWord(process.State) is { } word)
+				{
+					<span class="mta-facts-text mta-dim">@word</span>
+				}
+			</span>),
+		];
+		if (process.ParentPid is { } parent)
+		{
+			facts.Add(new("Parent", ValueContent: _processes.FirstOrDefault(item => item.Pid == parent) is { } up
+				? @<button type="button" class="mta-link mta-mono" @onclick="@(() => Select(up.Pid))">@($"{up.Name} ({up.Pid})")</button>
+				: @<span>@parent</span>));
+		}
+
+		facts.Add(new("Runs as", ValueContent: @<span class="mta-facts-line">
+			<span>@process.User</span>
+			@if (NeedsRoot(process))
+			{
+				<MokaTag Text="Ending it needs root" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="MokaColor.Warning" />
+			}
+		</span>));
+		return facts;
+	}
+
+	// The first letter of ps's STAT column, which says what the process is doing.
+	private static string? StateWord(string state) => state.Length == 0 ? null : state[0] switch
+	{
+		'R' => "running",
+		'S' => "sleeping",
+		'D' => "waiting on a disk",
+		'T' or 't' => "stopped",
+		'Z' => "a zombie",
+		'I' => "idle",
+		'X' => "dead",
+		_ => null,
 	};
 
 	private void ApplyFilter()

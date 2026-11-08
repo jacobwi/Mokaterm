@@ -1,0 +1,93 @@
+/* A panel's facts as Moka's data list in a quiet inner panel: keys as micro labels, values in mono, the way names,
+   numbers and paths read best. A narrow panel puts each key above its value. */
+.mta-facts {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	container-type: inline-size;
+}
+
+.mta-facts-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+	min-height: var(--moka-button-height-sm);
+}
+
+/* One class more than Moka's own rules for the list, which would otherwise win or lose by stylesheet order. */
+.mta-facts ::deep .mta-facts-list {
+	padding: 0 var(--moka-spacing-md);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+}
+
+/* Inside a card of its own, which already frames it. */
+.mta-facts.mta-facts--plain ::deep .mta-facts-list {
+	padding: 0;
+	border: 0;
+	background: none;
+}
+
+.mta-facts ::deep .mta-facts-list .moka-data-list-entry {
+	align-items: baseline;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+	padding: 7px 0;
+}
+
+.mta-facts ::deep .mta-facts-list .moka-data-list-term {
+	flex: 0 0 7.5rem;
+	min-width: 0;
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 18px;
+	opacity: 1;
+	text-transform: uppercase;
+}
+
+.mta-facts ::deep .mta-facts-list .moka-data-list-description {
+	flex: 1 1 auto;
+	min-width: 0;
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	line-height: 18px;
+	overflow-wrap: anywhere;
+}
+
+.mta-facts ::deep .mta-facts-text {
+	font-family: var(--moka-font-family);
+	letter-spacing: normal;
+}
+
+.mta-facts ::deep .mta-facts-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.mta-facts ::deep .mta-facts-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+@container (max-width: 279px) {
+	.mta-facts ::deep .mta-facts-list .moka-data-list-entry {
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.mta-facts ::deep .mta-facts-list .moka-data-list-term {
+		flex-basis: auto;
+	}
+}

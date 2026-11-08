@@ -98,7 +98,14 @@
 
 	private Fail2BanJail? SelectedJail => _view == "fail2ban" && _selected is { } name ? _snapshot?.Fail2Ban?.Jails.FirstOrDefault(jail => jail.Name == name) : null;
 
-	private RenderFragment? DetailFragment => Selected is not null ? CheckPanel : SelectedJail is not null ? JailPanel : null;
+	private RenderFragment? DetailFragment => _view switch
+	{
+		"checks" when Selected is not null => CheckPanel,
+		"fail2ban" when SelectedJail is not null => JailPanel,
+		"logins" when _snapshot is { FailedLogins.Count: > 0 } => LoginsPanel,
+		"ports" when _snapshot is { Listening.Count: > 0 } => PortsPanel,
+		_ => null,
+	};
 
 	protected override async Task LoadAsync(CancellationToken cancellationToken)
 	{
@@ -209,12 +216,6 @@
 		}
 
 		<div class="mta-stack">
-			@if (snapshot.FailedLogins.Count > 0)
-			{
-				<MokaText Element="p" Size="MokaSize.Xs" Class="mta-dim">
-					@($"Most tries: {string.Join(", ", FailedLoginParser.ByAddress(snapshot.FailedLogins).Take(5).Select(entry => $"{entry.Address} ({entry.Count})"))} · from {snapshot.FailedLoginSource}, newest first")
-				</MokaText>
-			}
 			<ToolTable TItem="AdminRow<FailedLogin>"
 					   Items="_loginsShown"
 					   ItemKey="@(row => row.Index)"
@@ -285,14 +286,10 @@
 				</MokaColumn>
 				<MokaColumn TItem="AdminRow<ListeningSocket>" Title="Reachable" Field="@(row => Reach(row.Item))" Mono Class="mt-col-wide">
 					<CellTemplate Context="row">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@(_openToAll.Contains(row.Item) ? MokaColor.Warning : MokaColor.Surface)" Label="@Reach(row.Item)" />
+						<MokaTag Text="@Reach(row.Item)" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="@ReachColor(row.Item)" />
 					</CellTemplate>
 				</MokaColumn>
 			</ToolTable>
-			@if (!snapshot.AsRoot)
-			{
-				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The processes behind other users' ports show as root.</MokaText>
-			}
 		</div>
 	};
 
@@ -369,33 +366,20 @@
 			</Actions>
 			<ChildContent>
 				<MokaText Element="p" Size="MokaSize.Sm">@check.Summary</MokaText>
-				<dl class="mta-kv">
-					<dt>Value</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@check.Value</MokaText></dd>
-					<dt>Status</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@LevelText(check.Level)</MokaText></dd>
-					@if (check.Keyword is { } keyword)
-					{
-						<dt>From</dt>
-						<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@SourceText(sshd, keyword)</MokaText></dd>
-					}
-				</dl>
-				@if (check.Keyword is not null && check.Fix is null && check.Level != SecurityLevel.Good && !sshd.Effective)
+				@if (check.Keyword is { } keyword)
 				{
-					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Changing it needs sshd's own reading of its settings (sshd -T), which only root gets. Turn on root mode.</MokaText>
+					<MokaChainCheck Steps="SshdSteps(check, sshd, keyword)" Label="@($"How sshd arrives at {keyword}")" FindingsLabel="What each step says" Class="mta-chain" />
 				}
-				@if (check.Fix is { } offered && check.Keyword is { } fixKeyword)
+				else
 				{
-					@if (sshd.RouteFor(fixKeyword) is { UsesDropIn: false } byHand)
-					{
-						<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">
-							@($"A drop-in would not win here, so {byHand.File} opens in the editor: set {offered.Keyword} {offered.Value} there. sshd -t checks it before sshd reloads.")
-						</MokaText>
-					}
-					@if (offered.Warning is { } warning)
-					{
-						<MokaAlert Severity="@(offered.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
-					}
+					<div class="mta-tiles">
+						<MokaStat Tile Value="@(check.Value.Length > 0 ? check.Value : "?")" Label="Value" HelpText="@check.Title" Color="@LevelColor(check.Level)" />
+						<MokaStat Tile Value="@LevelWord(check.Level)" Label="Status" HelpText="@LevelText(check.Level)" Color="@LevelColor(check.Level)" />
+					</div>
+				}
+				@if (check.Fix is { Warning: { } warning } offered)
+				{
+					<MokaAlert Severity="@(offered.CutsConnection ? MokaToastSeverity.Error : MokaToastSeverity.Warning)" Dense>@warning</MokaAlert>
 				}
 				@if (_editProblem is { } problem)
 				{
@@ -416,25 +400,126 @@
 			return;
 		}
 
-		<ToolDetailPanel Title="@jail.Name" Subtitle="@jail.Watches" OnClose="@(() => _selected = null)">
-			<dl class="mta-kv">
-				<dt>Failing now</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.CurrentlyFailed</MokaText></dd>
-				<dt>Failed in all</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.TotalFailed</MokaText></dd>
-				<dt>Banned in all</dt>
-				<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@jail.TotalBanned</MokaText></dd>
-			</dl>
-			<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Banned now</MokaText>
+		<ToolDetailPanel Title="@jail.Name" Subtitle="@jail.Watches" DotColor="@(jail.CurrentlyBanned > 0 ? MokaColor.Warning : MokaColor.Success)" OnClose="@(() => _selected = null)">
+			<div class="mta-tiles">
+				<MokaStat Tile Value="@Number(jail.CurrentlyFailed)" Label="Failing now" HelpText="@($"{Number(jail.TotalFailed)} in all")" />
+				<MokaStat Tile Value="@Number(jail.CurrentlyBanned)" Label="Banned now" HelpText="@($"{Number(jail.TotalBanned)} in all")" Color="@(jail.CurrentlyBanned > 0 ? MokaColor.Warning : MokaColor.Surface)" />
+			</div>
 			@if (jail.Banned.Count == 0)
 			{
-				<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Nobody.</MokaText>
+				<AdminFacts Items="@([new MokaDataListItem("Banned now", "nobody")])" />
 			}
 			else
 			{
-				<pre class="mta-pre">@string.Join("\n", jail.Banned)</pre>
+				<AdminOutput Label="Banned now" Text="@(string.Join('\n', jail.Banned))" CopyLabel="Copy the banned addresses" />
 			}
 		</ToolDetailPanel>
+	};
+
+	private RenderFragment LoginsPanel => __builder =>
+	{
+		if (_snapshot is not { } snapshot)
+		{
+			return;
+		}
+
+		IReadOnlyList<(string Address, int Count, string Last)> byAddress = FailedLoginParser.ByAddress(snapshot.FailedLogins);
+		int most = byAddress.Count > 0 ? byAddress[0].Count : 1;
+		<ToolDetailPanel Title="Failed logins" Subtitle="@($"From {snapshot.FailedLoginSource}")" Mono="false" DotColor="MokaColor.Error" DotGlow>
+			<div class="mta-tiles">
+				<MokaStat Tile Value="@AdminFormat.Count(snapshot.FailedLogins.Count)" Label="Failures" HelpText="in the recent lines" Color="MokaColor.Error" />
+				<MokaStat Tile Value="@AdminFormat.Count(byAddress.Count)" Label="Addresses" HelpText="trying" />
+				<MokaStat Tile Value="@AdminFormat.Count(snapshot.FailedLogins.Count(login => login.InvalidUser))" Label="No such user" HelpText="names guessed" />
+			</div>
+			<section class="mta-section" aria-label="Most tries">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Most tries</MokaText>
+				@foreach ((string address, int count, string last) in byAddress.Take(5))
+				{
+					<Hint @key="address" Text="@($"Last at {last}")" Class="mta-meter-hint">
+						<MokaMeter Value="count" Max="most" Label="@address" Color="MokaColor.Error" Size="MokaSize.Sm" Class="mta-meter-row" />
+					</Hint>
+				}
+			</section>
+			<section class="mta-section" aria-label="Latest">
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Latest</MokaText>
+				<MokaTimeline role="list" Class="mta-timeline">
+					@foreach (FailedLogin login in snapshot.FailedLogins.Reverse().Take(5))
+					{
+						<MokaTimelineItem role="listitem"
+										  Title="@($"{login.User} from {login.Address}")"
+										  Timestamp="@(login.Method.Length > 0 ? $"{login.Time} · {login.Method}" : login.Time)"
+										  DotColor="@(login.InvalidUser ? MokaColor.Surface : MokaColor.Error)" />
+					}
+				</MokaTimeline>
+			</section>
+		</ToolDetailPanel>
+	};
+
+	private RenderFragment PortsPanel => _snapshot is { } snapshot
+		? AdminListening.Panel(snapshot.Listening, snapshot.ListeningSource, Profile.Facts.SshServerPort, snapshot.AsRoot ? null : RootNote)
+		: _ => { };
+
+	private static RenderFragment RootNote => __builder =>
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">The processes behind other users' ports show as root.</MokaText>
+	};
+
+	// Where sshd's value comes from and what can be done about it, in the order sshd itself goes: it reads its files,
+	// the last one that sets the keyword wins, and the value is what it then does.
+	private IReadOnlyList<MokaChainStep> SshdSteps(SecurityCheck check, SshdConfig sshd, string keyword)
+	{
+		bool setInFile = sshd.Sources.TryGetValue(keyword.ToLowerInvariant(), out string? file);
+		SshdChangeRoute? route = sshd.RouteFor(keyword);
+		MokaChainStep fix = check switch
+		{
+			{ Level: SecurityLevel.Good } => new(MokaIcons.Status.CheckCircle, "Fix", MokaChainTone.Ok, "Nothing to do", ""),
+			{ Fix: { } offered } when route is { UsesDropIn: true } =>
+				new(MokaIcons.Action.Edit, "Fix", MokaChainTone.Warn, "Drop-in", $"{offered.Label} writes {offered.Keyword} {offered.Value} into {route.File}; sshd -t checks it before sshd reloads."),
+			{ Fix: { } offered } when route is { } byHand =>
+				new(MokaIcons.Action.Edit, "Fix", MokaChainTone.Warn, "By hand", $"A drop-in would not win here, so {byHand.File} opens in the editor: set {offered.Keyword} {offered.Value} there. sshd -t checks it before sshd reloads."),
+			_ when !sshd.Effective =>
+				new(MokatermIcons.Root, "Fix", MokaChainTone.Wait, "Needs root", "Changing it needs sshd's own reading of its settings (sshd -T), which only root gets. Turn on root mode."),
+			_ => new(MokaIcons.Action.Edit, "Fix", MokaChainTone.Off, "Not offered", ""),
+		};
+
+		return
+		[
+			new(MokaIcons.Action.Search, "Read", sshd.TestProblem is not null ? MokaChainTone.Fail : sshd.Effective ? MokaChainTone.Ok : MokaChainTone.Warn,
+				sshd.TestProblem is not null ? "Refused" : sshd.Effective ? "sshd -T" : "From files",
+				sshd.TestProblem is { } broken
+					? $"sshd -T refused its settings: {broken}"
+					: sshd.Effective ? "" : "Worked out from the files the way sshd reads them. Root mode asks sshd itself."),
+			new(MokaIcons.File.FileText, "Set in", setInFile ? MokaChainTone.Ok : MokaChainTone.Off, setInFile ? FileName(file!) : sshd.KnowsFiles ? "Default" : "Not read",
+				setInFile ? $"{keyword} is set in {file}." : sshd.KnowsFiles ? $"No file sets {keyword}, so sshd's default applies." : ""),
+			new(MokatermIcons.Shield, "Value", check.Level switch
+				{
+					SecurityLevel.Good => MokaChainTone.Ok,
+					SecurityLevel.Notice or SecurityLevel.Warning => MokaChainTone.Warn,
+					_ => MokaChainTone.Wait,
+				},
+				check.Value.Length > 0 ? check.Value : "?",
+				""),
+			fix,
+		];
+	}
+
+	private static string FileName(string path) => path.LastIndexOf('/') is var slash and >= 0 && slash < path.Length - 1 ? path[(slash + 1)..] : path;
+
+	private static string LevelWord(SecurityLevel level) => level switch
+	{
+		SecurityLevel.Good => "Fine",
+		SecurityLevel.Notice => "A look",
+		SecurityLevel.Warning => "Weak",
+		_ => "Not read",
+	};
+
+	private static string Number(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "?";
+
+	private MokaColor ReachColor(ListeningSocket socket) => AdminListening.ReachOf(socket) switch
+	{
+		ListeningReach.Every => MokaColor.Warning,
+		ListeningReach.Loopback => MokaColor.Success,
+		_ => MokaColor.Info,
 	};
 
 	private static MokaColor LevelColor(SecurityLevel level) => level switch
@@ -462,16 +547,12 @@
 		_ => "Open Packages",
 	};
 
-	private static string SourceText(SshdConfig sshd, string keyword) =>
-		sshd.Sources.TryGetValue(keyword.ToLowerInvariant(), out string? file)
-			? file
-			: sshd.KnowsFiles ? "sshd's default" : "not read";
-
-	private string Reach(ListeningSocket socket) =>
-		_openToAll.Contains(socket) ? "EVERY ADDRESS" : IsLoopback(socket) ? "THIS MACHINE" : "ONE ADDRESS";
-
-	private static bool IsLoopback(ListeningSocket socket) =>
-		socket.Address.StartsWith("127.", StringComparison.Ordinal) || socket.Address is "::1" || socket.Address.Contains("%lo", StringComparison.Ordinal);
+	private static string Reach(ListeningSocket socket) => AdminListening.ReachOf(socket) switch
+	{
+		ListeningReach.Every => "Every address",
+		ListeningReach.Loopback => "This machine",
+		_ => "One address",
+	};
 
 	private bool Matches(FailedLogin login) => _filter.Trim().Length == 0
 		|| login.Address.Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase)

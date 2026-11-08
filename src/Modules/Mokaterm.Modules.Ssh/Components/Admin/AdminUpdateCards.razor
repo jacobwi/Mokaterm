@@ -2,23 +2,29 @@
 @using Mokaterm.Modules.Ssh.Admin.Reboot
 @implements IDisposable
 
-@* Two overview cards, security updates and whether a reboot is due, which read on their own so the overview only
+@* Two overview tiles, security updates and whether a reboot is due, which read on their own so the overview only
    places them. Both open the packages page, where the reboot is offered. *@
-<button type="button" class="mta-card" @onclick="OpenSecurity" disabled="@(Context.Profile.Capabilities.Packages is null)">
-	<span class="mta-card-label">Security updates</span>
-	<span class="@(_security is { Count: > 0 } ? "mta-stat mta-stat--alert" : "mta-stat")">@(_security is { } security ? AdminFormat.Count(security.Count) : _securityNote is null ? "..." : "?")</span>
-	<span class="mta-card-sub" title="@_securityNote">@(_security is not null ? Context.Profile.Capabilities.Packages?.DisplayName : _securityNote ?? "asking")</span>
-</button>
+<Hint Text="@_securityNote" Class="mta-ov-tile-hint">
+	<button type="button" class="mta-ov-tile" @onclick="OpenSecurity" disabled="@(Context.Profile.Capabilities.Packages is null)">
+		<MokaStat Tile
+				  Value="@(_security is { } security ? AdminFormat.Count(security.Count) : _securityNote is null ? "..." : "?")"
+				  Label="Security updates"
+				  HelpText="@(_security is not null ? Context.Profile.Capabilities.Packages?.DisplayName : _securityNote is null ? "asking" : "not known")"
+				  Color="@(_security is { Count: > 0 } ? MokaColor.Error : MokaColor.Surface)" />
+	</button>
+</Hint>
 
 @if (RebootCommands.CanReboot(Context.Profile))
 {
-	<button type="button" class="mta-card" @onclick="OpenPackages">
-		<span class="mta-card-label">Reboot</span>
-		<span class="@(_reboot?.Required == true ? "mta-stat mta-stat--alert mta-stat--small" : "mta-stat mta-stat--small")">
-			@(_reboot?.Required switch { true => "REQUIRED", false => "not needed", _ => _reboot is null ? "..." : "unknown" })
-		</span>
-		<span class="mta-card-sub" title="@(_reboot is { } status ? AdminUpdateReads.RebootText(status) : null)">@(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "reading")</span>
-	</button>
+	<Hint Text="@(_reboot is { } status ? AdminUpdateReads.RebootText(status) : null)" Class="mta-ov-tile-hint">
+		<button type="button" class="mta-ov-tile" @onclick="OpenPackages">
+			<MokaStat Tile
+					  Value="@(_reboot?.Required switch { true => "Required", false => "Not needed", _ => _reboot is null ? "..." : "Unknown" })"
+					  Label="Reboot"
+					  HelpText="@(_reboot is { } known ? AdminUpdateReads.RebootText(known) : "reading")"
+					  Color="@(_reboot?.Required == true ? MokaColor.Error : _reboot?.Required == false ? MokaColor.Success : MokaColor.Surface)" />
+		</button>
+	</Hint>
 }
 
 @code {

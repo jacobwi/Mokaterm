@@ -1,0 +1,76 @@
+@namespace Mokaterm.Modules.Ssh.Components.Admin
+
+@* Moka's code block draws the text; its own copy button stays off, because ours goes through IClipboardService. *@
+<section class="@CssClass" aria-label="@Label">
+	@if (Label is { Length: > 0 } || Actions is not null || CanCopy)
+	{
+		<header class="mta-output-head">
+			@if (Label is { Length: > 0 } label)
+			{
+				<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@label</MokaText>
+			}
+			<span class="mta-spacer"></span>
+			@Actions
+			@if (CanCopy)
+			{
+				<CopyButton Text="@(Text ?? "")" Label="@CopyLabel" Position="MokaTooltipPosition.BottomEnd" />
+			}
+		</header>
+	}
+	@if (Text is null)
+	{
+		@ChildContent
+	}
+	else
+	{
+		<MokaCodeBlock Code="@Text" Id="@CodeId" ShowCopyButton="false" ShowLineNumbers="false" Wrap="Wrap" MaxHeight="@(Fill ? null : MaxHeight)" Class="mta-output-code" />
+	}
+</section>
+
+@code {
+	[Parameter]
+	public string? Text { get; set; }
+
+	[Parameter]
+	public string? Label { get; set; }
+
+	[Parameter]
+	public RenderFragment? Actions { get; set; }
+
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	[Parameter]
+	public string CopyLabel { get; set; } = "Copy the output";
+
+	[Parameter]
+	public bool Fill { get; set; }
+
+	[Parameter]
+	public bool Commands { get; set; }
+
+	[Parameter]
+	public bool Wrap { get; set; } = true;
+
+	[Parameter]
+	public bool Copyable { get; set; } = true;
+
+	[Parameter]
+	public string? MaxHeight { get; set; } = "260px";
+
+	[Parameter]
+	public string? CodeId { get; set; }
+
+	[Parameter]
+	public string? Class { get; set; }
+
+	private bool CanCopy => Copyable && Text is { Length: > 0 };
+
+	private string CssClass => string.Join(' ', new[]
+	{
+		"mta-output",
+		Fill ? "mta-output--fill" : "",
+		Commands ? "mta-output--commands" : "",
+		Class ?? "",
+	}.Where(part => part.Length > 0));
+}

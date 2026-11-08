@@ -12,7 +12,7 @@
 				Error="@LoadError"
 				OnRefresh="ReloadAsync"
 				ListPage
-				Detail="@(_view == "interfaces" && Selected is not null ? InterfacePanel : null)">
+				Detail="@DetailFragment">
 	<Chips>
 		<AdminChips Items="Chips" Value="@_view" ValueChanged="@(value => { _view = value; _selected = null; })" AriaLabel="Network details to show" />
 	</Chips>
@@ -135,10 +135,6 @@
 					else
 					{
 						<div class="mta-stack">
-							@if (!ReadAsRoot)
-							{
-								<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Processes show for this login's own sockets. Root mode shows them all.</MokaText>
-							}
 							<ToolTable TItem="ListeningSocket"
 									   Items="_portsShown"
 									   ItemKey="@(socket => $"{socket.Protocol}|{socket.Address}|{socket.Port}|{socket.Pid}")"
@@ -245,33 +241,67 @@
 				{
 					<MokaAlert Severity="MokaToastSeverity.Error" Dense>This SSH session arrives on this interface. Bringing it down cuts the session.</MokaAlert>
 				}
-				<dl class="mta-kv">
-					<dt>Addresses</dt>
-					<dd>
-						@if (networkInterface.Addresses.Count == 0)
-						{
-							<span class="mta-dim">none</span>
-						}
-						@foreach (NetAddress address in networkInterface.Addresses)
-						{
-							<div class="mta-mono" @key="address.Cidr">@address.Cidr<span class="mta-dim mta-after">@address.Scope</span></div>
-						}
-					</dd>
-					<dt>MAC</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(networkInterface.Mac.Length > 0 ? networkInterface.Mac : "none")</MokaText></dd>
-					<dt>MTU</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@networkInterface.Mtu</MokaText></dd>
-					<dt>Flags</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Xs" Mono>@string.Join(" ", networkInterface.Flags)</MokaText></dd>
-					@if (_snapshot?.Routes.Any(route => route.IsDefault && route.Device == networkInterface.Name) == true)
-					{
-						<dt>Routes</dt>
-						<dd>The default route leaves through this interface.</dd>
-					}
-				</dl>
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@(networkInterface.IsUp ? "Up" : "Down")" Label="Link" HelpText="@(networkInterface.State.Length > 0 ? networkInterface.State : "state unknown")" Color="@LinkColor(networkInterface)" />
+					<MokaStat Tile Value="@AdminFormat.Count(networkInterface.Addresses.Count)" Label="Addresses" HelpText="@(networkInterface.Addresses.Count == 1 ? "1 address" : $"{networkInterface.Addresses.Count} addresses")" />
+					<MokaStat Tile Value="@(networkInterface.Mtu?.ToString(CultureInfo.InvariantCulture) ?? "?")" Label="MTU" HelpText="@(networkInterface.LinkType.Length > 0 ? networkInterface.LinkType : "link type unknown")" />
+				</div>
+				<AdminFacts Items="InterfaceFacts(networkInterface)" />
 			</ChildContent>
 		</ToolDetailPanel>
 	};
+
+	private RenderFragment? DetailFragment => _view switch
+	{
+		"interfaces" when Selected is not null => InterfacePanel,
+		"ports" when _snapshot is { ListeningSource.Length: > 0 } snapshot && snapshot.Listening.Count > 0 => PortsPanel,
+		_ => null,
+	};
+
+	private RenderFragment PortsPanel => _snapshot is { } snapshot
+		? AdminListening.Panel(snapshot.Listening, snapshot.ListeningSource, Profile.Facts.SshServerPort, ReadAsRoot ? null : RootNote)
+		: _ => { };
+
+	private static RenderFragment RootNote => __builder =>
+	{
+		<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">Processes show for this login's own sockets. Root mode shows them all.</MokaText>
+	};
+
+	private IReadOnlyList<MokaDataListItem> InterfaceFacts(NetInterface networkInterface)
+	{
+		List<MokaDataListItem> facts =
+		[
+			new("Addresses", ValueContent: @<span class="mta-facts-stack">
+				@if (networkInterface.Addresses.Count == 0)
+				{
+					<span class="mta-dim">none</span>
+				}
+				@foreach (NetAddress address in networkInterface.Addresses)
+				{
+					<span class="mta-facts-line" @key="address.Cidr">
+						<span>@address.Cidr</span>
+						@if (address.Scope.Length > 0)
+						{
+							<MokaTag Text="@address.Scope" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="MokaColor.Surface" />
+						}
+					</span>
+				}
+			</span>),
+			new("MAC", networkInterface.Mac.Length > 0 ? networkInterface.Mac : "none"),
+			new("Flags", ValueContent: @<span class="mta-facts-line">
+				@foreach (string flag in networkInterface.Flags)
+				{
+					<MokaTag @key="flag" Text="@flag" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="@(flag is "UP" or "LOWER_UP" ? MokaColor.Success : MokaColor.Surface)" />
+				}
+			</span>),
+		];
+		if (_snapshot?.Routes.Any(route => route.IsDefault && route.Device == networkInterface.Name) == true)
+		{
+			facts.Add(new("Routes", ValueContent: @<span class="mta-facts-text">The default route leaves through this interface.</span>));
+		}
+
+		return facts;
+	}
 
 	private static MokaColor LinkColor(NetInterface networkInterface) => networkInterface.IsUp
 		? networkInterface.State is "DOWN" or "LOWERLAYERDOWN" ? MokaColor.Warning : MokaColor.Success

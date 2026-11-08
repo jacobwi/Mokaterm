@@ -138,7 +138,8 @@ public sealed partial class AdminPageRenderTests
 		int mysql = html.IndexOf(">3306<", StringComparison.Ordinal);
 		Assert.True(ssh > 0 && ssh < web && web < mysql, "the rules keep the order ufw applies them in");
 		Assert.Contains(">#<", html, StringComparison.Ordinal);
-		Assert.Contains("color:var(--moka-color-error)", html, StringComparison.Ordinal);
+		Assert.Contains("moka-tag--error", html, StringComparison.Ordinal);
+		Assert.Contains(">Default<", html, StringComparison.Ordinal);
 	}
 
 	private static AdminOutcome Ok(string output) => new() { ExitCode = 0, Output = output.ReplaceLineEndings("\n") };

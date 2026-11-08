@@ -13,7 +13,7 @@
 		{
 			<div class="mta-center" role="status">
 				<MokaSpinner Label="@RebootTitle(watch)" />
-				<MokaText Element="span" Size="MokaSize.Sm" Class="mta-dim">@RebootText(watch)</MokaText>
+				<MokaChainCheck Steps="RebootSteps(watch)" Label="@RebootTitle(watch)" FindingsLabel="Where the reboot is" Class="mta-reboot-chain" />
 				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="StopRebootWatch">Stop waiting</MokaButton>
 			</div>
 		}
@@ -62,7 +62,7 @@
 			<MokaText Element="span" Size="MokaSize.Sm" Weight="MokaFontWeight.Semibold" Truncate Class="mta-strip-name" title="@profile.DisplayName">@profile.DisplayName</MokaText>
 			@foreach (string part in SystemParts(profile))
 			{
-				<span class="mta-strip-part">@part</span>
+				<MokaTag Text="@part" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="MokaColor.Surface" Class="mta-strip-part" />
 			}
 			<MokaText Element="span" Size="MokaSize.Xs" Mono Truncate Class="mta-dim mta-strip-kernel" title="@profile.Facts.Kernel">@profile.Facts.Kernel</MokaText>
 			<span class="mta-spacer"></span>
@@ -152,11 +152,10 @@
 							<MokaStatusDot Size="MokaSize.Xs" Color="@(review.Script.AsRoot ? MokaColor.Error : MokaColor.Info)" Glow />
 							<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">@RunsAs(review)</MokaText>
 						</div>
-						<pre id="mta-review-commands" class="mta-pre mta-pre--commands">@review.Script.Body</pre>
+						<AdminOutput Text="@review.Script.Body" CodeId="mta-review-commands" Commands MaxHeight="320px" Copyable="false" />
 						@if (_reviewInput is { } reviewInput)
 						{
-							<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">On stdin</MokaText>
-							<pre class="mta-pre">@reviewInput.Preview</pre>
+							<AdminOutput Label="On stdin" Text="@reviewInput.Preview" MaxHeight="160px" Copyable="false" />
 						}
 						<div class="mta-review-actions">
 							@if (review.Destructive)
@@ -203,7 +202,7 @@
 				</div>
 				@if (!result.IsRunning && OutputOpen(result))
 				{
-					<pre class="mta-pre mta-pre--result">@ResultText(result)</pre>
+					<AdminOutput Text="@ResultText(result)" MaxHeight="150px" Copyable="false" />
 				}
 			</div>
 		}

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Moka.Red.Core.Enums;
+using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Formatting;
 
 namespace Mokaterm.Modules.Ssh.Components.Admin;
@@ -35,4 +36,22 @@ internal static class AdminFormat
 		false => MokaColor.Error,
 		_ => MokaColor.Surface,
 	};
+
+	public static MokaColor LevelColor(double? percent) => percent is not { } value || !double.IsFinite(value)
+		? MokaColor.Surface
+		: UsageBar.LevelOf(Math.Round(value)) switch
+		{
+			UsageLevel.Full => MokaColor.Error,
+			UsageLevel.Warn => MokaColor.Warning,
+			_ => MokaColor.Success,
+		};
+
+	public static string LevelWord(double? percent) => percent is not { } value || !double.IsFinite(value)
+		? "measuring"
+		: UsageBar.LevelOf(Math.Round(value)) switch
+		{
+			UsageLevel.Full => "critical",
+			UsageLevel.Warn => "high",
+			_ => "normal",
+		};
 }

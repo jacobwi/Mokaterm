@@ -1,4 +1,4 @@
-/* The live figures: a status in the chip row, two lines on one scale for in and out, and the busiest devices below. */
+/* The live status in the chip row. */
 .mta-live {
 	display: inline-flex;
 	align-items: center;
@@ -14,41 +14,211 @@
 	white-space: nowrap;
 }
 
-.mta-spark-pair {
-	position: relative;
-	display: block;
-	height: 28px;
+/* Moka's cards at the density of a tool page: a dozen pages share one dialog, so a card is a panel, not a hero. */
+.mta-ov {
+	--moka-card-padding: var(--moka-spacing-md);
+	--moka-card-gap: var(--moka-spacing-sm);
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+	container-type: inline-size;
+	container-name: mta-ov;
 }
 
-.mta-spark-pair ::deep .mt-sparkline {
-	position: absolute;
-	inset: 0;
+.mta-ov ::deep .mta-ov-card {
+	min-width: 0;
+	background: var(--moka-color-surface);
 }
 
-.mta-spark-pair ::deep .mta-spark-out,
-.mta-key--out {
-	--mt-sparkline-color: var(--moka-color-info);
+.mta-ov ::deep .mta-ov-card .moka-card-title {
+	font-size: var(--moka-font-size-sm);
 }
 
-.mta-key {
-	display: inline-flex;
+.mta-ov ::deep .mta-ov-card .moka-card-subtitle {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Now: a ring per figure with what it is beside it, each card a way into the page that explains it. */
+.mta-ov-gauges {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(25% - var(--moka-spacing-sm))), 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+/* Four that do not fit a row go two by two, never three and one. */
+@container mta-ov (max-width: 899px) {
+	.mta-ov-gauges {
+		grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - var(--moka-spacing-sm))), 1fr));
+	}
+}
+
+.mta-ov ::deep .mta-ov-gauge .moka-card-body {
+	display: flex;
 	align-items: center;
-	gap: 4px;
-	margin-right: var(--moka-spacing-sm);
+	gap: var(--moka-spacing-md);
+	min-width: 0;
 }
 
-/* A short line in the colour of its sparkline, as a legend. */
-.mta-key::before {
-	width: 10px;
-	height: 2px;
-	border-radius: 1px;
-	background: var(--mt-sparkline-color, var(--moka-color-primary));
-	content: "";
+.mta-ov ::deep .mta-ov-gauge .moka-gauge {
+	flex-shrink: 0;
 }
 
+.mta-ov ::deep .mta-ov-gauge-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.mta-ov ::deep .mta-ov-gauge-title {
+	margin-bottom: 2px;
+	color: var(--moka-color-on-surface);
+	font-size: var(--moka-font-size-sm);
+	font-weight: var(--moka-font-weight-semibold);
+}
+
+.mta-ov ::deep .mta-ov-gauge-line {
+	overflow: hidden;
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The last two minutes, two charts a row while they have the room and never three, so four make a square. */
+.mta-ov-charts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(max(300px, calc(50% - var(--moka-spacing-sm))), 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+/* State: Moka's fact tiles, each a button into the page that holds the detail. */
+.mta-ov-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: var(--moka-spacing-sm);
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile-hint {
+	display: grid;
+	min-width: 0;
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile {
+	display: grid;
+	min-width: 0;
+	padding: 0;
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color var(--moka-transition-fast), box-shadow var(--moka-transition-fast);
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile:hover:not(:disabled) {
+	border-color: var(--moka-color-primary-border);
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile:disabled {
+	cursor: default;
+	opacity: 0.6;
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile .moka-stat--tile {
+	height: 100%;
+}
+
+.mta-ov-tiles ::deep .mta-ov-tile .moka-stat__value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Two lines at most, so "required by libc6, linux-image-..." keeps its start and the tiles keep one height. */
+.mta-ov-tiles ::deep .mta-ov-tile .moka-stat__help {
+	display: -webkit-box;
+	overflow: hidden;
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+/* The machine and its file systems side by side. */
+.mta-ov-facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: var(--moka-spacing-sm);
+	align-items: start;
+}
+
+.mta-ov-fs-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mta-ov-fs-list ::deep .mta-ov-fs-hint {
+	display: grid;
+	min-width: 0;
+}
+
+.mta-ov-fs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding: 6px var(--moka-spacing-sm);
+	border: 0;
+	border-radius: var(--moka-radius-md);
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mta-ov-fs:hover {
+	background: var(--moka-color-surface-hover);
+}
+
+.mta-ov-fs:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+}
+
+.mta-ov-fs ::deep .moka-meter__label {
+	font-family: var(--moka-font-family-mono);
+	letter-spacing: 0.02em;
+}
+
+.mta-ov-fs-sub {
+	color: var(--moka-color-on-surface-variant);
+	font-family: var(--moka-font-family-mono);
+	font-size: 10px;
+	letter-spacing: 0.02em;
+}
+
+/* The busiest devices under everything else. */
 .mta-live-lists {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 	gap: var(--moka-spacing-sm);
-	margin-top: var(--moka-spacing-md);
 }

@@ -250,18 +250,12 @@
 				}
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
-					<dt>IDs</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@($"uid {user.Uid} · gid {user.Gid}")</MokaText></dd>
-					<dt>Home</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@user.Home</MokaText></dd>
-					<dt>Shell</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@user.Shell</MokaText></dd>
-					<dt>Password</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(user.Password == PasswordState.Unknown ? "not read (needs root mode)" : PasswordLabel(user.Password))</MokaText></dd>
-					<dt>Groups</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@string.Join(", ", user.Groups)</MokaText></dd>
-				</dl>
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@user.Uid.ToString(CultureInfo.InvariantCulture)" Label="UID" HelpText="@($"gid {user.Gid}")" />
+					<MokaStat Tile Value="@PasswordWord(user.Password)" Label="Password" HelpText="@(user.Password == PasswordState.Unknown ? "needs root mode" : PasswordMeaning(user.Password))" Color="@PasswordColor(user.Password)" />
+					<MokaStat Tile Value="@AdminFormat.Count(user.Groups.Count)" Label="Groups" HelpText="@(user.Groups.Any(IsPrivileged) ? "one can act as root" : "none of them root's")" Color="@(user.Groups.Any(IsPrivileged) ? MokaColor.Warning : MokaColor.Surface)" />
+				</div>
+				<AdminFacts Items="UserFacts(user)" />
 				@if (Capabilities.Accounts.CanChange)
 				{
 					@if (refusal is null)
@@ -331,12 +325,12 @@
 				}
 			</Actions>
 			<ChildContent>
-				<dl class="mta-kv">
-					<dt>Members</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(group.Members.Count > 0 ? string.Join(", ", group.Members) : "none listed")</MokaText></dd>
-					<dt>Primary of</dt>
-					<dd><MokaText Element="span" Size="MokaSize.Sm" Mono>@(primaryOf.Count > 0 ? string.Join(", ", primaryOf) : "nobody")</MokaText></dd>
-				</dl>
+				<div class="mta-tiles">
+					<MokaStat Tile Value="@group.Gid.ToString(CultureInfo.InvariantCulture)" Label="GID" HelpText="@(IsPrivileged(group.Name) ? "can act as root" : "group id")" Color="@(IsPrivileged(group.Name) ? MokaColor.Warning : MokaColor.Surface)" />
+					<MokaStat Tile Value="@AdminFormat.Count(group.Members.Count)" Label="Members" HelpText="listed in the group" />
+					<MokaStat Tile Value="@AdminFormat.Count(primaryOf.Count)" Label="Primary of" HelpText="users whose own group" />
+				</div>
+				<AdminFacts Items="@([new("Members", ValueContent: NameTags(group.Members, "none listed")), new("Primary of", ValueContent: NameTags(primaryOf, "nobody"))])" />
 				@if (refusal is not null)
 				{
 					<MokaText Element="span" Size="MokaSize.Xs" Class="mta-dim">@refusal</MokaText>
@@ -392,6 +386,56 @@
 	};
 
 	private IReadOnlyList<string> Shells => _snapshot is { Shells.Count: > 0 } snapshot ? snapshot.Shells : ["/bin/sh"];
+
+	// Membership in these hands out root, or root's equal through the Docker socket.
+	private static bool IsPrivileged(string group) => group is "sudo" or "wheel" or "admin" or "root" or "docker";
+
+	private static IReadOnlyList<MokaDataListItem> UserFacts(UserAccount user) =>
+	[
+		new("Home", user.Home),
+		new("Shell", user.Shell),
+		new("Groups", ValueContent: NameTags(user.Groups, "none")),
+	];
+
+	private static RenderFragment NameTags(IReadOnlyList<string> names, string none) => __builder =>
+	{
+		<span class="mta-facts-line">
+			@if (names.Count == 0)
+			{
+				<span class="mta-dim">@none</span>
+			}
+			@foreach (string name in names)
+			{
+				<MokaTag @key="name" Text="@name" Size="MokaSize.Xs" Variant="MokaVariant.Soft" Color="@(IsPrivileged(name) ? MokaColor.Warning : MokaColor.Surface)" />
+			}
+		</span>
+	};
+
+	private static string PasswordWord(PasswordState state) => state switch
+	{
+		PasswordState.Set => "Set",
+		PasswordState.Locked => "Locked",
+		PasswordState.Disabled => "No login",
+		PasswordState.Empty => "Empty",
+		_ => "Unknown",
+	};
+
+	private static string PasswordMeaning(PasswordState state) => state switch
+	{
+		PasswordState.Set => "logs in with it",
+		PasswordState.Locked => "kept but refused",
+		PasswordState.Disabled => "no password login",
+		PasswordState.Empty => "logs in without one",
+		_ => "",
+	};
+
+	private static MokaColor PasswordColor(PasswordState state) => state switch
+	{
+		PasswordState.Locked => MokaColor.Warning,
+		PasswordState.Empty => MokaColor.Error,
+		PasswordState.Set => MokaColor.Success,
+		_ => MokaColor.Surface,
+	};
 
 	private bool KnowsPasswords => _snapshot?.KnowsPasswords == true;
 
