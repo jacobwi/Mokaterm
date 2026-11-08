@@ -16,6 +16,21 @@
 		:root {
 			--mt-top-bar-height: 48px;
 		}
+
+		/* Boot's look on a popover, which is what puts it above dialogs and everything else in the top layer. */
+		#mt-closing {
+			width: 100%;
+			max-width: none;
+			height: 100%;
+			max-height: none;
+			margin: 0;
+			padding: 0;
+			border: 0;
+		}
+
+		#mt-closing:not(:popover-open) {
+			display: none;
+		}
 	</style>
 </head>
 <body>
@@ -33,6 +48,16 @@
 				</div>
 				<div class="moka-boot-bar"><span></span></div>
 			</div>
+		</div>
+	</div>
+	<div id="mt-closing" class="moka-boot" popover="manual" role="status">
+		<div class="moka-boot-brand">
+			<div class="moka-boot-mark">mokaterm</div>
+			<div class="moka-boot-subtitle">
+				<span class="moka-boot-pulse"></span>
+				<span>closing</span>
+			</div>
+			<div class="moka-boot-bar"><span></span></div>
 		</div>
 	</div>
 	<div id="blazor-error-ui" style="display:none">

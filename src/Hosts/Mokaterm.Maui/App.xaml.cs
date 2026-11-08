@@ -34,14 +34,15 @@ public partial class App : Application
 		return window;
 	}
 
-	// Blocks the UI thread on purpose, because the page's sessions are otherwise only closed by a disposal the exiting
-	// process does not wait for (see DesktopSessions). Nothing of that work needs this thread back, and it carries its
-	// own deadline, so the wait cannot outlast it. Tool windows go first: they borrow this window's services, and the
-	// app would otherwise keep running in them after its main window is gone.
+	// After a close through the window's button MainWindowClose has already done this work and the wait is over at once.
+	// Other ways out arrive here first, and block the UI thread on purpose, because the page's sessions are otherwise only
+	// closed by a disposal the exiting process does not wait for (see DesktopSessions). Nothing of that work needs this
+	// thread back, and it carries its own deadline, so the wait cannot outlast it. Tool windows go first: they borrow this
+	// window's services, and the app would otherwise keep running in them after its main window is gone.
 	private void OnWindowDestroying(object? sender, EventArgs e)
 	{
 		_toolWindows.CloseEverything();
-		_sessions.ShutDownAsync().Wait();
+		_sessions.ShutDownOnceAsync().Wait();
 
 #if WINDOWS
 		// On the thread that registered, as the Windows App SDK asks: a click after this starts the app again.

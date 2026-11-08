@@ -111,6 +111,8 @@ public static class MauiProgram
 		// And that target itself, which is what makes an external drop arrive at all: WinUI refuses one before any
 		// drag event reaches the WebView's content (microsoft-ui-xaml#10142). One window, so one target.
 		builder.Services.AddSingleton<Platforms.Windows.NativeFileDrop>();
+		builder.Services.AddSingleton<Platforms.Windows.MainWindowClose>();
+		builder.Services.AddSingleton<Platforms.Windows.MainWindowPlacement>();
 
 #if !MOKATERM_PACKAGED
 		// Updates, and the page that drives them, belong to a host that can replace its own files: the web host must
@@ -164,6 +166,8 @@ public static class MauiProgram
 			IServiceProvider? services = window.GetWindow()?.Handler?.MauiContext?.Services;
 			services?.GetService<Platforms.Windows.WindowChrome>()?.Attach(window);
 			services?.GetService<Platforms.Windows.NativeFileDrop>()?.Attach(window);
+			services?.GetService<Platforms.Windows.MainWindowClose>()?.Attach(window);
+			services?.GetService<Platforms.Windows.MainWindowPlacement>()?.Attach(window);
 
 			// Created here rather than on first use, so a click on a notification has somewhere to go from the start.
 			services?.GetService<Platforms.Windows.WindowsNotifications>()?.Attach(window);

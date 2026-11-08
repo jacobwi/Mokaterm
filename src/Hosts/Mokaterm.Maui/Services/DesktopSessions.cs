@@ -25,6 +25,7 @@ public sealed class DesktopSessions
 	private readonly Lock _lock = new();
 	private readonly List<Registration> _registrations = [];
 	private readonly ISettingsService _settings;
+	private Task? _windowClose;
 
 	public DesktopSessions(ISettingsService settings) => _settings = settings;
 
@@ -64,6 +65,12 @@ public sealed class DesktopSessions
 		Task clipboard = Report(ClearClipboardsAsync);
 		_ = await Task.WhenAny(Task.WhenAll(stop, flush, pages, clipboard), Task.Delay(ShutdownTimeout));
 	});
+
+	/// <summary>
+	/// The shutdown for the window's own close: started once, so the handler that destroys the window after a close that
+	/// already ran it does not run it again. Only the window's thread calls this.
+	/// </summary>
+	public Task ShutDownOnceAsync() => _windowClose ??= ShutDownAsync();
 
 	/// <summary>
 	/// Cancels every transfer and closes every session. Completes once the canceled transfers have stopped, which is
