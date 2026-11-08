@@ -1,3 +1,22 @@
+## What's new in 0.3.6
+
+**Desktop**
+
+- **Closing no longer freezes the window.** If ending your sessions takes a moment, a closing screen shows while it
+  happens.
+- **The main window opens where you left it**, at its size, and maximized if it was.
+- The top bar dims while the window is not the active one, the way Windows' own title bars do.
+
+**Appearance**
+
+- **Status bar styles**: Standard, Accent, Hairline, Floating, Chips, Segments and Terminal, in Settings, Appearance.
+- The current page in the System, Docker and plugin side menus uses the same highlight as the rest of the app.
+
+**System**
+
+- Fixed: Upgrade all skipped any update that needs a new package, which is every new kernel, and those stayed listed. It
+  now installs them too.
+
 ## What's new in 0.3.5
 
 **Docker**
