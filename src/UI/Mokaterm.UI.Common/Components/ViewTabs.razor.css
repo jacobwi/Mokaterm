@@ -3,10 +3,9 @@
 	min-width: 0;
 }
 
-/* Moka sizes these tabs for a page. A tool's side panel holds six or seven of them in a third of a dialog, so they take
-   a small button's height, which follows the density, and wrap rather than scroll a tab out of sight. */
+/* Moka sizes these tabs for a page. A tool's side panel holds six or seven of them in a third of a window, so they take
+   a small button's height, which follows the density. */
 .mt-view-tabs ::deep .moka-tabs--underline > .moka-tabs__list {
-	flex-wrap: wrap;
 	gap: 0 var(--moka-spacing-xs);
 }
 

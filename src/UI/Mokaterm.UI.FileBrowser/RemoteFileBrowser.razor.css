@@ -201,16 +201,8 @@
 	color: var(--moka-color-on-surface-variant);
 }
 
-/* Both sides of the footer give way with an ellipsis instead of running into each other: the counts take what the
-   account leaves, and the account never takes more than half. */
-.fb ::deep .fb-footer .moka-statusbar-start {
-	flex: 1 1 0;
-	overflow: hidden;
-}
-
+/* The account never takes more than half of the footer. */
 .fb ::deep .fb-footer .moka-statusbar-end {
-	flex: 0 1 auto;
-	min-width: 0;
 	max-width: 50%;
 }
 
