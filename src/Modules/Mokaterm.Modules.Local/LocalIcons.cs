@@ -1,4 +1,5 @@
 using Moka.Red.Core.Icons;
+using Moka.Red.Icons;
 
 namespace Mokaterm.Modules.Local;
 
@@ -13,9 +14,7 @@ internal static class LocalIcons
 	public static readonly MokaIconDefinition Shell = new("mt-local-shell",
 		"M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M8 21h8 M12 17v4 M6.5 7.5L9 10l-2.5 2.5 M11.5 12.5h5");
 
-	/// <summary>A box seen from a corner, for a shell in a Docker container.</summary>
-	public static readonly MokaIconDefinition Container = new("mt-local-container",
-		"M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z M12 12l8.5-4.75 M12 12v9.5 M12 12L3.5 7.25");
+	public static readonly MokaIconDefinition Container = MokaIcons.Content.Cube;
 
 	/// <summary>A seven sided wheel with its spokes, for a shell in a Kubernetes pod.</summary>
 	public static readonly MokaIconDefinition Pod = new("mt-local-pod",
