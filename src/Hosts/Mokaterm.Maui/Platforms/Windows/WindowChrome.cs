@@ -316,6 +316,21 @@ internal sealed class WindowChrome : IWindowChrome
 	{
 		UpdateInsets();
 		ApplyCaption(force: false);
+		MarkPageActive(args.WindowActivationState != WindowActivationState.Deactivated);
+	}
+
+	// The system dims its own caption buttons in a window that is not the active one; the page's bar beside them follows.
+	private void MarkPageActive(bool active)
+	{
+		try
+		{
+			string inactive = active ? "false" : "true";
+			_ = _webView?.CoreWebView2?.ExecuteScriptAsync($"document.documentElement.toggleAttribute('data-mt-window-inactive', {inactive})");
+		}
+		catch (COMException)
+		{
+			// The page is not there to mark: still starting up or already closing.
+		}
 	}
 
 	// While its template loads, and whenever its title bar row changes size, MAUI sets the window's drag rectangles from

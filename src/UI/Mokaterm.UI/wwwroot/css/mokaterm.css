@@ -130,6 +130,37 @@ body {
 	background-color: color-mix(in srgb, var(--moka-color-primary) 60%, transparent);
 }
 
+/* The status bar's muted greys and a machine's own colour are picked for a dark surface and vanish on the accent. */
+.moka-statusbar--accent .mt-status-group :not(.moka-tag, .moka-tag *) {
+	color: inherit !important;
+}
+
+/* Moka tints the first thing in the bar, which here is the wrapper around every item on the left. */
+.moka-statusbar.moka-statusbar--segments .moka-statusbar-start > .mt-status-group.mt-status-group-start {
+	background: none;
+	color: inherit;
+}
+
+.moka-statusbar--segments .mt-status-group-start > :first-child {
+	background: var(--moka-color-primary-bg);
+}
+
+/* Host and user names are case sensitive, so this look's capitals would show a name that does not exist. */
+.moka-statusbar--terminal .mt-status-group-start {
+	text-transform: none;
+}
+
+/* Windows dims the title bar of a window that is not the active one. The desktop host sets the mark. */
+.mt-shell-top > *,
+.mt-toolwin-top > * {
+	transition: opacity var(--moka-transition-fast);
+}
+
+html[data-mt-window-inactive] .mt-shell-top > *,
+html[data-mt-window-inactive] .mt-toolwin-top > * {
+	opacity: 0.55;
+}
+
 @supports not selector(::-webkit-scrollbar) {
 	.moka-root {
 		scrollbar-color: color-mix(in srgb, var(--moka-color-primary) 26%, transparent) transparent;

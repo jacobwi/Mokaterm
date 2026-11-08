@@ -685,12 +685,14 @@ public sealed class SettingsServiceTests
 				appearance => appearance with
 				{
 					ToolbarLayout = (SessionToolbarLayout)42,
+					StatusBarStyle = (StatusBarStyle)42,
 					HiddenToolbarButtons = ["find", " ", "find", " clear ", overlong, .. Enumerable.Range(0, 100).Select(i => $"b{i}")],
 				},
 				Ct);
 
 			AppearanceSettings saved = settings.Get<AppearanceSettings>();
 			Assert.Equal(SessionToolbarLayout.Grouped, saved.ToolbarLayout);
+			Assert.Equal(StatusBarStyle.Standard, saved.StatusBarStyle);
 			Assert.Equal(["find", "clear", "b0"], saved.HiddenToolbarButtons.Take(3));
 			Assert.Equal(AppearanceSettings.MaxHiddenToolbarButtons, saved.HiddenToolbarButtons.Count);
 			Assert.DoesNotContain(overlong, saved.HiddenToolbarButtons);

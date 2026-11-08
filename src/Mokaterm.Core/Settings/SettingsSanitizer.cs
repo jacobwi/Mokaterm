@@ -39,6 +39,7 @@ internal static class SettingsSanitizer
 			Mode = Defined(settings.Mode, defaults.Mode),
 			Density = Defined(settings.Density, defaults.Density),
 			ToolbarLayout = Defined(settings.ToolbarLayout, defaults.ToolbarLayout),
+			StatusBarStyle = Defined(settings.StatusBarStyle, defaults.StatusBarStyle),
 			HiddenToolbarButtons = ToolbarButtonIds(settings.HiddenToolbarButtons),
 		};
 	}

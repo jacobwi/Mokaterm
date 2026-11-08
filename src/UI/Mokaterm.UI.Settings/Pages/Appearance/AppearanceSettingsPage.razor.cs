@@ -34,6 +34,17 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		new(UiDensity.Comfortable, "Comfortable"),
 	];
 
+	private static readonly IReadOnlyList<EnumOption<StatusBarStyle>> StatusBarStyleOptions =
+	[
+		new(StatusBarStyle.Standard, "Standard"),
+		new(StatusBarStyle.Accent, "Accent"),
+		new(StatusBarStyle.Hairline, "Hairline"),
+		new(StatusBarStyle.Floating, "Floating"),
+		new(StatusBarStyle.Chips, "Chips"),
+		new(StatusBarStyle.Segments, "Segments"),
+		new(StatusBarStyle.Terminal, "Terminal"),
+	];
+
 	private static readonly IReadOnlyList<EnumOption<SessionToolbarLayout>> ToolbarLayoutOptions =
 	[
 		new(SessionToolbarLayout.Grouped, "Grouped", MokatermIcons.Tools),

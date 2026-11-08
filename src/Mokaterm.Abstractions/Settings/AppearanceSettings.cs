@@ -56,6 +56,9 @@ public sealed record AppearanceSettings : ISettingsSection
 
 	public bool ShowStatusBar { get; init; } = true;
 
+	/// <summary>How the status bar is drawn while it shows.</summary>
+	public StatusBarStyle StatusBarStyle { get; init; } = StatusBarStyle.Standard;
+
 	/// <summary>
 	/// Shows the CPU, memory and root disk use of the active session's machine in the status bar, for sessions that can
 	/// read them. Reading them runs a short command on that machine every <see cref="HostFiguresSeconds"/>.

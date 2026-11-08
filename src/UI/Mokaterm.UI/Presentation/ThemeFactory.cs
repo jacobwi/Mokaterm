@@ -27,6 +27,17 @@ internal static class ThemeFactory
 			_ => theme,
 		};
 
-		return theme.WithFontScale(usable.FontScale);
+		return theme.WithStatusBar(Look(usable.StatusBarStyle)).WithFontScale(usable.FontScale);
 	}
+
+	private static MokaStatusBarLook Look(StatusBarStyle style) => style switch
+	{
+		StatusBarStyle.Accent => MokaStatusBarLook.Accent,
+		StatusBarStyle.Hairline => MokaStatusBarLook.Hairline,
+		StatusBarStyle.Floating => MokaStatusBarLook.Floating,
+		StatusBarStyle.Chips => MokaStatusBarLook.Chips,
+		StatusBarStyle.Segments => MokaStatusBarLook.Segments,
+		StatusBarStyle.Terminal => MokaStatusBarLook.Terminal,
+		_ => MokaStatusBarLook.Standard,
+	};
 }

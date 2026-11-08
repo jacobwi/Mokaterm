@@ -57,6 +57,14 @@
 						ValueChanged="value => UpdateAsync(s => s with { ShowStatusBar = value })"
 						aria-label="Show status bar" />
 		</SettingsRow>
+		<SettingsRow Label="Status bar style" Description="How the bar is drawn: a filled bar, the accent colour, a thin line, floating, separate chips, joined segments or a terminal line.">
+			<EnumSegmentedControl TEnum="StatusBarStyle"
+								  Value="settings.StatusBarStyle"
+								  ValueChanged="value => UpdateAsync(s => s with { StatusBarStyle = value })"
+								  Options="StatusBarStyleOptions"
+								  Disabled="!settings.ShowStatusBar"
+								  AriaLabel="Status bar style" />
+		</SettingsRow>
 		<SettingsRow Label="Live host figures"
 					 Description="CPU, memory and root disk use of the active session's machine in the status bar, where the session can read them. Clicking them opens its System tool.">
 			<MokaSwitch Value="settings.ShowHostFigures"
