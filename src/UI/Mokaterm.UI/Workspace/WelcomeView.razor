@@ -242,7 +242,7 @@
 
 	// The detail wraps rather than being cut: what an action does is the point of the first-run tiles.
 	private RenderFragment ActionTile(MokaIconDefinition icon, string title, string? detail, string commandId, Action run, bool lead = false) =>
-		@<MokaCard Clickable NoPadding OnClick="run" Class="@(lead ? "mt-welcome-tile mt-welcome-tile--lead" : "mt-welcome-tile")">
+		@<MokaCard Clickable NoPadding OnClick="run" ActionLabel="@title" Class="@(lead ? "mt-welcome-tile mt-welcome-tile--lead" : "mt-welcome-tile")">
 			<div class="mt-welcome-tile-body">
 				<MokaAvatar Tile Icon="icon" SizeValue="@(detail is null ? "2rem" : "2.5rem")" Class="mt-welcome-tile-icon" />
 				<span class="mt-welcome-tile-text">

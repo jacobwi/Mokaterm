@@ -287,7 +287,7 @@
 }
 
 .mt-welcome-tiles ::deep .mt-welcome-tile:hover .mt-welcome-tile-icon,
-.mt-welcome-tiles ::deep .mt-welcome-tile:focus-visible .mt-welcome-tile-icon {
+.mt-welcome-tiles ::deep .mt-welcome-tile:has(.moka-card-action:focus-visible) .mt-welcome-tile-icon {
 	color: var(--moka-color-on-surface);
 }
 

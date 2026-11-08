@@ -258,7 +258,7 @@
 
 	private RenderFragment GaugeCard(string title, string label, double? value, string format, double min, double max, double? percent, string[] lines, Action open) => __builder =>
 	{
-		<MokaCard Outlined Elevation="0" Clickable OnClick="open" Class="mta-ov-card mta-ov-gauge" aria-label="@($"{label}: {(value is { } known ? known.ToString(format, CultureInfo.InvariantCulture) : "measuring")}")">
+		<MokaCard Outlined Elevation="0" Clickable OnClick="open" Class="mta-ov-card mta-ov-gauge" ActionLabel="@($"{label}: {(value is { } known ? known.ToString(format, CultureInfo.InvariantCulture) : "measuring")}")">
 			<MokaGauge Value="@(value ?? min)"
 					   Min="min"
 					   Max="max"
