@@ -1,3 +1,16 @@
+## What's new in 0.3.7
+
+**System**
+
+- **Updates Ubuntu is still rolling out are marked "Held by rollout"** on the Packages page, with a note saying why Upgrade
+  all leaves them for now. They install once your machine's turn comes.
+
+**Interface**
+
+- Tabs that do not fit in a narrow panel now go into a menu instead of wrapping onto a second row.
+
+Built on Moka.Red 0.3.16.
+
 ## What's new in 0.3.6
 
 **Desktop**
