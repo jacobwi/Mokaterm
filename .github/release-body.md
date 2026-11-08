@@ -1,3 +1,20 @@
+## What's new in 0.3.4
+
+**System and Docker**
+
+- **The System tool's Overview is a live dashboard**: gauges for CPU, load, memory and the root disk that open their
+  pages, charts that scroll as new readings come in, and tiles for uptime, failed services, updates and reboots. Detail
+  panels show their facts as tiles and lists, the sshd check and the reboot wait show their steps, and next cron runs and
+  failed logins are timelines.
+- **Docker's Stats page has live charts**: CPU and memory for the busiest containers, network and disk for all of them,
+  with rates in the table, and a row opens that container's charts. Inspect shows tiles and cards above the raw JSON, and
+  the Overview breaks containers and disk space into charts.
+
+**Plugins**
+
+- **The gallery's plugins were redesigned too.** Update Certificates, Developer Utilities, Kubernetes, Network Toolkit and
+  Password Generator from the Plugins page. Network Toolkit also fixes a Ping size field that could make a ping fail.
+
 ## What's new in 0.3.3
 
 **Plugins**
