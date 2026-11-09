@@ -1,4 +1,5 @@
 .fb {
+	--fb-scrollbar: 10px;
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -15,23 +16,50 @@
 	box-shadow: inset 0 2px 0 var(--moka-color-error);
 }
 
-/* The path row decides from the bar's own width, which is the browser's: a file panel beside a terminal can be narrow
-   in any window. */
-.fb ::deep .fb-nav {
-	container: fb-nav / inline-size;
+/* It fills a dock panel or a dialog, which can be shorter than the browser's own 20rem and draw the frame already. */
+.fb ::deep .moka-file-browser {
+	flex: 1;
+	min-height: 0;
+	border: none;
+	border-radius: 0;
+	background: transparent;
 }
 
-.fb-path {
-	flex: 1 1 0;
+.fb ::deep .moka-file-browser__bar {
+	gap: var(--moka-spacing-xxs);
+	padding-block: 0;
+	border-bottom-color: var(--moka-color-outline-variant);
+}
+
+/* The second row is only what ToolbarEnd holds: our own toolbar, an alert and the busy bar, each a full row. */
+.fb ::deep .moka-file-browser__bar + .moka-file-browser__bar {
+	position: relative;
+	padding: 0;
+	gap: 0;
+}
+
+.fb ::deep .moka-file-browser__bar + .moka-file-browser__bar > .moka-file-browser__grow {
+	display: none;
+}
+
+.fb ::deep .fb-actions {
+	flex: 1 1 100%;
 	min-width: 0;
-	display: flex;
-	align-items: center;
+}
+
+/* The browser's alert cannot name the folder or offer root, so the one in ToolbarEnd is shown from Load instead. */
+.fb ::deep .moka-file-browser__failure {
+	display: none;
+}
+
+.fb ::deep .moka-file-browser__path {
+	flex: 1 1 0;
 }
 
 /* Too narrow to share: the path takes a row of its own under the buttons, which Moka's toolbar wraps onto, and
    Refresh and Find stay at the end of the row above as they are beside a path that fits. */
-@container fb-nav (max-width: 32rem) {
-	.fb-path {
+@container moka-file-browser (max-width: 32rem) {
+	.fb ::deep .moka-file-browser__path {
 		order: 1;
 		flex-basis: 100%;
 	}
@@ -43,13 +71,13 @@
 
 /* Narrower still, Find would wrap onto a row of its own above the path. It stays in the More actions menu, which a
    browser this narrow always shows, and on Ctrl+Shift+F. */
-@container fb-nav (max-width: 17rem) {
+@container moka-file-browser (max-width: 17rem) {
 	.fb ::deep .fb-find {
 		display: none;
 	}
 }
 
-.fb-crumbs {
+.fb ::deep .fb-crumbs {
 	flex: 1;
 	min-width: 0;
 	align-self: stretch;
@@ -60,181 +88,199 @@
 }
 
 /* The hint and the well fill the strip, so the empty part that takes a typed path explains itself too. */
-.fb-crumbs ::deep .fb-crumbs-hint,
-.fb-crumbs ::deep .moka-breadcrumb {
+.fb ::deep .fb-crumbs .fb-crumbs-hint,
+.fb ::deep .fb-crumbs .moka-breadcrumb {
 	flex: 1;
 	min-width: 0;
 }
 
 /* The root crumb sits outside the scroller, so a long path never scrolls it away. Moka's gap after it is made for a
    chip and would set the first slash apart from the rest of the path. */
-.fb-crumbs ::deep .moka-breadcrumb--path > .moka-breadcrumb__root {
+.fb ::deep .fb-crumbs .moka-breadcrumb--path > .moka-breadcrumb__root {
 	margin-inline-end: 0;
 	color: var(--moka-color-on-surface-variant);
 }
 
-.fb-crumbs-copy {
+.fb ::deep .fb-crumbs-copy {
 	display: inline-flex;
 	flex-shrink: 0;
 }
 
-.fb-crumb {
+.fb ::deep .fb-crumb {
 	cursor: pointer;
 	white-space: nowrap;
 	transition: color var(--moka-transition-fast);
 }
 
-.fb-crumb--root {
+.fb ::deep .fb-crumb--root {
 	padding: var(--moka-spacing-xxs);
 }
 
-.fb-crumb--current {
+.fb ::deep .fb-crumb--current {
 	color: var(--moka-color-on-surface);
 }
 
 /* Moka's look for a link in a path, which these crumbs are without an address to go to. */
-.fb-crumb:hover {
+.fb ::deep .fb-crumb:hover {
 	color: var(--moka-color-on-surface);
 	text-decoration: underline dotted var(--moka-color-on-surface-tertiary);
 }
 
 /* Grows from nothing rather than from a width of its own, so the buttons beside it stay on the row. Moka's toolbar holds
    a field at 8rem, which in a narrow panel would drop the buttons first. */
-.fb-filter {
+.fb ::deep .fb-filter {
 	flex: 1 1 0;
 	min-width: 88px !important;
 	max-width: 280px;
 }
 
-.fb-progress {
-	flex-shrink: 0;
+.fb ::deep .fb-progress {
+	position: absolute;
+	inset-inline: 0;
+	bottom: -1px;
 	height: 2px;
 	overflow: hidden;
 }
 
-.fb-progress ::deep .moka-progress-track {
+.fb ::deep .fb-progress .moka-progress-track {
 	height: 2px;
 	border-radius: 0;
 	background: transparent;
 }
 
-.fb-alert {
-	padding: var(--moka-spacing-xs) var(--moka-spacing-sm) 0;
+.fb ::deep .fb-alert {
+	flex: 1 1 100%;
+	min-width: 0;
+	padding: var(--moka-spacing-xs) var(--moka-spacing-sm);
 }
 
-.fb-alert-body {
+.fb ::deep .fb-alert-body {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--moka-spacing-sm);
 }
 
-.fb-list {
-	position: relative;
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
+.fb ::deep .fb-skeleton {
+	justify-self: stretch;
+	align-self: start;
 }
 
-.fb-state {
-	flex: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+/* The app styles its scrollbars with ::-webkit-scrollbar, which Chromium ignores on an element with scrollbar-color. */
+.fb ::deep .moka-file-browser__list {
+	scrollbar-color: auto;
+	scrollbar-gutter: stable;
+	outline: none;
 }
 
-/* The table fills the list, so its scrollbars sit at the edges of the list instead of under the last row. */
-.fb-list ::deep .moka-table-wrapper,
-.fb-list ::deep .moka-table-container {
-	flex: 1;
-	min-height: 0;
+/* The heading row sits outside the list that scrolls, so it has to leave the same room as the list's scrollbar. */
+.fb ::deep .moka-file-browser__head::after {
+	content: "";
+	flex: none;
+	width: var(--fb-scrollbar);
+	margin-inline-start: calc(var(--moka-spacing-xl) * -2);
 }
 
-/* Fixed layout gives the name column whatever the sized columns leave, and long names truncate instead of widening it. */
-.fb-list ::deep .moka-table {
-	table-layout: fixed;
+/* The same heading and row the app's tables have, in step with Density through the cell padding. */
+.fb ::deep .moka-file-browser__head,
+.fb ::deep .moka-file-browser__row {
+	column-gap: calc(var(--moka-spacing-xl) * 2);
 }
 
-/* The cell's content takes over the theme's cell padding, so a click anywhere in a row reaches a handler that sees
-   modifier keys. Moka's state and skeleton cells keep their own padding, which they set as important. */
-.fb .fb-list ::deep .moka-table tbody td {
-	padding: 0;
-	user-select: none;
-}
-
-.fb-list ::deep tr.fb-drop-target > td {
-	background: var(--moka-color-primary-glow);
-	box-shadow: inset 0 1px 0 var(--moka-color-primary-border), inset 0 -1px 0 var(--moka-color-primary-border);
-}
-
-.fb-cell {
+.fb ::deep .moka-file-browser__head {
 	padding: var(--moka-cell-padding);
-	overflow: hidden;
+	background: transparent;
+	border-bottom-color: var(--moka-color-outline-variant);
+}
+
+.fb ::deep .moka-file-browser__row {
+	min-height: 0;
+	padding: var(--moka-cell-padding);
 	line-height: 16px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
-.fb-name {
-	display: flex;
-	align-items: center;
-	gap: var(--moka-spacing-sm);
+.fb ::deep .moka-file-browser__heading {
+	position: relative;
+	padding: 0;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
 }
 
-/* An error under the field may grow the row rather than be cut off. */
-.fb-name--renaming {
-	overflow: visible;
-	white-space: normal;
+/* The column the list is sorted by, the only heading with an arrow. */
+.fb ::deep .moka-file-browser__heading:has(svg) {
+	color: var(--moka-color-on-surface);
 }
 
-.fb-name--renaming ::deep .moka-inline-edit {
-	flex: 1;
+/* Where a column's edge can be taken. filebrowser.js does the dragging, since the browser's headings have no handle. */
+.fb ::deep .moka-file-browser__heading::after {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	right: -6px;
+	width: 12px;
+	cursor: col-resize;
 }
 
-/* The field is taller than the 16px line it replaces, and the cell's padding takes the difference so the row keeps its
-   height. A folder has no size text to hold the row open. */
-.fb-name--renaming ::deep .moka-inline-edit__field {
-	margin-block: -4px;
-}
-
-.fb-name-text,
-.fb-link {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
+.fb ::deep .moka-file-browser__heading:last-child::after {
+	right: 0;
+	width: 6px;
 }
 
 /* The name keeps its room first; the link target takes what is left. */
-.fb-name-text {
+.fb ::deep .moka-file-browser__name {
 	flex-shrink: 0;
 	max-width: 100%;
 }
 
-.fb-link {
+.fb ::deep .fb-link {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-mono);
 	color: var(--moka-color-on-surface-variant);
 }
 
+.fb ::deep .fb-mono {
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-mono);
+}
+
+.fb ::deep .fb-name--renaming {
+	flex: 1;
+	min-width: 0;
+}
+
+.fb ::deep .fb-name--renaming .moka-inline-edit {
+	flex: 1;
+}
+
+/* The field is taller than the 16px line it replaces, and the row's padding takes the difference so the row keeps its
+   height. A folder has no size text to hold the row open. */
+.fb ::deep .fb-name--renaming .moka-inline-edit__field {
+	margin-block: -4px;
+}
+
 /* The account never takes more than half of the footer. */
-.fb ::deep .fb-footer .moka-statusbar-end {
+.fb ::deep .moka-file-browser__status .moka-statusbar-end {
 	max-width: 50%;
 }
 
-.fb ::deep .fb-footer .moka-statusbar-item,
-.fb ::deep .fb-footer .moka-statusbar-item-tooltip {
+.fb ::deep .moka-file-browser__status .moka-statusbar-item,
+.fb ::deep .moka-file-browser__status .moka-statusbar-item-tooltip {
 	min-width: 0;
 }
 
 /* Moka's tag may wrap anywhere on the new design, which in a row that gives way puts one letter on each line. */
-.fb ::deep .fb-footer .moka-tag {
+.fb ::deep .moka-file-browser__status .moka-tag {
 	flex-shrink: 0;
 	white-space: nowrap;
 	overflow-wrap: normal;
 }
 
-.fb-account {
+.fb ::deep .fb-account {
 	display: block;
 	max-width: 24ch;
 	overflow: hidden;

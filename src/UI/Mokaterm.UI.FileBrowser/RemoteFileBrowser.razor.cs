@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Moka.Red.Core.Icons;
-using Moka.Red.Data.Table;
+using Moka.Red.Data.FileBrowser;
 using Moka.Red.Feedback.Dialog;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Diagnostics;
@@ -34,33 +34,20 @@ namespace Mokaterm.UI.FileBrowser;
 /// </summary>
 public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 {
-	// Beyond this many rows the table renders only the rows on screen.
-	private const int VirtualizeThreshold = 300;
-
-	// A first guess for the virtualized rows, which Virtualize corrects from the rows it draws: the 16px line of the cell
-	// content, the theme's 9px cell padding above and below, and the 1px border.
-	private const float RowHeight = 35;
-
 	// Widths in CSS pixels where the browser reaches BrowserWidth.Medium and BrowserWidth.Wide. Medium fits the name,
 	// size and modified columns, Wide every column, each at its set width.
 	private static readonly int[] WidthSteps = [440, 740];
 
+	private static readonly MokaFileFitWidths ColumnFit = new(Medium: WidthSteps[0] / 16.0, Wide: WidthSteps[1] / 16.0);
+
+	private static readonly IReadOnlySet<string> NothingSelected = new HashSet<string>(StringComparer.Ordinal);
+
 	private const string UserMode = "user";
 	private const string RootMode = "root";
-	private const string ToolbarStyle = "border-bottom:1px solid var(--moka-color-outline-variant)";
 
 	private static readonly string[] InitialDirectoryOptions = ["ssh.initialDirectory", "ftp.initialDirectory"];
 
-	private static readonly Func<RemoteFileEntry, object> EntryKey = entry => entry.Path;
-	private static readonly Func<RemoteFileEntry, object?> NameField = entry => entry.Name;
-	private static readonly Func<RemoteFileEntry, object?> SizeField = entry => entry.Size;
-	private static readonly Func<RemoteFileEntry, object?> ModifiedField = entry => entry.LastModified;
-	private static readonly Func<RemoteFileEntry, object?> PermissionsField = entry => entry.Permissions;
-	private static readonly Func<RemoteFileEntry, object?> OwnerField = EntryOrdering.OwnerLabel;
-
 	private readonly CancellationTokenSource _lifetime = new();
-	private readonly EntrySelection _selection = new();
-	private readonly NavigationHistory _history = new();
 
 	private ElementReference _root;
 	private DotNetObjectReference<FileBrowserJsReceiver>? _receiver;
@@ -77,20 +64,30 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private IRemoteFileSystem? _rootFileSystem;
 	private IRemoteFileSystem? _fileSystem;
 	private CancellationTokenSource? _connection;
-	private CancellationTokenSource? _load;
 	private bool _opening;
 	private string? _openError;
 
 	private string _path = RemotePath.Root;
 	private bool _loaded;
-	private bool _loading;
+	private bool _loadingStart;
 	private IReadOnlyList<RemoteFileEntry> _entries = [];
 	private DirectoryView _view = DirectoryView.Empty;
-	private HashSet<RemoteFileEntry> _selectedItems = [];
-	private string? _sortColumn = EntryOrdering.NameColumn;
-	private MokaSortDirection _sortDirection = MokaSortDirection.Ascending;
-	private bool _foldersFirst = true;
+	private IReadOnlySet<string> _selected = NothingSelected;
+	private MokaFileView _sort = new();
+	private bool _showHidden;
 	private string _filter = "";
+
+	private MokaFileBrowser<RemoteFileEntry>? _browser;
+	private MokaFileBrowserText _text = new();
+	private int _mount;
+
+	// The listing that decided the start folder, for the browser mounted on it to show without reading it again.
+	private (string Folder, IReadOnlyList<RemoteFileEntry> Entries)? _firstListing;
+
+	// What a listing of another folder brought, until the browser says it moved there.
+	private IReadOnlyList<RemoteFileEntry>? _arrivingListing;
+	private PendingNavigation? _navigation;
+	private string? _refreshSelect;
 
 	private BrowserAlert? _alert;
 	private int _busy;
@@ -102,7 +99,6 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private string _pathText = "";
 
 	// Work for the next OnAfterRenderAsync, once the DOM matches the new state.
-	private int? _scrollToIndex;
 	private bool _restoreFocus;
 	private string? _focusSelector;
 
@@ -172,8 +168,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	/// <summary>A file system is open and a listing is on screen.</summary>
 	private bool CanBrowse => _fileSystem is not null && _loaded;
 
-	// The table draws placeholder rows in its own columns until a connection's first listing arrives.
-	private bool IsFirstListing => _fileSystem is not null && !_loaded && _loading;
+	private bool IsFirstListing => _fileSystem is not null && !_loaded && _loadingStart;
 
 	private bool ShowsList => CanBrowse || IsFirstListing;
 
@@ -189,7 +184,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private bool CanElevate => _feature?.SupportsElevation == true;
 
-	private bool IsBusy => _loading || _opening || _switchingMode || _busy > 0;
+	// The browser draws its own bar for the folders it loads; this one is for everything else.
+	private bool IsBusy => _loadingStart || _opening || _switchingMode || _busy > 0;
 
 	private bool ShowHidden => Settings.Get<FileTransferSettings>().ShowHiddenFiles;
 
@@ -198,7 +194,17 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private TransferOrigin Origin => new(Source.Group, Source.Location);
 
-	private List<RemoteFileEntry> SelectedEntries => _selection.SelectedIn(_view);
+	private List<RemoteFileEntry> SelectedEntries => [.. _view.Entries.Where(entry => _selected.Contains(entry.Path))];
+
+	private IReadOnlyList<MokaFileCrumb> Crumbs => [.. RemotePath.GetSegments(_path).Select(segment => new MokaFileCrumb(segment.Path, segment.Name))];
+
+	private MokaFileControls ShownControls =>
+		MokaFileControls.Back | MokaFileControls.Up | MokaFileControls.Path | MokaFileControls.Refresh | (IsNarrow ? MokaFileControls.None : MokaFileControls.Forward);
+
+	// The rest of the keys are in filebrowser.js, which needs them with other modifiers than the browser's or for operations of ours.
+	private MokaFileKeys TakenKeys => CanBrowse
+		? MokaFileKeys.Move | MokaFileKeys.Toggle | MokaFileKeys.SelectAll | MokaFileKeys.History | MokaFileKeys.Filter
+		: MokaFileKeys.None;
 
 	private string RootClass => $"fb{(IsElevated ? " fb--root" : "")} {Class}".TrimEnd();
 
@@ -218,6 +224,11 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	{
 		get
 		{
+			if (!CanBrowse)
+			{
+				return "";
+			}
+
 			string shown = _view.Count == 1 ? "1 item" : string.Create(CultureInfo.CurrentCulture, $"{_view.Count:N0} items");
 			int notShown = _entries.Count - _view.Count;
 			return notShown > 0 ? string.Create(CultureInfo.CurrentCulture, $"{shown}, {notShown:N0} not shown") : shown;
@@ -246,7 +257,6 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 		Settings.Changed -= OnSettingsChanged;
 		Bookmarks.Changed -= OnBookmarksChanged;
-		_load?.Cancel();
 		CancelConnection();
 		_lifetime.Cancel();
 		CloseAlert();
@@ -274,7 +284,15 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_receiver = DotNetObjectReference.Create(new FileBrowserJsReceiver(this));
 		Settings.Changed += OnSettingsChanged;
 		Bookmarks.Changed += OnBookmarksChanged;
-		_foldersFirst = Settings.Get<FileTransferSettings>().FoldersFirst;
+		_text = new MokaFileBrowserText
+		{
+			Label = "Remote files",
+			ItemCount = _ => ItemCountText,
+			FilteredCount = (_, _) => ItemCountText,
+			SelectedCount = _ => SelectionText,
+			NoMatches = _ => NoMatchesText,
+		};
+		ReadViewSettings();
 	}
 
 	protected override void OnParametersSet()
@@ -326,12 +344,6 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		{
 			_focusSelector = null;
 			await _jsHandle.TryInvokeVoidAsync("focus", selector);
-		}
-
-		if (_scrollToIndex is { } index)
-		{
-			_scrollToIndex = null;
-			await _jsHandle.TryInvokeVoidAsync("scrollToRow", index);
 		}
 
 		if (_restoreFocus)
@@ -438,13 +450,15 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_openError = null;
 		_path = RemotePath.Root;
 		_loaded = false;
-		_loading = false;
+		_loadingStart = false;
 		_entries = [];
 		_filter = "";
 		_editingPath = false;
 		_dragOver = false;
-		_history.Clear();
-		_selection.Reset();
+		_selected = NothingSelected;
+		_firstListing = null;
+		_arrivingListing = null;
+		_mount++;
 		_clipboard = null;
 		_pendingTerminalFolder = null;
 		_terminalHome = null;
@@ -456,7 +470,6 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private void CancelConnection()
 	{
-		_load?.Cancel();
 		if (_connection is not null)
 		{
 			_connection.Cancel();
@@ -490,11 +503,17 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		_terminalHome = null;
 		_opening = false;
 		_openError = null;
-		_loading = false;
+		_loadingStart = false;
 		_dragOver = false;
 		_editingPath = false;
 		_renamingPath = null;
 		StateHasChanged();
+
+		// A listing that was on its way waits to be replaced, since the connection it needed is gone.
+		if (_browser is { IsBusy: true } browser)
+		{
+			await browser.ReloadAsync();
+		}
 
 		if (live is not null && _feature is not null)
 		{
@@ -550,6 +569,10 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		if (_loaded)
 		{
 			await RefreshAsync();
+
+			// The browser dropped the selection while the list was hidden.
+			_selected = new HashSet<string>(_selected, StringComparer.Ordinal);
+			StateHasChanged();
 		}
 		else
 		{
@@ -597,8 +620,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 			if (resolved is { } startPath)
 			{
-				LoadOutcome outcome = await LoadAsync(fileSystem, startPath, select: null);
-				if (outcome.Error is not { } startError)
+				if (await ListStartAsync(fileSystem, startPath) is not { } startError)
 				{
 					return;
 				}
@@ -623,8 +645,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			home = RemotePath.Root;
 		}
 
-		LoadOutcome homeOutcome = await LoadAsync(fileSystem, home, select: null);
-		if (homeOutcome.Error is { } error)
+		if (await ListStartAsync(fileSystem, home) is { } error)
 		{
 			ShowAlert("Could not open " + home, error, _ => RefreshAsync());
 		}
@@ -648,124 +669,156 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 	}
 
-	/// <summary>
-	/// Lists <paramref name="path"/> and shows it. A newer load or a new connection supersedes this one, which then
-	/// changes nothing. Returns the failure for the caller to report.
-	/// </summary>
-	private async Task<LoadOutcome> LoadAsync(IRemoteFileSystem fileSystem, string path, string? select)
+	// The browser is mounted only once this listed: it cannot forget a folder, and one it started on before the real start
+	// was known would be offered to Back.
+	private async Task<Exception?> ListStartAsync(IRemoteFileSystem fileSystem, string path)
 	{
-		_load?.Cancel();
-		using CancellationTokenSource load = CancellationTokenSource.CreateLinkedTokenSource(ConnectionToken);
-		_load = load;
-		_loading = true;
+		CancellationToken token = ConnectionToken;
+		_loadingStart = true;
 		StateHasChanged();
 		try
 		{
-			IReadOnlyList<RemoteFileEntry> entries = await fileSystem.ListAsync(path, load.Token);
-			if (load.IsCancellationRequested || !ReferenceEquals(fileSystem, _fileSystem))
+			IReadOnlyList<RemoteFileEntry> entries = await fileSystem.ListAsync(path, token);
+			if (token.IsCancellationRequested || !ReferenceEquals(fileSystem, _fileSystem))
 			{
-				return LoadOutcome.Superseded;
+				return null;
 			}
 
-			bool moved = !_loaded || _path != path;
-			if (moved)
-			{
-				_selection.Reset();
-				_filter = "";
-			}
-
-			_path = path;
+			_firstListing = (path, entries);
 			_entries = entries;
+			_path = path;
 			_loaded = true;
+			_selected = NothingSelected;
+			_filter = "";
 			RebuildView();
-			if (select is not null)
-			{
-				Reveal(select);
-			}
-
-			if (moved && FolderChanged.HasDelegate)
+			_mount++;
+			if (FolderChanged.HasDelegate)
 			{
 				await FolderChanged.InvokeAsync(path);
 			}
 
-			return LoadOutcome.Loaded;
+			return null;
 		}
 		catch (Exception ex)
 		{
-			return load.IsCancellationRequested || !ReferenceEquals(fileSystem, _fileSystem)
-				? LoadOutcome.Superseded
-				: LoadOutcome.Failed(ex);
+			return token.IsCancellationRequested || !ReferenceEquals(fileSystem, _fileSystem) ? null : ex;
 		}
 		finally
 		{
-			if (ReferenceEquals(_load, load))
-			{
-				_load = null;
-				_loading = false;
-			}
-
+			_loadingStart = false;
 			StateHasChanged();
 		}
 	}
 
-	/// <param name="reportFailure">False for a move the user did not ask for here, which fails without an alert.</param>
-	private async Task NavigateAsync(string path, NavigationKind kind = NavigationKind.Push, string? select = null, bool reportFailure = true)
+	// The failure is shown from here because the browser's own alert cannot say which folder failed or offer root.
+	private async Task<IReadOnlyList<RemoteFileEntry>> LoadFolderAsync(string folder, CancellationToken cancellationToken)
 	{
-		if (_fileSystem is not { } fileSystem)
+		if (_firstListing is { } first && first.Folder == folder)
+		{
+			_firstListing = null;
+			return first.Entries;
+		}
+
+		if (_fileSystem is not { } fileSystem || !_loaded)
+		{
+			return _entries;
+		}
+
+		using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ConnectionToken);
+		try
+		{
+			IReadOnlyList<RemoteFileEntry> entries = await fileSystem.ListAsync(folder, linked.Token);
+			if (folder == _path)
+			{
+				_entries = entries;
+				RebuildView();
+			}
+			else
+			{
+				_arrivingListing = entries;
+			}
+
+			return entries;
+		}
+		catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+		{
+			if (ConnectionToken.IsCancellationRequested)
+			{
+				await Task.Delay(Timeout.Infinite, cancellationToken);
+			}
+
+			ReportLoadFailure(folder, ex);
+			throw;
+		}
+	}
+
+	private void ReportLoadFailure(string folder, Exception error)
+	{
+		if (folder == _path)
+		{
+			string? select = _refreshSelect;
+			ShowAlert("Could not refresh " + folder, error, _ => RefreshAsync(select));
+		}
+		else if (_navigation is { } navigation && navigation.Folder == folder && !navigation.ReportFailure)
+		{
+			Logger.LogDebug("A folder the browser was sent to could not be listed: {Error}", LogSafe.Describe(error));
+		}
+		else
+		{
+			string? select = _navigation?.Folder == folder ? _navigation.Select : null;
+			ShowAlert("Could not open " + folder, error, _ => NavigateAsync(folder, select));
+		}
+	}
+
+	private async Task OnFolderChangedAsync(string folder)
+	{
+		_path = folder;
+		if (_arrivingListing is { } entries)
+		{
+			_entries = entries;
+			_arrivingListing = null;
+		}
+
+		_filter = "";
+		_editingPath = false;
+		RebuildView();
+		CloseAlert();
+		_restoreFocus = true;
+		if (FolderChanged.HasDelegate)
+		{
+			await FolderChanged.InvokeAsync(folder);
+		}
+	}
+
+	private async Task NavigateAsync(string path, string? select = null, bool reportFailure = true)
+	{
+		if (_fileSystem is null || _browser is not { } browser)
 		{
 			return;
 		}
 
 		string target = RemotePath.Normalize(path);
-		string previous = _path;
-		bool hadListing = _loaded;
 		_editingPath = false;
-
-		LoadOutcome outcome = await LoadAsync(fileSystem, target, select);
-		if (outcome.Error is { } error)
+		if (target == _path)
 		{
-			if (reportFailure)
-			{
-				ShowAlert("Could not open " + target, error, _ => NavigateAsync(target, kind, select));
-			}
-			else
-			{
-				Logger.LogDebug("A folder the browser was sent to could not be listed: {Error}", LogSafe.Describe(error));
-			}
-
+			CloseAlert();
+			await RefreshAsync(select);
+			_restoreFocus = true;
 			return;
 		}
 
-		if (!outcome.IsLoaded)
+		_navigation = new PendingNavigation(target, select, reportFailure);
+		try
 		{
-			return;
+			await browser.NavigateAsync(target, select);
 		}
-
-		if (hadListing && previous != target)
+		finally
 		{
-			switch (kind)
-			{
-				case NavigationKind.Back:
-					_history.CompleteBack(previous);
-					break;
-				case NavigationKind.Forward:
-					_history.CompleteForward(previous);
-					break;
-				default:
-					_history.Push(previous);
-					break;
-			}
+			_navigation = null;
+			_restoreFocus = true;
+			StateHasChanged();
 		}
-
-		CloseAlert();
-		_restoreFocus = true;
 	}
-
-	private Task GoBackAsync() =>
-		_history.PeekBack() is { } path ? NavigateAsync(path, NavigationKind.Back, select: _path) : Task.CompletedTask;
-
-	private Task GoForwardAsync() =>
-		_history.PeekForward() is { } path ? NavigateAsync(path, NavigationKind.Forward, select: _path) : Task.CompletedTask;
 
 	private Task GoUpAsync() =>
 		CanBrowse && !RemotePath.IsRoot(_path) ? NavigateAsync(RemotePath.GetParent(_path), select: _path) : Task.CompletedTask;
@@ -799,7 +852,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	/// <summary>Lists the current folder again, keeping the selection.</summary>
 	private async Task RefreshAsync(string? select = null)
 	{
-		if (_fileSystem is not { } fileSystem)
+		if (_fileSystem is null)
 		{
 			return;
 		}
@@ -810,11 +863,17 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			return;
 		}
 
-		string path = _path;
-		LoadOutcome outcome = await LoadAsync(fileSystem, path, select);
-		if (outcome.Error is { } error)
+		if (_browser is not { } browser)
 		{
-			ShowAlert("Could not refresh " + path, error, _ => RefreshAsync(select));
+			return;
+		}
+
+		_refreshSelect = select;
+		await browser.ReloadAsync();
+		_refreshSelect = null;
+		if (select is not null)
+		{
+			await RevealAsync(select);
 		}
 	}
 
@@ -907,20 +966,17 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		return RemotePath.Normalize(trimmed.StartsWith('/') ? trimmed : RemotePath.Combine(basePath, trimmed));
 	}
 
-	private void RebuildView()
+	private void ReadViewSettings()
 	{
 		FileTransferSettings settings = Settings.Get<FileTransferSettings>();
-		_foldersFirst = settings.FoldersFirst;
-		bool sorted = _sortColumn is not null && _sortDirection != MokaSortDirection.None;
-		_view = DirectoryView.Build(
-			_entries,
-			settings.ShowHiddenFiles,
-			_filter,
-			sorted ? _sortColumn : null,
-			_sortDirection == MokaSortDirection.Descending,
-			_foldersFirst);
-		_selection.Retain(_view);
-		UpdateSelectedItems();
+		_showHidden = settings.ShowHiddenFiles;
+		_sort = _sort with { FoldersFirst = settings.FoldersFirst };
+	}
+
+	private void RebuildView()
+	{
+		ReadViewSettings();
+		_view = DirectoryView.Build(_entries, _showHidden, _filter, _sort.SortBy, _sort.Descending, _sort.FoldersFirst);
 
 		// Gone from the list (filtered out, deleted, another folder), so nothing can be typed into any more.
 		if (_view.IndexOf(_renamingPath) < 0)
@@ -929,20 +985,9 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 	}
 
-	// The table ignores changes made to the set it was given, so every change hands it a new one.
-	private void UpdateSelectedItems() => _selectedItems = [.. _selection.SelectedIn(_view)];
-
-	/// <summary>Selects <paramref name="path"/> when it is visible and scrolls to it after the next render.</summary>
-	private void Reveal(string path)
-	{
-		int index = _view.IndexOf(path);
-		if (index >= 0)
-		{
-			_selection.SelectOnly(path);
-			UpdateSelectedItems();
-			_scrollToIndex = index;
-		}
-	}
+	// The browser's own reveal would clear a filter hiding the row.
+	private Task RevealAsync(string path) =>
+		_browser is { } browser && _view.IndexOf(path) >= 0 ? browser.RevealAsync(path) : Task.CompletedTask;
 
 	private void OnFilterChanged(string value)
 	{
@@ -975,31 +1020,73 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		RebuildView();
 	}
 
-	// The table sorts with the column's comparer; the browser's view uses the same order, so row indexes line up.
-	private void OnSortColumnChanged(string? column)
+	// While the list is hidden the browser has dropped every row, and the selection only looks empty.
+	private void OnSelectedChanged(IReadOnlySet<string> selected)
 	{
-		_sortColumn = column;
+		if (ShowsList)
+		{
+			_selected = selected;
+		}
+	}
+
+	// A heading's third click puts the natural order back, which is the name going up.
+	private void OnViewChanged(MokaFileView view)
+	{
+		bool thirdClick = view.SortBy == _sort.SortBy && _sort.Descending && !view.Descending;
+		_sort = thirdClick ? view with { SortBy = MokaFileSort.Name } : view;
 		RebuildView();
 	}
 
-	private void OnSortDirectionChanged(MokaSortDirection direction)
+	private bool ShowsEntry(RemoteFileEntry entry) => ShowsList && (_showHidden || !entry.IsHidden);
+
+	private static string EntryPath(RemoteFileEntry entry) => entry.Path;
+
+	// Sizes and times are drawn by the columns, and a size given here would add a folder total to the status bar.
+	private static MokaFileInfo Describe(RemoteFileEntry entry) =>
+		new(entry.Path, entry.Name, entry.IsDirectoryLike, Icon: EntryVisuals.IconFor(entry), IconColor: EntryVisuals.ColorFor(entry));
+
+	private IReadOnlyList<MokaFileColumn<RemoteFileEntry>> ColumnList
 	{
-		_sortDirection = direction;
-		RebuildView();
+		get
+		{
+			(bool, bool) features = (HasFeature(RemoteFileSystemFeatures.Permissions), HasFeature(RemoteFileSystemFeatures.Ownership));
+			if (_columns is null || features != _columnFeatures)
+			{
+				_columnFeatures = features;
+				List<MokaFileColumn<RemoteFileEntry>> columns =
+				[
+					Column(EntryOrdering.SizeColumn, "Size", "--fb-col-size", "68px", PlainCell(EntryVisuals.SizeText)) with { Mono = true, Fit = MokaFileColumnFit.Always },
+					Column(EntryOrdering.ModifiedColumn, "Modified", "--fb-col-modified", "124px", MonoCell(entry => DisplayFormat.Timestamp(entry.LastModified))) with { Fit = MokaFileColumnFit.Medium },
+				];
+				if (features.Item1)
+				{
+					columns.Add(Column(EntryOrdering.PermissionsColumn, "Permissions", "--fb-col-permissions", "104px", MonoCell(EntryVisuals.PermissionsText)));
+				}
+
+				if (features.Item2)
+				{
+					columns.Add(Column(EntryOrdering.OwnerColumn, "Owner", "--fb-col-owner", "112px", MonoCell(EntryOrdering.OwnerLabel)));
+				}
+
+				_columns = columns;
+			}
+
+			return _columns;
+		}
 	}
 
-	private int CompareByName(RemoteFileEntry a, RemoteFileEntry b) => CompareBy(EntryOrdering.NameColumn, a, b);
+	// The width is a variable so a drag on the heading's edge (filebrowser.js) can change it without a render per move.
+	// The comparison falls back to the name itself, which the browser then turns around with the rest for a descending sort.
+	private static MokaFileColumn<RemoteFileEntry> Column(string id, string title, string widthVariable, string width, RenderFragment<RemoteFileEntry> cell) =>
+		new(id, title)
+		{
+			Cell = cell,
+			Compare = (a, b) => EntryOrdering.Compare(a, b, id, descending: false, foldersFirst: false),
+			Width = $"var({widthVariable}, {width})",
+		};
 
-	private int CompareBySize(RemoteFileEntry a, RemoteFileEntry b) => CompareBy(EntryOrdering.SizeColumn, a, b);
-
-	private int CompareByModified(RemoteFileEntry a, RemoteFileEntry b) => CompareBy(EntryOrdering.ModifiedColumn, a, b);
-
-	private int CompareByPermissions(RemoteFileEntry a, RemoteFileEntry b) => CompareBy(EntryOrdering.PermissionsColumn, a, b);
-
-	private int CompareByOwner(RemoteFileEntry a, RemoteFileEntry b) => CompareBy(EntryOrdering.OwnerColumn, a, b);
-
-	private int CompareBy(string column, RemoteFileEntry a, RemoteFileEntry b) =>
-		EntryOrdering.Compare(a, b, column, _sortDirection == MokaSortDirection.Descending, _foldersFirst);
+	private IReadOnlyList<MokaFileColumn<RemoteFileEntry>>? _columns;
+	private (bool, bool) _columnFeatures;
 
 	private bool HasFeature(RemoteFileSystemFeatures feature) => _fileSystem is not null && (_fileSystem.Features & feature) == feature;
 
@@ -1026,7 +1113,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			return new StateInfo(MokaIcons.Status.Warning, "Could not open files", _openError, CanRetry: true);
 		}
 
-		if (_fileSystem is null || _opening || _loading)
+		if (_fileSystem is null || _opening || _loadingStart)
 		{
 			return new StateInfo(MokatermIcons.FolderOpen, "Opening files...", null, CanRetry: false);
 		}
@@ -1034,21 +1121,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		return new StateInfo(MokatermIcons.FolderOpen, "No folder open", "The start folder could not be opened.", CanRetry: true);
 	}
 
-	private enum NavigationKind
-	{
-		Push,
-		Back,
-		Forward,
-	}
-
-	private readonly record struct LoadOutcome(bool IsLoaded, Exception? Error)
-	{
-		public static LoadOutcome Loaded => new(true, null);
-
-		public static LoadOutcome Superseded => new(false, null);
-
-		public static LoadOutcome Failed(Exception error) => new(false, error);
-	}
+	private sealed record PendingNavigation(string Folder, string? Select, bool ReportFailure);
 
 	private sealed record StateInfo(MokaIconDefinition Icon, string Title, string? Description, bool CanRetry);
 }

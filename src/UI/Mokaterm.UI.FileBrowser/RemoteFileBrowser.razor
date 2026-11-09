@@ -1,325 +1,277 @@
 @namespace Mokaterm.UI.FileBrowser
 
-@{
-	RenderFragment TextCell(RemoteFileEntry entry, string text) =>
-		@<div class="fb-cell" title="@text" draggable="true" @onclick="args => OnEntryClick(entry, args)" @ondblclick="() => OpenEntryAsync(entry)">@text</div>;
-
-	RenderFragment hiddenOnly =
-		@<MokaEmptyState Icon="MokaIcons.Toggle.EyeOff" Title="Only hidden items" Description="@HiddenOnlyText" Live="true">
-			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Toggle.Eye" OnClick="ToggleHiddenAsync">Show hidden files</MokaButton>
-		</MokaEmptyState>;
-}
-
 <div @ref="_root" class="@RootClass" style="@Style" tabindex="-1">
-	<MokaToolbar Dense Wrap Bordered="false" Rounded="MokaRounding.None" Class="fb-nav" Style="@ToolbarStyle">
-		<IconButton Icon="MokaIcons.Navigation.ArrowLeft"
-					Disabled="@(!CanBrowse || !_history.CanGoBack)" OnClick="GoBackAsync" Label="Back" Shortcut="Alt+Left"
-					Position="MokaTooltipPosition.BottomStart" />
-		@if (!IsNarrow)
-		{
-			<IconButton Icon="MokaIcons.Navigation.ArrowRight"
-						Disabled="@(!CanBrowse || !_history.CanGoForward)" OnClick="GoForwardAsync" Label="Forward" Shortcut="Alt+Right" />
-		}
-		<IconButton Icon="MokaIcons.Navigation.ArrowUp"
-					Disabled="@(!CanBrowse || RemotePath.IsRoot(_path))" OnClick="GoUpAsync" Label="Up" Shortcut="Backspace" />
-		<IconButton Icon="MokaIcons.Navigation.Home"
-					Disabled="@(_fileSystem is null)" OnClick="GoHomeAsync" Label="Home" />
-		@if (CanBookmark)
-		{
-			<IconButton Color="@(IsBookmarked ? MokaColor.Primary : MokaColor.Surface)"
-						Icon="@(IsBookmarked ? MokaIcons.Toggle.Star : MokaIcons.Toggle.StarOutline)"
-						Disabled="@(!CanBrowse)"
-						OnClick="ShowBookmarksMenuAsync"
-						Label="Bookmarks"
-						aria-haspopup="menu" />
-		}
-
-		<div class="fb-path">
-			@if (_editingPath)
+	<MokaFileBrowser @key="_mount"
+					 @ref="_browser"
+					 TItem="RemoteFileEntry"
+					 Load="LoadFolderAsync"
+					 Describe="Describe"
+					 Folder="@_path"
+					 FolderChanged="OnFolderChangedAsync"
+					 Crumbs="Crumbs"
+					 Selected="_selected"
+					 SelectedChanged="OnSelectedChanged"
+					 View="_sort"
+					 ViewChanged="OnViewChanged"
+					 Columns="ColumnList"
+					 FitWidths="ColumnFit"
+					 Text="_text"
+					 Filter="@_filter"
+					 FilterChanged="OnFilterChanged"
+					 ItemFilter="ShowsEntry"
+					 KeepListOnLoadFailure
+					 ReselectOnReturn
+					 Controls="ShownControls"
+					 Keys="TakenKeys"
+					 DragText="EntryPath"
+					 Move="MoveDraggedAsync"
+					 OnOpenFile="OpenEntryAsync"
+					 ItemMenu="ItemMenu"
+					 BackgroundMenu="BackgroundMenu">
+		<ToolbarControl Context="control">
+			@switch (control.Which)
 			{
-				<MokaTextField Value="@_pathText"
-							   ValueChanged="OnPathTextChanged"
-							   Size="MokaSize.Sm"
-							   Placeholder="/path/to/folder or ~"
-							   OnBlur="CancelPathEdit"
-							   Style="width:100%"
-							   spellcheck="false"
-							   autocomplete="off"
-							   data-path-editor="true"
-							   @onkeydown="OnPathKeyDownAsync" />
-			}
-			else if (_loaded)
-			{
-				@* The hint carries the whole path as well, since a long one scrolls its start out of the well: a title
-				   beside it would show twice. Moka's own copy button writes the clipboard itself, which would slip past
-				   the schedule that clears copied secrets, so the copy is ours. *@
-				<div class="fb-crumbs" @onclick="BeginPathEdit">
-					<Hint Text="@($"{_path} (click to type a path, Ctrl+L)")" Position="MokaTooltipPosition.BottomStart" Class="fb-crumbs-hint">
-						<MokaBreadcrumb @key="_path" Look="MokaBreadcrumbLook.Path">
-							<Root>
-								<span class="@RootCrumbClass" @onclick="() => NavigateAsync(RemotePath.Root)" @onclick:stopPropagation="true">/</span>
-							</Root>
-							<ChildContent>
-								@foreach (RemotePathSegment segment in FolderSegments)
-								{
-									<MokaBreadcrumbItem>
-										<span class="fb-crumb" @onclick="() => NavigateAsync(segment.Path)" @onclick:stopPropagation="true">@segment.Name</span>
-									</MokaBreadcrumbItem>
-								}
-							</ChildContent>
-						</MokaBreadcrumb>
-					</Hint>
-					<span class="fb-crumbs-copy" @onclick:stopPropagation="true">
-						<CopyButton Text="@_path" Label="Copy folder path" Position="MokaTooltipPosition.BottomEnd" />
-					</span>
-				</div>
-			}
-		</div>
-
-		<IconButton Icon="MokaIcons.Action.Refresh" Class="fb-refresh"
-					Disabled="@(_fileSystem is null)" OnClick="() => RefreshAsync()" Label="Refresh" Shortcut="F5" />
-		<IconButton Icon="MokaIcons.Action.Search" Class="fb-find"
-					Disabled="@(!CanBrowse)" OnClick="() => FindFilesAsync(_path)" Label="Find files" Shortcut="Ctrl+Shift+F"
-					Position="MokaTooltipPosition.BottomEnd" />
-	</MokaToolbar>
-
-	@* A narrow browser leaves the create and upload buttons to its More actions menu, so nothing there can drop out. *@
-	<MokaToolbar Dense Expandable Bordered="false" Rounded="MokaRounding.None" Style="@ToolbarStyle">
-		@if (!IsNarrow)
-		{
-			<MokaToolbarGroup Priority="-1">
-				<IconButton Icon="MokatermIcons.FolderPlus"
-							Disabled="@(!CanBrowse)" OnClick="CreateFolderAsync" Label="New folder"
-							Position="MokaTooltipPosition.BottomStart" />
-				<IconButton Icon="MokatermIcons.FilePlus"
-							Disabled="@(!CanBrowse)" OnClick="CreateFileAsync" Label="New file" Shortcut="Shift+F4" />
-			</MokaToolbarGroup>
-			<MokaToolbarGroup Priority="-2">
-				<IconButton Icon="MokatermIcons.FileUpload"
-							Disabled="@(!CanBrowse)" OnClick="PickAndUploadFilesAsync" Label="Upload files" />
-				@if (LocalFiles.CanPickFolders)
-				{
-					<IconButton Icon="MokaIcons.Action.Upload"
-								Disabled="@(!CanBrowse)" OnClick="PickAndUploadFolderAsync" Label="Upload folder" />
-				}
-			</MokaToolbarGroup>
-			<MokaToolbarDivider />
-		}
-		<div class="fb-filter" data-moka-priority="3">
-			<MokaTextField Value="@_filter"
-						   ValueChanged="OnFilterChanged"
-						   Size="MokaSize.Sm"
-						   Placeholder="Filter"
-						   StartIcon="MokaIcons.Content.Filter"
-						   Clearable
-						   DebounceDelay="150"
-						   Disabled="@(!CanBrowse)"
-						   Style="width:100%"
-						   spellcheck="false"
-						   autocomplete="off"
-						   data-filter="true"
-						   @onkeydown="OnFilterKeyDown" />
-		</div>
-		<MokaToolbarGroup Priority="1">
-			<IconButton Variant="@(ShowHidden ? MokaVariant.Soft : MokaVariant.Text)"
-						Color="@(ShowHidden ? MokaColor.Primary : MokaColor.Surface)"
-						Icon="@(ShowHidden ? MokaIcons.Toggle.Eye : MokaIcons.Toggle.EyeOff)"
-						OnClick="ToggleHiddenAsync"
-						Label="@(ShowHidden ? "Hide hidden files" : "Show hidden files")"
-						AriaLabel="Show hidden files"
-						Pressed="ShowHidden" />
-			@if (CanFollowTerminal)
-			{
-				<IconButton Variant="@(FollowTerminal ? MokaVariant.Soft : MokaVariant.Text)"
-							Color="@(FollowTerminal ? MokaColor.Primary : MokaColor.Surface)"
-							Icon="MokaIcons.Content.Link"
-							OnClick="ToggleFollowTerminalAsync"
-							Label="@FollowTitle"
-							AriaLabel="Follow the terminal's folder"
-							Pressed="FollowTerminal" />
-			}
-		</MokaToolbarGroup>
-		@if (IsNarrow)
-		{
-			<MokaToolbarGroup Priority="2">
-				<IconButton Icon="MokaIcons.Navigation.MoreHorizontal"
-							Disabled="@(!CanBrowse)" OnClick="ShowActionsMenu" Label="More actions" aria-haspopup="menu"
-							Position="@(CanElevate ? MokaTooltipPosition.Bottom : MokaTooltipPosition.BottomEnd)" />
-				@if (CanElevate)
-				{
-					<IconButton Variant="@(ModeValue == RootMode ? MokaVariant.Soft : MokaVariant.Text)"
-								Color="@(ModeValue == RootMode ? MokaColor.Error : MokaColor.Surface)"
-								Icon="MokatermIcons.Root"
-								Disabled="@(_switchingMode || _fileSystem is null)"
-								OnClick="() => OnModeChangedAsync(IsElevated ? UserMode : RootMode)"
-								Label="Run as root"
-								Pressed="IsElevated"
-								Position="MokaTooltipPosition.BottomEnd" />
-				}
-			</MokaToolbarGroup>
-		}
-		else if (CanElevate)
-		{
-			<MokaSpacer />
-			<MokaToolbarGroup Priority="2">
-				<MokaSegmentedControl Size="MokaSize.Xs" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
-					<MokaSegment Value="@UserMode" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
-					<MokaSegment Value="@RootMode" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
-				</MokaSegmentedControl>
-			</MokaToolbarGroup>
-		}
-	</MokaToolbar>
-
-	<div class="fb-progress">
-		@if (IsBusy)
-		{
-			<MokaProgress />
-		}
-	</div>
-
-	@if (_alert is { } alert)
-	{
-		<div class="fb-alert">
-			<MokaAlert @key="alert" Severity="MokaToastSeverity.Error" Title="@alert.Title" Dense Closable OnClose="() => DismissAlert(alert)">
-				<div class="fb-alert-body">
-					<span>@alert.Message</span>
-					@if (alert.RetryAsRoot is not null)
+				case MokaFileControls.Back:
+					<IconButton Icon="MokaIcons.Navigation.ArrowLeft"
+								Disabled="@(!CanBrowse || !control.Enabled)" OnClick="control.Run!" Label="Back" Shortcut="Alt+Left"
+								Position="MokaTooltipPosition.BottomStart" />
+					break;
+				case MokaFileControls.Forward:
+					<IconButton Icon="MokaIcons.Navigation.ArrowRight"
+								Disabled="@(!CanBrowse || !control.Enabled)" OnClick="control.Run!" Label="Forward" Shortcut="Alt+Right" />
+					break;
+				case MokaFileControls.Up:
+					<IconButton Icon="MokaIcons.Navigation.ArrowUp"
+								Disabled="@(!CanBrowse || RemotePath.IsRoot(_path))" OnClick="GoUpAsync" Label="Up" Shortcut="Backspace" />
+					<IconButton Icon="MokaIcons.Navigation.Home"
+								Disabled="@(_fileSystem is null)" OnClick="GoHomeAsync" Label="Home" />
+					@if (CanBookmark)
 					{
-						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root"
-									OnClick="() => RetryAsRootAsync(alert)">Retry as root</MokaButton>
+						<IconButton Color="@(IsBookmarked ? MokaColor.Primary : MokaColor.Surface)"
+									Icon="@(IsBookmarked ? MokaIcons.Toggle.Star : MokaIcons.Toggle.StarOutline)"
+									Disabled="@(!CanBrowse)"
+									OnClick="ShowBookmarksMenuAsync"
+									Label="Bookmarks"
+									aria-haspopup="menu" />
 					}
+					break;
+				case MokaFileControls.Path:
+					@if (_editingPath)
+					{
+						<MokaTextField Value="@_pathText"
+									   ValueChanged="OnPathTextChanged"
+									   Size="MokaSize.Sm"
+									   Placeholder="/path/to/folder or ~"
+									   OnBlur="CancelPathEdit"
+									   Style="width:100%"
+									   spellcheck="false"
+									   autocomplete="off"
+									   data-path-editor="true"
+									   @onkeydown="OnPathKeyDownAsync" />
+					}
+					else if (_loaded)
+					{
+						@* The hint carries the whole path as well, since a long one scrolls its start out of the well: a title
+						   beside it would show twice. Moka's own copy button writes the clipboard itself, which would slip past
+						   the schedule that clears copied secrets, so the copy is ours. *@
+						<div class="fb-crumbs" @onclick="BeginPathEdit">
+							<Hint Text="@($"{_path} (click to type a path, Ctrl+L)")" Position="MokaTooltipPosition.BottomStart" Class="fb-crumbs-hint">
+								<MokaBreadcrumb @key="_path" Look="MokaBreadcrumbLook.Path">
+									<Root>
+										<span class="@RootCrumbClass" @onclick="() => NavigateAsync(RemotePath.Root)" @onclick:stopPropagation="true">/</span>
+									</Root>
+									<ChildContent>
+										@foreach (RemotePathSegment segment in FolderSegments)
+										{
+											<MokaBreadcrumbItem>
+												<span class="fb-crumb" @onclick="() => NavigateAsync(segment.Path)" @onclick:stopPropagation="true">@segment.Name</span>
+											</MokaBreadcrumbItem>
+										}
+									</ChildContent>
+								</MokaBreadcrumb>
+							</Hint>
+							<span class="fb-crumbs-copy" @onclick:stopPropagation="true">
+								<CopyButton Text="@_path" Label="Copy folder path" Position="MokaTooltipPosition.BottomEnd" />
+							</span>
+						</div>
+					}
+					break;
+				case MokaFileControls.Refresh:
+					<IconButton Icon="MokaIcons.Action.Refresh" Class="fb-refresh"
+								Disabled="@(_fileSystem is null)" OnClick="() => RefreshAsync()" Label="Refresh" Shortcut="F5" />
+					<IconButton Icon="MokaIcons.Action.Search" Class="fb-find"
+								Disabled="@(!CanBrowse)" OnClick="() => FindFilesAsync(_path)" Label="Find files" Shortcut="Ctrl+Shift+F"
+								Position="MokaTooltipPosition.BottomEnd" />
+					break;
+			}
+		</ToolbarControl>
+		<ToolbarEnd>
+			@* A narrow browser leaves the create and upload buttons to its More actions menu, so nothing there can drop out. *@
+			<MokaToolbar Dense Expandable Bordered="false" Rounded="MokaRounding.None" Class="fb-actions">
+				@if (!IsNarrow)
+				{
+					<MokaToolbarGroup Priority="-1">
+						<IconButton Icon="MokatermIcons.FolderPlus"
+									Disabled="@(!CanBrowse)" OnClick="CreateFolderAsync" Label="New folder"
+									Position="MokaTooltipPosition.BottomStart" />
+						<IconButton Icon="MokatermIcons.FilePlus"
+									Disabled="@(!CanBrowse)" OnClick="CreateFileAsync" Label="New file" Shortcut="Shift+F4" />
+					</MokaToolbarGroup>
+					<MokaToolbarGroup Priority="-2">
+						<IconButton Icon="MokatermIcons.FileUpload"
+									Disabled="@(!CanBrowse)" OnClick="PickAndUploadFilesAsync" Label="Upload files" />
+						@if (LocalFiles.CanPickFolders)
+						{
+							<IconButton Icon="MokaIcons.Action.Upload"
+										Disabled="@(!CanBrowse)" OnClick="PickAndUploadFolderAsync" Label="Upload folder" />
+						}
+					</MokaToolbarGroup>
+					<MokaToolbarDivider />
+				}
+				<div class="fb-filter" data-moka-priority="3">
+					<MokaTextField Value="@_filter"
+								   ValueChanged="OnFilterChanged"
+								   Size="MokaSize.Sm"
+								   Placeholder="Filter"
+								   StartIcon="MokaIcons.Content.Filter"
+								   Clearable
+								   DebounceDelay="150"
+								   Disabled="@(!CanBrowse)"
+								   Style="width:100%"
+								   spellcheck="false"
+								   autocomplete="off"
+								   data-moka-file-filter=""
+								   @onkeydown="OnFilterKeyDown" />
 				</div>
-			</MokaAlert>
-		</div>
-	}
-
-	<div class="fb-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
-		@if (!ShowsList)
-		{
-			StateInfo state = DescribeState();
-			<div class="fb-state">
+				<MokaToolbarGroup Priority="1">
+					<IconButton Variant="@(ShowHidden ? MokaVariant.Soft : MokaVariant.Text)"
+								Color="@(ShowHidden ? MokaColor.Primary : MokaColor.Surface)"
+								Icon="@(ShowHidden ? MokaIcons.Toggle.Eye : MokaIcons.Toggle.EyeOff)"
+								OnClick="ToggleHiddenAsync"
+								Label="@(ShowHidden ? "Hide hidden files" : "Show hidden files")"
+								AriaLabel="Show hidden files"
+								Pressed="ShowHidden" />
+					@if (CanFollowTerminal)
+					{
+						<IconButton Variant="@(FollowTerminal ? MokaVariant.Soft : MokaVariant.Text)"
+									Color="@(FollowTerminal ? MokaColor.Primary : MokaColor.Surface)"
+									Icon="MokaIcons.Content.Link"
+									OnClick="ToggleFollowTerminalAsync"
+									Label="@FollowTitle"
+									AriaLabel="Follow the terminal's folder"
+									Pressed="FollowTerminal" />
+					}
+				</MokaToolbarGroup>
+				@if (IsNarrow)
+				{
+					<MokaToolbarGroup Priority="2">
+						<IconButton Icon="MokaIcons.Navigation.MoreHorizontal"
+									Disabled="@(!CanBrowse)" OnClick="ShowActionsMenu" Label="More actions" aria-haspopup="menu"
+									Position="@(CanElevate ? MokaTooltipPosition.Bottom : MokaTooltipPosition.BottomEnd)" />
+						@if (CanElevate)
+						{
+							<IconButton Variant="@(ModeValue == RootMode ? MokaVariant.Soft : MokaVariant.Text)"
+										Color="@(ModeValue == RootMode ? MokaColor.Error : MokaColor.Surface)"
+										Icon="MokatermIcons.Root"
+										Disabled="@(_switchingMode || _fileSystem is null)"
+										OnClick="() => OnModeChangedAsync(IsElevated ? UserMode : RootMode)"
+										Label="Run as root"
+										Pressed="IsElevated"
+										Position="MokaTooltipPosition.BottomEnd" />
+						}
+					</MokaToolbarGroup>
+				}
+				else if (CanElevate)
+				{
+					<MokaSpacer />
+					<MokaToolbarGroup Priority="2">
+						<MokaSegmentedControl Size="MokaSize.Xs" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
+							<MokaSegment Value="@UserMode" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
+							<MokaSegment Value="@RootMode" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
+						</MokaSegmentedControl>
+					</MokaToolbarGroup>
+				}
+			</MokaToolbar>
+			@if (_alert is { } alert)
+			{
+				<div class="fb-alert">
+					<MokaAlert @key="alert" Severity="MokaToastSeverity.Error" Title="@alert.Title" Dense Closable OnClose="() => DismissAlert(alert)">
+						<div class="fb-alert-body">
+							<span>@alert.Message</span>
+							@if (alert.RetryAsRoot is not null)
+							{
+								<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokatermIcons.Root"
+											OnClick="() => RetryAsRootAsync(alert)">Retry as root</MokaButton>
+							}
+						</div>
+					</MokaAlert>
+				</div>
+			}
+			<div class="fb-progress">
+				@if (IsBusy)
+				{
+					<MokaProgress />
+				}
+			</div>
+		</ToolbarEnd>
+		<NameCell Context="cell">
+			@if (cell.Item.Path == _renamingPath)
+			{
+				@* The row opens a file on a double click and selects on a click, and the field needs both for itself. *@
+				<div class="fb-name--renaming" @onclick:stopPropagation="true" @ondblclick:stopPropagation="true">
+					<EntryRenameField Entry="cell.Item"
+									  TakenNames="TakenNames(except: cell.Item.Name)"
+									  Save="name => SaveRenameAsync(cell.Item, name)"
+									  Closed="EndRename" />
+				</div>
+			}
+			else
+			{
+				@cell.Name
+				@if (cell.Item.LinkTarget is { Length: > 0 } target)
+				{
+					<span class="fb-link" title="@target">&rarr; @target</span>
+				}
+			}
+		</NameCell>
+		<Empty Context="empty">
+			@if (!ShowsList)
+			{
+				StateInfo state = DescribeState();
 				<MokaEmptyState Icon="@state.Icon" Title="@state.Title" Description="@state.Description">
 					@if (state.CanRetry)
 					{
 						<MokaButton Size="MokaSize.Sm" StartIcon="MokatermIcons.Reconnect" OnClick="RetryOpenAsync">Try again</MokaButton>
 					}
 				</MokaEmptyState>
-			</div>
-		}
-		else
-		{
-			<MokaTable TItem="RemoteFileEntry"
-					   Items="_view.Entries"
-					   ItemKey="EntryKey"
-					   ShowToolbar="false"
-					   ShowPagination="false"
-					   Dense="true"
-					   FixedHeader="true"
-					   Height="100%"
-					   Style="border:none;border-radius:0;background:transparent"
-					   Virtualize="@(_view.Count > VirtualizeThreshold)"
-					   VirtualRowHeight="RowHeight"
-					   SelectedItems="_selectedItems"
-					   SortColumn="@_sortColumn"
-					   SortColumnChanged="OnSortColumnChanged"
-					   SortDirection="_sortDirection"
-					   SortDirectionChanged="OnSortDirectionChanged"
-					   OnRowClick="OnRowClick"
-					   OnRowContextMenu="ShowEntryMenu"
-					   Loading="IsFirstListing"
-					   EmptyIcon="@(IsFiltering ? MokaIcons.Content.Filter : MokatermIcons.FolderOpen)"
-					   EmptyTitle="@(IsFiltering ? "No matches" : "Empty folder")"
-					   EmptyText="@(IsFiltering ? NoMatchesText : "Drop files here to upload them.")"
-					   Empty="@(OnlyHiddenEntries ? hiddenOnly : null)">
-				<ChildContent>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.NameColumn" Field="NameField" SortComparer="CompareByName" MinWidth="120px">
-						<CellTemplate Context="entry">
-							@if (entry.Path == _renamingPath)
-							{
-								<div class="fb-cell fb-name fb-name--renaming"
-									 data-entry-path="@entry.Path"
-									 data-entry-directory="@(entry.IsDirectoryLike ? "true" : "false")">
-									<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Size="MokaSize.Sm" Color="@EntryVisuals.ColorFor(entry)" />
-									<EntryRenameField Entry="entry"
-													  TakenNames="TakenNames(except: entry.Name)"
-													  Save="name => SaveRenameAsync(entry, name)"
-													  Closed="EndRename" />
-								</div>
-							}
-							else
-							{
-								<div class="fb-cell fb-name"
-									 draggable="true"
-									 data-entry-path="@entry.Path"
-									 data-entry-directory="@(entry.IsDirectoryLike ? "true" : "false")"
-									 @onclick="args => OnEntryClick(entry, args)"
-									 @ondblclick="() => OpenEntryAsync(entry)">
-									<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Size="MokaSize.Sm" Color="@EntryVisuals.ColorFor(entry)" />
-									<span class="fb-name-text" title="@entry.Name">@entry.Name</span>
-									@if (entry.LinkTarget is { Length: > 0 } target)
-									{
-										<span class="fb-link" title="@target">&rarr; @target</span>
-									}
-								</div>
-							}
-						</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.SizeColumn" Field="SizeField" SortComparer="CompareBySize" Width="100px" Mono="true" Align="MokaTextAlign.Right">
-						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.SizeText(entry))</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.ModifiedColumn" Field="ModifiedField" SortComparer="CompareByModified" Width="156px" Mono="true"
-								Visible="@(_width >= BrowserWidth.Medium)">
-						<CellTemplate Context="entry">@TextCell(entry, DisplayFormat.Timestamp(entry.LastModified))</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.PermissionsColumn" Field="PermissionsField" SortComparer="CompareByPermissions" Width="136px" Mono="true"
-								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Permissions))">
-						<CellTemplate Context="entry">@TextCell(entry, EntryVisuals.PermissionsText(entry))</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="RemoteFileEntry" Title="@EntryOrdering.OwnerColumn" Field="OwnerField" SortComparer="CompareByOwner" Width="144px" Mono="true"
-								Visible="@(_width == BrowserWidth.Wide && HasFeature(RemoteFileSystemFeatures.Ownership))">
-						<CellTemplate Context="entry">@TextCell(entry, EntryOrdering.OwnerLabel(entry))</CellTemplate>
-					</MokaColumn>
-				</ChildContent>
-			</MokaTable>
-
-			@if (_dragOver)
+			}
+			else if (IsFirstListing)
 			{
-				<div class="fb-drop">
-					<MokaFlexbox Direction="MokaDirection.Column" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
-						<MokaIcon Icon="MokatermIcons.FileUpload" SizeValue="32px" Color="MokaColor.Primary" />
-						<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">Drop to upload</MokaText>
-						<MokaText Element="span" Size="MokaSize.Sm" Mono>@_path</MokaText>
-						@if (IsElevated)
-						{
-							<MokaTag Text="as root" Icon="MokatermIcons.Root" Color="MokaColor.Error" />
-						}
-						else
-						{
-							<MokaTag Text="@DropAccountText" Icon="MokatermIcons.User" />
-						}
-					</MokaFlexbox>
+				<div class="fb-skeleton">
+					<MokaSkeleton Lines="6" />
 				</div>
 			}
-		}
-	</div>
-
-	<MokaStatusBar Class="fb-footer" Style="position:static">
-		<StartContent>
-			@if (CanBrowse)
+			else if (IsFiltering)
 			{
-				<MokaStatusBarItem Text="@ItemCountText" />
-				@if (_selection.Count > 0)
-				{
-					<MokaStatusBarItem Text="@SelectionText" />
-				}
-				@* A narrow browser has no room beside the counts; Paste in the menus still says something is held. *@
-				@if (!IsNarrow && ClipboardText is { } held)
-				{
-					<MokaStatusBarItem Text="@held" Tooltip="Ctrl+V pastes them into the folder on screen" />
-				}
+				@empty.Default
 			}
-		</StartContent>
-		<EndContent>
+			else if (OnlyHiddenEntries)
+			{
+				<MokaEmptyState Icon="MokaIcons.Toggle.EyeOff" Title="Only hidden items" Description="@HiddenOnlyText" Live="true">
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" StartIcon="MokaIcons.Toggle.Eye" OnClick="ToggleHiddenAsync">Show hidden files</MokaButton>
+				</MokaEmptyState>
+			}
+			else
+			{
+				<MokaEmptyState Icon="MokatermIcons.FolderOpen" Title="Empty folder" Description="Drop files here to upload them." Live="true" />
+			}
+		</Empty>
+		<StatusEnd>
+			@* A narrow browser has no room beside the counts; Paste in the menus still says something is held. *@
+			@if (!IsNarrow && CanBrowse && ClipboardText is { } held)
+			{
+				<MokaStatusBarItem Text="@held" Tooltip="Ctrl+V pastes them into the folder on screen" />
+			}
 			@if (IsElevated)
 			{
 				<MokaTag Text="Root" Icon="MokatermIcons.Root" Color="MokaColor.Error" Size="MokaSize.Xs" />
@@ -330,6 +282,35 @@
 					<span class="fb-account">@AccountLabel</span>
 				</MokaStatusBarItem>
 			}
-		</EndContent>
-	</MokaStatusBar>
+		</StatusEnd>
+	</MokaFileBrowser>
+
+	@if (_dragOver)
+	{
+		<div class="fb-drop">
+			<MokaFlexbox Direction="MokaDirection.Column" Align="MokaAlign.Center" Gap="MokaSpacingScale.Sm">
+				<MokaIcon Icon="MokatermIcons.FileUpload" SizeValue="32px" Color="MokaColor.Primary" />
+				<MokaText Element="span" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">Drop to upload</MokaText>
+				<MokaText Element="span" Size="MokaSize.Sm" Mono>@_path</MokaText>
+				@if (IsElevated)
+				{
+					<MokaTag Text="as root" Icon="MokatermIcons.Root" Color="MokaColor.Error" />
+				}
+				else
+				{
+					<MokaTag Text="@DropAccountText" Icon="MokatermIcons.User" />
+				}
+			</MokaFlexbox>
+		</div>
+	}
 </div>
+
+@code {
+
+	private static RenderFragment<RemoteFileEntry> MonoCell(Func<RemoteFileEntry, string> text) => entry =>
+		@<span class="fb-mono" title="@text(entry)">@text(entry)</span>;
+
+	private static RenderFragment<RemoteFileEntry> PlainCell(Func<RemoteFileEntry, string> text) => entry =>
+		@<span title="@text(entry)">@text(entry)</span>;
+
+}

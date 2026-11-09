@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Web;
 using Moka.Red.ContextMenu;
-using Moka.Red.Core.Interactions;
+using Moka.Red.Data.FileBrowser;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.UI.Common.Icons;
@@ -12,44 +12,7 @@ namespace Mokaterm.UI.FileBrowser;
 // Pointer, keyboard and context menu input.
 public partial class RemoteFileBrowser
 {
-	// Set by an inner handler and read by an outer one for the same browser event: Blazor dispatches innermost first.
-	private bool _cellClickHandled;
-	private bool _entryMenuOpened;
-
-	private void OnEntryClick(RemoteFileEntry entry, MouseEventArgs args)
-	{
-		_cellClickHandled = true;
-		if (args.ShiftKey)
-		{
-			_selection.SelectRange(_view, entry.Path);
-		}
-		else if (args.CtrlKey || args.MetaKey)
-		{
-			_selection.Toggle(entry.Path);
-		}
-		else
-		{
-			_selection.SelectOnly(entry.Path);
-		}
-
-		UpdateSelectedItems();
-	}
-
-	// The table's row click carries no modifier keys. Clicks on cell content were handled above with theirs, so only a
-	// click that lands on a cell border selects from here.
-	private void OnRowClick(RemoteFileEntry entry)
-	{
-		if (_cellClickHandled)
-		{
-			_cellClickHandled = false;
-			return;
-		}
-
-		_selection.SelectOnly(entry.Path);
-		UpdateSelectedItems();
-	}
-
-	internal Task HandleKeyCommandAsync(string command, bool shift, int pageRows) => RunSafeAsync(async () =>
+	internal Task HandleKeyCommandAsync(string command, string? cursor) => RunSafeAsync(async () =>
 	{
 		if (_disposed || !IsActive || !CanBrowse || _editingPath)
 		{
@@ -59,32 +22,23 @@ public partial class RemoteFileBrowser
 		switch (command)
 		{
 			case "open":
-				await OpenSelectionAsync();
-				break;
-			case "toggle":
-				ToggleFocused();
+				await OpenSelectionAsync(cursor);
 				break;
 			case "up":
 				await GoUpAsync();
-				break;
-			case "back":
-				await GoBackAsync();
-				break;
-			case "forward":
-				await GoForwardAsync();
 				break;
 			case "refresh":
 				await RefreshAsync();
 				break;
 			case "rename":
-				if (FocusedOrOnlySelected() is { } entry)
+				if (FocusedOrOnlySelected(cursor) is { } entry)
 				{
 					BeginRename(entry);
 				}
 
 				break;
 			case "edit":
-				if (FocusedOrOnlySelected() is { IsDirectoryLike: false } file)
+				if (FocusedOrOnlySelected(cursor) is { IsDirectoryLike: false } file)
 				{
 					await EditAsync(file);
 				}
@@ -93,39 +47,17 @@ public partial class RemoteFileBrowser
 			case "delete":
 				await DeleteAsync(SelectedEntries);
 				break;
-			case "selectAll":
-				_selection.SelectAll(_view);
-				UpdateSelectedItems();
-				break;
 			case "clear":
 				// A name that was refused keeps its field open after the focus has left it, where its own Escape cannot reach.
+				// Through the parameter, because the browser's own Escape would also forget the keyboard position.
 				_renamingPath = null;
-				_selection.Clear();
-				UpdateSelectedItems();
-				break;
-			case "previous":
-				MoveFocusBy(-1, shift);
-				break;
-			case "next":
-				MoveFocusBy(1, shift);
-				break;
-			case "pageUp":
-				MoveFocusBy(-Math.Max(1, pageRows), shift);
-				break;
-			case "pageDown":
-				MoveFocusBy(Math.Max(1, pageRows), shift);
-				break;
-			case "first":
-				MoveFocusTo(0, shift);
-				break;
-			case "last":
-				MoveFocusTo(_view.Count - 1, shift);
+				_selected = NothingSelected;
 				break;
 			case "editPath":
 				BeginPathEdit();
 				break;
 			case "filter":
-				_focusSelector = "[data-filter]";
+				_focusSelector = "[data-moka-file-filter]";
 				break;
 			case "find":
 				await FindFilesAsync(_path);
@@ -156,46 +88,38 @@ public partial class RemoteFileBrowser
 	});
 
 	/// <summary>Jumps to the next name starting with the typed letters. Repeating one letter cycles through its names.</summary>
-	internal Task HandleTypeAheadAsync(string prefix) => RunSafeAsync(() =>
+	internal Task HandleTypeAheadAsync(string prefix, string? cursor) => RunSafeAsync(async () =>
 	{
 		if (_disposed || !IsActive || !CanBrowse || _view.Count == 0 || string.IsNullOrEmpty(prefix))
-		{
-			return Task.CompletedTask;
-		}
-
-		bool repeated = prefix.Length > 1 && prefix.All(character => char.ToUpperInvariant(character) == char.ToUpperInvariant(prefix[0]));
-		string needle = repeated ? prefix[..1] : prefix;
-		int start = Math.Max(0, _view.IndexOf(_selection.Focus));
-		int offset = needle.Length == 1 && _view.IndexOf(_selection.Focus) >= 0 ? 1 : 0;
-		for (int step = 0; step < _view.Count; step++)
-		{
-			int index = (start + offset + step) % _view.Count;
-			if (_view.Entries[index].Name.StartsWith(needle, StringComparison.OrdinalIgnoreCase))
-			{
-				MoveFocusTo(index, extend: false);
-				StateHasChanged();
-				break;
-			}
-		}
-
-		return Task.CompletedTask;
-	});
-
-	internal Task HandleEntryDropAsync(string sourcePath, string targetDirectory) => RunSafeAsync(async () =>
-	{
-		if (_disposed || !CanBrowse || _view.Find(sourcePath) is not { } source || _view.Find(targetDirectory) is not { IsDirectoryLike: true })
 		{
 			return;
 		}
 
-		List<RemoteFileEntry> moving = _selection.Contains(sourcePath) ? SelectedEntries : [source];
+		bool repeated = prefix.Length > 1 && prefix.All(character => char.ToUpperInvariant(character) == char.ToUpperInvariant(prefix[0]));
+		string needle = repeated ? prefix[..1] : prefix;
+		string? from = cursor ?? (_selected.Count == 1 ? _selected.First() : null);
+		int start = Math.Max(0, _view.IndexOf(from));
+		int offset = needle.Length == 1 && _view.IndexOf(from) >= 0 ? 1 : 0;
+		for (int step = 0; step < _view.Count; step++)
+		{
+			RemoteFileEntry candidate = _view.Entries[(start + offset + step) % _view.Count];
+			if (candidate.Name.StartsWith(needle, StringComparison.OrdinalIgnoreCase))
+			{
+				await RevealAsync(candidate.Path);
+				break;
+			}
+		}
+	});
+
+	private async Task MoveDraggedAsync(IReadOnlyList<RemoteFileEntry> entries, string targetDirectory)
+	{
 		// A folder cannot move into itself or below itself.
-		moving.RemoveAll(entry => RemotePath.IsSameOrInside(targetDirectory, entry.Path));
-		if (moving.Count > 0)
+		List<RemoteFileEntry> moving = [.. entries.Where(entry => !RemotePath.IsSameOrInside(targetDirectory, entry.Path))];
+		if (!_disposed && CanBrowse && moving.Count > 0)
 		{
 			await MoveAsync(moving, targetDirectory);
 		}
-	});
+	}
 
 	/// <summary>The browser crossed one of <see cref="WidthSteps"/>; <paramref name="step"/> counts the steps it reaches.</summary>
 	internal Task HandleWidthChangedAsync(int step) => RunSafeAsync(() =>
@@ -210,86 +134,21 @@ public partial class RemoteFileBrowser
 		return Task.CompletedTask;
 	});
 
-	private RemoteFileEntry? FocusedOrOnlySelected()
+	private RemoteFileEntry? FocusedOrOnlySelected(string? cursor)
 	{
 		List<RemoteFileEntry> selected = SelectedEntries;
-		return selected.Count == 1 ? selected[0] : _view.Find(_selection.Focus);
+		return selected.Count == 1 ? selected[0] : _view.Find(cursor);
 	}
 
-	private void ToggleFocused()
-	{
-		if (_selection.Focus is { } focus && _view.IndexOf(focus) >= 0)
-		{
-			_selection.Toggle(focus);
-			UpdateSelectedItems();
-		}
-	}
+	private List<MokaContextMenuItem> ItemMenu(MokaFileMenuContext<RemoteFileEntry> context) =>
+		BuildEntryMenu(context.Items[0], [.. context.Items]);
 
-	private void MoveFocusBy(int delta, bool extend)
-	{
-		if (_view.Count == 0)
-		{
-			return;
-		}
-
-		int current = _view.IndexOf(_selection.Focus);
-		int target = current < 0 ? (delta > 0 ? 0 : _view.Count - 1) : current + delta;
-		MoveFocusTo(target, extend);
-	}
-
-	private void MoveFocusTo(int index, bool extend)
-	{
-		if (_view.Count == 0)
-		{
-			return;
-		}
-
-		int target = Math.Clamp(index, 0, _view.Count - 1);
-		string path = _view.Entries[target].Path;
-		if (extend)
-		{
-			_selection.SelectRange(_view, path);
-		}
-		else
-		{
-			_selection.SelectOnly(path);
-		}
-
-		UpdateSelectedItems();
-		_scrollToIndex = target;
-	}
-
-	private void ShowEntryMenu(MokaItemContextMenuArgs<RemoteFileEntry> args)
-	{
-		_entryMenuOpened = true;
-		RemoteFileEntry entry = args.Item;
-		if (!_selection.Contains(entry.Path))
-		{
-			_selection.SelectOnly(entry.Path);
-			UpdateSelectedItems();
-		}
-
-		ContextMenu.Show(args.MouseEvent, BuildEntryMenu(entry, SelectedEntries));
-	}
+	private List<MokaContextMenuItem> BackgroundMenu(MokaFileMenuContext<RemoteFileEntry> context) =>
+		CanBrowse ? BuildBackgroundMenu() : [];
 
 	// The narrow toolbar's overflow button: the same actions as a right-click on the list background.
 	private void ShowActionsMenu(MouseEventArgs args)
 	{
-		if (CanBrowse)
-		{
-			ContextMenu.Show(args, BuildBackgroundMenu());
-		}
-	}
-
-	// Right-clicks on rows bubble here after the table showed the entry menu.
-	private void OnBackgroundContextMenu(MouseEventArgs args)
-	{
-		if (_entryMenuOpened)
-		{
-			_entryMenuOpened = false;
-			return;
-		}
-
 		if (CanBrowse)
 		{
 			ContextMenu.Show(args, BuildBackgroundMenu());

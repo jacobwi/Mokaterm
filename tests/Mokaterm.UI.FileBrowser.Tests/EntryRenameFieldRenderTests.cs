@@ -18,10 +18,12 @@ public sealed class EntryRenameFieldRenderTests
 	[InlineData("conf.d", RemoteEntryKind.Directory, 6)]
 	public async Task TheField_OpensOnTheNameAndMarksWhatIsSelected(string name, RemoteEntryKind kind, int selectedTo)
 	{
-		string html = await RenderAsync(new RemoteFileEntry { Path = "/srv/" + name, Name = name, Kind = kind });
+		RemoteFileEntry entry = new() { Path = "/srv/" + name, Name = name, Kind = kind };
+
+		string html = await RenderAsync(entry);
 
 		Assert.Contains($"value=\"{name}\"", html, StringComparison.Ordinal);
-		Assert.Contains($"data-name-end=\"{selectedTo}\"", html, StringComparison.Ordinal);
+		Assert.Equal(selectedTo, EntryRenameField.StemEnd(name, entry.IsDirectoryLike));
 		Assert.Contains(kind == RemoteEntryKind.Directory ? "aria-label=\"Folder name\"" : "aria-label=\"File name\"", html, StringComparison.Ordinal);
 	}
 

@@ -19,7 +19,7 @@ internal sealed class DirectoryView
 
 	public static DirectoryView Empty { get; } = new([]);
 
-	/// <summary>Rows in display order. Every build returns a new list because the table reloads on a new reference only.</summary>
+	/// <summary>Rows in display order, as the browser sorts and filters them.</summary>
 	public IReadOnlyList<RemoteFileEntry> Entries { get; }
 
 	public int Count => Entries.Count;
@@ -44,7 +44,7 @@ internal sealed class DirectoryView
 		{
 			if ((showHidden || !entry.IsHidden)
 				&& (trimmedFilter.Length == 0 || entry.Name.Contains(trimmedFilter, StringComparison.OrdinalIgnoreCase))
-				// The table throws on duplicate row keys, and some FTP servers list an entry twice.
+				// Some FTP servers list an entry twice.
 				&& seen.Add(entry.Path))
 			{
 				rows.Add(entry);

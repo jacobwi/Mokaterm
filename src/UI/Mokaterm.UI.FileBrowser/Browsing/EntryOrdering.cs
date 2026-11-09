@@ -1,22 +1,23 @@
+using Moka.Red.Data.FileBrowser;
 using Mokaterm.Abstractions.FileSystem;
 
 namespace Mokaterm.UI.FileBrowser.Browsing;
 
 /// <summary>
-/// Sort order of a listing. The table sorts its rows with these comparisons as well, so the browser's own view and
-/// the rendered rows agree on every row index.
+/// Sort order of a listing. The browser sorts its rows with these comparisons as well, so the view kept here and the
+/// rendered rows agree on every row index.
 /// </summary>
 internal static class EntryOrdering
 {
-	public const string NameColumn = "Name";
+	public const string NameColumn = MokaFileSort.Name;
 
-	public const string SizeColumn = "Size";
+	public const string SizeColumn = MokaFileSort.Size;
 
-	public const string ModifiedColumn = "Modified";
+	public const string ModifiedColumn = MokaFileSort.Modified;
 
-	public const string PermissionsColumn = "Permissions";
+	public const string PermissionsColumn = "permissions";
 
-	public const string OwnerColumn = "Owner";
+	public const string OwnerColumn = "owner";
 
 	/// <summary>
 	/// Compares for a sort by <paramref name="column"/>. A descending sort reverses the whole result, so with

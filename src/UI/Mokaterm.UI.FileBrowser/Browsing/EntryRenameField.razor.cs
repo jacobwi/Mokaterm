@@ -23,7 +23,9 @@ public sealed partial class EntryRenameField : ComponentBase
 
 	private string FieldLabel => Entry.IsDirectoryLike ? "Folder name" : "File name";
 
-	private int StemLength => EntryNames.Split(Entry.Name, Entry.IsDirectoryLike).Stem.Length;
+	internal static int StemEnd(string name, bool isFolder) => EntryNames.Split(name, isFolder).Stem.Length;
+
+	private int SelectionEnd(string name) => StemEnd(name, Entry.IsDirectoryLike);
 
 	private string? Validate(string name) => EntryNames.ProblemWith(name, TakenNames);
 

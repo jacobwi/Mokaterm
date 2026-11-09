@@ -1,15 +1,20 @@
-// Browser side of RemoteFileBrowser: keyboard shortcuts that must beat browser defaults (F5 reloads the page, Alt+Left
-// navigates back, Ctrl+A selects the page), moving entries by dragging them onto folder rows, width steps for the
-// responsive layout, focus and scroll helpers, Enter handling for the browser's dialogs, and the file editor's gutter,
-// indenting, Ctrl+S and the coloured layer under its text (tokens come from syntax.js).
+// Browser side of RemoteFileBrowser: the keys MokaFileBrowser leaves to it, dragging a column's edge, width steps for the
+// responsive layout, focus helpers, Enter handling for the browser's dialogs, and the file editor's gutter, indenting,
+// Ctrl+S and the coloured layer under its text (tokens come from syntax.js).
 import { invoke } from '../../Mokaterm.UI.Common/js/interop.js';
 import { canHighlight, createHighlightModel } from './syntax.js';
 export { bindDialog } from '../../Mokaterm.UI.Common/js/forms.js';
 
-const entryType = 'application/x-mokaterm-entry';
-const dropTargetClass = 'fb-drop-target';
 const typeAheadResetMs = 800;
-// Long enough for a closing menu to hand focus back over a slow circuit; any key or click ends it sooner.
+const listSelector = '[data-moka-list]';
+const headSelector = '.moka-file-browser__head';
+
+// How far from a heading's right edge a press takes the edge rather than the heading.
+const columnEdgeReach = 6;
+const columnMinWidth = 48;
+
+// A little longer than MokaDialog's 200 ms exit.
+const dialogExitMs = 260;
 
 function isElement(target) {
 	return !!target && typeof target.closest === 'function';
@@ -31,14 +36,13 @@ function hasTextSelection(root) {
 		&& !!root && typeof root.contains === 'function' && root.contains(selection.anchorNode);
 }
 
+// The keys that are ours. MokaFileBrowser takes the arrows, Space, Ctrl+A, Alt+Left, Alt+Right and the slash.
 function commandFor(event) {
 	const mod = event.ctrlKey || event.metaKey;
 	const alt = event.altKey;
 	switch (event.key) {
 		case 'Enter':
 			return mod || alt || isActivatable(event.target) ? null : 'open';
-		case ' ':
-			return mod || alt || isActivatable(event.target) ? null : 'toggle';
 		case 'Backspace':
 			return mod || alt ? null : 'up';
 		case 'F2':
@@ -52,27 +56,11 @@ function commandFor(event) {
 			return 'refresh';
 		case 'Escape':
 			return 'clear';
-		case 'ArrowLeft':
-			return alt && !mod ? 'back' : null;
-		case 'ArrowRight':
-			return alt && !mod ? 'forward' : null;
 		case 'ArrowUp':
-			return mod ? null : alt ? 'up' : 'previous';
-		case 'ArrowDown':
-			return mod || alt ? null : 'next';
-		case 'Home':
-			return mod || alt ? null : 'first';
-		case 'End':
-			return mod || alt ? null : 'last';
-		case 'PageUp':
-			return mod || alt ? null : 'pageUp';
-		case 'PageDown':
-			return mod || alt ? null : 'pageDown';
+			return alt && !mod ? 'up' : null;
 		default:
 			if (mod && !alt && event.key.length === 1) {
 				switch (event.key.toLowerCase()) {
-					case 'a':
-						return 'selectAll';
 					case 'l':
 						return 'editPath';
 					// Ctrl+Shift+F is Find in the terminal too, so the two panes of a session agree on it.
@@ -98,26 +86,132 @@ function commandFor(event) {
 	}
 }
 
+// Keys MokaFileBrowser answers only while its list has the focus. The browser has always taken them from anywhere inside it.
+function isListKey(event) {
+	const mod = event.ctrlKey || event.metaKey;
+	if (event.altKey) {
+		return false;
+	}
+
+	if (mod) {
+		return !event.shiftKey && event.key.toLowerCase() === 'a';
+	}
+
+	return ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', '/'].includes(event.key)
+		|| (event.key === ' ' && !isActivatable(event.target));
+}
+
+function columnVariable(heading) {
+	return /--fb-col-[a-z]+/.exec(heading.getAttribute('style') ?? '')?.[0] ?? null;
+}
+
+// The heading whose right edge is under the pointer, or null. Headings a narrow browser hides measure nothing.
+function edgeAt(head, x) {
+	return [...head.children].find(heading => {
+		const box = heading.getBoundingClientRect();
+		return box.width > 0 && Math.abs(x - box.right) <= columnEdgeReach;
+	}) ?? null;
+}
+
+// MokaFileBrowser's columns cannot be dragged, so this does it from outside. Each width is a variable the column reads and
+// this sets on the root, for as long as the browser lives. The name takes what is left, so its own edge moves the next column.
+function attachColumnResize(root) {
+	let swallowClick = false;
+
+	const onPointerDown = event => {
+		const head = event.button === 0 && isElement(event.target) ? event.target.closest(headSelector) : null;
+		const edge = head ? edgeAt(head, event.clientX) : null;
+		if (!edge) {
+			return;
+		}
+
+		const headings = [...head.children];
+		const resized = columnVariable(edge) ? edge : headings[headings.indexOf(edge) + 1];
+		const variable = resized ? columnVariable(resized) : null;
+		if (!variable) {
+			return;
+		}
+
+		const direction = resized === edge ? 1 : -1;
+		const startX = event.clientX;
+		const startWidth = resized.getBoundingClientRect().width;
+		swallowClick = true;
+		event.preventDefault();
+
+		const onMove = move => {
+			const width = Math.max(columnMinWidth, startWidth + direction * (move.clientX - startX));
+			root.style.setProperty(variable, `${Math.round(width)}px`);
+		};
+
+		const onUp = () => {
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('pointercancel', onUp);
+		};
+
+		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointerup', onUp);
+		window.addEventListener('pointercancel', onUp);
+	};
+
+	// Blazor listens on the document, so stopping it here keeps a press on an edge from sorting the column.
+	const onClick = event => {
+		if (swallowClick) {
+			swallowClick = false;
+			event.stopPropagation();
+		}
+	};
+
+	const onDoubleClick = event => {
+		const head = isElement(event.target) ? event.target.closest(headSelector) : null;
+		const edge = head ? edgeAt(head, event.clientX) : null;
+		if (!edge) {
+			return;
+		}
+
+		const headings = [...head.children];
+		const resized = columnVariable(edge) ? edge : headings[headings.indexOf(edge) + 1];
+		const variable = resized ? columnVariable(resized) : null;
+		if (variable) {
+			root.style.removeProperty(variable);
+		}
+	};
+
+	root.addEventListener('pointerdown', onPointerDown, true);
+	root.addEventListener('click', onClick, true);
+	root.addEventListener('dblclick', onDoubleClick, true);
+	return () => {
+		root.removeEventListener('pointerdown', onPointerDown, true);
+		root.removeEventListener('click', onClick, true);
+		root.removeEventListener('dblclick', onDoubleClick, true);
+	};
+}
+
 export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 	let active = !!initiallyActive;
 	let typeAhead = '';
 	let typeAheadTimer = 0;
-	let dragSource = null;
-	let dropRow = null;
 	let widthStep = -1;
 	const state = { dotNet: dotNetRef, disposed: false };
 
-	const scroller = () => root.querySelector('.moka-table-container');
+	const list = () => root.querySelector(listSelector);
 
-	const rowHeight = () => {
-		const row = root.querySelector('tbody tr[data-row-index]');
-		return row ? row.getBoundingClientRect().height : 0;
+	// The row the list's own cursor is on, which it says through aria-activedescendant.
+	const cursor = () => {
+		const id = list()?.getAttribute('aria-activedescendant');
+		return (id ? document.getElementById(id)?.getAttribute('data-moka-key') : null) ?? null;
 	};
 
-	const pageRows = () => {
-		const container = scroller();
-		const height = rowHeight();
-		return container && height > 0 ? Math.max(1, Math.floor(container.clientHeight / height) - 1) : 10;
+	// A press inside the rename field selects text, and the row around it would start dragging instead. Only for the press,
+	// because the row's attribute belongs to the render that wrote it.
+	const onPointerDown = event => {
+		const row = isElement(event.target) && event.target.closest('.fb-name--renaming')
+			? event.target.closest('[draggable="true"]')
+			: null;
+		if (row) {
+			row.setAttribute('draggable', 'false');
+			window.addEventListener('pointerup', () => row.setAttribute('draggable', 'true'), { once: true });
+		}
 	};
 
 	const onKeyDown = event => {
@@ -126,127 +220,43 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 		}
 
 		const mod = event.ctrlKey || event.metaKey;
-		const typing = !mod && !event.altKey && event.key.length === 1;
+		const typing = !mod && !event.altKey && event.key.length === 1 && event.key !== '/';
 		if (typing && (event.key !== ' ' || typeAhead.length > 0) && !(event.key === ' ' && isActivatable(event.target))) {
 			typeAhead += event.key;
 			clearTimeout(typeAheadTimer);
 			typeAheadTimer = setTimeout(() => { typeAhead = ''; }, typeAheadResetMs);
 			event.preventDefault();
 			event.stopPropagation();
-			invoke(state, 'OnTypeAhead', typeAhead);
+			invoke(state, 'OnTypeAhead', typeAhead, cursor());
 			return;
 		}
 
 		const command = commandFor(event);
-		if (!command) {
+		if (command) {
+			// Escape has no browser default worth blocking, and outer handlers may still want it.
+			if (command !== 'clear') {
+				event.preventDefault();
+				event.stopPropagation();
+			}
+
+			invoke(state, 'OnKeyCommand', command, cursor());
 			return;
 		}
 
-		// Escape has no browser default worth blocking, and outer handlers may still want it.
-		if (command !== 'clear') {
+		const target = list();
+		if (target && event.target !== target && isListKey(event)) {
 			event.preventDefault();
 			event.stopPropagation();
-		}
-
-		invoke(state, 'OnKeyCommand', command, event.shiftKey, pageRows());
-	};
-
-	const rowEntry = target => {
-		const row = isElement(target) ? target.closest('tr') : null;
-		if (!row || !root.contains(row)) {
-			return null;
-		}
-
-		const cell = row.querySelector('[data-entry-path]');
-		return cell
-			? { row, path: cell.getAttribute('data-entry-path'), isDirectory: cell.getAttribute('data-entry-directory') === 'true' }
-			: null;
-	};
-
-	const carriesEntry = event => {
-		const types = event.dataTransfer?.types;
-		return !!types && Array.from(types).includes(entryType);
-	};
-
-	const setDropRow = row => {
-		if (dropRow === row) {
-			return;
-		}
-
-		dropRow?.classList.remove(dropTargetClass);
-		dropRow = row;
-		dropRow?.classList.add(dropTargetClass);
-	};
-
-	const onDragStart = event => {
-		const handle = isElement(event.target) ? event.target.closest('[draggable="true"]') : null;
-		const entry = handle ? rowEntry(handle) : null;
-		if (!entry || !event.dataTransfer) {
-			return;
-		}
-
-		dragSource = entry.path;
-		// Firefox only starts a drag that carries data.
-		event.dataTransfer.setData(entryType, entry.path);
-		event.dataTransfer.setData('text/plain', entry.path);
-		event.dataTransfer.effectAllowed = 'move';
-	};
-
-	const onDragOver = event => {
-		if (!dragSource || !carriesEntry(event)) {
-			return;
-		}
-
-		event.stopPropagation();
-		const entry = rowEntry(event.target);
-		if (!entry || !entry.isDirectory || entry.path === dragSource) {
-			setDropRow(null);
-			return;
-		}
-
-		event.preventDefault();
-		event.dataTransfer.dropEffect = 'move';
-		setDropRow(entry.row);
-	};
-
-	const onDragLeave = event => {
-		if (dragSource && !root.contains(event.relatedTarget)) {
-			setDropRow(null);
-		}
-	};
-
-	const onDrop = event => {
-		if (!dragSource || !carriesEntry(event)) {
-			return;
-		}
-
-		const source = dragSource;
-		const entry = rowEntry(event.target);
-		dragSource = null;
-		setDropRow(null);
-		if (!entry || !entry.isDirectory || entry.path === source) {
-			return;
-		}
-
-		event.preventDefault();
-		event.stopPropagation();
-		invoke(state, 'OnEntryDrop', source, entry.path);
-	};
-
-	const onDragEnd = () => {
-		dragSource = null;
-		setDropRow(null);
-	};
-
-	// The select event of the selection Moka's field makes when it opens, and only that one, so a selection the user
-	// makes afterwards stays. Focus events would be no use: a page without the window's focus never gets them.
-	const nameFieldsDone = new WeakSet();
-	const onSelect = event => {
-		const field = event.target;
-		const end = isElement(field) ? field.getAttribute('data-name-end') : null;
-		if (end !== null && !nameFieldsDone.has(field)) {
-			nameFieldsDone.add(field);
-			field.setSelectionRange(0, Number(end));
+			target.focus({ preventScroll: true });
+			target.dispatchEvent(new KeyboardEvent('keydown', {
+				key: event.key,
+				code: event.code,
+				ctrlKey: event.ctrlKey,
+				metaKey: event.metaKey,
+				shiftKey: event.shiftKey,
+				bubbles: true,
+				cancelable: true,
+			}));
 		}
 	};
 
@@ -267,15 +277,10 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 	});
 	resizeObserver.observe(root);
 
-	// Capture, so the browser's keys run before the table's own. MokaTable clicks its focused cell on Enter, and that
-	// cell is the one a mouse click focused, not the one the arrow keys moved the selection to since.
+	// Capture, so these keys are settled before MokaFileBrowser's own listener on the element inside.
 	root.addEventListener('keydown', onKeyDown, true);
-	root.addEventListener('dragstart', onDragStart);
-	root.addEventListener('dragover', onDragOver);
-	root.addEventListener('dragleave', onDragLeave);
-	root.addEventListener('drop', onDrop);
-	root.addEventListener('dragend', onDragEnd);
-	root.addEventListener('select', onSelect);
+	root.addEventListener('pointerdown', onPointerDown, true);
+	const detachColumnResize = attachColumnResize(root);
 
 	return {
 		setActive(value) {
@@ -285,43 +290,19 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			}
 		},
 
-		// Keeps the row at index visible below the sticky header, and moves DOM focus onto it when focus is already in
-		// the browser so the focus ring follows the keyboard. Rows the virtualized table has not rendered are estimated.
-		scrollToRow(index) {
-			const container = scroller();
-			if (!container || index < 0) {
-				return;
-			}
-
-			const row = container.querySelector(`tbody tr[data-row-index="${index}"]`);
-			const header = container.querySelector('thead');
-			const headerHeight = header ? header.getBoundingClientRect().height : 0;
-			if (!row) {
-				const height = rowHeight() || 25;
-				container.scrollTop = Math.max(0, index * height - (container.clientHeight - headerHeight) / 2);
-				return;
-			}
-
-			const box = container.getBoundingClientRect();
-			const rect = row.getBoundingClientRect();
-			if (rect.top < box.top + headerHeight) {
-				container.scrollTop -= box.top + headerHeight - rect.top;
-			} else if (rect.bottom > box.bottom) {
-				container.scrollTop += rect.bottom - box.bottom;
-			}
-
-			const cell = row.querySelector('td[data-col-index]');
-			if (cell && root.contains(document.activeElement) && !isEditable(document.activeElement)) {
-				cell.focus({ preventScroll: true });
-			}
-		},
-
-		// After a navigation the focused row may be gone; bring focus back so shortcuts keep working.
+		// After a navigation or a dialog the focused element may be gone; bring focus back so shortcuts keep working.
 		restoreFocus() {
-			const current = document.activeElement;
-			if (!current || current === document.body || !current.isConnected) {
-				root.focus({ preventScroll: true });
-			}
+			const restore = () => {
+				const current = document.activeElement;
+				if (!state.disposed && (!current || current === document.body || !current.isConnected)) {
+					(list() ?? root).focus({ preventScroll: true });
+				}
+			};
+
+			restore();
+
+			// A dialog keeps the focus through its exit animation and takes it along when it leaves the page.
+			setTimeout(restore, dialogExitMs);
 		},
 
 		focus(selector) {
@@ -338,14 +319,9 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			state.disposed = true;
 			resizeObserver.disconnect();
 			root.removeEventListener('keydown', onKeyDown, true);
-			root.removeEventListener('dragstart', onDragStart);
-			root.removeEventListener('dragover', onDragOver);
-			root.removeEventListener('dragleave', onDragLeave);
-			root.removeEventListener('drop', onDrop);
-			root.removeEventListener('dragend', onDragEnd);
-			root.removeEventListener('select', onSelect);
+			root.removeEventListener('pointerdown', onPointerDown, true);
+			detachColumnResize();
 			clearTimeout(typeAheadTimer);
-			setDropRow(null);
 		},
 	};
 }

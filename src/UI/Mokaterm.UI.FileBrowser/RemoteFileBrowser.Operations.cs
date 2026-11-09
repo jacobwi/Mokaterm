@@ -194,13 +194,15 @@ public partial class RemoteFileBrowser
 	/// Applies a change with <paramref name="fileSystem"/>, or the browser's current one, and lists the folder again, also
 	/// after a partial failure. A failure shows an alert, and a permission error offers to run the change again as root.
 	/// <paramref name="then"/> runs once the change went through and the folder was listed, after a retry as root too.
+	/// <paramref name="reloads"/> is false when the browser lists the folder itself afterwards.
 	/// </summary>
 	private async Task RunChangeAsync(
 		string failureTitle,
 		Func<IRemoteFileSystem, CancellationToken, Task> change,
 		string? select = null,
 		IRemoteFileSystem? fileSystem = null,
-		Func<Task>? then = null)
+		Func<Task>? then = null,
+		bool reloads = true)
 	{
 		if ((fileSystem ?? _fileSystem) is not { } target)
 		{
@@ -230,7 +232,11 @@ public partial class RemoteFileBrowser
 
 		if (!token.IsCancellationRequested && BelongsToConnection(target))
 		{
-			await RefreshAsync(succeeded ? select : null);
+			if (reloads)
+			{
+				await RefreshAsync(succeeded ? select : null);
+			}
+
 			if (succeeded && then is not null && !_disposed)
 			{
 				await then();
@@ -238,7 +244,7 @@ public partial class RemoteFileBrowser
 		}
 	}
 
-	private async Task OpenSelectionAsync()
+	private async Task OpenSelectionAsync(string? cursor)
 	{
 		List<RemoteFileEntry> selected = SelectedEntries;
 		if (selected.Count > 1 && selected.TrueForAll(entry => !entry.IsDirectoryLike))
@@ -247,7 +253,7 @@ public partial class RemoteFileBrowser
 			return;
 		}
 
-		if ((_view.Find(_selection.Focus) ?? selected.FirstOrDefault()) is { } target)
+		if ((_view.Find(cursor) ?? selected.FirstOrDefault()) is { } target)
 		{
 			await OpenEntryAsync(target);
 		}
@@ -372,13 +378,18 @@ public partial class RemoteFileBrowser
 
 	private void BeginRename(RemoteFileEntry entry)
 	{
-		if (!CanBrowse || _operationRunning || _view.IndexOf(entry.Path) is not (>= 0 and var index))
+		if (!CanBrowse || _operationRunning || _view.IndexOf(entry.Path) < 0)
 		{
 			return;
 		}
 
 		_renamingPath = entry.Path;
-		_scrollToIndex = index;
+
+		// Selecting is the browser's only way to scroll, so a row of several selected stays where it is.
+		if (_selected.Count <= 1)
+		{
+			_ = RunSafeAsync(() => RevealAsync(entry.Path));
+		}
 
 		// Also reached from the context menu, whose click belongs to another component.
 		StateHasChanged();
@@ -427,8 +438,8 @@ public partial class RemoteFileBrowser
 				return;
 			}
 
-			// Keep the keyboard position: the row after the deleted ones becomes the focus.
-			int focusIndex = _view.IndexOf(_selection.Focus);
+			// Keep the keyboard position: the row after the deleted ones takes their place.
+			int firstDeleted = entries.Min(entry => _view.IndexOf(entry.Path));
 			string title = entries.Count == 1
 				? "Could not delete " + entries[0].Name
 				: string.Create(CultureInfo.CurrentCulture, $"Could not delete {entries.Count} items");
@@ -449,9 +460,9 @@ public partial class RemoteFileBrowser
 				}
 			});
 
-			if (_selection.Count == 0 && focusIndex >= 0 && _view.Count > 0)
+			if (_selected.Count == 0 && firstDeleted >= 0 && _view.Count > 0)
 			{
-				MoveFocusTo(Math.Min(focusIndex, _view.Count - 1), extend: false);
+				await RevealAsync(_view.Entries[Math.Min(firstDeleted, _view.Count - 1)].Path);
 			}
 		}
 		finally
@@ -544,7 +555,8 @@ public partial class RemoteFileBrowser
 
 			OverwriteBehavior behavior = Settings.Get<FileTransferSettings>().Overwrite;
 			await RunChangeAsync("Could not move " + what, (fileSystem, token) =>
-				EntryMover.MoveAsync(fileSystem, entries, targetDirectory, new OverwriteResolver(Interaction, behavior, entries.Count > 1), token));
+				EntryMover.MoveAsync(fileSystem, entries, targetDirectory, new OverwriteResolver(Interaction, behavior, entries.Count > 1), token),
+				reloads: false);
 		}
 		finally
 		{

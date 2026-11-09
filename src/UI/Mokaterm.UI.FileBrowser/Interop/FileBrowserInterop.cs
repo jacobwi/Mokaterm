@@ -14,10 +14,9 @@ internal sealed class FileBrowserInterop : IAsyncDisposable
 	public FileBrowserInterop(IJSRuntime jsRuntime) => _module = new JsModule(jsRuntime, ModulePath);
 
 	/// <summary>
-	/// Wires keyboard shortcuts, dragging entries onto folders, and focus and scroll helpers to the browser root, and
-	/// reports through <see cref="FileBrowserJsReceiver.OnWidthChanged"/> whenever the root's width crosses one of the
-	/// ascending <paramref name="widthSteps"/>. The result exposes <c>setActive</c>, <c>scrollToRow</c>,
-	/// <c>restoreFocus</c>, <c>focus</c> and <c>dispose</c>.
+	/// Wires keyboard shortcuts, column resizing and focus helpers to the browser root, and reports through
+	/// <see cref="FileBrowserJsReceiver.OnWidthChanged"/> whenever the root's width crosses one of the ascending
+	/// <paramref name="widthSteps"/>. The result exposes <c>setActive</c>, <c>restoreFocus</c>, <c>focus</c> and <c>dispose</c>.
 	/// </summary>
 	public ValueTask<IJSObjectReference> AttachBrowserAsync(
 		ElementReference root,
