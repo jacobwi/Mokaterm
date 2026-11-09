@@ -1,3 +1,4 @@
+@using Moka.Red.Core.Theming
 @using Moka.Red.ThemeGen.Appearance
 @using Mokaterm.Abstractions.Platform
 @using Mokaterm.Abstractions.Presentation
@@ -6,6 +7,21 @@
 
 @{
 	AppearanceSettings settings = Settings;
+	MokaAppearance appearance = AppearanceChoice.ValueFor(settings);
+	IReadOnlyList<MokaAccent> accents = PreviewAccents(settings);
+
+	RenderFragment Panel(MokaAppearanceRows rows, bool disabled = false) =>
+		@<div class="appearance-choice">
+			<MokaAppearancePanel Value="appearance"
+								 ValueChanged="PickAsync"
+								 Rows="rows"
+								 Palettes="AppearanceChoice.Palettes"
+								 Accents="accents"
+								 OptionState="AppearanceChoice.StateOf"
+								 Text="AppearanceChoice.Words"
+								 ShowReset="false"
+								 Disabled="disabled" />
+		</div>;
 }
 
 <SettingsPage Title="Appearance"
@@ -13,22 +29,11 @@
 			  ResetMessage="Put the theme, accent color, density, font scale, status bar, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms." Stacked>
-			<div class="appearance-mode">
-				<MokaAppearancePanel Value="@AppearanceChoice.ValueFor(settings, PreviewAccents(settings))"
-									 ValueChanged="SetModeAsync"
-									 Rows="MokaAppearanceRows.ColorMode"
-									 Palettes="AppearanceChoice.Palettes"
-									 Accents="@PreviewAccents(settings)"
-									 Text="AppearanceChoice.Words" />
-			</div>
+			@Panel(MokaAppearanceRows.ColorMode)
 		</SettingsRow>
-		<SettingsRow Label="Accent color" Description="@AccentHelp">
+		<SettingsRow Label="Accent color" Description="@AccentHelp" Stacked>
 			<div class="accent-picker">
-				<MokaColorSwatch Colors="AccentPresets"
-								 SelectedColor="@SelectedPreset(settings.AccentColor)"
-								 SelectedColorChanged="SelectPresetAsync"
-								 Columns="AccentPresets.Length"
-								 SwatchSize="20px" />
+				@Panel(MokaAppearanceRows.Accent)
 				<ColorSetting Value="@settings.AccentColor"
 							  ValueChanged="value => SaveAsync(s => s with { AccentColor = value })"
 							  Forms="HexColorForms.Accent"
@@ -56,18 +61,16 @@
 						ValueFormat="P0"
 						aria-label="Font scale" />
 		</SettingsRow>
-		<SettingsRow Label="Status bar" Description="Show the bar with session and transfer status along the bottom of the window.">
+	</SettingsSection>
+
+	<SettingsSection Title="Status bar">
+		<SettingsRow Label="Show status bar" Description="The bar with session and transfer status along the bottom of the window.">
 			<MokaSwitch Value="settings.ShowStatusBar"
 						ValueChanged="value => UpdateAsync(s => s with { ShowStatusBar = value })"
 						aria-label="Show status bar" />
 		</SettingsRow>
-		<SettingsRow Label="Status bar style" Description="How the bar is drawn: a filled bar, the accent colour, a thin line, floating, separate chips, joined segments or a terminal line.">
-			<EnumSegmentedControl TEnum="StatusBarStyle"
-								  Value="settings.StatusBarStyle"
-								  ValueChanged="value => UpdateAsync(s => s with { StatusBarStyle = value })"
-								  Options="StatusBarStyleOptions"
-								  Disabled="!settings.ShowStatusBar"
-								  AriaLabel="Status bar style" />
+		<SettingsRow Label="Status bar style" Description="How the bar is drawn." Stacked>
+			@Panel(MokaAppearanceRows.StatusBar, disabled: !settings.ShowStatusBar)
 		</SettingsRow>
 		<SettingsRow Label="Live host figures"
 					 Description="CPU, memory and root disk use of the active session's machine in the status bar, where the session can read them. Clicking them opens its System tool.">

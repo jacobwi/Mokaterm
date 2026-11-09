@@ -1,5 +1,6 @@
 using Moka.Red.Core.Theming;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Presentation;
 
 namespace Mokaterm.UI.Presentation;
 
@@ -27,17 +28,6 @@ internal static class ThemeFactory
 			_ => theme,
 		};
 
-		return theme.WithStatusBar(Look(usable.StatusBarStyle)).WithFontScale(usable.FontScale);
+		return theme.WithStatusBar(StatusBarLooks.Of(usable.StatusBarStyle)).WithFontScale(usable.FontScale);
 	}
-
-	private static MokaStatusBarLook Look(StatusBarStyle style) => style switch
-	{
-		StatusBarStyle.Accent => MokaStatusBarLook.Accent,
-		StatusBarStyle.Hairline => MokaStatusBarLook.Hairline,
-		StatusBarStyle.Floating => MokaStatusBarLook.Floating,
-		StatusBarStyle.Chips => MokaStatusBarLook.Chips,
-		StatusBarStyle.Segments => MokaStatusBarLook.Segments,
-		StatusBarStyle.Terminal => MokaStatusBarLook.Terminal,
-		_ => MokaStatusBarLook.Standard,
-	};
 }

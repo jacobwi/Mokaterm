@@ -9,6 +9,7 @@ using Mokaterm.UI.Common.Components;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Presentation;
 using Mokaterm.UI.Settings.Pages.Appearance;
 using Mokaterm.UI.Tests.Fakes;
 
@@ -51,13 +52,95 @@ public sealed class AppearanceSettingsPageTests
 		Assert.DoesNotContain("value=\"matrix\"", html, StringComparison.Ordinal);
 	}
 
-	// The page's stylesheet hides this card by that value, because the app has no mode to save it as.
+	// The app stores light or dark, so there is no mode to save following the device as.
 	[Fact]
-	public async Task Render_TheCardForFollowingTheDevice_CanStillBeFoundToHide()
+	public async Task Render_OffersNoCardForFollowingTheDevice()
 	{
 		string html = await RenderAsync(new AppearanceSettings());
 
-		Assert.Matches("<label[^>]*moka-radio-item[^>]*>\\s*<input[^>]*value=\"System\"", html);
+		Assert.DoesNotContain("value=\"System\"", html, StringComparison.Ordinal);
+	}
+
+	// The page has a confirmed reset of its own, and the panel's would appear in light mode or with any accent.
+	[Fact]
+	public async Task Render_ThePanelsAddNoResetOfTheirOwn()
+	{
+		string html = await RenderAsync(new AppearanceSettings { Mode = ThemeMode.Light, AccentColor = "#42a5f5", StatusBarStyle = StatusBarStyle.Chips });
+
+		Assert.DoesNotContain("Back to defaults", html, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task Render_EveryStatusBarStyleIsACard_WithTheStoredOnePicked()
+	{
+		string html = await RenderAsync(new AppearanceSettings { StatusBarStyle = StatusBarStyle.Chips });
+
+		Assert.Contains("data-setting=\"status-bar-style\"", html, StringComparison.Ordinal);
+		foreach (StatusBarStyle style in Enum.GetValues<StatusBarStyle>())
+		{
+			Assert.Matches($"<input[^>]*value=\"{style}\"", html);
+		}
+
+		Assert.Matches("<input[^>]*value=\"Chips\"[^>]*checked", html);
+		Assert.DoesNotMatch("<input[^>]*value=\"Standard\"[^>]*checked", html);
+	}
+
+	[Fact]
+	public async Task Render_WithTheStatusBarOff_TheStyleCardsAreInert()
+	{
+		string on = await RenderAsync(new AppearanceSettings());
+		string off = await RenderAsync(new AppearanceSettings { ShowStatusBar = false });
+
+		Assert.DoesNotContain("moka-appearance-panel--disabled", on, StringComparison.Ordinal);
+		Assert.Contains("moka-appearance-panel--disabled", off, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public void StatusBarLooks_RoundTripEveryStyle_AndEveryLookIsOneWeCanStore()
+	{
+		foreach (StatusBarStyle style in Enum.GetValues<StatusBarStyle>())
+		{
+			Assert.Equal(style, StatusBarLooks.From(StatusBarLooks.Of(style)));
+		}
+
+		foreach (MokaStatusBarLook look in Enum.GetValues<MokaStatusBarLook>())
+		{
+			Assert.Equal(look, StatusBarLooks.Of(StatusBarLooks.From(look)));
+		}
+	}
+
+	[Theory]
+	[InlineData(StatusBarStyle.Terminal)]
+	[InlineData(StatusBarStyle.Standard)]
+	public void Choice_APickedStatusBar_IsStored_AndNothingElseMoves(StatusBarStyle style)
+	{
+		AppearanceSettings settings = new() { Mode = ThemeMode.Light, AccentColor = "#123456", Density = UiDensity.Compact };
+
+		AppearanceSettings next = AppearanceChoice.Apply(settings, AppearanceChoice.ValueFor(settings) with { StatusBar = StatusBarLooks.Of(style) });
+
+		Assert.Equal(settings with { StatusBarStyle = style }, next);
+	}
+
+	[Theory]
+	[InlineData("blue", "#42a5f5")]
+	[InlineData("red", AppearanceSettings.DefaultAccentColor)]
+	[InlineData(null, AppearanceSettings.DefaultAccentColor)]
+	public void Choice_APickedAccent_StoresItsColor(string? id, string stored)
+	{
+		AppearanceSettings settings = new() { AccentColor = "#123456" };
+
+		Assert.Equal(stored, AppearanceChoice.Apply(settings, AppearanceChoice.ValueFor(settings) with { Accent = id }).AccentColor);
+	}
+
+	[Fact]
+	public void Choice_AColorOfTheUsersOwn_IsKeptAndOffered()
+	{
+		AppearanceSettings settings = new() { AccentColor = "#123456" };
+
+		MokaAppearance value = AppearanceChoice.ValueFor(settings);
+
+		Assert.Contains(AppearanceChoice.AccentsFor(settings), accent => accent.Id == value.Accent && accent.Name == "#123456");
+		Assert.Equal("#123456", AppearanceChoice.Apply(settings, value).AccentColor);
 	}
 
 	[Fact]
@@ -69,31 +152,28 @@ public sealed class AppearanceSettingsPageTests
 		Assert.Equal(ThemeMode.Dark, AppearanceChoice.ModeFrom(MokaColorMode.Dark, ThemeMode.Light));
 	}
 
-	// ThemeFactory leaves the default accent to Red's own tuned shades, so the pictures have to as well.
 	[Theory]
 	[InlineData("#ef5350")]
 	[InlineData("#EF5350")]
 	[InlineData("not a color")]
-	public void Choice_TheDefaultAccent_IsNoAccent(string stored)
+	public void Choice_TheDefaultAccent_IsTheRedSwatch(string stored)
 	{
 		AppearanceSettings settings = new() { AccentColor = stored };
 
-		IReadOnlyList<MokaAccent> accents = AppearanceChoice.AccentsFor(settings);
-
-		Assert.Empty(accents);
-		Assert.Null(AppearanceChoice.ValueFor(settings, accents).Accent);
+		Assert.DoesNotContain(AppearanceChoice.AccentsFor(settings), accent => accent.Id == "custom");
+		Assert.Equal("red", AppearanceChoice.ValueFor(settings).Accent);
 	}
 
 	[Theory]
-	[InlineData("#42a5f5")]
-	[InlineData("#abc")]
-	public void Choice_AnyOtherAccent_TintsThePictures(string stored)
+	[InlineData("#42a5f5", "blue")]
+	[InlineData("#42A5F5", "blue")]
+	[InlineData("#abc", "custom")]
+	public void Choice_AnyOtherAccent_IsPickedInTheList(string stored, string id)
 	{
 		AppearanceSettings settings = new() { AccentColor = stored };
 
-		MokaAccent accent = Assert.Single(AppearanceChoice.AccentsFor(settings));
-
-		Assert.Equal(accent.Id, AppearanceChoice.ValueFor(settings, [accent]).Accent);
+		Assert.Equal(id, AppearanceChoice.ValueFor(settings).Accent);
+		Assert.Contains(AppearanceChoice.AccentsFor(settings), accent => accent.Id == id);
 	}
 
 	[Fact]

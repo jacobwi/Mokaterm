@@ -1,49 +1,111 @@
 using Moka.Red.Core.Theming;
 using Moka.Red.ThemeGen.Appearance;
 using Mokaterm.Abstractions.Settings;
+using Mokaterm.UI.Common.Presentation;
 
 namespace Mokaterm.UI.Settings.Pages.Appearance;
 
-/// <summary>
-/// What the Appearance page hands Moka's appearance panel, read from <see cref="AppearanceSettings"/>, and the one choice
-/// that comes back. The panel only picks the mode here, so its value says nothing else that could reach the stored record.
-/// </summary>
+// Translates between AppearanceSettings and the MokaAppearance the page's panels take and give back.
 internal static class AppearanceChoice
 {
-	/// <summary>Only the design <c>ThemeFactory</c> builds, so the pictures show what the app will look like.</summary>
+	private const string CustomAccentId = "custom";
+
+	private static readonly (string Id, string Name, string Color)[] AccentPresets =
+	[
+		("red", "Moka red", AppearanceSettings.DefaultAccentColor),
+		("blue", "Blue", "#42a5f5"),
+		("green", "Green", "#00e676"),
+		("orange", "Orange", "#ffab40"),
+		("purple", "Purple", "#ce93d8"),
+		("yellow", "Yellow", "#ffd54f"),
+	];
+
+	private static readonly IReadOnlyList<MokaAccent> PresetAccents =
+		[.. AccentPresets.Select(preset => MokaAccent.FromColor(preset.Color) with { Id = preset.Id, Name = preset.Name })];
+
+	// Only the design ThemeFactory builds, so the pictures show what the app will look like.
 	public static IReadOnlyList<MokaAppearancePalette> Palettes { get; } = [MokaAppearancePalette.Red];
 
-	public static MokaAppearanceText Words { get; } = new() { ColorMode = "Theme mode" };
+	public static MokaAppearanceText Words { get; } = new()
+	{
+		ColorMode = "Theme mode",
+		Accent = "Accent color",
+		StatusBar = "Status bar style",
+	};
 
-	/// <summary>
-	/// The accent the pictures are tinted with. The default stays no accent at all, as it does in <c>ThemeFactory</c>:
-	/// Red tunes its own shades, and running the default through an accent would come out a slightly different red.
-	/// </summary>
+	// The app stores light or dark, so following the device has nothing to save as.
+	public static MokaAppearanceOptionState StateOf(MokaAppearanceOption option) =>
+		option.Value is MokaColorMode.System ? MokaAppearanceOptionState.Hidden : MokaAppearanceOptionState.Available;
+
 	public static IReadOnlyList<MokaAccent> AccentsFor(AppearanceSettings settings)
 	{
 		ArgumentNullException.ThrowIfNull(settings);
 		string accent = settings.Clamped().AccentColor;
-		return string.Equals(accent, AppearanceSettings.DefaultAccentColor, StringComparison.OrdinalIgnoreCase)
-			? []
-			: [MokaAccent.FromColor(accent)];
+		return AccentIdFor(accent) == CustomAccentId
+			? [.. PresetAccents, MokaAccent.FromColor(accent) with { Id = CustomAccentId, Name = accent }]
+			: PresetAccents;
 	}
 
-	public static MokaAppearance ValueFor(AppearanceSettings settings, IReadOnlyList<MokaAccent> accents)
+	public static MokaAppearance ValueFor(AppearanceSettings settings)
 	{
 		ArgumentNullException.ThrowIfNull(settings);
-		ArgumentNullException.ThrowIfNull(accents);
+		AppearanceSettings usable = settings.Clamped();
 		return new MokaAppearance
 		{
-			Mode = settings.Mode == ThemeMode.Light ? MokaColorMode.Light : MokaColorMode.Dark,
-			Accent = accents.Count > 0 ? accents[0].Id : null,
+			Mode = usable.Mode == ThemeMode.Light ? MokaColorMode.Light : MokaColorMode.Dark,
+			Accent = AccentIdFor(usable.AccentColor),
+			StatusBar = StatusBarLooks.Of(usable.StatusBarStyle),
 		};
 	}
 
-	/// <summary>The stored mode for a pick. A pick the app has no mode for changes nothing.</summary>
+	public static AppearanceSettings Apply(AppearanceSettings settings, MokaAppearance picked)
+	{
+		ArgumentNullException.ThrowIfNull(settings);
+		ArgumentNullException.ThrowIfNull(picked);
+		return settings with
+		{
+			Mode = ModeFrom(picked.Mode, settings.Mode),
+			AccentColor = AccentColorFrom(picked.Accent, settings.AccentColor),
+			StatusBarStyle = picked.StatusBar is { } look ? StatusBarLooks.From(look) : settings.StatusBarStyle,
+		};
+	}
+
 	public static ThemeMode ModeFrom(MokaColorMode picked, ThemeMode current) => picked switch
 	{
 		MokaColorMode.Light => ThemeMode.Light,
 		MokaColorMode.Dark => ThemeMode.Dark,
 		_ => current,
 	};
+
+	private static string AccentIdFor(string color)
+	{
+		foreach ((string id, _, string preset) in AccentPresets)
+		{
+			if (string.Equals(color, preset, StringComparison.OrdinalIgnoreCase))
+			{
+				return id;
+			}
+		}
+
+		return CustomAccentId;
+	}
+
+	private static string AccentColorFrom(string? id, string current)
+	{
+		// Clicking the picked swatch clears it, which here means back to the default.
+		if (id is null)
+		{
+			return AppearanceSettings.DefaultAccentColor;
+		}
+
+		foreach ((string presetId, _, string color) in AccentPresets)
+		{
+			if (presetId == id)
+			{
+				return color;
+			}
+		}
+
+		return current;
+	}
 }

@@ -20,25 +20,11 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		$"Buttons, focus rings and selections. Moka red ({AppearanceSettings.DefaultAccentColor}) is the default. "
 		+ HexColor.Requirement(HexColorForms.Accent);
 
-	private static readonly string[] AccentPresets =
-		[AppearanceSettings.DefaultAccentColor, "#42a5f5", "#00e676", "#ffab40", "#ce93d8", "#ffd54f"];
-
 	private static readonly IReadOnlyList<EnumOption<UiDensity>> DensityOptions =
 	[
 		new(UiDensity.Compact, "Compact"),
 		new(UiDensity.Cozy, "Cozy"),
 		new(UiDensity.Comfortable, "Comfortable"),
-	];
-
-	private static readonly IReadOnlyList<EnumOption<StatusBarStyle>> StatusBarStyleOptions =
-	[
-		new(StatusBarStyle.Standard, "Standard"),
-		new(StatusBarStyle.Accent, "Accent"),
-		new(StatusBarStyle.Hairline, "Hairline"),
-		new(StatusBarStyle.Floating, "Floating"),
-		new(StatusBarStyle.Chips, "Chips"),
-		new(StatusBarStyle.Segments, "Segments"),
-		new(StatusBarStyle.Terminal, "Terminal"),
 	];
 
 	private static readonly IReadOnlyList<EnumOption<SessionToolbarLayout>> ToolbarLayoutOptions =
@@ -73,14 +59,7 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		return _previewAccents;
 	}
 
-	private Task SetModeAsync(MokaAppearance appearance) =>
-		UpdateAsync(s => s with { Mode = AppearanceChoice.ModeFrom(appearance.Mode, s.Mode) });
-
-	private static string? SelectedPreset(string accent) =>
-		Array.Find(AccentPresets, preset => string.Equals(preset, accent, StringComparison.OrdinalIgnoreCase));
-
-	private Task SelectPresetAsync(string? color) =>
-		color is null ? Task.CompletedTask : SaveAsync(s => s with { AccentColor = color });
+	private Task PickAsync(MokaAppearance picked) => SaveAsync(s => AppearanceChoice.Apply(s, picked));
 
 	private Task SetFontScaleAsync(double value) =>
 		// Range inputs report binary fractions such as 1.1500000000000001; store the step value instead. The range
