@@ -1,3 +1,17 @@
+## What's new in 0.3.9
+
+**File browser**
+
+- Rebuilt on Moka.Red's file browser, with the same toolbars, keys and file operations.
+- Drag the left edge of a column heading to resize it, or use the arrow keys with focus on that edge. A double click puts it
+  back.
+- Clicking empty space in the list clears the selection, Ctrl+Shift+click adds a range, and `/` jumps to the filter.
+
+**Appearance**
+
+- Every status bar style is now a picture card drawn on a real status bar, and the status bar settings have their own section.
+- Accent swatches show the shade the app really uses in the current mode.
+
 ## What's new in 0.3.8
 
 **File browser**
