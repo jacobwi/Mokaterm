@@ -15,6 +15,7 @@
 					 ViewChanged="OnViewChanged"
 					 Columns="ColumnList"
 					 FitWidths="ColumnFit"
+					 ResizableColumns
 					 Text="_text"
 					 Filter="@_filter"
 					 FilterChanged="OnFilterChanged"
@@ -307,10 +308,7 @@
 
 @code {
 
-	private static RenderFragment<RemoteFileEntry> MonoCell(Func<RemoteFileEntry, string> text) => entry =>
-		@<span class="fb-mono" title="@text(entry)">@text(entry)</span>;
-
-	private static RenderFragment<RemoteFileEntry> PlainCell(Func<RemoteFileEntry, string> text) => entry =>
+	private static RenderFragment<RemoteFileEntry> CellOf(Func<RemoteFileEntry, string> text) => entry =>
 		@<span title="@text(entry)">@text(entry)</span>;
 
 }

@@ -1,5 +1,4 @@
 .fb {
-	--fb-scrollbar: 10px;
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -173,11 +172,11 @@
 	outline: none;
 }
 
-/* The heading row sits outside the list that scrolls, so it has to leave the same room as the list's scrollbar. */
+/* Our padding below replaces the one Moka adds the list's scrollbar to, so the room is left here. */
 .fb ::deep .moka-file-browser__head::after {
 	content: "";
 	flex: none;
-	width: var(--fb-scrollbar);
+	width: var(--moka-file-browser-gutter, 0px);
 	margin-inline-start: calc(var(--moka-spacing-xl) * -2);
 }
 
@@ -212,21 +211,6 @@
 	color: var(--moka-color-on-surface);
 }
 
-/* Where a column's edge can be taken. filebrowser.js does the dragging, since the browser's headings have no handle. */
-.fb ::deep .moka-file-browser__heading::after {
-	content: "";
-	position: absolute;
-	inset-block: 0;
-	right: -6px;
-	width: 12px;
-	cursor: col-resize;
-}
-
-.fb ::deep .moka-file-browser__heading:last-child::after {
-	right: 0;
-	width: 6px;
-}
-
 /* The name keeps its room first; the link target takes what is left. */
 .fb ::deep .moka-file-browser__name {
 	flex-shrink: 0;
@@ -241,11 +225,6 @@
 	font-family: var(--moka-font-family-mono);
 	font-size: var(--moka-font-size-mono);
 	color: var(--moka-color-on-surface-variant);
-}
-
-.fb ::deep .fb-mono {
-	font-family: var(--moka-font-family-mono);
-	font-size: var(--moka-font-size-mono);
 }
 
 .fb ::deep .fb-name--renaming {

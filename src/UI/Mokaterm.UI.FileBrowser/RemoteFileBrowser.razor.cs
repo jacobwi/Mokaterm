@@ -1,4 +1,5 @@
 using Moka.Red.ContextMenu;
+using Moka.Red.Core.Enums;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -1055,17 +1056,17 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 				_columnFeatures = features;
 				List<MokaFileColumn<RemoteFileEntry>> columns =
 				[
-					Column(EntryOrdering.SizeColumn, "Size", "--fb-col-size", "68px", PlainCell(EntryVisuals.SizeText)) with { Mono = true, Fit = MokaFileColumnFit.Always },
-					Column(EntryOrdering.ModifiedColumn, "Modified", "--fb-col-modified", "124px", MonoCell(entry => DisplayFormat.Timestamp(entry.LastModified))) with { Fit = MokaFileColumnFit.Medium },
+					Column(EntryOrdering.SizeColumn, "Size", "68px", EntryVisuals.SizeText) with { Align = MokaTextAlign.Right, Fit = MokaFileColumnFit.Always },
+					Column(EntryOrdering.ModifiedColumn, "Modified", "124px", entry => DisplayFormat.Timestamp(entry.LastModified)) with { Fit = MokaFileColumnFit.Medium },
 				];
 				if (features.Item1)
 				{
-					columns.Add(Column(EntryOrdering.PermissionsColumn, "Permissions", "--fb-col-permissions", "104px", MonoCell(EntryVisuals.PermissionsText)));
+					columns.Add(Column(EntryOrdering.PermissionsColumn, "Permissions", "104px", EntryVisuals.PermissionsText));
 				}
 
 				if (features.Item2)
 				{
-					columns.Add(Column(EntryOrdering.OwnerColumn, "Owner", "--fb-col-owner", "112px", MonoCell(EntryOrdering.OwnerLabel)));
+					columns.Add(Column(EntryOrdering.OwnerColumn, "Owner", "112px", EntryOrdering.OwnerLabel));
 				}
 
 				_columns = columns;
@@ -1075,14 +1076,15 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		}
 	}
 
-	// The width is a variable so a drag on the heading's edge (filebrowser.js) can change it without a render per move.
 	// The comparison falls back to the name itself, which the browser then turns around with the rest for a descending sort.
-	private static MokaFileColumn<RemoteFileEntry> Column(string id, string title, string widthVariable, string width, RenderFragment<RemoteFileEntry> cell) =>
+	private static MokaFileColumn<RemoteFileEntry> Column(string id, string title, string width, Func<RemoteFileEntry, string> text) =>
 		new(id, title)
 		{
-			Cell = cell,
+			Cell = CellOf(text),
 			Compare = (a, b) => EntryOrdering.Compare(a, b, id, descending: false, foldersFirst: false),
-			Width = $"var({widthVariable}, {width})",
+			Width = width,
+			Mono = true,
+			Align = MokaTextAlign.Left,
 		};
 
 	private IReadOnlyList<MokaFileColumn<RemoteFileEntry>>? _columns;

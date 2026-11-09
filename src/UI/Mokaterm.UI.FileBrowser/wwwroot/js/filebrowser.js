@@ -1,5 +1,4 @@
-// Browser side of RemoteFileBrowser: the keys MokaFileBrowser leaves to it, dragging a column's edge, width steps for the
-// responsive layout, focus helpers, Enter handling for the browser's dialogs, and the file editor's gutter, indenting,
+// Browser side of RemoteFileBrowser: the keys MokaFileBrowser leaves to it, width steps for the responsive layout, focus helpers, Enter handling for the browser's dialogs, and the file editor's gutter, indenting,
 // Ctrl+S and the coloured layer under its text (tokens come from syntax.js).
 import { invoke } from '../../Mokaterm.UI.Common/js/interop.js';
 import { canHighlight, createHighlightModel } from './syntax.js';
@@ -7,11 +6,6 @@ export { bindDialog } from '../../Mokaterm.UI.Common/js/forms.js';
 
 const typeAheadResetMs = 800;
 const listSelector = '[data-moka-list]';
-const headSelector = '.moka-file-browser__head';
-
-// How far from a heading's right edge a press takes the edge rather than the heading.
-const columnEdgeReach = 6;
-const columnMinWidth = 48;
 
 // A little longer than MokaDialog's 200 ms exit.
 const dialogExitMs = 260;
@@ -101,92 +95,6 @@ function isListKey(event) {
 		|| (event.key === ' ' && !isActivatable(event.target));
 }
 
-function columnVariable(heading) {
-	return /--fb-col-[a-z]+/.exec(heading.getAttribute('style') ?? '')?.[0] ?? null;
-}
-
-// The heading whose right edge is under the pointer, or null. Headings a narrow browser hides measure nothing.
-function edgeAt(head, x) {
-	return [...head.children].find(heading => {
-		const box = heading.getBoundingClientRect();
-		return box.width > 0 && Math.abs(x - box.right) <= columnEdgeReach;
-	}) ?? null;
-}
-
-// MokaFileBrowser's columns cannot be dragged, so this does it from outside. Each width is a variable the column reads and
-// this sets on the root, for as long as the browser lives. The name takes what is left, so its own edge moves the next column.
-function attachColumnResize(root) {
-	let swallowClick = false;
-
-	const onPointerDown = event => {
-		const head = event.button === 0 && isElement(event.target) ? event.target.closest(headSelector) : null;
-		const edge = head ? edgeAt(head, event.clientX) : null;
-		if (!edge) {
-			return;
-		}
-
-		const headings = [...head.children];
-		const resized = columnVariable(edge) ? edge : headings[headings.indexOf(edge) + 1];
-		const variable = resized ? columnVariable(resized) : null;
-		if (!variable) {
-			return;
-		}
-
-		const direction = resized === edge ? 1 : -1;
-		const startX = event.clientX;
-		const startWidth = resized.getBoundingClientRect().width;
-		swallowClick = true;
-		event.preventDefault();
-
-		const onMove = move => {
-			const width = Math.max(columnMinWidth, startWidth + direction * (move.clientX - startX));
-			root.style.setProperty(variable, `${Math.round(width)}px`);
-		};
-
-		const onUp = () => {
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('pointercancel', onUp);
-		};
-
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('pointercancel', onUp);
-	};
-
-	// Blazor listens on the document, so stopping it here keeps a press on an edge from sorting the column.
-	const onClick = event => {
-		if (swallowClick) {
-			swallowClick = false;
-			event.stopPropagation();
-		}
-	};
-
-	const onDoubleClick = event => {
-		const head = isElement(event.target) ? event.target.closest(headSelector) : null;
-		const edge = head ? edgeAt(head, event.clientX) : null;
-		if (!edge) {
-			return;
-		}
-
-		const headings = [...head.children];
-		const resized = columnVariable(edge) ? edge : headings[headings.indexOf(edge) + 1];
-		const variable = resized ? columnVariable(resized) : null;
-		if (variable) {
-			root.style.removeProperty(variable);
-		}
-	};
-
-	root.addEventListener('pointerdown', onPointerDown, true);
-	root.addEventListener('click', onClick, true);
-	root.addEventListener('dblclick', onDoubleClick, true);
-	return () => {
-		root.removeEventListener('pointerdown', onPointerDown, true);
-		root.removeEventListener('click', onClick, true);
-		root.removeEventListener('dblclick', onDoubleClick, true);
-	};
-}
-
 export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 	let active = !!initiallyActive;
 	let typeAhead = '';
@@ -216,6 +124,11 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 
 	const onKeyDown = event => {
 		if (!active || event.isComposing || isEditable(event.target)) {
+			return;
+		}
+
+		// A column's edge resizes it from the keyboard, and this listener runs first.
+		if (isElement(event.target) && event.target.closest('[role="separator"]')) {
 			return;
 		}
 
@@ -280,7 +193,6 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 	// Capture, so these keys are settled before MokaFileBrowser's own listener on the element inside.
 	root.addEventListener('keydown', onKeyDown, true);
 	root.addEventListener('pointerdown', onPointerDown, true);
-	const detachColumnResize = attachColumnResize(root);
 
 	return {
 		setActive(value) {
@@ -320,7 +232,6 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			resizeObserver.disconnect();
 			root.removeEventListener('keydown', onKeyDown, true);
 			root.removeEventListener('pointerdown', onPointerDown, true);
-			detachColumnResize();
 			clearTimeout(typeAheadTimer);
 		},
 	};
