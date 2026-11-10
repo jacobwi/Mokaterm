@@ -24,6 +24,8 @@ internal static class AppearanceChoice
 		ColorMode = "Theme mode",
 		Accent = "Accent color",
 		StatusBar = "Status bar style",
+		Popups = "Menus and popups",
+		Lists = "Field lists",
 	};
 
 	// The app stores light or dark, so following the device has nothing to save as.
@@ -48,6 +50,11 @@ internal static class AppearanceChoice
 			Mode = usable.Mode == ThemeMode.Light ? MokaColorMode.Light : MokaColorMode.Dark,
 			Accent = AccentIdFor(usable.AccentColor),
 			StatusBar = StatusBarLooks.Of(usable.StatusBarStyle),
+			Toasts = ComponentLooks.Of(usable.ToastStyle),
+			ToastStacking = ComponentLooks.Of(usable.ToastStack),
+			Popups = ComponentLooks.Of(usable.PopupStyle),
+			Lists = ComponentLooks.Of(usable.ListStyle),
+			Buttons = ComponentLooks.Of(usable.ButtonStyle),
 		};
 	}
 
@@ -60,6 +67,11 @@ internal static class AppearanceChoice
 			Mode = ModeFrom(picked.Mode, settings.Mode),
 			AccentColor = AccentColorFrom(picked.Accent, settings.AccentColor),
 			StatusBarStyle = picked.StatusBar is { } look ? StatusBarLooks.From(look) : settings.StatusBarStyle,
+			ToastStyle = picked.Toasts is { } toasts ? ComponentLooks.From(toasts) : settings.ToastStyle,
+			ToastStack = picked.ToastStacking is { } stacking ? ComponentLooks.From(stacking) : settings.ToastStack,
+			PopupStyle = picked.Popups is { } popups ? ComponentLooks.From(popups) : settings.PopupStyle,
+			ListStyle = picked.Lists is { } lists ? ComponentLooks.From(lists) : settings.ListStyle,
+			ButtonStyle = picked.Buttons is { } buttons ? ComponentLooks.From(buttons) : settings.ButtonStyle,
 		};
 	}
 

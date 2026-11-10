@@ -28,6 +28,13 @@ internal static class ThemeFactory
 			_ => theme,
 		};
 
-		return theme.WithStatusBar(StatusBarLooks.Of(usable.StatusBarStyle)).WithFontScale(usable.FontScale);
+		return theme
+			.WithStatusBar(StatusBarLooks.Of(usable.StatusBarStyle))
+			.WithToasts(ComponentLooks.Of(usable.ToastStyle))
+			.WithToastStacking(ComponentLooks.Of(usable.ToastStack))
+			.WithPopups(ComponentLooks.Of(usable.PopupStyle))
+			.WithLists(ComponentLooks.Of(usable.ListStyle))
+			.WithButtons(ComponentLooks.Of(usable.ButtonStyle))
+			.WithFontScale(usable.FontScale);
 	}
 }

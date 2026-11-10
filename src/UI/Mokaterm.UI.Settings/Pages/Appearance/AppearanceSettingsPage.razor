@@ -26,7 +26,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale, status bar, host figures, session toolbar and tool windows back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, font scale, status bar, component styles, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms." Stacked>
 			@Panel(MokaAppearanceRows.ColorMode)
@@ -88,6 +88,24 @@
 						   Suffix="s"
 						   Disabled="!settings.ShowHostFigures"
 						   AriaLabel="Host figures interval in seconds" />
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Components" Description="How the app's own pieces are drawn. Each applies at once.">
+		<SettingsRow Label="Buttons" Description="Every button in the app." Stacked>
+			@Panel(MokaAppearanceRows.Buttons)
+		</SettingsRow>
+		<SettingsRow Label="Menus and popups" Description="Context menus, dropdowns, popovers and the other panels that float over a page." Stacked>
+			@Panel(MokaAppearanceRows.Popups)
+		</SettingsRow>
+		<SettingsRow Label="Field lists" Description="The list a field opens to pick from, such as a protocol or a theme." Stacked>
+			@Panel(MokaAppearanceRows.Lists)
+		</SettingsRow>
+		<SettingsRow Label="Toasts" Description="The short notices in the corner of the window." Stacked>
+			@Panel(MokaAppearanceRows.Toasts)
+		</SettingsRow>
+		<SettingsRow Label="Toast stack" Description="Several toasts at once, one under another or piled up and fanned out when pointed at." Stacked>
+			@Panel(MokaAppearanceRows.ToastStacking)
 		</SettingsRow>
 	</SettingsSection>
 

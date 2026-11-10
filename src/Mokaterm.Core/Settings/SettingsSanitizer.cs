@@ -40,6 +40,11 @@ internal static class SettingsSanitizer
 			Density = Defined(settings.Density, defaults.Density),
 			ToolbarLayout = Defined(settings.ToolbarLayout, defaults.ToolbarLayout),
 			StatusBarStyle = Defined(settings.StatusBarStyle, defaults.StatusBarStyle),
+			ToastStyle = Defined(settings.ToastStyle, defaults.ToastStyle),
+			ToastStack = Defined(settings.ToastStack, defaults.ToastStack),
+			PopupStyle = Defined(settings.PopupStyle, defaults.PopupStyle),
+			ListStyle = Defined(settings.ListStyle, defaults.ListStyle),
+			ButtonStyle = Defined(settings.ButtonStyle, defaults.ButtonStyle),
 			HiddenToolbarButtons = ToolbarButtonIds(settings.HiddenToolbarButtons),
 		};
 	}

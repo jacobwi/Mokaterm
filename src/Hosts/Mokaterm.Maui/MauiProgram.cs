@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
+using Moka.Red.Core.Extensions;
 using Mokaterm.Abstractions.Platform;
 using Mokaterm.Core.Extensions;
 using Mokaterm.Core.Plugins;
@@ -67,6 +68,7 @@ public static class MauiProgram
 		builder.Services.AddPluginGallery(PluginGalleryOptions.FromEnvironment());
 		builder.Services.AddMokatermSessions();
 		builder.Services.AddMokatermUI();
+		builder.Services.AddMokaFilePicker<DesktopFilePicker>();
 
 		// The main window's title in place of the page's document title, which nothing outside the WebView shows.
 		builder.Services.AddSingleton<DesktopWindowTitle>();

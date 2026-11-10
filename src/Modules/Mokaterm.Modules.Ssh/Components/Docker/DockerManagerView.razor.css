@@ -602,7 +602,8 @@
 	vertical-align: middle;
 }
 
-@container mt-tool-table (max-width: 799px) {
+/* The time beside a state tag goes first: the ports and the image need that room more, and the tag's hint has the time. */
+@container mt-tool-table (max-width: 959px) {
 	.mt-dk ::deep .mt-dk-since {
 		display: none;
 	}

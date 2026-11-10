@@ -59,6 +59,21 @@ public sealed record AppearanceSettings : ISettingsSection
 	/// <summary>How the status bar is drawn while it shows.</summary>
 	public StatusBarStyle StatusBarStyle { get; init; } = StatusBarStyle.Standard;
 
+	/// <summary>How toasts are drawn.</summary>
+	public ToastStyle ToastStyle { get; init; } = ToastStyle.Standard;
+
+	/// <summary>How several toasts at once are laid out.</summary>
+	public ToastStack ToastStack { get; init; } = ToastStack.List;
+
+	/// <summary>How menus, popovers and other floating panels are drawn.</summary>
+	public PopupStyle PopupStyle { get; init; } = PopupStyle.Standard;
+
+	/// <summary>How the rows of a list that opens from a field are drawn.</summary>
+	public ListStyle ListStyle { get; init; } = ListStyle.Standard;
+
+	/// <summary>How buttons are drawn.</summary>
+	public ButtonStyle ButtonStyle { get; init; } = ButtonStyle.Standard;
+
 	/// <summary>
 	/// Shows the CPU, memory and root disk use of the active session's machine in the status bar, for sessions that can
 	/// read them. Reading them runs a short command on that machine every <see cref="HostFiguresSeconds"/>.

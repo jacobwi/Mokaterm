@@ -21,8 +21,16 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 
 	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFilesAsync(bool multiple = true, IReadOnlyList<string>? extensions = null, CancellationToken cancellationToken = default)
 	{
-		List<string> paths = await MainThread.InvokeOnMainThreadAsync(async () =>
+		IReadOnlyList<FileResult> picked = await PickAsync(multiple, extensions);
+		return LocalPaths.Expand(picked.Select(result => result.FullPath).ToList());
+	}
+
+	// MAUI's file picker has to be called on the UI thread. A pick started from a click in the page waits for that event
+	// to return first, because a dialog shown inside a WebView event can misbehave on Windows.
+	internal static Task<IReadOnlyList<FileResult>> PickAsync(bool multiple, IReadOnlyList<string>? extensions) =>
+		MainThread.InvokeOnMainThreadAsync<IReadOnlyList<FileResult>>(async () =>
 		{
+			await Task.Yield();
 			PickOptions options = new()
 			{
 				PickerTitle = multiple ? "Choose files to upload" : "Choose a file",
@@ -33,15 +41,12 @@ internal sealed partial class MauiLocalFileAccess : ILocalFileAccess
 			if (multiple)
 			{
 				IEnumerable<FileResult?>? results = await FilePicker.Default.PickMultipleAsync(options);
-				return results is null ? new List<string>() : results.OfType<FileResult>().Select(result => result.FullPath).ToList();
+				return results is null ? [] : [.. results.OfType<FileResult>()];
 			}
 
 			FileResult? single = await FilePicker.Default.PickAsync(options);
-			return single is null ? new List<string>() : new List<string> { single.FullPath };
+			return single is null ? [] : [single];
 		});
-
-		return LocalPaths.Expand(paths);
-	}
 
 	public async ValueTask<IReadOnlyList<LocalFileItem>> PickFolderAsync(CancellationToken cancellationToken = default)
 	{

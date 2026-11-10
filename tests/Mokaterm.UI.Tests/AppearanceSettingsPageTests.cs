@@ -73,9 +73,14 @@ public sealed class AppearanceSettingsPageTests
 	[Fact]
 	public async Task Render_EveryStatusBarStyleIsACard_WithTheStoredOnePicked()
 	{
-		string html = await RenderAsync(new AppearanceSettings { StatusBarStyle = StatusBarStyle.Chips });
+		string page = await RenderAsync(new AppearanceSettings { StatusBarStyle = StatusBarStyle.Chips });
 
-		Assert.Contains("data-setting=\"status-bar-style\"", html, StringComparison.Ordinal);
+		// Only the status bar's row: the component rows below it have Standard cards of their own.
+		int start = page.IndexOf("data-setting=\"status-bar-style\"", StringComparison.Ordinal);
+		Assert.True(start >= 0);
+		int end = page.IndexOf("data-setting=", start + 1, StringComparison.Ordinal);
+		string html = end < 0 ? page[start..] : page[start..end];
+
 		foreach (StatusBarStyle style in Enum.GetValues<StatusBarStyle>())
 		{
 			Assert.Matches($"<input[^>]*value=\"{style}\"", html);
@@ -106,6 +111,79 @@ public sealed class AppearanceSettingsPageTests
 		foreach (MokaStatusBarLook look in Enum.GetValues<MokaStatusBarLook>())
 		{
 			Assert.Equal(look, StatusBarLooks.Of(StatusBarLooks.From(look)));
+		}
+	}
+
+	[Fact]
+	public void ComponentLooks_RoundTripEveryStyle_AndEveryLookIsOneWeCanStore()
+	{
+		RoundTrip<ToastStyle, MokaToastLook>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<ToastStack, MokaToastStacking>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<PopupStyle, MokaPopupLook>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<ListStyle, MokaListLook>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<ButtonStyle, MokaButtonLook>(ComponentLooks.Of, ComponentLooks.From);
+
+		static void RoundTrip<TStored, TLook>(Func<TStored, TLook> of, Func<TLook, TStored> from)
+			where TStored : struct, Enum
+			where TLook : struct, Enum
+		{
+			foreach (TStored stored in Enum.GetValues<TStored>())
+			{
+				Assert.Equal(stored, from(of(stored)));
+			}
+
+			foreach (TLook look in Enum.GetValues<TLook>())
+			{
+				Assert.Equal(look, of(from(look)));
+			}
+		}
+	}
+
+	[Fact]
+	public void Choice_PickedComponentLooks_AreStored_AndNothingElseMoves()
+	{
+		AppearanceSettings settings = new() { Mode = ThemeMode.Light, AccentColor = "#123456", StatusBarStyle = StatusBarStyle.Chips };
+		MokaAppearance picked = AppearanceChoice.ValueFor(settings) with
+		{
+			Toasts = MokaToastLook.Pill,
+			ToastStacking = MokaToastStacking.Pile,
+			Popups = MokaPopupLook.Glass,
+			Lists = MokaListLook.Check,
+			Buttons = MokaButtonLook.Soft,
+		};
+
+		AppearanceSettings next = AppearanceChoice.Apply(settings, picked);
+
+		Assert.Equal(settings with
+		{
+			ToastStyle = ToastStyle.Pill,
+			ToastStack = ToastStack.Pile,
+			PopupStyle = PopupStyle.Glass,
+			ListStyle = ListStyle.Check,
+			ButtonStyle = ButtonStyle.Soft,
+		}, next);
+	}
+
+	[Fact]
+	public async Task Render_EveryComponentRowShowsTheStoredStyle()
+	{
+		string html = await RenderAsync(new AppearanceSettings
+		{
+			ButtonStyle = ButtonStyle.Ghost,
+			PopupStyle = PopupStyle.Contrast,
+			ListStyle = ListStyle.Radio,
+			ToastStyle = ToastStyle.Snackbar,
+			ToastStack = ToastStack.Pile,
+		});
+
+		foreach (string anchor in new[] { "buttons", "menus-and-popups", "field-lists", "toasts", "toast-stack" })
+		{
+			Assert.Contains($"data-setting=\"{anchor}\"", html, StringComparison.Ordinal);
+		}
+
+		foreach (string picked in new[] { "Ghost", "Contrast", "Radio", "Snackbar", "Pile" })
+		{
+			Assert.Matches($"<input[^>]*value=\"{picked}\"[^>]*checked", html);
 		}
 	}
 

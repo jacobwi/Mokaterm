@@ -51,6 +51,7 @@
 	<ItemGroup>
 		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Services\NotificationClick.cs" LinkBase="Shared" />
 		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Services\MainWindowPlace.cs" LinkBase="Shared" />
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Services\FilePickExtensions.cs" LinkBase="Shared" />
 	</ItemGroup>
 
 	<!--
