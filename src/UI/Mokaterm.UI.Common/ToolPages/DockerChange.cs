@@ -14,6 +14,9 @@ internal sealed record DockerChange(string Title, string Command, DockerOutput? 
 
 	public string ExitText => Output?.ExitText ?? "did not finish";
 
+	/// <summary>How it ended, as its tag says it.</summary>
+	public string ExitLabel => Output?.ExitLabel ?? "Did not finish";
+
 	/// <summary>What the output box shows: both streams, or the reason it did not run.</summary>
 	public string Text => Output is { } output
 		? output.Combined is { Length: > 0 } combined ? combined : "(no output)"

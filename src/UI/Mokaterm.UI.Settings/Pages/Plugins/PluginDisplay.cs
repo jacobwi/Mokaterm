@@ -20,7 +20,7 @@ internal static class PluginDisplay
 	/// <summary>What the gallery's verified badge means.</summary>
 	public const string VerifiedTitle = "Built from source in the gallery's own repository and reviewed by the Mokaterm team.";
 
-	public static string Kind(bool hasCode) => hasCode ? "CODE" : "DATA";
+	public static string Kind(bool hasCode) => hasCode ? "Code" : "Data";
 
 	/// <summary>Code gets the accent because it is what the trust step is about; data runs nothing.</summary>
 	public static MokaColor KindColor(bool hasCode) => hasCode ? MokaColor.Primary : MokaColor.Surface;

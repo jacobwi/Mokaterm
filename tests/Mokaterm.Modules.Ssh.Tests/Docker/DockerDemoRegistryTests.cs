@@ -10,7 +10,8 @@ namespace Mokaterm.Modules.Ssh.Tests.Docker;
 /// <summary>
 /// The DevHost's demo docker played end to end through the module's own shell, client and readers, the way the manager
 /// drives it: the client config, a login that reads its password from stdin and refuses a wrong one, logout, a build
-/// whose lines arrive over time and that can be stopped, a tag, and a push that a registry refuses until it is logged in to.
+/// whose lines arrive over time and that can be stopped, a tag, a push that a registry refuses until it is logged in to,
+/// and several containers stopped and started in one command, as the containers page's bulk bar sends them.
 /// </summary>
 public sealed class DockerDemoRegistryTests
 {
@@ -152,6 +153,29 @@ public sealed class DockerDemoRegistryTests
 
 	private static DockerLivePlan LivePlan(DockerCall call, bool progress = true) =>
 		new([call], "Demo run", "Runs it.", "Run", DockerLivePlan.ImagesOwner, progress);
+
+	[Fact]
+	public async Task SeveralContainers_StopAndStartInOneCommand_AsTheBulkBarSendsThem()
+	{
+		(FakeTimeProvider time, DockerSessionFeature feature) = Demo();
+		await using (feature)
+		{
+			DockerOutput stopped = await DriveAsync(time, feature.Client.RunAsync(DockerCommands.Stop(["shop-web-1", "shop-db-1"]), Ct));
+			IReadOnlyList<DockerContainer> afterStop = await DriveAsync(time, feature.Client.ListContainersAsync(Ct));
+			DockerOutput started = await DriveAsync(time, feature.Client.RunAsync(DockerCommands.Start(["shop-web-1", "shop-db-1"]), Ct));
+			IReadOnlyList<DockerContainer> afterStart = await DriveAsync(time, feature.Client.ListContainersAsync(Ct));
+			DockerOutput missing = await DriveAsync(time, feature.Client.RunAsync(DockerCommands.Restart(["shop-web-1", "nothing-here"]), Ct));
+
+			Assert.True(stopped.Succeeded, stopped.Error);
+			Assert.Equal("shop-web-1\nshop-db-1\n", stopped.Output);
+			Assert.All(afterStop.Where(container => container.Name is "shop-web-1" or "shop-db-1"), container => Assert.False(container.IsAlive));
+			Assert.True(started.Succeeded, started.Error);
+			Assert.All(afterStart.Where(container => container.Name is "shop-web-1" or "shop-db-1"), container => Assert.True(container.IsRunning));
+			Assert.Equal(1, missing.ExitCode);
+			Assert.Contains("No such container: nothing-here", missing.Error, StringComparison.Ordinal);
+			Assert.Contains("shop-web-1", missing.Output, StringComparison.Ordinal);
+		}
+	}
 
 	private static (FakeTimeProvider Time, DockerSessionFeature Feature) Demo()
 	{

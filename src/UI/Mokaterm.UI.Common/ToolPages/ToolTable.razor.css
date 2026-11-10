@@ -40,6 +40,54 @@
 	text-overflow: ellipsis;
 }
 
+/*
+	The column toggle has no toolbar row of its own: Moka's toolbar is lifted out of the flow and laid over the end of the
+	header row, where the actions column has no heading, so the list keeps its height. While rows are picked the bulk bar
+	holds the top of the table and the toggle steps aside.
+*/
+.mt-tool-table--columns {
+	position: relative;
+}
+
+.mt-tool-table--columns ::deep > .moka-table-wrapper > .moka-table-toolbar {
+	position: absolute;
+	top: 1px;
+	right: 1px;
+	z-index: 4;
+	height: var(--mt-tool-row);
+	padding: 0 var(--moka-spacing-xs);
+	border: 0;
+	background: transparent;
+}
+
+.mt-tool-table--columns ::deep > .moka-table-wrapper > .moka-table-toolbar > .moka-table-toolbar-spacer {
+	display: none;
+}
+
+/* A quiet icon in the heading, the size of a row's own buttons, rather than a framed toolbar button. */
+.mt-tool-table--columns ::deep .moka-table-column-toggle-btn {
+	width: var(--moka-button-height-sm);
+	height: var(--moka-button-height-sm);
+	border-color: transparent;
+	background: transparent;
+	color: var(--moka-color-on-surface-variant);
+}
+
+.mt-tool-table--columns ::deep .moka-table-column-toggle-btn:hover,
+.mt-tool-table--columns ::deep .moka-table-column-toggle-btn[aria-expanded="true"] {
+	border-color: transparent;
+	background: var(--moka-color-surface-hover);
+	color: var(--moka-color-on-surface);
+}
+
+.mt-tool-table--columns ::deep thead th {
+	height: var(--mt-tool-row);
+}
+
+.mt-tool-table--picking ::deep > .moka-table-wrapper > .moka-table-toolbar {
+	display: none;
+}
+
 @container mt-tool-table (max-width: 799px) {
 	.mt-tool-table ::deep .mt-col-wider {
 		display: none;

@@ -38,7 +38,7 @@ public sealed partial class SshTunnelsView : SessionViewBase, IDisposable
 	private IReadOnlyList<(string Kind, SshForwardingLine Line)> ForwardingLines =>
 		_forwarding is not { } forwarding
 			? []
-			: [.. new (string Kind, SshForwardingLine Line)[] { ("AGENT", forwarding.Agent), ("X11", forwarding.X11) }.Where(entry => entry.Line.State != SshForwardingState.Off)];
+			: [.. new (string Kind, SshForwardingLine Line)[] { ("Agent", forwarding.Agent), ("X11", forwarding.X11) }.Where(entry => entry.Line.State != SshForwardingState.Off)];
 
 	public void Dispose()
 	{

@@ -56,6 +56,12 @@
 				   Label="Networks"
 				   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
 				   RowClass="@(network => network.InUse || network.IsBuiltIn ? null : "mt-dk-row--down")"
+				   BulkActions="BulkBar"
+				   ItemName="@(network => network.Name)"
+				   ItemsName="networks"
+				   ShowColumnToggle
+				   Layout="@Navigation?.LayoutOf(DockerPageIds.Networks)"
+				   LayoutChanged="@(layout => Navigation?.KeepLayout(DockerPageIds.Networks, layout))"
 				   EmptyIcon="DockerIcons.Network"
 				   EmptyTitle="@(_networks.Count == 0 ? "No networks" : "Nothing matches")"
 				   EmptyText="@(_networks.Count == 0 ? "docker network ls lists nothing on this host." : "No network matches the filter.")">
@@ -73,12 +79,12 @@
 							Position="MokaTooltipPosition.BottomEnd" />
 			</RowActions>
 			<ChildContent>
-				<MokaColumn TItem="DockerNetwork" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
+				<MokaColumn TItem="DockerNetwork" Title="" Sortable="false" Resizable="false" Class="mt-col-dot" Fixed>
 					<CellTemplate Context="network">
 						<MokaStatusDot Size="MokaSize.Xs" Color="@(network.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="network.InUse" />
 					</CellTemplate>
 				</MokaColumn>
-				<MokaColumn TItem="DockerNetwork" Title="Network" Field="@(network => network.Name)" SortComparer="ByName" Mono>
+				<MokaColumn TItem="DockerNetwork" Title="Network" Field="@(network => network.Name)" SortComparer="ByName" Mono Fixed>
 					<CellTemplate Context="network">
 						<span class="mt-dk-name mt-dk-clip" title="@network.Name">@network.Name</span>
 						@if (KindText(network) is { Length: > 0 } kind)
@@ -106,3 +112,15 @@
 		</ToolTable>
 	</ChildContent>
 </ToolPageFrame>
+
+@code {
+	/// <summary>Removes the picked networks no container is on, together; Docker's own and the ones in use stay, and the question says so.</summary>
+	private RenderFragment<IReadOnlyList<DockerNetwork>> BulkBar => picked => @<MokaButton Variant="MokaVariant.Outlined"
+																						  Color="MokaColor.Error"
+																						  Size="MokaSize.Xs"
+																						  StartIcon="MokaIcons.Action.Delete"
+																						  Disabled="@(IsBusy || !picked.Any(network => network.IsRemovable))"
+																						  OnClick="@(() => RemoveManyAsync(picked))">
+		Remove
+	</MokaButton>;
+}

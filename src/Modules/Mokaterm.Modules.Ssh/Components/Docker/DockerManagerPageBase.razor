@@ -7,7 +7,7 @@
 		@if (Feature?.ImageUpdates.Find(image) is { HasUpdate: true } update)
 		{
 			<Hint Text="@update.Detail">
-				<MokaTag Text="UPDATE" Size="MokaSize.Xs" Color="MokaColor.Info" />
+				<MokaTag Text="Update" Size="MokaSize.Xs" Color="MokaColor.Info" />
 			</Hint>
 		}
 	</text>;
@@ -16,8 +16,41 @@
 		@if (loop is { IsLooping: true })
 		{
 			<Hint Text="@DockerRestartWording.Summary(loop)">
-				<MokaTag Text="RESTART LOOP" Size="MokaSize.Xs" Color="MokaColor.Error" />
+				<MokaTag Text="Restart loop" Size="MokaSize.Xs" Color="MokaColor.Error" />
 			</Hint>
+		}
+	</text>;
+
+	/// <summary>
+	/// A size in a list: our own byte figure beside a bar as long as its share of <paramref name="largest"/>, the biggest
+	/// in the list, so the heavy rows show at a glance. A dash while the size is not known.
+	/// </summary>
+	private protected static RenderFragment SizeCell(long? bytes, long largest) => @<span class="mt-dk-size">
+		@if (bytes is { } size)
+		{
+			<MokaMeter Value="@(largest > 0 ? Math.Min(100, size * 100d / largest) : 0)"
+					   ShowValue="false"
+					   Size="MokaSize.Xs"
+					   Color="MokaColor.Info"
+					   Class="mt-dk-size-bar"
+					   aria-hidden="true" />
+			<span class="mt-dk-size-text">@DisplayFormat.Bytes(size)</span>
+		}
+		else
+		{
+			<span class="mt-dk-size-text mt-dk-dim">-</span>
+		}
+	</span>;
+
+	/// <summary>Names in one cell, cut to its width with the whole list in the title, or a quiet word when there are none.</summary>
+	private protected static RenderFragment NamesCell(IReadOnlyList<string> names, string none) => @<text>
+		@if (names.Count == 0)
+		{
+			<span class="mt-dk-flag">@none</span>
+		}
+		else
+		{
+			<span class="mt-dk-dim mt-dk-clip mt-dk-clip--short" title="@string.Join(", ", names)">@string.Join(", ", names)</span>
 		}
 	</text>;
 

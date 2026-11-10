@@ -69,6 +69,14 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 
 	private static int ByName(ComposeProject left, ComposeProject right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
 
+	/// <summary>How many of a project's containers are in each state, the ones that run first.</summary>
+	private static List<(string State, int Count)> StateCounts(ComposeProject project) =>
+		[.. project.Containers
+			.GroupBy(container => container.State, StringComparer.Ordinal)
+			.OrderBy(group => group.Key switch { "running" => 0, "restarting" or "paused" => 1, "created" => 2, "exited" => 3, _ => 4 })
+			.ThenBy(group => group.Key, StringComparer.Ordinal)
+			.Select(group => (group.Key, group.Count()))];
+
 	private static int ByRunning(ComposeProject left, ComposeProject right) => left.RunningCount.CompareTo(right.RunningCount);
 
 	/// <summary>The row's menu, from its button or a right-click.</summary>

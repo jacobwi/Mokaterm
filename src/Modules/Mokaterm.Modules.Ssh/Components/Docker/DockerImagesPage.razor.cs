@@ -12,8 +12,10 @@ using Mokaterm.UI.Common.Platform;
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's images in one table: pull one by reference, ask the registries whether a tag moved on (and pull the newer
-/// image), start a new container from one, and remove a tag or an untagged image (forcing it from the row's menu only).
+/// The host's images in one table, each with the containers made from it and its size beside a bar of its share of the
+/// largest: pull one by reference, ask the registries whether a tag moved on (and pull the newer image), start a new
+/// container from one, and remove a tag or an untagged image (forcing it from the row's menu only), or several picked
+/// together.
 /// A selected image opens its panel, where it is tagged and pushed; Build opens the build form. Builds and pushes run in
 /// the session's background and show their output in place of the list. Pruning lives on the cleanup page, which lists
 /// what would go first.
@@ -34,6 +36,8 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 	private IReadOnlyList<DockerImage> _images = [];
 	private IReadOnlyList<DockerImage> _shown = [];
 	private IReadOnlyList<string> _tagged = [];
+	private Dictionary<string, IReadOnlyList<string>> _users = new(StringComparer.Ordinal);
+	private long _largest;
 	private string _query = "";
 	private string _pull = "";
 	private string? _pullError;
@@ -48,7 +52,11 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 		? null
 		: string.Create(
 			CultureInfo.CurrentCulture,
-			$"{_images.Count} images, {_tagged.Count} tagged, {DanglingCount} dangling · {DisplayFormat.Bytes(_images.DistinctBy(image => image.Id).Sum(image => image.SizeBytes ?? 0))}");
+			$"{_images.Count} images, {_tagged.Count} tagged, {DanglingCount} dangling · {DisplayFormat.Bytes(TotalBytes(_images))}");
+
+	private string ShownText => _shown.Count == _images.Count
+		? string.Create(CultureInfo.CurrentCulture, $"{_images.Count} images")
+		: string.Create(CultureInfo.CurrentCulture, $"{_shown.Count} of {_images.Count} images");
 
 	private EventCallback<string> SearchCallback => ShowsList ? EventCallback.Factory.Create<string>(this, OnQueryChanged) : default;
 
@@ -97,6 +105,13 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 	private static int ByCreated(DockerImage left, DockerImage right) => Nullable.Compare(left.CreatedAt, right.CreatedAt);
 
 	private static int BySize(DockerImage left, DockerImage right) => Nullable.Compare(left.SizeBytes, right.SizeBytes);
+
+	/// <summary>Every image once, however many tags point at it.</summary>
+	private static long TotalBytes(IEnumerable<DockerImage> images) => images.DistinctBy(image => image.Id).Sum(image => image.SizeBytes ?? 0);
+
+	private int ByUsers(DockerImage left, DockerImage right) => UsersOf(left).Count.CompareTo(UsersOf(right).Count);
+
+	private IReadOnlyList<string> UsersOf(DockerImage image) => _users.TryGetValue(Key(image), out IReadOnlyList<string>? users) ? users : [];
 
 	private ImageUpdateResult? UpdateOf(DockerImage image) => image.IsTagged ? Feature?.ImageUpdates.Find(image.Reference) : null;
 
@@ -186,8 +201,14 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{
-		_images = await client.ListImagesAsync(token);
+		Task<IReadOnlyList<DockerImage>> images = client.ListImagesAsync(token);
+		Task<IReadOnlyList<DockerContainer>> containers = client.ListContainersAsync(token);
+		await Task.WhenAll(images, containers);
+		_images = await images;
+		IReadOnlyList<DockerContainer> listed = await containers;
 		_tagged = [.. _images.Where(image => image.IsTagged).Select(image => image.Reference).Distinct(StringComparer.Ordinal)];
+		_users = _images.ToDictionary(Key, image => DockerUsers.OfImage(image, listed), StringComparer.Ordinal);
+		_largest = _images.Max(image => image.SizeBytes) ?? 0;
 		ApplyFilter();
 	});
 
@@ -271,6 +292,27 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 		{
 			// The page went away.
 		}
+	}
+
+	/// <summary>
+	/// The picked images in one <c>docker image rm</c>, which docker works through one by one: a tag goes on its own, and
+	/// an image that a container still uses is refused while the rest go.
+	/// </summary>
+	private Task RemoveManyAsync(IReadOnlyList<DockerImage> picked)
+	{
+		if (picked is [var only])
+		{
+			return RemoveAsync(only, force: false);
+		}
+
+		List<string> names = [.. picked.Select(image => image.Reference)];
+		string count = picked.Count.ToString(CultureInfo.CurrentCulture);
+		return ChangeAsync(
+			DockerCommands.RemoveImages([.. picked.Select(image => image.RemoveTarget).Distinct(StringComparer.Ordinal)]),
+			$"Remove {count} images",
+			$"These {count} images are removed: {DockerWording.NameList(names)}. A tag goes on its own, and an image goes too when no other tag points at it. Docker refuses any that a container was made from, and removes the rest.",
+			"Remove",
+			RefreshAsync);
 	}
 
 	private Task RemoveAsync(DockerImage image, bool force)

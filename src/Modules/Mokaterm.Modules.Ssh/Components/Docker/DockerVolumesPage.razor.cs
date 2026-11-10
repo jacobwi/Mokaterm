@@ -4,15 +4,18 @@ using Moka.Red.ContextMenu;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Platform;
 
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// The host's volumes, marked in use unless no container at all (running or stopped) refers to them. A volume opens
-/// its panel: the full path on the docker host, the containers that mount it and where, and a read-only look at its
-/// files, which usually takes root. Only unused volumes can be removed, one here or together on the cleanup page, and
-/// nothing is ever written into one from here.
+/// The host's volumes, each with the containers that mount it (running or stopped) and its size beside a bar of its share
+/// of the largest. A volume opens its panel: the full path on the docker host, the containers that mount it and where,
+/// and a read-only look at its files, which usually takes root. Only unused volumes can be removed, one here, several
+/// picked together, or on the cleanup page, and nothing is ever written into one from here. Sizes come from the
+/// session's last <c>docker system df --verbose</c>, measured when the page opens on one older than a few minutes and
+/// when asked, never with the list.
 /// </summary>
 public sealed partial class DockerVolumesPage : DockerManagerPageBase
 {
@@ -25,6 +28,11 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	private string _name = "";
 	private string? _nameError;
 	private bool _creating;
+	private bool _measuring;
+	private string? _sizeProblem;
+	private IReadOnlyDictionary<string, IReadOnlyList<string>> _users = new Dictionary<string, IReadOnlyList<string>>();
+	private DockerSystemUsage? _sizesFrom;
+	private Dictionary<string, long> _sizes = new(StringComparer.Ordinal);
 
 	[Inject]
 	private IClipboardService Clipboard { get; set; } = default!;
@@ -37,7 +45,30 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 		? null
 		: string.Create(CultureInfo.CurrentCulture, $"{_volumes.Count} volumes, {_volumes.Count(volume => volume.InUse)} in use, {_volumes.Count(volume => !volume.InUse)} unused");
 
-	protected override Task OnInitializedAsync() => RefreshAsync();
+	private string ShownText => _shown.Count == _volumes.Count
+		? string.Create(CultureInfo.CurrentCulture, $"{_volumes.Count} volumes")
+		: string.Create(CultureInfo.CurrentCulture, $"{_shown.Count} of {_volumes.Count} volumes");
+
+	/// <summary>What the rows shown hold together, or null before any of them was measured.</summary>
+	private long? ShownBytes => _shown.Select(SizeOf).OfType<long>().ToList() is { Count: > 0 } known ? known.Sum() : null;
+
+	private string MeasuredText => _sizeProblem is { } problem
+		? $"Could not measure: {problem}"
+		: Feature?.Usage is { ReadAt: { } readAt } usage
+			? usage.Usage is null ? "This docker does not size its volumes" : $"Measured {DisplayFormat.Relative(readAt, Time.GetUtcNow())}"
+			: "Not measured yet";
+
+	private long LargestSize => _shown.Select(SizeOf).Max() ?? 0;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshAsync();
+		await MeasureAsync(force: false);
+	}
+
+	/// <summary>Shortens the 64 hex digits of an anonymous volume to the 12 docker shows for ids; its title keeps them all.</summary>
+	private static string ShownName(DockerVolume volume) =>
+		volume.IsAnonymous && volume.Name.Length > 12 ? volume.Name[..12] + "\u2026" : volume.Name;
 
 	/// <summary>Unused, and named in a way this app passes to docker: a plugin driver may name its volumes otherwise.</summary>
 	private static bool CanRemove(DockerVolume volume) =>
@@ -45,7 +76,29 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 
 	private static int ByName(DockerVolume left, DockerVolume right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
 
-	private static int ByUse(DockerVolume left, DockerVolume right) => right.InUse.CompareTo(left.InUse);
+	private int ByUse(DockerVolume left, DockerVolume right)
+	{
+		int byUse = right.InUse.CompareTo(left.InUse);
+		return byUse != 0 ? byUse : UsersOf(left).Count.CompareTo(UsersOf(right).Count);
+	}
+
+	private int BySize(DockerVolume left, DockerVolume right) => Nullable.Compare(SizeOf(left), SizeOf(right));
+
+	private IReadOnlyList<string> UsersOf(DockerVolume volume) => _users.TryGetValue(volume.Name, out IReadOnlyList<string>? users) ? users : [];
+
+	private long? SizeOf(DockerVolume volume)
+	{
+		DockerSystemUsage? usage = Feature?.Usage.Usage;
+		if (!ReferenceEquals(usage, _sizesFrom))
+		{
+			_sizesFrom = usage;
+			_sizes = usage is null
+				? new Dictionary<string, long>(StringComparer.Ordinal)
+				: usage.Volumes.Where(measured => measured.SizeBytes is not null).ToDictionary(measured => measured.Name, measured => measured.SizeBytes!.Value, StringComparer.Ordinal);
+		}
+
+		return _sizes.TryGetValue(volume.Name, out long size) ? size : null;
+	}
 
 	/// <summary>The row's menu, from its button or a right-click.</summary>
 	private List<MokaContextMenuItem> MenuFor(DockerVolume volume) =>
@@ -75,7 +128,11 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{
-		_volumes = await client.ListVolumesAsync(token);
+		Task<IReadOnlyList<DockerVolume>> volumes = client.ListVolumesAsync(token);
+		Task<IReadOnlyList<DockerContainer>> containers = client.ListContainersAsync(token);
+		await Task.WhenAll(volumes, containers);
+		_volumes = await volumes;
+		_users = DockerUsers.OfVolumes(await containers);
 		if (_selected is { } selected && !_volumes.Any(volume => volume.Name == selected))
 		{
 			ClosePanel();
@@ -97,6 +154,43 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	}
 
 	private void ToggleCreate() => _creating = !_creating;
+
+	/// <summary>
+	/// Reads the sizes of every volume, unless the session's last read is recent enough and the user did not ask. Its
+	/// failure stays in the foot: the list itself is fine without sizes.
+	/// </summary>
+	private async Task MeasureAsync(bool force)
+	{
+		if (_measuring || Feature is not { } feature || Client is not { } client || (!force && !feature.Usage.IsStale))
+		{
+			return;
+		}
+
+		_measuring = true;
+		StateHasChanged();
+		try
+		{
+			await feature.Usage.MeasureAsync(client, Lifetime);
+			_sizeProblem = null;
+		}
+		catch (Exception ex) when (Describe(ex) is { } problem)
+		{
+			_sizeProblem = problem;
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+		finally
+		{
+			_measuring = false;
+		}
+
+		if (!IsDisposed)
+		{
+			StateHasChanged();
+		}
+	}
 
 	private void OnNameChanged(string? value)
 	{
@@ -150,6 +244,39 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 			_name = "";
 			_creating = false;
 		}
+	}
+
+	/// <summary>The picked volumes no container uses, in one <c>docker volume rm</c>. One alone goes the way its own row's Remove does.</summary>
+	private Task RemoveManyAsync(IReadOnlyList<DockerVolume> picked)
+	{
+		List<DockerVolume> removable = [.. picked.Where(CanRemove)];
+		if (removable.Count == 0)
+		{
+			return Task.CompletedTask;
+		}
+
+		if (removable is [var only] && picked.Count == 1)
+		{
+			return RemoveAsync(only);
+		}
+
+		int kept = picked.Count - removable.Count;
+		string count = removable.Count.ToString(CultureInfo.CurrentCulture);
+		string keeping = kept switch
+		{
+			0 => "",
+			1 => " The other one picked is in use and stays.",
+			_ => string.Create(CultureInfo.CurrentCulture, $" The other {kept} picked are in use and stay."),
+		};
+		string message = removable is [var one]
+			? $"The volume {ShownName(one)} and everything stored in it are deleted. No container uses it now, and this cannot be undone."
+			: $"These {count} volumes and everything stored in them are deleted: {DockerWording.NameList([.. removable.Select(ShownName)])}. No container uses them now, and this cannot be undone.";
+		return ChangeAsync(
+			DockerCommands.RemoveVolumes([.. removable.Select(volume => volume.Name)]),
+			removable is [var single] ? $"Remove volume {ShownName(single)}" : $"Remove {count} volumes",
+			message + keeping,
+			"Remove",
+			RefreshAsync);
 	}
 
 	private Task RemoveAsync(DockerVolume volume) => ChangeAsync(

@@ -59,7 +59,7 @@
 			@if (Identity.ChainTrusted is { } chainTrusted)
 			{
 				<MokaKeyValue Label="CHAIN" LabelWidth="96px">
-					<MokaTag Text="@(chainTrusted ? "TRUSTED BY THE SYSTEM" : "NOT TRUSTED BY THE SYSTEM")"
+					<MokaTag Text="@(chainTrusted ? "Trusted by the system" : "Not trusted by the system")"
 							 Color="@(chainTrusted ? MokaColor.Success : MokaColor.Warning)"
 							 Size="MokaSize.Xs" />
 				</MokaKeyValue>

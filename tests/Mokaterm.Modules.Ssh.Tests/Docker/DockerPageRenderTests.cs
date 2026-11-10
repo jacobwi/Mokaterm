@@ -11,6 +11,7 @@ using Mokaterm.Modules.Ssh.Docker;
 using Mokaterm.Modules.Ssh.Tests.Fakes;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Common.Files;
+using Mokaterm.UI.Common.Formatting;
 
 namespace Mokaterm.Modules.Ssh.Tests.Docker;
 
@@ -64,6 +65,10 @@ public sealed class DockerPageRenderTests
 		Assert.Contains("title=\"shop-web-1\"", html, StringComparison.Ordinal);
 		Assert.Contains("aria-label=\"Actions for shop-web-1\"", html, StringComparison.Ordinal);
 		Assert.Contains("New container", html, StringComparison.Ordinal);
+
+		// Every row can be picked for the bulk bar, and the columns can be chosen.
+		Assert.Contains("aria-label=\"Select shop-web-1\"", html, StringComparison.Ordinal);
+		Assert.Contains("aria-label=\"Toggle columns\"", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -74,8 +79,18 @@ public sealed class DockerPageRenderTests
 		Assert.Contains("aria-label=\"Images\"", html, StringComparison.Ordinal);
 		Assert.Contains(">nginx:1.27-alpine<", html, StringComparison.Ordinal);
 		Assert.Contains(">dangling<", html, StringComparison.Ordinal);
-		Assert.Contains("48.3MB", html, StringComparison.Ordinal);
 		Assert.Contains("3 images, 1 tagged, 1 dangling", html, StringComparison.Ordinal);
+
+		// Sizes are ours, in 1024s, with a bar of each one's share of the largest and the total in the foot.
+		Assert.Contains($">{DisplayFormat.Bytes(48_300_000)}<", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("48.3MB", html, StringComparison.Ordinal);
+		Assert.Equal(3, Count(html, "mt-dk-size-bar"));
+		Assert.Contains($"{DisplayFormat.Bytes(48_300_000 + 198_000_000 + 1_200_000_000)} in all", html, StringComparison.Ordinal);
+
+		// The tag's container, read from the container listing, and the rest unused.
+		Assert.Contains(">shop-web-1<", html, StringComparison.Ordinal);
+		Assert.Equal(2, Count(html, ">unused<"));
+		Assert.Contains("aria-label=\"Select nginx:1.27-alpine\"", html, StringComparison.Ordinal);
 	}
 
 	[Fact]
@@ -86,8 +101,22 @@ public sealed class DockerPageRenderTests
 		Assert.Contains("aria-label=\"Volumes\"", html, StringComparison.Ordinal);
 		Assert.Contains(">shop_pgdata<", html, StringComparison.Ordinal);
 		Assert.Contains(">old-cache<", html, StringComparison.Ordinal);
-		Assert.Contains(">in use<", html, StringComparison.Ordinal);
 		Assert.Contains(">unused<", html, StringComparison.Ordinal);
+
+		// shop_pgdata names the container that mounts it, and old-cache its size from system df --verbose.
+		Assert.Contains(">shop-db-1<", html, StringComparison.Ordinal);
+		Assert.Contains($">{DisplayFormat.Bytes(212_000_000)}<", html, StringComparison.Ordinal);
+		Assert.Contains("Measure again", html, StringComparison.Ordinal);
+		Assert.Single(_shell.Asked, line => line == Line(DockerCommands.SystemUsage()));
+	}
+
+	[Fact]
+	public async Task TheVolumes_AreNotMeasuredAgain_WhileTheLastReadIsRecent()
+	{
+		await RenderAsync<DockerVolumesPage>();
+		await RenderAsync<DockerVolumesPage>();
+
+		Assert.Single(_shell.Asked, line => line == Line(DockerCommands.SystemUsage()));
 	}
 
 	[Fact]
@@ -206,9 +235,18 @@ public sealed class DockerPageRenderTests
 	{
 		string html = await RenderAsync<DockerContainersPage>();
 
+		// The state is a tag, the health while a check runs, with docker's own time beside it.
+		Assert.Contains(">Healthy<", html, StringComparison.Ordinal);
+		Assert.Contains(">Unhealthy<", html, StringComparison.Ordinal);
+		Assert.Contains(">Paused<", html, StringComparison.Ordinal);
 		Assert.Contains(">Up 2 days<", html, StringComparison.Ordinal);
-		Assert.Contains("title=\"Up 2 days (healthy)\"", html, StringComparison.Ordinal);
-		Assert.Contains(">Exited (137) 3 hours ago<", html, StringComparison.Ordinal);
+		Assert.Contains(">Exited (137)<", html, StringComparison.Ordinal);
+		Assert.Contains(">3 hours ago<", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("HEALTHY", html, StringComparison.Ordinal);
+
+		// Published ports are tags, once each though docker lists the IPv4 and IPv6 bindings; exposed ones stay text.
+		Assert.Equal(1, Count(System.Net.WebUtility.HtmlDecode(html), ">8080→80/tcp<"));
+		Assert.Contains(">6379/tcp<", html, StringComparison.Ordinal);
 	}
 
 	[Fact]

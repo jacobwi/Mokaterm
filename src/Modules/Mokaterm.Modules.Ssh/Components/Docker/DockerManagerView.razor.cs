@@ -135,7 +135,7 @@ public sealed partial class DockerManagerView : SessionViewBase, IDisposable
 	];
 
 	private static string ComposeLabel(ComposeTool compose) =>
-		compose.Program == DockerProgram.ComposePlugin ? $"COMPOSE {compose.Version}" : $"DOCKER-COMPOSE {compose.Version}";
+		compose.Program == DockerProgram.ComposePlugin ? $"Compose {compose.Version}" : $"docker-compose {compose.Version}";
 
 	private void Show(string page) => _page = page;
 

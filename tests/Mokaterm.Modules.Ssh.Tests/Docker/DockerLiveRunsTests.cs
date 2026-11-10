@@ -26,7 +26,7 @@ public sealed class DockerLiveRunsTests
 		await run.Completion.WaitAsync(TimeSpan.FromSeconds(15), Ct);
 
 		Assert.Equal(DockerLiveState.Succeeded, run.State);
-		Assert.Equal("exit 0", run.StateText);
+		Assert.Equal("Exit 0", run.StateText);
 		Assert.Null(run.Problem);
 		Assert.Equal(["#1 [internal] load build definition", "#2 DONE 0.1s"], run.Lines.Snapshot().Select(line => line.Text));
 		Assert.Equal(["docker buildx build --tag app:1.4 /srv/app"], run.Shown);
@@ -67,7 +67,7 @@ public sealed class DockerLiveRunsTests
 		Assert.Equal(DockerLiveState.Stopped, run.State);
 		Assert.True(shell.SawCancel);
 		Assert.StartsWith("Stopped.", run.Problem, StringComparison.Ordinal);
-		Assert.Equal("stopped", run.StateText);
+		Assert.Equal("Stopped", run.StateText);
 	}
 
 	[Fact]

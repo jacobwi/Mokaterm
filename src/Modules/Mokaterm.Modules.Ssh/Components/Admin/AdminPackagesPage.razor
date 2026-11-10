@@ -30,7 +30,7 @@
 		@if (_reboot is { Required: true } reboot)
 		{
 			<Hint Text="@($"Reboot {AdminUpdateReads.RebootText(reboot)}")">
-				<MokaTag Text="REBOOT REQUIRED" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				<MokaTag Text="Reboot required" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 			</Hint>
 		}
 		@if (RebootCommands.CanReboot(Profile))
@@ -99,7 +99,7 @@
 							<span title="@update.Name">@update.Name</span>
 							@if (_view == "updates" && IsSecurity(update))
 							{
-								<span class="mta-after"><MokaTag Text="SECURITY" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
+								<span class="mta-after"><MokaTag Text="Security" Size="MokaSize.Xs" Color="MokaColor.Warning" /></span>
 							}
 							@if (IsDeferred(update))
 							{

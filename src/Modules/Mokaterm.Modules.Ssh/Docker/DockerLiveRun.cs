@@ -62,13 +62,13 @@ internal sealed class DockerLiveRun
 	/// <summary>Completes when the run ended, however it ended. It never faults.</summary>
 	public Task Completion => _completion.Task;
 
-	/// <summary>What the run's tag says: <c>RUNNING</c>, <c>EXIT 0</c>, <c>STOPPED</c>.</summary>
+	/// <summary>What the run's tag says: <c>Running</c>, <c>Exit 0</c>, <c>Stopped</c>.</summary>
 	public string StateText => State switch
 	{
-		DockerLiveState.Running => "running",
-		DockerLiveState.Stopped => "stopped",
-		DockerLiveState.Lost => "did not finish",
-		_ => ExitCode is { } code ? string.Create(CultureInfo.InvariantCulture, $"exit {code}") : "no exit status",
+		DockerLiveState.Running => "Running",
+		DockerLiveState.Stopped => "Stopped",
+		DockerLiveState.Lost => "Did not finish",
+		_ => ExitCode is { } code ? string.Create(CultureInfo.InvariantCulture, $"Exit {code}") : "No exit status",
 	};
 
 	/// <summary>Stops the run: the call's channel closes, which ends the docker client and, with it, the build.</summary>

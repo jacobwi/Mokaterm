@@ -42,6 +42,9 @@ public sealed record DockerOutput
 		? string.Create(CultureInfo.InvariantCulture, $"exit {code}")
 		: ExitSignal is { Length: > 0 } signal ? $"signal {signal}" : "no exit status";
 
+	/// <summary><see cref="ExitText"/> as a tag shows it on its own: <c>Exit 0</c>, <c>Signal TERM</c>.</summary>
+	public string ExitLabel => string.Concat(ExitText[..1].ToUpperInvariant(), ExitText.AsSpan(1));
+
 	/// <summary>Both streams for an output box, stdout first, without escape sequences.</summary>
 	public string Combined
 	{

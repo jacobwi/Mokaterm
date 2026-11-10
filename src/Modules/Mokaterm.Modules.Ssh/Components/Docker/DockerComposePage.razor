@@ -74,12 +74,34 @@
 					</MokaColumn>
 					<MokaColumn TItem="ComposeProject" Title="Running" Field="@(project => project.RunningCount)" SortComparer="ByRunning" SortDescendingFirst Mono>
 						<CellTemplate Context="project">
-							<span class="mt-dk-dim">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
+							<span class="mt-dk-size">
+								<MokaMeter Value="@(project.Containers.Count > 0 ? project.RunningCount * 100d / project.Containers.Count : 0)"
+										   ShowValue="false"
+										   Size="MokaSize.Xs"
+										   Color="@ProjectColor(project)"
+										   Class="mt-dk-size-bar"
+										   aria-hidden="true" />
+								<span class="mt-dk-dim">@project.RunningCount.ToString(CultureInfo.InvariantCulture)/@project.Containers.Count.ToString(CultureInfo.InvariantCulture)</span>
+							</span>
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="ComposeProject" Title="Status" Field="@(project => project.Status)" Mono Class="mt-col-wider">
 						<CellTemplate Context="project">
-							<span class="mt-dk-dim mt-dk-clip" title="@project.Status">@project.Status</span>
+							@if (StateCounts(project) is { Count: > 0 } states)
+							{
+								<span class="mt-dk-chips">
+									@foreach ((string state, int count) in states)
+									{
+										<MokaTag Text="@($"{DockerStateDisplay.StateWord(state)} {count.ToString(CultureInfo.CurrentCulture)}")"
+												 Size="MokaSize.Xs"
+												 Color="@DockerStateDisplay.Color(state)" />
+									}
+								</span>
+							}
+							else
+							{
+								<span class="mt-dk-dim mt-dk-clip" title="@project.Status">@project.Status</span>
+							}
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="ComposeProject" Title="Folder" Field="@(project => project.WorkingDirectory)" Mono Class="mt-col-main">

@@ -8,7 +8,7 @@
 		@if (_asRoot)
 		{
 			<Hint Text="Read through sudo">
-				<MokaTag Text="AS ROOT" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+				<MokaTag Text="As root" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 			</Hint>
 		}
 		<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh"
@@ -39,7 +39,7 @@
 				<span class="mt-dk-label">@file.Role</span>
 				@if (!file.Exists)
 				{
-					<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="@(file.Required ? MokaColor.Error : MokaColor.Surface)" />
+					<MokaTag Text="Missing" Size="MokaSize.Xs" Color="@(file.Required ? MokaColor.Error : MokaColor.Surface)" />
 				}
 				<span class="mt-dk-spacer"></span>
 				@EditButtons(file.Path, _asRoot, createNew: !file.Exists)

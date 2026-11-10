@@ -21,9 +21,9 @@ public partial class SshTunnelList : ComponentBase
 
 	internal static string KindLabel(SshTunnelKind kind) => kind switch
 	{
-		SshTunnelKind.Remote => "REMOTE",
+		SshTunnelKind.Remote => "Remote",
 		SshTunnelKind.Dynamic => "SOCKS",
-		_ => "LOCAL",
+		_ => "Local",
 	};
 
 	private Task AddAsync(SshTunnelKind kind)

@@ -33,7 +33,7 @@
 			<div class="@(change.Succeeded ? "mt-dk-change mt-dk-change--ok" : "mt-dk-change mt-dk-change--failed")" role="status">
 				<div class="mt-dk-change-head">
 					<span class="mt-dk-change-title" title="@change.Title">@change.Title</span>
-					<MokaTag Text="@change.ExitText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@(change.Succeeded ? MokaColor.Success : MokaColor.Error)" />
+					<MokaTag Text="@change.ExitLabel" Size="MokaSize.Xs" Color="@(change.Succeeded ? MokaColor.Success : MokaColor.Error)" />
 					<span class="mt-dk-spacer"></span>
 					@if (change.Text.Length > 0)
 					{

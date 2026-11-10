@@ -31,13 +31,13 @@
 			@if (_status.Info is { Rootless: true })
 			{
 				<Hint Text="The daemon runs as an ordinary user">
-					<MokaTag Text="ROOTLESS" Size="MokaSize.Xs" Color="MokaColor.Info" />
+					<MokaTag Text="Rootless" Size="MokaSize.Xs" Color="MokaColor.Info" />
 				</Hint>
 			}
 			@if (_status.IsElevated)
 			{
 				<Hint Text="Every docker command runs through sudo">
-					<MokaTag Text="SUDO" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+					<MokaTag Text="sudo" Icon="MokatermIcons.Root" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 				</Hint>
 			}
 			<span class="mt-dk-spacer"></span>

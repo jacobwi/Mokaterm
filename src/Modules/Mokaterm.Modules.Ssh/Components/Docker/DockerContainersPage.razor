@@ -62,6 +62,12 @@
 					   GroupHeader="GroupHeader"
 					   CollapsedGroups="_collapsedGroups"
 					   GroupToggled="OnGroupToggled"
+					   BulkActions="BulkBar"
+					   ItemName="@(container => container.Name)"
+					   ItemsName="containers"
+					   ShowColumnToggle
+					   Layout="@Navigation?.LayoutOf(DockerPageIds.Containers)"
+					   LayoutChanged="@(layout => Navigation?.KeepLayout(DockerPageIds.Containers, layout))"
 					   EmptyIcon="DockerIcons.Container"
 					   EmptyTitle="@(_containers.Count == 0 ? "No containers" : "Nothing matches")"
 					   EmptyText="@(_containers.Count == 0 ? "docker ps -a lists nothing on this host." : "No container matches the filter.")">
@@ -89,18 +95,22 @@
 										 OnAction="@(action => OnMenuAsync(container, action))" />
 				</RowActions>
 				<ChildContent>
-					<MokaColumn TItem="DockerContainer" Title="" Sortable="false" Resizable="false" Class="mt-col-dot">
-						<CellTemplate Context="container">
-							<Hint Text="@container.Status" Position="MokaTooltipPosition.BottomStart" Class="mt-dk-state">
-								<MokaStatusDot Size="MokaSize.Xs"
-											   Color="@DockerStateDisplay.Color(container.State, container.Health)"
-											   Pulse="@DockerStateDisplay.IsMoving(container.State, container.Health)" />
-							</Hint>
-						</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="DockerContainer" Title="Name" Field="ShortName" SortComparer="ByName">
+					<MokaColumn TItem="DockerContainer" Title="Name" Field="ShortName" SortComparer="ByName" Fixed>
 						<CellTemplate Context="container">
 							<span class="mt-dk-name" title="@container.Name">@ShortName(container)</span>
+						</CellTemplate>
+					</MokaColumn>
+					<MokaColumn TItem="DockerContainer" Title="Status" Field="@(container => DockerStateDisplay.Rank(container))" SortComparer="ByStatus">
+						<CellTemplate Context="container">
+							<span class="mt-dk-status">
+								<Hint Text="@container.Status" Position="MokaTooltipPosition.BottomStart">
+									<MokaTag Text="@DockerStateDisplay.TagText(container)" Size="MokaSize.Xs" Color="@DockerStateDisplay.Color(container.State, container.Health)" />
+								</Hint>
+								@if (DockerStateDisplay.Since(container) is { Length: > 0 } since)
+								{
+									<span class="mt-dk-dim mt-dk-since">@since</span>
+								}
+							</span>
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Image" Field="@(container => container.Image)" SortComparer="ByImage" Mono Class="mt-col-main">
@@ -108,7 +118,7 @@
 							<span class="mt-dk-dim" title="@container.Image">@container.Image</span>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="DockerContainer" Title="" Sortable="false" Resizable="false">
+					<MokaColumn TItem="DockerContainer" Title="" Sortable="false" Resizable="false" Fixed>
 						<CellTemplate Context="container">
 							<span class="mt-dk-chips">
 								@LoopChip(LoopOf(container.Id, container.Name))
@@ -116,18 +126,9 @@
 							</span>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="DockerContainer" Title="Status" Field="@(container => container.Health)" SortComparer="ByHealth" Class="mt-col-wider">
-						<CellTemplate Context="container">
-							<span class="mt-dk-dim mt-dk-clip" title="@container.Status">@container.StatusText</span>
-							@if (container.Health != DockerHealth.None)
-							{
-								<span class="@(container.Health == DockerHealth.Unhealthy ? "mt-dk-flag mt-dk-flag--bad mt-dk-after" : "mt-dk-flag mt-dk-after")">@DockerStateDisplay.HealthLabel(container.Health)</span>
-							}
-						</CellTemplate>
-					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Ports" Field="Ports" SortComparer="ByPorts" Mono Class="mt-col-wider">
 						<CellTemplate Context="container">
-							<span class="mt-dk-dim mt-dk-clip" title="@Ports(container)">@Ports(container)</span>
+							@PortsCell(container)
 						</CellTemplate>
 					</MokaColumn>
 				</ChildContent>
@@ -150,6 +151,53 @@
 							  OnClose="ClosePanel"
 							  OnChanged="RefreshAsync" />
 	</div>;
+
+	/// <summary>Published ports as tags, two of them and a count of the rest; ports that are only exposed stay quiet text.</summary>
+	private static RenderFragment PortsCell(DockerContainer container) => @<text>
+		@if (PublishedPorts(container) is { Count: > 0 } published)
+		{
+			<span class="mt-dk-ports">
+				@foreach (string port in published.Take(ShownPorts))
+				{
+					<MokaTag Text="@port" Size="MokaSize.Xs" Color="MokaColor.Surface" Mono />
+				}
+				@if (published.Count > ShownPorts)
+				{
+					<Hint Text="@string.Join(", ", published.Skip(ShownPorts))" Position="MokaTooltipPosition.BottomEnd">
+						<MokaTag Text="@($"+{(published.Count - ShownPorts).ToString(CultureInfo.CurrentCulture)}")" Size="MokaSize.Xs" Color="MokaColor.Surface" Mono />
+					</Hint>
+				}
+			</span>
+		}
+		else if (container.Ports.Count > 0)
+		{
+			<span class="mt-dk-dim mt-dk-clip" title="@Ports(container)">@Ports(container)</span>
+		}
+	</text>;
+
+	/// <summary>What the picked containers can have done together. A button whose action fits none of them is off.</summary>
+	private RenderFragment<IReadOnlyList<DockerContainer>> BulkBar => picked => @<text>
+		<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Play"
+					Disabled="@(IsBusy || picked.All(container => container.IsAlive))"
+					OnClick="@(() => RunManyAsync("start", picked))">
+			Start
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Stop"
+					Disabled="@(IsBusy || !picked.Any(container => container.IsAlive))"
+					OnClick="@(() => RunManyAsync("stop", picked))">
+			Stop
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokatermIcons.Reconnect"
+					Disabled="IsBusy"
+					OnClick="@(() => RunManyAsync("restart", picked))">
+			Restart
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
+					Disabled="IsBusy"
+					OnClick="@(() => RunManyAsync("remove", picked))">
+			Remove
+		</MokaButton>
+	</text>;
 
 	private RenderFragment<MokaTableGroup<DockerContainer>> GroupHeader => group => @<text>
 		<span class="mt-dk-group-name">@(group.Key.Length == 0 ? "Standalone" : group.Key)</span>

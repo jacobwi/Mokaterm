@@ -97,6 +97,6 @@
 	private RenderFragment StateDot(string path) => _exists.TryGetValue(path, out bool exists)
 		? exists
 			? @<Hint Text="On disk"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Success" Glow="false" /></Hint>
-			: @<MokaTag Text="MISSING" Size="MokaSize.Xs" Color="MokaColor.Error" />
+			: @<MokaTag Text="Missing" Size="MokaSize.Xs" Color="MokaColor.Error" />
 		: @<Hint Text="Not checked yet"><MokaStatusDot Size="MokaSize.Xs" Color="MokaColor.Surface" Glow="false" /></Hint>;
 }

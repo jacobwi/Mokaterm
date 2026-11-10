@@ -113,6 +113,7 @@ public sealed partial class DockerCleanupPage : DockerManagerPageBase
 		await Task.WhenAll(summary, usage);
 		_summary = await summary;
 		_usage = await usage;
+		Feature?.Usage.Record(_usage);
 		Select();
 	});
 

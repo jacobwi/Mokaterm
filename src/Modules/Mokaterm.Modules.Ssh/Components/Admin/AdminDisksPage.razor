@@ -58,7 +58,7 @@
 										}
 										@if (_smart.TryGetValue(row.Item.Name, out SmartReport? health) && health.Passed is { } passed)
 										{
-											<span class="mta-after"><MokaTag Text="@(passed && !health.NeedsAttention ? "OK" : "CHECK")" Size="MokaSize.Xs" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : MokaColor.Error)" /></span>
+											<span class="mta-after"><MokaTag Text="@(passed && !health.NeedsAttention ? "OK" : "Check")" Size="MokaSize.Xs" Color="@(passed && !health.NeedsAttention ? MokaColor.Success : MokaColor.Error)" /></span>
 										}
 									</Hint>
 								</CellTemplate>

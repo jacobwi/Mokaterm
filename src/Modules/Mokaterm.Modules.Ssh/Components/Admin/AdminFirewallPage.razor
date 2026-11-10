@@ -27,7 +27,7 @@
 			@if (firewall.CanChange && firewall.AllowsSsh(status) == false && status.Active == true)
 			{
 				<Hint Text="No rule allows the port this session arrived on; something else, such as a source rule, lets it in.">
-					<MokaTag Text="@($"NO RULE FOR PORT {firewall.SshPort}")" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+					<MokaTag Text="@($"No rule for port {firewall.SshPort}")" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 				</Hint>
 			}
 		}

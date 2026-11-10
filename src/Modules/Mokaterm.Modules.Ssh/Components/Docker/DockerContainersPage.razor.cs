@@ -8,17 +8,19 @@ using Mokaterm.UI.Common.Platform;
 namespace Mokaterm.Modules.Ssh.Components.Docker;
 
 /// <summary>
-/// Every container on the host in one table, grouped under its compose project with the rest under Standalone: state,
-/// name, health, image, whether it is in a restart loop and whether the session's update check found a newer one, and
-/// ports, with the status in the dot's hint. The common actions show on a row that is pointed at or has the focus,
-/// everything else is in the row's menu (its button or a right-click), and a row opens its panel beside the list (under
-/// it on a narrow page). "New container" swaps the list for the docker run form. The list refreshes every few seconds
-/// while it shows.
+/// Every container on the host in one table, grouped under its compose project with the rest under Standalone: name,
+/// its state as a tag (the health while a check runs) with how long it has been so, image, whether it is in a restart
+/// loop and whether the session's update check found a newer one, and its published ports, with docker's own status in
+/// the tag's hint. The common actions show on a row that is pointed at or has the focus, everything else is in the row's
+/// menu (its button or a right-click), and a row opens its panel beside the list (under it on a narrow page). Boxes pick
+/// rows to start, stop, restart or remove together, asked about once. "New container" swaps the list for the docker run
+/// form. The list refreshes every few seconds while it shows.
 /// </summary>
 public sealed partial class DockerContainersPage : DockerManagerPageBase
 {
 	private const string StandaloneKey = "";
 	private const string LoopsFilter = "loops";
+	private const int ShownPorts = 2;
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
 
 	private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
@@ -95,9 +97,13 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 	/// <summary>The published ports, or the exposed ones when nothing is published.</summary>
 	private static string Ports(DockerContainer container)
 	{
-		List<string> ports = [.. container.Ports.Where(port => port.IsPublished).Select(port => port.Display)];
-		return string.Join(", ", ports.Count > 0 ? ports : container.Ports.Select(port => port.Display));
+		IReadOnlyList<string> published = PublishedPorts(container);
+		return string.Join(", ", published.Count > 0 ? published : container.Ports.Select(port => port.Display).Distinct(StringComparer.Ordinal));
 	}
+
+	/// <summary>Each published port once: docker lists a port bound on every interface for IPv4 and IPv6 alike.</summary>
+	private static IReadOnlyList<string> PublishedPorts(DockerContainer container) =>
+		[.. container.Ports.Where(port => port.IsPublished).Select(port => port.Display).Distinct(StringComparer.Ordinal)];
 
 	/// <summary>
 	/// Running containers first, then by name, whatever docker's own order was. One in a restart loop keeps the place of a
@@ -150,15 +156,7 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 
 	private static int ByPorts(DockerContainer left, DockerContainer right) => StringComparer.Ordinal.Compare(Ports(left), Ports(right));
 
-	private static int ByHealth(DockerContainer left, DockerContainer right) => HealthOrder(left.Health).CompareTo(HealthOrder(right.Health));
-
-	private static int HealthOrder(DockerHealth health) => health switch
-	{
-		DockerHealth.Unhealthy => 0,
-		DockerHealth.Starting => 1,
-		DockerHealth.Healthy => 2,
-		_ => 3,
-	};
+	private static int ByStatus(DockerContainer left, DockerContainer right) => DockerStateDisplay.Rank(left).CompareTo(DockerStateDisplay.Rank(right));
 
 	private bool HasUpdate(DockerContainer container) => Feature?.ImageUpdates.Find(container.Image) is { HasUpdate: true };
 
@@ -285,6 +283,15 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 	private async Task RestartAsync(DockerContainer container) => await RunPlanAsync(DockerContainerActions.Plan("restart", container.Name, container.IsAlive)!, RefreshAsync);
 
 	private async Task ShellAsync(DockerContainer container) => _shellProblem = await OpenShellAsync(container.Name);
+
+	/// <summary>One change for every picked container the action fits, through the same question and change path a row's own action takes.</summary>
+	private async Task RunManyAsync(string action, IReadOnlyList<DockerContainer> picked)
+	{
+		if (DockerContainerActions.PlanMany(action, [.. picked.Select(container => (container.Name, container.IsAlive))]) is { } plan)
+		{
+			await RunPlanAsync(plan, RefreshAsync);
+		}
+	}
 
 	private async Task OnMenuAsync(DockerContainer container, string action)
 	{

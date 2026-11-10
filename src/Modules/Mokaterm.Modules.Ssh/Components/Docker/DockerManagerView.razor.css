@@ -555,6 +555,10 @@
 	max-width: 48ch;
 }
 
+.mt-dk ::deep .mt-dk-clip--short {
+	max-width: 20ch;
+}
+
 .mt-dk ::deep .mt-dk-after {
 	margin-left: 6px;
 }
@@ -588,6 +592,53 @@
 .mt-dk ::deep .mt-dk-chips *,
 .mt-dk ::deep td .moka-tag {
 	white-space: nowrap;
+}
+
+/* A container's state: its tag, and docker's time beside it while the list has room for both. */
+.mt-dk ::deep .mt-dk-status {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	vertical-align: middle;
+}
+
+@container mt-tool-table (max-width: 799px) {
+	.mt-dk ::deep .mt-dk-since {
+		display: none;
+	}
+}
+
+/* Published ports as tags, a few at most, the rest counted. */
+.mt-dk ::deep .mt-dk-ports {
+	display: inline-flex;
+	gap: var(--moka-spacing-xxs);
+	vertical-align: middle;
+}
+
+/* A size: a short bar of its share of the largest in the list, then the figure, which lines up on the right. */
+.mt-dk ::deep .mt-dk-size {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--moka-spacing-sm);
+	vertical-align: middle;
+}
+
+.mt-dk ::deep .mt-dk-size-bar {
+	flex: none;
+	width: 48px;
+}
+
+.mt-dk ::deep .mt-dk-size-text {
+	min-width: 7ch;
+	text-align: right;
+}
+
+/* The end of a list's foot: a note and the button that acts on it. */
+.mt-dk ::deep .mt-dk-foot-end {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
 }
 
 /* A row's state dot says what the state is in its hint. The dot is 6px across, so the hint's element reaches a few
@@ -633,7 +684,8 @@
 }
 
 /*
-	A row's quick actions show on a row that is pointed at, has the focus or is open; its menu button always shows. They
+	A row's quick actions show on a row that is pointed at, has the focus or is open (ToolTable marks it mt-tool-row--open,
+	apart from rows picked with their boxes); its menu button always shows. They
 	float over the end of the row, left of the menu, on the row's own background, so the column holds one button and the
 	table keeps its width for the data. Where nothing hovers, and on a list narrowed by the panel beside it, they stay
 	out: the menu and the panel offer the same.
@@ -671,7 +723,7 @@
 
 .mt-dk ::deep tr:hover .mt-dk-quick,
 .mt-dk ::deep tr:focus-within .mt-dk-quick,
-.mt-dk ::deep .moka-table-row--selected .mt-dk-quick {
+.mt-dk ::deep .mt-tool-row--open .mt-dk-quick {
 	opacity: 1;
 	pointer-events: auto;
 }

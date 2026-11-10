@@ -88,8 +88,8 @@ public sealed partial class PluginGalleryViewTests
 		Assert.Contains(">Certificates<", html, StringComparison.Ordinal);
 		Assert.Matches(">\\s*Verified\\s*<", html);
 		Assert.Single(VerifiedBadges().Matches(html));
-		Assert.Contains(">CODE<", html, StringComparison.Ordinal);
-		Assert.Contains(">DATA<", html, StringComparison.Ordinal);
+		Assert.Contains(">Code<", html, StringComparison.Ordinal);
+		Assert.Contains(">Data<", html, StringComparison.Ordinal);
 		Assert.Contains(">Security<", html, StringComparison.Ordinal);
 		Assert.Contains(">Server tools<", html, StringComparison.Ordinal);
 		Assert.Contains(">MIT<", html, StringComparison.Ordinal);

@@ -222,7 +222,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private string AccountLabel => _fileSystem is null ? "" : _fileSystem.UserName + "@" + Source.Location;
 
-	private string DropAccountText => "as " + _fileSystem?.UserName;
+	private string DropAccountText => "As " + _fileSystem?.UserName;
 
 	private string NoMatchesText => "Nothing here matches \"" + _filter.Trim() + "\".";
 

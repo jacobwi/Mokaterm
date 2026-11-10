@@ -65,6 +65,7 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 			? new DockerHostFiles(rootFiles, stagingDirectory)
 			: files is null ? null : new DockerHostFiles(files, stagingDirectory);
 		ImageUpdates = new DockerImageUpdates(time);
+		Usage = new DockerUsageCache(time);
 		Changes = new DockerChangeLog(time);
 		LiveRuns = new DockerLiveRuns(time, Changes, logger);
 	}
@@ -84,6 +85,9 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 	internal DockerChangeLog Changes { get; }
 
 	internal DockerRestartLoops RestartLoops { get; } = new();
+
+	/// <summary>The last read of what every volume and image takes on disk, kept so the pages measure only now and then.</summary>
+	internal DockerUsageCache Usage { get; }
 
 	/// <summary>The session's builds and pushes, which run on whatever page is shown.</summary>
 	internal DockerLiveRuns LiveRuns { get; }

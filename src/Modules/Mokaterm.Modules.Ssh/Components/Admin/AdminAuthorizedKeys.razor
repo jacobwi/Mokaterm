@@ -75,11 +75,11 @@ else
 							<span>@(key.Comment.Length > 0 ? key.Comment : key.Algorithm)</span>
 							@if (key.Fingerprint == _login?.KeyFingerprint && UserName == Context.LoginName)
 							{
-								<span class="mta-after"><MokaTag Text="THIS SESSION" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
+								<span class="mta-after"><MokaTag Text="This session" Size="MokaSize.Xs" Color="MokaColor.Info" /></span>
 							}
 							@if (key.Options.Length > 0)
 							{
-								<span class="mta-after"><MokaTag Text="OPTIONS" Size="MokaSize.Xs" Color="MokaColor.Surface" /></span>
+								<span class="mta-after"><MokaTag Text="Options" Size="MokaSize.Xs" Color="MokaColor.Surface" /></span>
 							}
 							<span class="mta-mono mta-dim mta-after">@key.Fingerprint</span>
 						</span>

@@ -29,10 +29,10 @@ internal sealed partial class DemoDockerEngine
 		["logs", .. var rest] => Logs(rest),
 		["exec", var name, "sh", "-c", "command -v bash"] => FindBash(name),
 		["exec", .. var execution] => Exec(execution),
-		["start", var name] => Change(name, container => Start(container)),
-		["restart", var name] => Change(name, container => Start(container)),
+		["start", .. var names] => ChangeEach(names, container => Start(container)),
+		["restart", .. var names] => ChangeEach(names, container => Start(container)),
 		["unpause", var name] => Change(name, container => container.State = "running"),
-		["stop", var name] => Change(name, container => Stop(container, 0)),
+		["stop", .. var names] => ChangeEach(names, container => Stop(container, 0)),
 		["kill", var name] => Change(name, container => Stop(container, 137)),
 		["pause", var name] => Change(name, container => container.State = "paused"),
 		["update", var restart, var name] when restart.StartsWith(RestartFlag, StringComparison.Ordinal) =>
@@ -347,6 +347,21 @@ internal sealed partial class DemoDockerEngine
 
 		change(container);
 		return DemoDockerResult.Ok(name + "\n");
+	}
+
+	/// <summary>Each container named, the way docker goes on past one it cannot find and exits 1 at the end.</summary>
+	private DemoDockerResult ChangeEach(string[] names, Action<DemoDockerContainer> change)
+	{
+		StringBuilder output = new();
+		StringBuilder error = new();
+		foreach (string name in names)
+		{
+			DemoDockerResult result = Change(name, change);
+			output.Append(result.Output);
+			error.Append(result.Error);
+		}
+
+		return new DemoDockerResult(error.Length == 0 ? 0 : 1, output.ToString(), error.ToString());
 	}
 
 	private void Start(DemoDockerContainer container)

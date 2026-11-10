@@ -2,22 +2,29 @@
 @typeparam TItem
 @using Moka.Red.Data.Table
 
-<div class="mt-tool-table" style="@RowStyle">
+<div class="@WrapperClass" style="@RowStyle">
 	<MokaTable TItem="TItem"
 			   Items="Items"
 			   ItemKey="ItemKey"
 			   Label="@Label"
-			   ShowToolbar="false"
+			   ShowToolbar="ShowColumnToggle"
+			   ShowColumnToggle="ShowColumnToggle"
 			   ShowPagination="false"
 			   Dense="true"
 			   FixedHeader="true"
 			   Height="100%"
 			   Virtualize="Virtualize"
 			   VirtualRowHeight="RowPixels"
+			   Selectable="IsPickable"
 			   SelectedItems="SelectedSet"
+			   SelectedItemsChanged="PickedChanged"
+			   BulkActions="BulkActions"
+			   ItemName="ItemName"
+			   ItemsName="@ItemsName"
+			   BulkClearIcon="true"
 			   OnRowClick="OnRowClick"
 			   OnRowContextMenu="OnRowMenu"
-			   RowClass="RowClass"
+			   RowClass="RowClassFor"
 			   RowActions="RowActions"
 			   ActionsColumnTitle=""
 			   ActionsColumnWidth="@ActionsWidth"
@@ -29,10 +36,13 @@
 			   SortColumnChanged="SortColumnChanged"
 			   SortDirection="SortDirection"
 			   SortDirectionChanged="SortDirectionChanged"
+			   Layout="Layout"
+			   LayoutChanged="LayoutChanged"
 			   Loading="Loading"
 			   EmptyIcon="EmptyIcon"
 			   EmptyTitle="@EmptyTitle"
-			   EmptyText="@EmptyText">
+			   EmptyText="@EmptyText"
+			   FootContent="FootContent">
 		@ChildContent
 	</MokaTable>
 </div>

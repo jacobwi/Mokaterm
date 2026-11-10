@@ -65,8 +65,8 @@ public sealed partial class PluginsPageTests
 			Assert.Matches($"moka-status-dot-label\"[^>]*>{Regex.Escape(status)}<", html);
 		}
 
-		Assert.Contains(">CODE<", html, StringComparison.Ordinal);
-		Assert.Contains(">DATA<", html, StringComparison.Ordinal);
+		Assert.Contains(">Code<", html, StringComparison.Ordinal);
+		Assert.Contains(">Data<", html, StringComparison.Ordinal);
 		Assert.Contains(">Moka<", html, StringComparison.Ordinal);
 		Assert.Contains("Guests, storage and backups on a Proxmox host.", html, StringComparison.Ordinal);
 		Assert.Contains(">3 themes<", html, StringComparison.Ordinal);
@@ -328,7 +328,7 @@ public sealed partial class PluginsPageTests
 			ThemeCount = 4,
 		});
 
-		Assert.Contains(">DATA<", html, StringComparison.Ordinal);
+		Assert.Contains(">Data<", html, StringComparison.Ordinal);
 		Assert.Contains("4 themes", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("This plugin runs code", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Install turned off", html, StringComparison.Ordinal);

@@ -157,6 +157,24 @@ internal static class DockerCommands
 
 	public static DockerCall Restart(string container) => Docker(["restart", Container(container)]).AsChange();
 
+	/// <summary>Several containers in one command, which docker works through one by one and fails at the end when any one failed.</summary>
+	public static DockerCall Start(IReadOnlyList<string> containers) => Several("start", containers);
+
+	/// <inheritdoc cref="Start(IReadOnlyList{string})"/>
+	public static DockerCall Stop(IReadOnlyList<string> containers) => Several("stop", containers);
+
+	/// <inheritdoc cref="Start(IReadOnlyList{string})"/>
+	public static DockerCall Restart(IReadOnlyList<string> containers) => Several("restart", containers);
+
+	/// <summary>Removes exactly the containers named, which is what the confirmation lists.</summary>
+	/// <param name="force">Kills the running ones first (<c>--force</c>); without it docker refuses each of them.</param>
+	public static DockerCall Remove(IReadOnlyList<string> containers, bool force)
+	{
+		ArgumentNullException.ThrowIfNull(containers);
+		ArgumentOutOfRangeException.ThrowIfZero(containers.Count);
+		return Docker(force ? ["rm", "--force", .. containers.Select(Container)] : ["rm", .. containers.Select(Container)]).AsChange();
+	}
+
 	public static DockerCall Pause(string container) => Docker(["pause", Container(container)]).AsChange();
 
 	public static DockerCall Unpause(string container) => Docker(["unpause", Container(container)]).AsChange();
@@ -321,6 +339,13 @@ internal static class DockerCommands
 	private static DockerCall Docker(IReadOnlyList<string> words) => new() { Program = DockerProgram.Docker, Arguments = words };
 
 	private static string Container(string reference) => Checked(reference, DockerNames.ContainerProblem(reference));
+
+	private static DockerCall Several(string command, IReadOnlyList<string> containers)
+	{
+		ArgumentNullException.ThrowIfNull(containers);
+		ArgumentOutOfRangeException.ThrowIfZero(containers.Count);
+		return Docker([command, .. containers.Select(Container)]).AsChange();
+	}
 
 	private static string Image(string reference) => Checked(reference, DockerNames.ImageProblem(reference));
 

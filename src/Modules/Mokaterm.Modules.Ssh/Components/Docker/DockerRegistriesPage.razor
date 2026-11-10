@@ -22,18 +22,18 @@
 		@if (_config is { } config)
 		{
 			<Hint Text="@($"{DockerRegistryWording.Whose(config)} reads {config.Path}")">
-				<MokaTag Text="@(config.User == "root" ? "ROOT'S CONFIG" : "LOGIN'S CONFIG")" Size="MokaSize.Xs" Color="@(config.User == "root" ? MokaColor.Warning : MokaColor.Surface)" />
+				<MokaTag Text="@(config.User == "root" ? "Root's config" : "Login's config")" Size="MokaSize.Xs" Color="@(config.User == "root" ? MokaColor.Warning : MokaColor.Surface)" />
 			</Hint>
 			@if (config.CredentialsStore is { } store)
 			{
 				<Hint Text="@($"Logins go to docker-credential-{store}, not into the file")">
-					<MokaTag Text="@($"STORE {store}".ToUpperInvariant())" Size="MokaSize.Xs" Color="MokaColor.Success" />
+					<MokaTag Text="@($"Store {store}")" Size="MokaSize.Xs" Color="MokaColor.Success" />
 				</Hint>
 			}
 			else
 			{
 				<Hint Text="No credsStore is set, so docker writes each login's password into config.json as base64">
-					<MokaTag Text="NO CREDENTIAL STORE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+					<MokaTag Text="No credential store" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 				</Hint>
 			}
 		}
@@ -106,11 +106,11 @@
 							<span class="mt-dk-chips">
 								@if (row.Entry is { StoredInFile: true })
 								{
-									<MokaTag Text="IN FILE" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+									<MokaTag Text="In file" Size="MokaSize.Xs" Color="MokaColor.Warning" />
 								}
 								@if (row.Saved is not null)
 								{
-									<MokaTag Text="SAVED" Size="MokaSize.Xs" Color="MokaColor.Info" />
+									<MokaTag Text="Saved" Size="MokaSize.Xs" Color="MokaColor.Info" />
 								}
 							</span>
 						</CellTemplate>

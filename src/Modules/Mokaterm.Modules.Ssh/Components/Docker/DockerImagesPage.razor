@@ -88,6 +88,13 @@
 					   OnRowClick="OnRowClick"
 					   OnRowMenu="@(args => ShowRowMenu(args.MouseEvent, MenuFor(args.Item)))"
 					   RowClass="@(image => image.IsDangling ? "mt-dk-row--down" : null)"
+					   BulkActions="BulkBar"
+					   ItemName="@(image => image.Reference)"
+					   ItemsName="images"
+					   ShowColumnToggle
+					   Layout="@Navigation?.LayoutOf(DockerPageIds.Images)"
+					   LayoutChanged="@(layout => Navigation?.KeepLayout(DockerPageIds.Images, layout))"
+					   FootContent="@(_shown.Count > 0 ? Foot : null)"
 					   EmptyIcon="DockerIcons.Image"
 					   EmptyTitle="@(_images.Count == 0 ? "No images" : "Nothing matches")"
 					   EmptyText="@(_images.Count == 0 ? "Pull one, or let compose build one." : "No image matches the filter.")">
@@ -111,12 +118,12 @@
 								Position="MokaTooltipPosition.BottomEnd" />
 				</RowActions>
 				<ChildContent>
-					<MokaColumn TItem="DockerImage" Title="Image" Field="@(image => image.Reference)" SortComparer="ByReference" Mono Class="mt-col-main">
+					<MokaColumn TItem="DockerImage" Title="Image" Field="@(image => image.Reference)" SortComparer="ByReference" Mono Class="mt-col-main" Fixed>
 						<CellTemplate Context="image">
 							<span class="mt-dk-name" title="@image.Reference">@image.Reference</span>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn TItem="DockerImage" Title="" Sortable="false" Resizable="false">
+					<MokaColumn TItem="DockerImage" Title="" Sortable="false" Resizable="false" Fixed>
 						<CellTemplate Context="image">
 							@if (image.IsDangling)
 							{
@@ -132,6 +139,11 @@
 							}
 						</CellTemplate>
 					</MokaColumn>
+					<MokaColumn TItem="DockerImage" Title="Used by" Field="@(image => UsersOf(image).Count)" SortComparer="ByUsers" SortDescendingFirst Mono Class="mt-col-wider">
+						<CellTemplate Context="image">
+							@NamesCell(UsersOf(image), "unused")
+						</CellTemplate>
+					</MokaColumn>
 					<MokaColumn TItem="DockerImage" Title="Id" Field="@(image => image.ShortId)" Mono Class="mt-col-wider">
 						<CellTemplate Context="image">
 							<span class="mt-dk-dim">@image.ShortId</span>
@@ -143,7 +155,7 @@
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="DockerImage" Title="Size" Field="@(image => image.SizeBytes)" SortComparer="BySize" SortDescendingFirst Mono Align="MokaTextAlign.Right">
-						<CellTemplate Context="image">@image.Size</CellTemplate>
+						<CellTemplate Context="image">@SizeCell(image.SizeBytes, _largest)</CellTemplate>
 					</MokaColumn>
 				</ChildContent>
 			</ToolTable>
@@ -152,6 +164,22 @@
 </ToolPageFrame>
 
 @code {
+	/// <summary>Removes the picked images together. One goes the way its own row's Remove does.</summary>
+	private RenderFragment<IReadOnlyList<DockerImage>> BulkBar => picked => @<MokaButton Variant="MokaVariant.Outlined"
+																						Color="MokaColor.Error"
+																						Size="MokaSize.Xs"
+																						StartIcon="MokaIcons.Action.Delete"
+																						Disabled="IsBusy"
+																						OnClick="@(() => RemoveManyAsync(picked))">
+		Remove
+	</MokaButton>;
+
+	/// <summary>The rows shown, and what they take on disk with every image counted once however many tags it has.</summary>
+	private RenderFragment Foot => @<text>
+		<span>@ShownText</span>
+		<span class="mt-dk-mono">@($"{DisplayFormat.Bytes(TotalBytes(_shown))} in all")</span>
+	</text>;
+
 	private RenderFragment? DetailFragment => ShowsList && SelectedImage is { } selected
 		? @<DockerImagePanel @key="Key(selected)"
 							 Session="Session"
@@ -163,7 +191,7 @@
 							 TagSource="@selected.RemoveTarget"
 							 Size="@selected.Size"
 							 Created="@selected.CreatedSince"
-							 Containers="selected.ContainerCount"
+							 Containers="UsersOf(selected).Count"
 							 RepositoryTags="RepositoryTags(selected)"
 							 OnClose="ClosePanel"
 							 OnChanged="RefreshAsync"

@@ -106,6 +106,39 @@ public sealed partial class DockerNetworksPage : DockerManagerPageBase
 		"Remove",
 		RefreshAsync);
 
+	/// <summary>The picked networks that can go, in one <c>docker network rm</c>. One alone goes the way its own row's Remove does.</summary>
+	private Task RemoveManyAsync(IReadOnlyList<DockerNetwork> picked)
+	{
+		List<DockerNetwork> removable = [.. picked.Where(network => network.IsRemovable)];
+		if (removable.Count == 0)
+		{
+			return Task.CompletedTask;
+		}
+
+		if (removable is [var only] && picked.Count == 1)
+		{
+			return RemoveAsync(only);
+		}
+
+		int kept = picked.Count - removable.Count;
+		string keeping = kept switch
+		{
+			0 => "",
+			1 => " The other one picked is Docker's own or in use, and stays.",
+			_ => string.Create(CultureInfo.CurrentCulture, $" The other {kept} picked are Docker's own or in use, and stay."),
+		};
+		List<string> names = [.. removable.Select(network => network.Name)];
+		string message = removable is [var one]
+			? $"The network {one.Name} is removed. No container is on it now."
+			: string.Create(CultureInfo.CurrentCulture, $"These {names.Count} networks are removed: {DockerWording.NameList(names)}. No container is on any of them now.");
+		return ChangeAsync(
+			DockerCommands.RemoveNetworks([.. removable.Select(Target)]),
+			removable is [var single] ? $"Remove network {single.Name}" : string.Create(CultureInfo.CurrentCulture, $"Remove {names.Count} networks"),
+			message + keeping,
+			"Remove",
+			RefreshAsync);
+	}
+
 	private Task RemoveUnusedAsync()
 	{
 		List<DockerNetwork> removable = Removable;

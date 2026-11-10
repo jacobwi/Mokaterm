@@ -70,13 +70,13 @@
 			@if (_feature.LoginIsRoot)
 			{
 				<Hint Text="This session logged in as root, so changes run without sudo.">
-					<MokaTag Text="ROOT LOGIN" Size="MokaSize.Xs" Color="MokaColor.Error" />
+					<MokaTag Text="Root login" Size="MokaSize.Xs" Color="MokaColor.Error" />
 				</Hint>
 			}
 			else if (_feature.RootBlockedReason is { } blocked)
 			{
 				<Hint Text="@blocked">
-					<MokaTag Text="READ ONLY" Size="MokaSize.Xs" Color="MokaColor.Surface" />
+					<MokaTag Text="Read only" Size="MokaSize.Xs" Color="MokaColor.Surface" />
 				</Hint>
 			}
 			else if (_feature.RootModeOn)

@@ -64,11 +64,11 @@ public sealed class DockerRestartLoopRenderTests
 
 		string html = await RenderAsync<DockerContainersPage>(Page());
 
-		Assert.Equal(1, Occurrences(html, ">RESTART LOOP<"));
+		Assert.Equal(1, Occurrences(html, ">Restart loop<"));
 		Assert.Contains("Looping 1", html, StringComparison.Ordinal);
 		Assert.Contains("It stopped again and Docker is about to restart it (44 times so far). Its last exit was 137, killed when it ran out of memory.", html, StringComparison.Ordinal);
 		Assert.True(
-			html.IndexOf(">RESTART LOOP<", StringComparison.Ordinal) < html.IndexOf(">web<", StringComparison.Ordinal),
+			html.IndexOf(">Restart loop<", StringComparison.Ordinal) < html.IndexOf(">web<", StringComparison.Ordinal),
 			"the chip is on the prometheus row, which sorts before web");
 	}
 
@@ -77,7 +77,7 @@ public sealed class DockerRestartLoopRenderTests
 	{
 		string html = await RenderAsync<DockerContainersPage>(Page());
 
-		Assert.DoesNotContain("RESTART LOOP", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Restart loop", html, StringComparison.Ordinal);
 		Assert.DoesNotContain("Looping", html, StringComparison.Ordinal);
 	}
 
@@ -122,7 +122,7 @@ public sealed class DockerRestartLoopRenderTests
 
 		string html = await RenderAsync<DockerComposeProjectView>(parameters);
 
-		Assert.Equal(1, Occurrences(html, ">RESTART LOOP<"));
+		Assert.Equal(1, Occurrences(html, ">Restart loop<"));
 	}
 
 	private static int Occurrences(string text, string part)

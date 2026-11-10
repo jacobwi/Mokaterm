@@ -65,7 +65,7 @@ else
 		<div class="mt-dk-section">
 			<div class="mt-dk-section-head">
 				<span class="mt-dk-label">Result</span>
-				<MokaTag Text="@result.ExitText.ToUpperInvariant()" Size="MokaSize.Xs" Color="@(result.Succeeded ? MokaColor.Success : MokaColor.Error)" />
+				<MokaTag Text="@result.ExitLabel"Size="MokaSize.Xs" Color="@(result.Succeeded ? MokaColor.Success : MokaColor.Error)" />
 				<span class="mt-dk-mono mt-dk-muted">@Duration(result)</span>
 				<span class="mt-dk-spacer"></span>
 				<CopyButton Text="@result.Command" Label="Copy the command" />
