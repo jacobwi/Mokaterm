@@ -1,0 +1,126 @@
+.fb-details {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-md);
+	min-width: 0;
+}
+
+.fb-details-head {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.fb-details-name {
+	min-width: 0;
+	font-size: var(--moka-font-size-sm);
+	font-weight: var(--moka-font-weight-semibold);
+	line-height: 18px;
+	overflow-wrap: anywhere;
+}
+
+/* Keys as micro labels above their values, the values in mono: a pane this narrow has no room for a key column. */
+.fb-details ::deep .fb-details-facts .moka-data-list-entry {
+	min-width: 0;
+	padding: 5px 0;
+}
+
+.fb-details ::deep .fb-details-facts .moka-data-list-term,
+.fb-details-label {
+	color: var(--moka-color-on-surface-tertiary);
+	font-size: 10px;
+	font-weight: var(--moka-font-weight-semibold);
+	letter-spacing: 0.08em;
+	line-height: 16px;
+	opacity: 1;
+	text-transform: uppercase;
+}
+
+.fb-details ::deep .fb-details-facts .moka-data-list-description {
+	min-width: 0;
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-xs);
+	letter-spacing: 0.02em;
+	line-height: 18px;
+	overflow-wrap: anywhere;
+}
+
+.fb-details-path {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}
+
+.fb-details-path > span:first-child {
+	flex: 1;
+	min-width: 0;
+}
+
+.fb-details-preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+}
+
+/* Long lines wrap, keeping their indentation: a pane this narrow would otherwise scroll sideways inside a pane that
+   scrolls down. */
+.fb-details-text {
+	max-height: 24rem;
+	margin: 0;
+	overflow-y: auto;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background: var(--moka-color-surface-2);
+	color: var(--moka-color-on-surface);
+	font-family: var(--moka-font-family-mono);
+	font-size: var(--moka-font-size-mono);
+	line-height: 1.5;
+	tab-size: 4;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	outline: none;
+}
+
+.fb-details-text:focus-visible {
+	border-color: var(--moka-color-primary-border);
+}
+
+/* A checkerboard under the picture, so a transparent one shows where it is see-through. */
+.fb-details-image-frame {
+	display: flex;
+	justify-content: center;
+	padding: var(--moka-spacing-sm);
+	border: 1px solid var(--moka-color-outline-variant);
+	border-radius: var(--moka-radius-md);
+	background-color: var(--moka-color-surface-2);
+	background-image: conic-gradient(var(--moka-color-surface-3) 25%, transparent 0 50%, var(--moka-color-surface-3) 0 75%, transparent 0);
+	background-size: 16px 16px;
+}
+
+.fb-details-image {
+	display: block;
+	max-width: 100%;
+	max-height: 16rem;
+	object-fit: contain;
+}
+
+.fb-details-note {
+	margin: 0;
+	color: var(--moka-color-on-surface-variant);
+	font-size: var(--moka-font-size-xs);
+	line-height: 18px;
+}
+
+.fb-details-note--error {
+	color: var(--moka-color-error);
+}
+
+.fb-details-reading {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+}

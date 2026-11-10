@@ -1,4 +1,5 @@
 using Mokaterm.Abstractions.Commands;
+using Moka.Red.Icons;
 using Mokaterm.UI.Common.Icons;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
@@ -383,6 +384,12 @@ public partial class RemoteFileBrowser
 			return;
 		}
 
+		if (IsTiles)
+		{
+			_ = RunSafeAsync(() => RenameInDialogAsync(entry));
+			return;
+		}
+
 		_renamingPath = entry.Path;
 
 		// Selecting is the browser's only way to scroll, so a row of several selected stays where it is.
@@ -412,16 +419,52 @@ public partial class RemoteFileBrowser
 
 		try
 		{
-			string target = RemotePath.Combine(RemotePath.GetParent(entry.Path), name);
-			await RunChangeAsync(
-				"Could not rename " + entry.Name,
-				(fileSystem, token) => fileSystem.RenameAsync(entry.Path, target, overwrite: false, token).AsTask(),
-				select: target);
+			await RenameAsync(entry, name);
 		}
 		finally
 		{
 			EndOperation();
 		}
+	}
+
+	// A tile has no name cell to type into (Moka draws its own name there), so tiles ask in the dialog New folder uses.
+	private async Task RenameInDialogAsync(RemoteFileEntry entry)
+	{
+		if (!BeginOperation())
+		{
+			return;
+		}
+
+		try
+		{
+			string? name = await Dialogs.AskNameAsync(
+				"Rename",
+				MokaIcons.Action.Edit,
+				entry.IsDirectoryLike ? "Folder name" : "File name",
+				entry.Name,
+				"Rename",
+				TakenNames(except: entry.Name),
+				selectBaseName: !entry.IsDirectoryLike);
+			if (name is not null && name != entry.Name)
+			{
+				await RenameAsync(entry, name);
+			}
+		}
+		finally
+		{
+			EndOperation();
+			_restoreFocus = true;
+			StateHasChanged();
+		}
+	}
+
+	private Task RenameAsync(RemoteFileEntry entry, string name)
+	{
+		string target = RemotePath.Combine(RemotePath.GetParent(entry.Path), name);
+		return RunChangeAsync(
+			"Could not rename " + entry.Name,
+			(fileSystem, token) => fileSystem.RenameAsync(entry.Path, target, overwrite: false, token).AsTask(),
+			select: target);
 	}
 
 	private async Task DeleteAsync(List<RemoteFileEntry> entries)

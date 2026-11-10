@@ -98,6 +98,15 @@ internal static class DemoTreeSeed
 		Text(downloads, "2026-09-12_customer-export_all-regions_including-archived-accounts_and-cancelled-subscriptions_final.csv", user, "644", now.AddDays(-5), CustomerExport);
 		Text(downloads, "\u00DCberpr\u00FCfung r\u00E9sum\u00E9 \u65E5\u672C\u8A9E \U0001F680.md", user, "644", now.AddDays(-2), UnicodeNotes);
 
+		DemoNode pictures = Folder(home, "pictures", user, "755", now.AddDays(-3));
+		Picture(pictures, "chart.png", user, now.AddDays(-6), DemoPictures.Chart);
+		Picture(pictures, "logo.gif", user, now.AddDays(-40), DemoPictures.Logo);
+		Picture(pictures, "mountains.jpg", user, now.AddDays(-12), DemoPictures.Photo);
+		Picture(pictures, "banner.webp", user, now.AddDays(-9), DemoPictures.Banner);
+		Text(pictures, "status-badge.svg", user, "644", now.AddDays(-3), DemoPictures.BadgeSvg);
+		Blob(pictures, "panorama.png", user, "644", now.AddDays(-30), (3 * MiB) + 412_733, DemoPictures.PngSignature);
+		Link(pictures, "latest.png", "chart.png", user, now.AddDays(-1));
+
 		Text(home, "notes.md", user, "644", now.AddHours(-3), Notes);
 		Text(home, "run.sh", user, "755", now.AddDays(-8), RunScript);
 		Link(home, "current", "projects/mokaterm", user, now.AddDays(-1));
@@ -134,6 +143,9 @@ internal static class DemoTreeSeed
 
 	private static DemoNode Blob(DemoNode parent, string name, Owner owner, string mode, DateTimeOffset modified, long size, byte[]? head = null) =>
 		parent.Add(DemoNode.NewFile(name, owner.User, owner.Group, DemoModes.Octal(mode), modified, size, head ?? []));
+
+	private static DemoNode Picture(DemoNode parent, string name, Owner owner, DateTimeOffset modified, byte[] content) =>
+		Blob(parent, name, owner, "644", modified, content.Length, content);
 
 	private static DemoNode Link(DemoNode parent, string name, string target, Owner owner, DateTimeOffset modified) =>
 		parent.Add(DemoNode.NewLink(name, target, owner.User, owner.Group, modified));

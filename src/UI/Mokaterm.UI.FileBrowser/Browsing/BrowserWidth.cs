@@ -11,4 +11,7 @@ internal enum BrowserWidth
 
 	/// <summary>Adds the permissions and owner columns.</summary>
 	Wide,
+
+	/// <summary>Room for the details pane beside a list that keeps the modified column.</summary>
+	Roomy,
 }

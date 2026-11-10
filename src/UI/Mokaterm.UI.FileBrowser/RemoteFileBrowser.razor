@@ -14,7 +14,7 @@
 					 View="_sort"
 					 ViewChanged="OnViewChanged"
 					 Columns="ColumnList"
-					 FitWidths="ColumnFit"
+					 FitWidths="ColumnFitNow"
 					 ResizableColumns
 					 Text="_text"
 					 Filter="@_filter"
@@ -28,7 +28,8 @@
 					 Move="MoveDraggedAsync"
 					 OnOpenFile="OpenEntryAsync"
 					 ItemMenu="ItemMenu"
-					 BackgroundMenu="BackgroundMenu">
+					 BackgroundMenu="BackgroundMenu"
+					 Details="@(ShowsDetails ? DetailsContent : null)">
 		<ToolbarControl Context="control">
 			@switch (control.Which)
 			{
@@ -161,6 +162,27 @@
 									Label="@FollowTitle"
 									AriaLabel="Follow the terminal's folder"
 									Pressed="FollowTerminal" />
+					}
+					@* A narrow browser has both in its More actions menu, and the pane only fits a roomy one. *@
+					@if (!IsNarrow)
+					{
+						<IconButton Variant="@(IsTiles ? MokaVariant.Soft : MokaVariant.Text)"
+									Color="@(IsTiles ? MokaColor.Primary : MokaColor.Surface)"
+									Icon="MokaIcons.Navigation.Grid"
+									OnClick="ToggleTiles"
+									Label="@TilesTitle"
+									AriaLabel="Show as tiles"
+									Pressed="IsTiles" />
+					}
+					@if (CanShowDetails)
+					{
+						<IconButton Variant="@(_detailsOpen ? MokaVariant.Soft : MokaVariant.Text)"
+									Color="@(_detailsOpen ? MokaColor.Primary : MokaColor.Surface)"
+									Icon="MokaIcons.Navigation.PanelRight"
+									OnClick="ToggleDetails"
+									Label="@(_detailsOpen ? "Hide details" : "Show details")"
+									AriaLabel="Show details"
+									Pressed="_detailsOpen" />
 					}
 				</MokaToolbarGroup>
 				@if (IsNarrow)
@@ -310,5 +332,8 @@
 
 	private static RenderFragment<RemoteFileEntry> CellOf(Func<RemoteFileEntry, string> text) => entry =>
 		@<span title="@text(entry)">@text(entry)</span>;
+
+	private RenderFragment<IReadOnlyList<RemoteFileEntry>> DetailsContent => entries =>
+		@<EntryDetails Entries="entries" FileSystem="_fileSystem" Active="IsActive" Folder="@_path" FolderSummary="@ItemCountText" />;
 
 }

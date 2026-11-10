@@ -13,8 +13,9 @@ internal sealed class TextFileSystem : IRemoteFileSystem
 
 	private readonly Dictionary<string, (byte[] Bytes, DateTimeOffset Modified)> _files = new(StringComparer.Ordinal);
 	private int _clock;
+	private long _bytesRead;
 
-	public RemoteFileSystemFeatures Features => RemoteFileSystemFeatures.None;
+	public RemoteFileSystemFeatures Features { get; init; } = RemoteFileSystemFeatures.None;
 
 	public string UserName => "abc";
 
@@ -28,6 +29,12 @@ internal sealed class TextFileSystem : IRemoteFileSystem
 
 	/// <summary>When set, opening a file for reading fails with this.</summary>
 	public Exception? ReadFailure { get; set; }
+
+	/// <summary>How many times a file was opened for reading.</summary>
+	public int Opened { get; private set; }
+
+	/// <summary>Every byte handed to a reader, over all the files opened.</summary>
+	public long BytesRead => _bytesRead;
 
 	public TextFileSystem WriteElsewhere(string path, string text) => WriteElsewhere(path, Encoding.UTF8.GetBytes(text));
 
@@ -55,13 +62,14 @@ internal sealed class TextFileSystem : IRemoteFileSystem
 
 	public ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
 	{
+		Opened++;
 		if (ReadFailure is { } failure)
 		{
 			return ValueTask.FromException<Stream>(failure);
 		}
 
 		return _files.TryGetValue(path, out (byte[] Bytes, DateTimeOffset Modified) file)
-			? ValueTask.FromResult<Stream>(new MemoryStream(file.Bytes, writable: false))
+			? ValueTask.FromResult<Stream>(new CountingReadStream(new MemoryStream(file.Bytes, writable: false), read => Interlocked.Add(ref _bytesRead, read)))
 			: ValueTask.FromException<Stream>(new RemoteFileSystemException(RemoteFileErrorKind.NotFound, "No such file", path));
 	}
 

@@ -124,7 +124,7 @@ public partial class RemoteFileBrowser
 	/// <summary>The browser crossed one of <see cref="WidthSteps"/>; <paramref name="step"/> counts the steps it reaches.</summary>
 	internal Task HandleWidthChangedAsync(int step) => RunSafeAsync(() =>
 	{
-		BrowserWidth width = (BrowserWidth)Math.Clamp(step, (int)BrowserWidth.Narrow, (int)BrowserWidth.Wide);
+		BrowserWidth width = (BrowserWidth)Math.Clamp(step, (int)BrowserWidth.Narrow, (int)BrowserWidth.Roomy);
 		if (!_disposed && width != _width)
 		{
 			_width = width;
@@ -353,6 +353,11 @@ public partial class RemoteFileBrowser
 			DividerBefore = true,
 			OnClick = ToggleHiddenAsync,
 		});
+		items.Add(new MokaContextMenuItem { Text = "Show as tiles", Icon = MokaIcons.Navigation.Grid, Checked = IsTiles, OnClickSync = ToggleTiles });
+		if (CanShowDetails)
+		{
+			items.Add(new MokaContextMenuItem { Text = "Show details", Icon = MokaIcons.Navigation.PanelRight, Checked = _detailsOpen, OnClickSync = ToggleDetails });
+		}
 
 		if (CanFollowTerminal)
 		{

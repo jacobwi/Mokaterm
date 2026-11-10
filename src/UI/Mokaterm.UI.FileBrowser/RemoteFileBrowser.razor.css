@@ -46,6 +46,17 @@
 	min-width: 0;
 }
 
+/* The pane is handed over only while the browser has room for it, so Moka's own cut-off at 60rem, and the button
+   that opens its drawer instead, are undone: the drawer would open at the window's edge, far from a side panel. */
+.fb ::deep .moka-file-browser__details {
+	display: block;
+	border-inline-start-color: var(--moka-color-outline-variant);
+}
+
+.fb ::deep .moka-file-browser__details-toggle {
+	display: none;
+}
+
 /* The browser's alert cannot name the folder or offer root, so the one in ToolbarEnd is shown from Load instead. */
 .fb ::deep .moka-file-browser__failure {
 	display: none;

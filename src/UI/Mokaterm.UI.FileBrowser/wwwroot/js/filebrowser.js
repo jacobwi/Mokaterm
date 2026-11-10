@@ -81,7 +81,8 @@ function commandFor(event) {
 }
 
 // Keys MokaFileBrowser answers only while its list has the focus. The browser has always taken them from anywhere inside it.
-function isListKey(event) {
+// Left and Right move through tiles only, and stay with a control that moves by them itself.
+function isListKey(event, list) {
 	const mod = event.ctrlKey || event.metaKey;
 	if (event.altKey) {
 		return false;
@@ -89,6 +90,11 @@ function isListKey(event) {
 
 	if (mod) {
 		return !event.shiftKey && event.key.toLowerCase() === 'a';
+	}
+
+	if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+		return list.classList.contains('moka-file-browser__list--tiles')
+			&& !(isElement(event.target) && event.target.closest('[role="radiogroup"], [role="tablist"], [role="menu"], [role="slider"]'));
 	}
 
 	return ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', '/'].includes(event.key)
@@ -127,8 +133,9 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			return;
 		}
 
-		// A column's edge resizes it from the keyboard, and this listener runs first.
-		if (isElement(event.target) && event.target.closest('[role="separator"]')) {
+		// A column's edge resizes it from the keyboard, and this listener runs first. The details pane's preview scrolls
+		// by the same keys the list moves by.
+		if (isElement(event.target) && event.target.closest('[role="separator"], [data-fb-own-keys]')) {
 			return;
 		}
 
@@ -157,7 +164,7 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 		}
 
 		const target = list();
-		if (target && event.target !== target && isListKey(event)) {
+		if (target && event.target !== target && isListKey(event, target)) {
 			event.preventDefault();
 			event.stopPropagation();
 			target.focus({ preventScroll: true });

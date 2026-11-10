@@ -4,6 +4,7 @@ using Mokaterm.UI.Common.Editing;
 using Mokaterm.UI.Common.Files;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.FileBrowser.Bookmarks;
+using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Dialogs;
 using Mokaterm.UI.FileBrowser.Editing;
 using Mokaterm.UI.FileBrowser.Interop;
@@ -26,6 +27,7 @@ public static class FileBrowserServiceCollectionExtensions
 		services.TryAddScoped<FileBrowserInterop>();
 		services.TryAddScoped<RemoteTransferService>();
 		services.TryAddScoped<FolderBookmarkStore>();
+		services.TryAddScoped<FileBrowserViewMemory>();
 		services.TryAddScoped<IRemoteTextEditor, RemoteTextEditor>();
 		services.TryAddScoped<IFileBrowserDialog, FileBrowserDialogService>();
 		return services;

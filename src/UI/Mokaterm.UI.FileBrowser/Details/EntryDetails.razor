@@ -1,0 +1,93 @@
+@namespace Mokaterm.UI.FileBrowser.Details
+@using Moka.Red.Primitives.DataList
+
+<div class="fb-details">
+	@if (Single is { } entry)
+	{
+		<div class="fb-details-head">
+			<MokaIcon Icon="@EntryVisuals.IconFor(entry)" Color="@EntryVisuals.ColorFor(entry)" SizeValue="28px" />
+			<span class="fb-details-name">@entry.Name</span>
+		</div>
+		<MokaDataList Items="FactsOf(entry)" Dense Class="fb-details-facts" />
+		@if (EntryPreviews.KindOf(entry) != EntryPreviewKind.None)
+		{
+			<section class="fb-details-preview" aria-label="Preview">
+				<span class="fb-details-label">Preview</span>
+				@if (_preview is { } preview)
+				{
+					@switch (preview.State)
+					{
+						case EntryPreviewState.Text:
+							<pre class="fb-details-text" tabindex="0" aria-label="Start of the file" data-fb-own-keys>@preview.Text</pre>
+							@if (preview.IsCut)
+							{
+								<p class="fb-details-note">@CutNote</p>
+							}
+							break;
+						case EntryPreviewState.Image when _imageBroken:
+							<p class="fb-details-note">This image could not be drawn.</p>
+							break;
+						case EntryPreviewState.Image:
+							<div class="fb-details-image-frame" @oncontextmenu:preventDefault="true">
+								<img class="fb-details-image" src="@preview.ImageAddress" alt="@entry.Name" draggable="false" @onerror="OnImageFailed" />
+							</div>
+							break;
+						case EntryPreviewState.Empty:
+							<p class="fb-details-note">Empty file.</p>
+							break;
+						case EntryPreviewState.TooLarge:
+							<p class="fb-details-note">@TooLargeNote</p>
+							break;
+						case EntryPreviewState.Binary:
+							<p class="fb-details-note">Not text, so there is no preview.</p>
+							break;
+						case EntryPreviewState.NotUtf8:
+							<p class="fb-details-note">Not UTF-8 text, so there is no preview.</p>
+							break;
+						case EntryPreviewState.Failed:
+							<p class="fb-details-note fb-details-note--error">Could not read it. @preview.Problem</p>
+							break;
+					}
+				}
+				else if (_phase == ReadPhase.Reading)
+				{
+					<div class="fb-details-note fb-details-reading" role="status">
+						<MokaSpinner SizeValue="12px" />
+						<span>Reading...</span>
+					</div>
+				}
+			</section>
+		}
+	}
+	else if (Entries.Count > 1)
+	{
+		<div class="fb-details-head">
+			<MokaIcon Icon="MokaIcons.File.Files" Color="MokaColor.Primary" SizeValue="28px" />
+			<span class="fb-details-name">@EntryVisuals.Count(Entries.Count, "item", "items") selected</span>
+		</div>
+		<MokaDataList Items="SelectionFacts" Dense Class="fb-details-facts" />
+		@if (Entries.Any(item => item.Kind != RemoteEntryKind.File))
+		{
+			<p class="fb-details-note">Only files count toward the size: folders and links are left out.</p>
+		}
+	}
+	else
+	{
+		<div class="fb-details-head">
+			<MokaIcon Icon="MokatermIcons.FolderOpen" Color="MokaColor.Primary" SizeValue="28px" />
+			<span class="fb-details-name">@FolderName</span>
+		</div>
+		<MokaDataList Items="FolderFacts" Dense Class="fb-details-facts" />
+		<p class="fb-details-note">Select an item to see its details here, with a preview of text files and images.</p>
+	}
+</div>
+
+@code {
+
+	private static RenderFragment PathValue(string path) =>
+		@<span class="fb-details-path">
+			<span>@path</span>
+			<CopyButton Text="@path" Label="Copy path" Position="MokaTooltipPosition.BottomEnd" />
+		</span>;
+
+}

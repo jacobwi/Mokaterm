@@ -35,11 +35,18 @@ namespace Mokaterm.UI.FileBrowser;
 /// </summary>
 public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 {
-	// Widths in CSS pixels where the browser reaches BrowserWidth.Medium and BrowserWidth.Wide. Medium fits the name,
-	// size and modified columns, Wide every column, each at its set width.
-	private static readonly int[] WidthSteps = [440, 740];
+	// Widths in CSS pixels where the browser reaches BrowserWidth.Medium, Wide and Roomy. Medium fits the name, size and
+	// modified columns, Wide every column, each at its set width, and Roomy the details pane beside a Medium list.
+	private static readonly int[] WidthSteps = [440, 740, 800];
+
+	// Moka's details pane is 17rem wide.
+	private const int DetailsPanePixels = 17 * 16;
 
 	private static readonly MokaFileFitWidths ColumnFit = new(Medium: WidthSteps[0] / 16.0, Wide: WidthSteps[1] / 16.0);
+
+	// Moka fits the columns to the whole browser, so beside the pane they wait for the room the pane takes as well.
+	private static readonly MokaFileFitWidths ColumnFitBesideDetails =
+		new(Medium: (WidthSteps[0] + DetailsPanePixels) / 16.0, Wide: (WidthSteps[1] + DetailsPanePixels) / 16.0);
 
 	private static readonly IReadOnlySet<string> NothingSelected = new HashSet<string>(StringComparer.Ordinal);
 
@@ -76,6 +83,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private IReadOnlySet<string> _selected = NothingSelected;
 	private MokaFileView _sort = new();
 	private bool _showHidden;
+	private bool _detailsOpen;
 	private string _filter = "";
 
 	private MokaFileBrowser<RemoteFileEntry>? _browser;
@@ -157,6 +165,9 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private RemoteTransferService Transfers { get; set; } = default!;
 
 	[Inject]
+	private FileBrowserViewMemory ViewMemory { get; set; } = default!;
+
+	[Inject]
 	private ILogger<RemoteFileBrowser> Logger { get; set; } = default!;
 
 	private FileBrowserDialogs Dialogs => _dialogs ??= new FileBrowserDialogs(DialogService);
@@ -220,6 +231,18 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 		: string.Create(CultureInfo.CurrentCulture, $"This folder holds {_entries.Count:N0} hidden items.");
 
 	private bool IsNarrow => _width == BrowserWidth.Narrow;
+
+	private bool IsTiles => _sort.Mode == MokaFileViewMode.Tiles;
+
+	private bool CanShowDetails => _width >= BrowserWidth.Roomy;
+
+	// A narrower browser keeps the pane closed rather than move it into Moka's drawer, which opens at the window's edge
+	// however far from it the file panel is. Whether it was open is kept for when the browser is wide again.
+	private bool ShowsDetails => _detailsOpen && CanShowDetails && ShowsList;
+
+	private MokaFileFitWidths ColumnFitNow => ShowsDetails ? ColumnFitBesideDetails : ColumnFit;
+
+	private string TilesTitle => IsTiles ? "Show as a list" : "Show as tiles";
 
 	private string ItemCountText
 	{
@@ -293,6 +316,8 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 			SelectedCount = _ => SelectionText,
 			NoMatches = _ => NoMatchesText,
 		};
+		_sort = ViewMemory.View;
+		_detailsOpen = ViewMemory.DetailsOpen;
 		ReadViewSettings();
 	}
 
@@ -1035,7 +1060,28 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	{
 		bool thirdClick = view.SortBy == _sort.SortBy && _sort.Descending && !view.Descending;
 		_sort = thirdClick ? view with { SortBy = MokaFileSort.Name } : view;
+		ViewMemory.View = _sort;
 		RebuildView();
+	}
+
+	// Also reached from the background menu, whose click belongs to another component.
+	private void ToggleTiles()
+	{
+		_sort = _sort with { Mode = IsTiles ? MokaFileViewMode.List : MokaFileViewMode.Tiles };
+		ViewMemory.View = _sort;
+
+		// Tiles draw no name cell, so a field left open in the list would come back with the list.
+		_renamingPath = null;
+		RebuildView();
+		_restoreFocus = true;
+		StateHasChanged();
+	}
+
+	private void ToggleDetails()
+	{
+		_detailsOpen = !_detailsOpen;
+		ViewMemory.DetailsOpen = _detailsOpen;
+		StateHasChanged();
 	}
 
 	private bool ShowsEntry(RemoteFileEntry entry) => ShowsList && (_showHidden || !entry.IsHidden);
