@@ -66,6 +66,11 @@
 						<DockerMountsPanel @key="details.Id" Session="Session" Mounts="@MountsOf(details)" Visible="Visible" />
 					</div>
 					break;
+				case "limits":
+					<div class="mt-dk-scroll">
+						<DockerLimitsPanel @key="details.Id" Session="Session" ContainerId="@details.Id" Visible="Visible" OnChanged="AfterChangeAsync" />
+					</div>
+					break;
 				case "run":
 					<div class="mt-dk-scroll">
 						<DockerExecPanel @key="details.Id" Session="Session" Container="@Name" Running="@(details.Status == "running")" Visible="Visible" />

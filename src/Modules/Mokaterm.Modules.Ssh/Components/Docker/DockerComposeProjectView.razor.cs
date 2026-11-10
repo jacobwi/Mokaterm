@@ -6,6 +6,7 @@ using Moka.Red.Core.Icons;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.Containers;
 using Mokaterm.Modules.Ssh.Docker;
+using Mokaterm.UI.Common.Formatting;
 using Mokaterm.UI.Common.Icons;
 using Mokaterm.UI.Common.Platform;
 
@@ -46,6 +47,7 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 	private string? _logService;
 	private bool _build;
 	private bool _pullFirst;
+	private bool _checkingDrift;
 
 	[Parameter, EditorRequired]
 	public string ProjectName { get; set; } = "";
@@ -83,11 +85,55 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 		? "No compose was found on this host (or not the one picked in the overview), so the project can be looked at but not changed."
 		: "Reading the project.";
 
+	// Compared with the containers' labels at every draw; the files' side is the session's, read at most once a minute.
+	private ComposeDrift? Drift => _project is { } project && Feature is { } feature
+		? ComposeDrift.Compare(feature.ComposeDrift.Find(project.Name), project.Containers, Tool)
+		: null;
+
 	protected override async Task OnInitializedAsync()
 	{
 		FollowRestartLoops();
 		await RefreshAsync();
-		StartPolling(RefreshInterval, RefreshAsync);
+		await ReadDriftAsync(force: false);
+		StartPolling(RefreshInterval, async () =>
+		{
+			await RefreshAsync();
+			await ReadDriftAsync(force: false);
+		});
+	}
+
+	private string DriftCheckLabel(ComposeDrift drift) => string.Create(
+		CultureInfo.CurrentCulture,
+		$"Compare with the files again (last read {DisplayFormat.Relative(drift.ReadAt, Time.GetUtcNow())})");
+
+	private Task CheckDriftAsync() => ReadDriftAsync(force: true);
+
+	private async Task ReadDriftAsync(bool force)
+	{
+		if (_target is not { HasFiles: true } target || Feature is not { } feature || Client is not { } client
+			|| (!force && !feature.ComposeDrift.IsStale(ProjectName, target.Tool, DockerComposeDrift.ProjectAge)))
+		{
+			return;
+		}
+
+		_checkingDrift = true;
+		try
+		{
+			await feature.ComposeDrift.ReadAsync(client, target, Lifetime);
+		}
+		catch (OperationCanceledException)
+		{
+			return;
+		}
+		finally
+		{
+			_checkingDrift = false;
+		}
+
+		if (!IsDisposed)
+		{
+			StateHasChanged();
+		}
 	}
 
 	private static MokaColor HealthColor(ComposeProjectHealth health) => health switch

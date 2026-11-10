@@ -9,7 +9,7 @@
 			   PrimaryText="@(ShowsList ? "Build" : null)"
 			   PrimaryIcon="DockerIcons.Build"
 			   PrimaryDisabled="IsWorking"
-			   PrimaryTitle="@(LiveRuns?.IsRunning == true ? "A build or a push is still running" : null)"
+			   PrimaryTitle="@(LiveRuns?.IsRunning == true ? "A build, push, backup or restore is still running" : null)"
 			   OnPrimary="ShowBuild"
 			   Loading="FrameLoading"
 			   Loaded="@(!IsFirstLoad)"

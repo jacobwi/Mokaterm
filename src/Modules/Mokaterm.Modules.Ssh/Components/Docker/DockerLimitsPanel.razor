@@ -1,0 +1,108 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerManagerPageBase
+
+@LoadErrorPanel(LoadAsync)
+@ChangePanel
+
+@if (_details is { } details)
+{
+	<MokaCard Inner Class="mt-dk-card">
+		<Header><span class="mt-dk-label">Now</span></Header>
+		<ChildContent>
+			<MokaDataList Items="NowFacts(details.Limits)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts mt-dk-facts--data" />
+		</ChildContent>
+	</MokaCard>
+
+	@if (ComposeProject(details) is { } project)
+	{
+		<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+			@($"{details.Name} belongs to the compose project {project}. These values last until compose makes the container again (an up after its files changed, a recreate, or down and up), which puts the compose file's values back. Put them in the compose file to keep them.")
+		</MokaAlert>
+	}
+
+	<form class="mt-dk-section" @onsubmit="ApplyAsync" @onsubmit:preventDefault="true">
+		<div class="mt-dk-form">
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="CPUs"
+							   Value="@_cpus"
+							   ValueChanged="@(value => Set(ref _cpus, value, DockerUpdateSpec.CpusField))"
+							   ErrorText="@Problem(DockerUpdateSpec.CpusField)"
+							   HelperText="@CpusHelp"
+							   Placeholder="no limit"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   inputmode="decimal"
+							   spellcheck="false"
+							   autocomplete="off" />
+			</div>
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="Memory"
+							   Value="@_memory"
+							   ValueChanged="@(value => Set(ref _memory, value, DockerUpdateSpec.MemoryField))"
+							   ErrorText="@Problem(DockerUpdateSpec.MemoryField)"
+							   HelperText="A size such as 512m or 2g"
+							   Placeholder="no limit"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   spellcheck="false"
+							   autocomplete="off" />
+			</div>
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="Memory and swap"
+							   Value="@_swap"
+							   ValueChanged="@(value => Set(ref _swap, value, DockerUpdateSpec.SwapField))"
+							   ErrorText="@Problem(DockerUpdateSpec.SwapField)"
+							   HelperText="Both together, or -1 for no swap limit"
+							   Placeholder="docker's default"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   spellcheck="false"
+							   autocomplete="off" />
+			</div>
+		</div>
+
+		<span class="mt-dk-label">Restart policy</span>
+		<div class="mt-dk-toolbar">
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_restart.ToString()" ValueChanged="OnRestartChanged" AriaLabel="Restart policy">
+				<MokaSegment Value="@nameof(DockerRestartPolicy.No)" Text="no" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.OnFailure)" Text="on-failure" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.Always)" Text="always" />
+				<MokaSegment Value="@nameof(DockerRestartPolicy.UnlessStopped)" Text="unless-stopped" />
+			</MokaSegmentedControl>
+			@if (_restart == DockerRestartPolicy.OnFailure)
+			{
+				<div class="mt-dklim-retries">
+					<MokaTextField Value="@_retries"
+								   ValueChanged="@(value => Set(ref _retries, value, DockerUpdateSpec.RestartField))"
+								   Placeholder="retries, 0 for no limit"
+								   Mono
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   inputmode="numeric"
+								   autocomplete="off"
+								   aria-label="Retries" />
+				</div>
+			}
+		</div>
+		@if (Problem(DockerUpdateSpec.RestartField) is { } restartProblem)
+		{
+			<span class="mt-dk-note mt-dk-note--error">@restartProblem</span>
+		}
+
+		<div class="mt-dk-toolbar">
+			<span class="mt-dk-note">Only what you change goes on the docker update line, which is shown before it runs. It applies at once and lasts across restarts.</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" Disabled="IsBusy" OnClick="Reset">Reset</MokaButton>
+			<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Status.Check" Loading="IsBusy" Disabled="IsBusy">
+				Apply
+			</MokaButton>
+		</div>
+	</form>
+}
+else if (IsFirstLoad)
+{
+	<div class="mt-dk-center"><MokaSpinner Label="Reading the limits" /></div>
+}

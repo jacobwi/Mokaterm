@@ -1,4 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Moka.Red.Feedback.Dialog
 @inherits DockerManagerPageBase
 
 <ToolPageFrame Title="Volumes"
@@ -17,6 +18,9 @@
 			   OnRefresh="@(() => RefreshByHandAsync(RefreshAsync))"
 			   ListPage
 			   Detail="@DetailFragment">
+	<Chips>
+		@ArchiveChips
+	</Chips>
 	<ChipsEnd>
 		@if (Navigation is { } navigation)
 		{
@@ -99,7 +103,7 @@
 						}
 					</CellTemplate>
 				</MokaColumn>
-				<MokaColumn TItem="DockerVolume" Title="Used by" Field="@(volume => volume.InUse)" SortComparer="ByUse" Mono Class="mt-col-wide">
+				<MokaColumn TItem="DockerVolume" Title="Used by" Field="@(volume => volume.InUse)" SortComparer="ByUse" Mono Class="mt-col-wider">
 					<CellTemplate Context="volume">
 						@if (UsersOf(volume) is { Count: > 0 } users)
 						{
@@ -123,6 +127,13 @@
 		</ToolTable>
 	</ChildContent>
 </ToolPageFrame>
+
+<HeadedDialog Open="@(_archiveMode is not null)" OpenChanged="OnArchiveOpenChanged" Title="@ArchiveTitle" Icon="@(_archiveMode == DockerVolumeArchiveView.RestoreMode ? DockerIcons.Restore : DockerIcons.Backup)" DialogSize="MokaDialogSize.Large">
+	@if (_archiveMode is { } mode)
+	{
+		<DockerVolumeArchiveView @key="_archiveKey" Session="Session" Visible="Visible" Mode="@mode" Volume="@_archiveVolume" TakenNames="VolumeNames" OnClose="CloseArchive" />
+	}
+</HeadedDialog>
 
 @code {
 	/// <summary>Removes the picked volumes no container uses, together; the ones in use stay, and the question says so.</summary>
@@ -161,6 +172,33 @@
 		</span>
 	</text>;
 
+	private RenderFragment ArchiveChips => @<text>
+		@if (VolumeRun is { } run)
+		{
+			<Hint Text="@($"{run.Title}: show its output")">
+				<MokaButton Variant="MokaVariant.Text" Color="@(run.IsRunning ? MokaColor.Warning : MokaColor.Surface)" Size="MokaSize.Xs"
+							StartIcon="@(run.IsRunning ? DockerIcons.Backup : MokaIcons.File.FileText)" OnClick="@(() => OpenArchive(DockerVolumeArchiveView.RunMode, null))">
+					@(run.IsRunning ? "Running" : $"Last run: {run.StateText}")
+				</MokaButton>
+			</Hint>
+		}
+		<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Restore"
+					Disabled="IsWorking" OnClick="@(() => OpenArchive(DockerVolumeArchiveView.RestoreMode, null))">
+			Restore a backup
+		</MokaButton>
+	</text>;
+
+	private RenderFragment ArchiveActions(DockerVolume volume) => @<text>
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Backup"
+					Disabled="@(IsWorking || !CanArchive(volume))" OnClick="@(() => OpenArchive(DockerVolumeArchiveView.BackupMode, volume.Name))">
+			Back up
+		</MokaButton>
+		<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Restore"
+					Disabled="@(IsWorking || !CanArchive(volume))" OnClick="@(() => OpenArchive(DockerVolumeArchiveView.RestoreMode, volume.Name))">
+			Restore
+		</MokaButton>
+	</text>;
+
 	private RenderFragment? DetailFragment => _selected is { } selected ? DetailPanel(selected) : null;
 
 	private RenderFragment DetailPanel(string selected) => @<ToolDetailPanel Title="@selected"
@@ -171,6 +209,7 @@
 		<Actions>
 			@if (SelectedVolume is { } volume)
 			{
+				@ArchiveActions(volume)
 				<Hint Text="@(volume.InUse ? "A container still uses it" : null)">
 					<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Error" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Delete"
 								Disabled="@(IsBusy || !CanRemove(volume))" OnClick="@(() => RemoveAsync(volume))">

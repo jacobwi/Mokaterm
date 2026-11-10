@@ -54,6 +54,25 @@
 		}
 	</text>;
 
+	// A compose project whose files no longer define some of its services the way they were brought up.
+	private protected static RenderFragment DriftChip(ComposeDrift? drift) => @<text>
+		@if (drift is { State: ComposeDriftState.Changed } changed)
+		{
+			<Hint Text="@changed.ChangedText()">
+				<MokaTag Text="Changed" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+			</Hint>
+		}
+	</text>;
+
+	private protected static RenderFragment DriftChip(ComposeServiceDrift? service) => @<text>
+		@if (service is { State: ComposeDriftState.Changed } changed)
+		{
+			<Hint Text="@changed.Detail">
+				<MokaTag Text="Changed" Size="MokaSize.Xs" Color="MokaColor.Warning" />
+			</Hint>
+		}
+	</text>;
+
 	/// <summary>What docker system df prints, one row per kind: the overview's summary and the cleanup page's.</summary>
 	private protected static RenderFragment DiskUsageTable(IReadOnlyList<DockerDiskUsage> rows) => @<ToolTable TItem="DockerDiskUsage"
 																										   Items="rows"

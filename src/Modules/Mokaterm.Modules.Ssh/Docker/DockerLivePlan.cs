@@ -16,6 +16,22 @@ internal sealed record DockerLivePlan(IReadOnlyList<DockerCall> Calls, string Ti
 	/// <summary>The owner of builds and pushes started from the images page.</summary>
 	public const string ImagesOwner = "images";
 
+	// The owner of volume backups and restores, which the volumes page shows.
+	public const string VolumesOwner = "volumes";
+
+	// Run once the calls ended however they ended, while the session lives: the clean-up a stop or a failure needs, such
+	// as removing a helper container the calls' own script could not.
+	public IReadOnlyList<DockerCall> Cleanup { get; init; } = [];
+
+	// What a stopped run says; null keeps a build's or a push's wording.
+	public string? StopNote { get; init; }
+
+	// The file on the docker host a run that succeeded wrote, which the page offers to download.
+	public string? Produces { get; init; }
+
+	// The question is asked as a destructive one, such as a restore that writes over a volume's files.
+	public bool Destructive { get; init; }
+
 	/// <summary>The references whose update check is dropped once the run succeeded: a pushed or rebuilt tag reads anew.</summary>
 	public IReadOnlyList<string> Refreshes { get; init; } = [];
 

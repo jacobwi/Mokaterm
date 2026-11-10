@@ -56,7 +56,53 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 	protected override async Task OnInitializedAsync()
 	{
 		await RefreshAsync();
-		StartPolling(RefreshInterval, () => _selected is null ? RefreshAsync() : Task.CompletedTask);
+		await ReadDriftAsync();
+		StartPolling(RefreshInterval, async () =>
+		{
+			if (_selected is null)
+			{
+				await RefreshAsync();
+				await ReadDriftAsync();
+			}
+		});
+	}
+
+	private ComposeDrift? DriftOf(ComposeProject project) =>
+		Feature is { } feature ? ComposeDrift.Compare(feature.ComposeDrift.Find(project.Name), project.Containers, feature.Compose) : null;
+
+	// At most two projects per refresh, and only those whose last answer is older than the list takes, so a host with
+	// many projects is read a few at a time rather than all at once.
+	private async Task ReadDriftAsync()
+	{
+		if (Feature is not { Compose: { } tool } feature || Client is not { } client)
+		{
+			return;
+		}
+
+		int reads = 0;
+		foreach (ComposeProject project in _projects)
+		{
+			ComposeTarget target = ComposeTarget.For(tool, project);
+			if (reads == 2 || IsDisposed || !target.HasFiles || !feature.ComposeDrift.IsStale(project.Name, tool, DockerComposeDrift.ListAge))
+			{
+				continue;
+			}
+
+			reads++;
+			try
+			{
+				await feature.ComposeDrift.ReadAsync(client, target, Lifetime);
+			}
+			catch (OperationCanceledException)
+			{
+				return;
+			}
+		}
+
+		if (reads > 0 && !IsDisposed)
+		{
+			StateHasChanged();
+		}
 	}
 
 	private static MokaColor ProjectColor(ComposeProject project) => project.Health switch

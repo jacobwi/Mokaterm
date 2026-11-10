@@ -35,8 +35,7 @@ internal sealed partial class DemoDockerEngine
 		["stop", .. var names] => ChangeEach(names, container => Stop(container, 0)),
 		["kill", var name] => Change(name, container => Stop(container, 137)),
 		["pause", var name] => Change(name, container => container.State = "paused"),
-		["update", var restart, var name] when restart.StartsWith(RestartFlag, StringComparison.Ordinal) =>
-			Change(name, container => SetRestartPolicy(container, restart[RestartFlag.Length..])),
+		["update", .. var update] => Update(update),
 		["rm", .. var rest] => Remove(rest),
 		["run", .. var run] => RunContainer(run),
 		["image", "ls", ..] => DemoDockerResult.Ok(string.Concat(_images.Select(image => Line(ImageRow(image)) + "\n"))),
@@ -93,7 +92,7 @@ internal sealed partial class DemoDockerEngine
 		["CreatedAt"] = ListingTime(container.Created),
 		["ID"] = container.Id,
 		["Image"] = container.Image,
-		["Labels"] = string.Join(',', container.Labels.Select(label => $"{label.Key}={label.Value}")),
+		["Labels"] = string.Join(',', LabelsOf(container).Select(label => $"{label.Key}={label.Value}")),
 		["LocalVolumes"] = container.Volumes.Count.ToString(CultureInfo.InvariantCulture),
 		["Mounts"] = string.Join(',', container.Volumes),
 		["Names"] = container.Name,
@@ -167,6 +166,12 @@ internal sealed partial class DemoDockerEngine
 					NetworkMode = container.Networks.Count > 0 ? container.Networks[0] : "default",
 					Privileged = false,
 					RestartPolicy = PolicyOf(container),
+					NanoCpus = container.NanoCpus,
+					CpuQuota = 0,
+					CpuPeriod = 0,
+					Memory = container.MemoryLimit,
+					MemorySwap = container.MemorySwap,
+					AutoRemove = false,
 				},
 				Mounts = container.Volumes.Select(volume => new
 				{
@@ -187,7 +192,7 @@ internal sealed partial class DemoDockerEngine
 					Image = container.Image,
 					WorkingDir = "",
 					Entrypoint = new[] { container.Command.Split(' ')[0] },
-					Labels = container.Labels,
+					Labels = LabelsOf(container),
 				},
 				NetworkSettings = new
 				{
@@ -407,6 +412,7 @@ internal sealed partial class DemoDockerEngine
 			else
 			{
 				_containers.Remove(container);
+				RemoveHelper(container.Name);
 				output.Append(name).Append('\n');
 			}
 		}

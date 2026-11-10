@@ -43,7 +43,7 @@ internal sealed class DemoSession : IProtocolSession
 		_tunnels = new DemoTunnels(timeProvider);
 		_commands = new DemoCommandFeature(account, hostName, timeProvider);
 		_docker = DockerSessionFeature.ForCommands(
-			new DemoDockerCommands(new DemoDockerEngine(timeProvider, DemoDockerFiles.Reader(tree), DemoDockerFiles.ByteReader(tree)), timeProvider),
+			new DemoDockerCommands(new DemoDockerEngine(timeProvider, DemoDockerFiles.Reader(tree), DemoDockerFiles.ByteReader(tree), tree, account), timeProvider),
 			timeProvider,
 			hostName,
 			account.Name,

@@ -18,7 +18,8 @@ public static class FileBrowserServiceCollectionExtensions
 	/// <summary>
 	/// Registers the file browser services, including a browser-based <c>IFileDropBridge</c> hosts may replace, the text
 	/// editor that modules reach through <see cref="IRemoteTextEditor"/>, and the browser itself in a dialog, which they
-	/// reach through <see cref="IFileBrowserDialog"/>. Called by the shell's <c>AddMokatermUI()</c>; safe to call twice.
+	/// reach through <see cref="IFileBrowserDialog"/>, and its downloads through <see cref="IRemoteFileDownloads"/>. Called by
+	/// the shell's <c>AddMokatermUI()</c>; safe to call twice.
 	/// </summary>
 	public static IServiceCollection AddMokatermFileBrowser(this IServiceCollection services)
 	{
@@ -30,6 +31,7 @@ public static class FileBrowserServiceCollectionExtensions
 		services.TryAddScoped<FileBrowserViewMemory>();
 		services.TryAddScoped<IRemoteTextEditor, RemoteTextEditor>();
 		services.TryAddScoped<IFileBrowserDialog, FileBrowserDialogService>();
+		services.TryAddScoped<IRemoteFileDownloads, RemoteFileDownloads>();
 		return services;
 	}
 }

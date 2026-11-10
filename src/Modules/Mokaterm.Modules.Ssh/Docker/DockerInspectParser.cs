@@ -49,6 +49,7 @@ internal static class DockerInspectParser
 			Hostname = DockerJson.Text(config, "Hostname"),
 			NetworkMode = DockerJson.Text(host, "NetworkMode"),
 			Privileged = DockerJson.Bool(host, "Privileged"),
+			Limits = DockerContainerLimits.Read(host),
 			Ports = Ports(DockerJson.Get(container, "NetworkSettings", "Ports")),
 			Mounts = Mounts(DockerJson.Get(container, "Mounts")),
 			Networks = Networks(DockerJson.Get(container, "NetworkSettings", "Networks")),

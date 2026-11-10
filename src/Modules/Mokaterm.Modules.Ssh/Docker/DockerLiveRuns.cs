@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Mokaterm.Abstractions.Containers;
 using Mokaterm.Abstractions.Diagnostics;
 
 namespace Mokaterm.Modules.Ssh.Docker;
@@ -62,7 +63,7 @@ internal sealed class DockerLiveRuns : IAsyncDisposable
 			ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 			if (_current is { IsRunning: true })
 			{
-				throw new InvalidOperationException("A build or a push is still running.");
+				throw new InvalidOperationException("A build, push, backup or restore is still running.");
 			}
 
 			run = new DockerLiveRun(plan, shown, _time, _lifetime.Token);
@@ -113,7 +114,7 @@ internal sealed class DockerLiveRuns : IAsyncDisposable
 	{
 		// The run starts once Start returned, so the page sees it as current before its first line.
 		await Task.Yield();
-		using IDisposable noted = _changes.Begin(run.Plan.Calls);
+		using IDisposable noted = _changes.Begin([.. run.Plan.Calls, .. run.Plan.Cleanup]);
 		try
 		{
 			await run.RunAsync(client);
@@ -129,7 +130,29 @@ internal sealed class DockerLiveRuns : IAsyncDisposable
 		}
 		finally
 		{
+			await CleanUpAsync(client, run.Plan);
 			Changed?.Invoke();
+		}
+	}
+
+	// The clean-up runs with the session's lifetime rather than the run's, which a stop has cancelled already. A clean-up
+	// that finds nothing left to remove fails, and that is fine.
+	private async Task CleanUpAsync(DockerClient client, DockerLivePlan plan)
+	{
+		foreach (DockerCall call in plan.Cleanup)
+		{
+			try
+			{
+				_ = await client.RunAsync(call, _lifetime.Token);
+			}
+			catch (OperationCanceledException)
+			{
+				return;
+			}
+			catch (DockerOperationException ex)
+			{
+				_logger?.LogInformation("A clean-up after a Docker run did not run: {Reason}", LogSafe.Describe(ex));
+			}
 		}
 	}
 }

@@ -55,6 +55,10 @@ internal sealed record DockerChangeScope
 	public static DockerChangeScope Of(DockerCall call)
 	{
 		ArgumentNullException.ThrowIfNull(call);
+		if (call.Touches is { } touches)
+		{
+			return touches;
+		}
 
 		// A build or a push runs under the server's own time limit; what it touches is what the command inside touches.
 		if (DockerTimeLimit.Unwrap(call) is { } inner)

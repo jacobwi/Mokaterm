@@ -127,10 +127,16 @@ internal sealed partial class DemoDockerEngine
 			["config", "--quiet"] => project == "shop"
 				? new DemoDockerResult(0, "", "time=\"2026-10-11T07:00:00Z\" level=warning msg=\"The \\\"SMTP_PASSWORD\\\" variable is not set. Defaulting to a blank string.\"\n")
 				: DemoDockerResult.Fail(15, $"open {directory}/docker-compose.override.yml: no such file or directory"),
+			["config", "--hash", "*"] => project == "shop" && hasFiles
+				? ConfigHashes()
+				: DemoDockerResult.Fail(15, $"open {directory}/docker-compose.override.yml: no such file or directory"),
+			["config", "--no-interpolate", "--format", "json"] => project == "shop" && hasFiles
+				? ConfigRaw()
+				: DemoDockerResult.Fail(15, $"open {directory}/docker-compose.override.yml: no such file or directory"),
 			["config"] => project == "shop" && hasFiles
 				? DemoDockerResult.Ok(ShopConfig + "\n")
 				: DemoDockerResult.Fail(15, $"open {directory}/docker-compose.override.yml: no such file or directory"),
-			["up", ..] when command.Contains("--force-recreate") => Each(chosen, "Recreate", "Started", container => Start(container)),
+			["up", ..] when command.Contains("--force-recreate") => Each(chosen, "Recreate", "Started", Recreate),
 			["up", ..] => Up(project, members, command.Contains("--build")),
 			["down", ..] => Down(project, members, command.Contains("--volumes")),
 			["stop", ..] => Each(chosen, "Stopping", "Stopped", container => Stop(container, 0)),
@@ -210,7 +216,7 @@ internal sealed partial class DemoDockerEngine
 		StringBuilder error = new();
 		if (members.Count == 0 && project == "shop")
 		{
-			AddShop(_time.GetUtcNow());
+			AddShop(_time.GetUtcNow(), fresh: true);
 			members = [.. _containers.Where(container => container.Project == project)];
 			foreach (DemoDockerContainer container in members)
 			{
@@ -227,6 +233,13 @@ internal sealed partial class DemoDockerEngine
 
 		foreach (DemoDockerContainer container in members)
 		{
+			if (IsOutOfDate(container))
+			{
+				Recreate(container);
+				error.Append(CultureInfo.InvariantCulture, $" Container {container.Name}  Recreated\n");
+				continue;
+			}
+
 			bool wasRunning = container.State == "running";
 			if (!wasRunning)
 			{

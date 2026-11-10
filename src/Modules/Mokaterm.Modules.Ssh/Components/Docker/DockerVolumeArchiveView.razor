@@ -1,0 +1,201 @@
+@namespace Mokaterm.Modules.Ssh.Components.Docker
+@inherits DockerManagerPageBase
+
+<div class="@(_mode == RunMode ? "mt-dkva mt-dkva--run" : "mt-dkva")">
+	@if (_mode == RunMode)
+	{
+		<DockerLiveRunPanel Session="Session" Visible="Visible" Owner="@DockerLivePlan.VolumesOwner" OnBack="OnClose" BackLabel="Close" Finished="FinishedActions" />
+	}
+	else
+	{
+		@LoadErrorPanel(LoadAsync)
+		@ChangePanel
+
+		@if (IsFirstLoad)
+		{
+			<div class="mt-dk-center"><MokaSpinner Label="Reading the volume and the images" /></div>
+		}
+		else if (_mode == BackupMode)
+		{
+			@BackupForm
+		}
+		else
+		{
+			@RestoreForm
+		}
+	}
+</div>
+
+@code {
+	private RenderFragment HelperLine => @<text>
+		@if (_helper is { } helper)
+		{
+			<span class="mt-dk-note">
+				@($"It goes through a container made from {HelperName(helper)}{SizeOf(helper)}, the smallest image already on this host. That container is never started, so the image needs no shell or tar of its own, and it is removed afterwards, whatever happens.")
+			</span>
+		}
+		else if (_images is not null)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+				<div class="mt-dk-alert-line">
+					<span>This host has no image to make the helper container from. Pull a small one first; busybox is about 4 MB.</span>
+					<MokaButton Variant="MokaVariant.Text" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download" Disabled="IsBusy" OnClick="PullBusyboxAsync">Pull busybox</MokaButton>
+				</div>
+			</MokaAlert>
+		}
+	</text>;
+
+	private RenderFragment BackupForm => @<form class="mt-dkva-form" @onsubmit="BackUpAsync" @onsubmit:preventDefault="true">
+		@if (RunningUsers is { Count: > 0 } running)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+				@($"{Names(running)} {(running.Count == 1 ? "is" : "are")} running and may write to {Volume} while it is copied, which can leave the copy inconsistent, a database most of all. Stop {(running.Count == 1 ? "it" : "them")} first for a clean copy.")
+			</MokaAlert>
+		}
+
+		<div class="mt-dk-form">
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="Folder on the docker host"
+							   Value="@_folder"
+							   ValueChanged="@(value => Set(ref _folder, value, FolderField))"
+							   ErrorText="@Problem(FolderField)"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   spellcheck="false"
+							   autocomplete="off" />
+			</div>
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="IsBusy" OnClick="PickBackupFolderAsync">Browse</MokaButton>
+		</div>
+		<div class="mt-dk-form">
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="File name"
+							   Value="@_name"
+							   ValueChanged="OnNameChanged"
+							   ErrorText="@Problem(NameField)"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus />
+			</div>
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_gzip ? "gzip" : "tar")" ValueChanged="OnCompressionChanged" AriaLabel="Compression">
+				<MokaSegment Value="gzip" Text="tar.gz" />
+				<MokaSegment Value="tar" Text="tar" />
+			</MokaSegmentedControl>
+		</div>
+		<span class="mt-dk-note">The file is written readable by you alone and never replaces one that is there. Once it is done it can be downloaded from here.</span>
+		@HelperLine
+		<div class="mt-dk-toolbar">
+			<span class="mt-dk-note">The exact command is shown before it runs.</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="OnClose">Cancel</MokaButton>
+			<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Backup" Disabled="@(IsBusy || _helper is null)">Back up</MokaButton>
+		</div>
+	</form>;
+
+	private RenderFragment RestoreForm => @<form class="mt-dkva-form" @onsubmit="RestoreAsync" @onsubmit:preventDefault="true">
+		@if (Volume is { } existing)
+		{
+			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_newVolume ? "new" : "existing")" ValueChanged="OnTargetChanged" AriaLabel="Restore into">
+				<MokaSegment Value="existing" Text="@($"Into {existing}")" />
+				<MokaSegment Value="new" Text="Into a new volume" />
+			</MokaSegmentedControl>
+		}
+
+		@if (_newVolume)
+		{
+			<div class="mt-dk-form">
+				<div class="mt-dk-form-field">
+					<MokaTextField Label="New volume"
+								   Value="@_newName"
+								   ValueChanged="@(value => Set(ref _newName, value, VolumeField))"
+								   ErrorText="@Problem(VolumeField)"
+								   Placeholder="letters, digits, '_', '.' and '-'"
+								   Mono
+								   Disabled="IsBusy"
+								   Size="MokaSize.Sm"
+								   spellcheck="false"
+								   autocomplete="off" />
+				</div>
+			</div>
+		}
+		else if (RunningUsers is { Count: > 0 } running)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Error" Dense>
+				@($"Stop {Names(running)} first: {(running.Count == 1 ? "it uses" : "they use")} {Volume}, and unpacking files under a running program can corrupt what it writes. Or restore into a new volume.")
+			</MokaAlert>
+		}
+		else
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+				@($"Files in the archive replace {Volume}'s files at the same paths, and files the archive does not hold stay. For an exact copy, restore into a new volume.")
+			</MokaAlert>
+		}
+
+		<div class="mt-dk-form">
+			<div class="mt-dk-form-field">
+				<MokaTextField Label="Archive on the docker host"
+							   Value="@_archive"
+							   ValueChanged="@(value => Set(ref _archive, value, ArchiveField))"
+							   ErrorText="@Problem(ArchiveField)"
+							   HelperText="A .tar file, plain or compressed with gzip, bzip2 or xz"
+							   Placeholder="/tmp/data.tar.gz"
+							   Mono
+							   Disabled="IsBusy"
+							   Size="MokaSize.Sm"
+							   spellcheck="false"
+							   autocomplete="off"
+							   data-autofocus />
+			</div>
+			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="@(IsBusy || _listing)" OnClick="PickArchiveFolderAsync">Browse</MokaButton>
+		</div>
+		<span class="mt-dk-note">To restore a file from this computer, upload it into a folder in the browser first, then use that folder.</span>
+
+		@if (_found is { } found)
+		{
+			<div class="mt-dk-section">
+				<div class="mt-dk-toolbar">
+					<span class="mt-dk-label">Archives in</span>
+					<span class="mt-dk-mono">@_foundFolder</span>
+				</div>
+				@if (_listProblem is { } listProblem)
+				{
+					<span class="mt-dk-note mt-dk-note--error">@listProblem</span>
+				}
+				else if (found.Count == 0)
+				{
+					<span class="mt-dk-note">No .tar, .tar.gz, .tgz, .tar.bz2 or .tar.xz file there.</span>
+				}
+				<div class="mt-dkva-found">
+					@foreach (RemoteFileEntry entry in found)
+					{
+						<MokaButton @key="entry.Path" Variant="@(entry.Path == _archive.Trim() ? MokaVariant.Outlined : MokaVariant.Text)" Color="MokaColor.Surface" Size="MokaSize.Xs"
+									StartIcon="DockerIcons.Backup" OnClick="@(() => PickArchive(entry))" aria-pressed="@(entry.Path == _archive.Trim() ? "true" : "false")">
+							@($"{entry.Name} · {DisplayFormat.Bytes(entry.Size)}")
+						</MokaButton>
+					}
+				</div>
+			</div>
+		}
+
+		@HelperLine
+		<div class="mt-dk-toolbar">
+			<span class="mt-dk-note">The exact command is shown before it runs.</span>
+			<span class="mt-dk-spacer"></span>
+			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="OnClose">Cancel</MokaButton>
+			<MokaButton Type="submit" Variant="MokaVariant.Outlined" Color="@(_newVolume ? MokaColor.Primary : MokaColor.Error)" Size="MokaSize.Xs" StartIcon="DockerIcons.Restore"
+						Disabled="@(IsBusy || _helper is null || (!_newVolume && RunningUsers is { Count: > 0 }))">
+				Restore
+			</MokaButton>
+		</div>
+	</form>;
+
+	private RenderFragment FinishedActions => @<text>
+		@if (LiveRuns?.Current is { Owner: DockerLivePlan.VolumesOwner, State: DockerLiveState.Succeeded, Plan.Produces: { } produced })
+		{
+			<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Download" OnClick="@(() => DownloadAsync(produced))">Download</MokaButton>
+		}
+	</text>;
+}

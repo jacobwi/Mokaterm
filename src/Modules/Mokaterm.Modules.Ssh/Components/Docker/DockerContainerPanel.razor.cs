@@ -22,6 +22,7 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 		("stats", "Stats"),
 		("env", "Env"),
 		("mounts", "Mounts"),
+		("limits", "Limits"),
 		("run", "Run"),
 	];
 
@@ -142,7 +143,7 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 			case "files":
 				await BrowseAsync();
 				return;
-			case "logs" or "inspect" or "stats" or "mounts" or "run":
+			case "logs" or "inspect" or "stats" or "mounts" or "limits" or "run":
 				await TabChanged.InvokeAsync(action);
 				return;
 			case "copy-name":

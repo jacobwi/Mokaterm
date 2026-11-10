@@ -54,6 +54,8 @@ internal sealed record DockerContainerDetails
 
 	public bool Privileged { get; init; }
 
+	public DockerContainerLimits Limits { get; init; } = DockerContainerLimits.None;
+
 	public IReadOnlyList<DockerPort> Ports { get; init; } = [];
 
 	public IReadOnlyList<DockerMount> Mounts { get; init; } = [];

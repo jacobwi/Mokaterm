@@ -24,6 +24,8 @@ internal sealed partial class DemoDockerEngine
 				["docker", "build", .. var rest] => Build(rest, buildKit: false),
 				["docker", "push", .. var rest] => Push(rest),
 				["docker", "compose", .. var rest] when ComposeWord(rest) == "build" => ComposeBuild(rest, directory),
+				["sh", "-c", var script, "sh", .. var rest] when IsBackupScript(script) => VolumeBackup(rest),
+				["sh", "-c", var script, "sh", .. var rest] when IsRestoreScript(script) => VolumeRestore(rest),
 				_ => null,
 			};
 		}

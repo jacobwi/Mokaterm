@@ -66,6 +66,7 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 			: files is null ? null : new DockerHostFiles(files, stagingDirectory);
 		ImageUpdates = new DockerImageUpdates(time);
 		Usage = new DockerUsageCache(time);
+		ComposeDrift = new DockerComposeDrift(time);
 		Changes = new DockerChangeLog(time);
 		LiveRuns = new DockerLiveRuns(time, Changes, logger);
 	}
@@ -80,6 +81,9 @@ public sealed class DockerSessionFeature : IAsyncDisposable
 
 	/// <summary>The update checks run this session, which every page reads to mark what has a newer image.</summary>
 	internal DockerImageUpdates ImageUpdates { get; }
+
+	// The compose files' hashes per project, which the compose pages compare with the containers' labels.
+	internal DockerComposeDrift ComposeDrift { get; }
 
 	/// <summary>The changes the user ran this session, so the health watch never reports them.</summary>
 	internal DockerChangeLog Changes { get; }

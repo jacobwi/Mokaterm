@@ -35,6 +35,12 @@ internal static class DockerIcons
 
 	public static readonly MokaIconDefinition Stats = MokaIcons.Content.BarChart;
 
+	public static readonly MokaIconDefinition Limits = MokaIcons.Status.Gauge;
+
+	public static readonly MokaIconDefinition Backup = MokaIcons.File.Archive;
+
+	public static readonly MokaIconDefinition Restore = MokaIcons.File.ArchiveRestore;
+
 	public static readonly MokaIconDefinition Update = MokaIcons.Navigation.ArrowUpCircle;
 
 	/// <summary>A warehouse with its door, for registries.</summary>

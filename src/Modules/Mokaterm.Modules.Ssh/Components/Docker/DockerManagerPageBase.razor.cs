@@ -151,7 +151,7 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 
 		if (feature.LiveRuns.IsRunning)
 		{
-			Interaction.Notify(NoticeSeverity.Warning, "A build or a push is still running. Let it finish, or stop it, first.");
+			Interaction.Notify(NoticeSeverity.Warning, "A build, push, backup or restore is still running. Let it finish, or stop it, first.");
 			return null;
 		}
 
@@ -162,7 +162,7 @@ public abstract partial class DockerManagerPageBase : DockerPageBase
 				Title = plan.Title,
 				Message = plan.Confirm,
 				ConfirmText = plan.ConfirmText,
-				Destructive = false,
+				Destructive = plan.Destructive,
 				Details = string.Join('\n', DockerSessionFeature.Shown(client, plan.Calls)),
 			},
 			Lifetime);

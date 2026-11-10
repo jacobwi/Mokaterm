@@ -303,7 +303,7 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 			case "files":
 				await BrowseFilesAsync(container.Name);
 				return;
-			case "logs" or "inspect" or "stats" or "mounts" or "run":
+			case "logs" or "inspect" or "stats" or "mounts" or "limits" or "run":
 				Select(container, action);
 				return;
 			case "copy-name":

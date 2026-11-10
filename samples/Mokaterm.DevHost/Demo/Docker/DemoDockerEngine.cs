@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Mokaterm.DevHost.Demo.FileSystem;
 
 namespace Mokaterm.DevHost.Demo.Docker;
 
@@ -24,6 +25,8 @@ internal sealed partial class DemoDockerEngine
 	private readonly DateTimeOffset _started;
 	private readonly Func<string, string?> _readFile;
 	private readonly Func<string, byte[]?> _readBytes;
+	private readonly DemoFileTree? _tree;
+	private readonly DemoAccount _login;
 	private readonly List<DemoDockerContainer> _containers = [];
 	private readonly List<(string Repository, string Tag, string Id, long Size, DateTimeOffset Created)> _images = [];
 	private readonly List<string> _volumes = [];
@@ -31,12 +34,16 @@ internal sealed partial class DemoDockerEngine
 
 	/// <param name="readFile">The text of a file on the demo host, or null when there is none.</param>
 	/// <param name="readBytes">The bytes of a file on the demo host, for one piped into a container; null when the demo has no host files.</param>
-	public DemoDockerEngine(TimeProvider time, Func<string, string?> readFile, Func<string, byte[]?>? readBytes = null)
+	/// <param name="tree">The demo host's files, which volume backups write into and restores read from; null leaves both out.</param>
+	/// <param name="login">Who the manager's shell runs as, which owns the files a backup writes.</param>
+	public DemoDockerEngine(TimeProvider time, Func<string, string?> readFile, Func<string, byte[]?>? readBytes = null, DemoFileTree? tree = null, DemoAccount? login = null)
 	{
 		_time = time;
 		_started = time.GetUtcNow();
 		_readFile = readFile;
 		_readBytes = readBytes ?? (_ => null);
+		_tree = tree;
+		_login = login ?? DemoAccount.Root;
 		DateTimeOffset now = time.GetUtcNow();
 		SeedImages(now);
 		_volumes.AddRange(["shop_pgdata", "monitoring_grafana", "old-cache", HexId("anon-1"), HexId("anon-2")]);
@@ -127,7 +134,7 @@ internal sealed partial class DemoDockerEngine
 		_images.Add(("<none>", "<none>", "sha256:" + HexId("dangling"), 198_000_000, now.AddDays(-9)));
 	}
 
-	private void AddShop(DateTimeOffset now)
+	private void AddShop(DateTimeOffset now, bool fresh = false)
 	{
 		Dictionary<string, string> Labels(string service) => new()
 		{
@@ -165,6 +172,7 @@ internal sealed partial class DemoDockerEngine
 			HasBash = false,
 			CpuBase = 0.4,
 			MemoryBytes = 9L * 1024 * 1024,
+			ConfigHash = ShopHash("web", fresh),
 		});
 		_containers.Add(new DemoDockerContainer
 		{
@@ -188,6 +196,7 @@ internal sealed partial class DemoDockerEngine
 			],
 			CpuBase = 6,
 			MemoryBytes = 186L * 1024 * 1024,
+			ConfigHash = ShopHash("api", fresh),
 		});
 		_containers.Add(new DemoDockerContainer
 		{
@@ -211,6 +220,10 @@ internal sealed partial class DemoDockerEngine
 			],
 			CpuBase = 2.5,
 			MemoryBytes = 96L * 1024 * 1024,
+			NanoCpus = 1_500_000_000,
+			MemoryLimit = 512L * 1024 * 1024,
+			MemorySwap = 1024L * 1024 * 1024,
+			ConfigHash = ShopHash("db", fresh),
 		});
 	}
 

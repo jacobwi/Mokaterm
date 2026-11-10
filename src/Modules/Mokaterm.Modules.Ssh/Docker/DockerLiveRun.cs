@@ -112,7 +112,7 @@ internal sealed class DockerLiveRun
 		catch (OperationCanceledException) when (Volatile.Read(ref _stoppedByUser) != 0)
 		{
 			ended = DockerLiveState.Stopped;
-			Problem = "Stopped. Closing the command's channel ends the docker client, and with it the build or the push; what a push already sent stays in the registry.";
+			Problem = Plan.StopNote ?? "Stopped. Closing the command's channel ends the docker client, and with it the build or the push; what a push already sent stays in the registry.";
 		}
 		catch (OperationCanceledException)
 		{

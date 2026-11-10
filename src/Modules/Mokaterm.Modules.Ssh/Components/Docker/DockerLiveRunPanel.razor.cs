@@ -31,6 +31,10 @@ public sealed partial class DockerLiveRunPanel : DockerManagerPageBase
 	[Parameter]
 	public string BackLabel { get; set; } = "Back";
 
+	// Drawn in the head once the run ended, such as a backup's Download.
+	[Parameter]
+	public RenderFragment? Finished { get; set; }
+
 	private DockerLiveRun? Run => LiveRuns?.Current is { } run && string.Equals(run.Owner, Owner, StringComparison.Ordinal) ? run : null;
 
 	internal static string Elapsed(TimeSpan time) => time.TotalHours >= 1

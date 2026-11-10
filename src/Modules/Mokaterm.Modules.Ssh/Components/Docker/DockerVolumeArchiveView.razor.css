@@ -1,0 +1,26 @@
+.mt-dkva {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+/* The run's log fills what the head and the command leave, so the view needs a height of its own inside the dialog. */
+.mt-dkva--run {
+	height: min(560px, calc(100dvh - 220px));
+	min-height: 280px;
+}
+
+.mt-dkva-form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dkva-found {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--moka-spacing-xxs);
+	min-width: 0;
+}

@@ -78,6 +78,8 @@
 			</div>
 		}
 
+		@DriftLine
+
 		@ChangePanel
 
 		<ViewTabs Tabs="ShownTabs" Active="@_tab" ActiveChanged="Show" Label="Project views" />
@@ -117,6 +119,37 @@
 </div>
 
 @code {
+	private RenderFragment DriftLine => @<text>
+		@if (Drift is { State: ComposeDriftState.Changed } drift)
+		{
+			<MokaAlert Severity="MokaToastSeverity.Warning" Dense>
+				<div class="mt-dk-alert-line">
+					<span>@drift.ChangedText()</span>
+					<span class="mt-dk-toolbar">
+						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Primary" Size="MokaSize.Xs" StartIcon="MokaIcons.Navigation.ArrowUp"
+									Disabled="@(IsBusy || _target is not { HasFiles: true })" OnClick="@(() => RunAsync("up"))">
+							Up
+						</MokaButton>
+						<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="DockerIcons.Update"
+									Disabled="@(IsBusy || _target is not { HasFiles: true })" OnClick="@(() => RunAsync("update"))">
+							Pull, then up
+						</MokaButton>
+						<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh" Disabled="_checkingDrift" OnClick="CheckDriftAsync"
+									Label="@DriftCheckLabel(drift)" AriaLabel="Compare with the files again" Position="MokaTooltipPosition.BottomEnd" />
+					</span>
+				</div>
+			</MokaAlert>
+		}
+		else if (Drift is { State: ComposeDriftState.Unknown } unknown && unknown.UnknownText() is { } doubt)
+		{
+			<div class="mt-dk-toolbar">
+				<span class="mt-dk-note mt-dk-grow">@doubt</span>
+				<IconButton Size="MokaSize.Xs" Icon="MokaIcons.Action.Refresh" Disabled="_checkingDrift" OnClick="CheckDriftAsync"
+							Label="@DriftCheckLabel(unknown)" AriaLabel="Compare with the files again" Position="MokaTooltipPosition.BottomEnd" />
+			</div>
+		}
+	</text>;
+
 	private RenderFragment ServicesContent => @<div class="mt-dk-fill">
 		<ToolTable TItem="ServiceLine"
 				   Items="Lines"
@@ -221,6 +254,7 @@
 						{
 							<span class="mt-dk-chips">
 								@LoopChip(ServiceLoop(line.Service))
+								@DriftChip(Drift?.Find(line.Service.Name))
 								@UpdateChip(line.Service.Image)
 							</span>
 						}

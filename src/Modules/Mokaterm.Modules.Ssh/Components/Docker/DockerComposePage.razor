@@ -70,6 +70,7 @@
 					<MokaColumn TItem="ComposeProject" Title="Project" Field="@(project => project.Name)" SortComparer="ByName" Mono>
 						<CellTemplate Context="project">
 							<span class="mt-dk-name mt-dk-clip" title="@project.Name">@project.Name</span>
+							@DriftChip(DriftOf(project))
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="ComposeProject" Title="Running" Field="@(project => project.RunningCount)" SortComparer="ByRunning" SortDescendingFirst Mono>

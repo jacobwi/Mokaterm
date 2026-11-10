@@ -33,6 +33,12 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	private IReadOnlyDictionary<string, IReadOnlyList<string>> _users = new Dictionary<string, IReadOnlyList<string>>();
 	private DockerSystemUsage? _sizesFrom;
 	private Dictionary<string, long> _sizes = new(StringComparer.Ordinal);
+	private string? _archiveMode;
+	private string? _archiveVolume;
+	private int _archiveKey;
+	private DockerLiveRuns? _watchedRuns;
+	private DockerLiveRun? _seenRun;
+	private bool _seenRunning;
 
 	[Inject]
 	private IClipboardService Clipboard { get; set; } = default!;
@@ -62,6 +68,7 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 
 	protected override async Task OnInitializedAsync()
 	{
+		WatchRuns();
 		await RefreshAsync();
 		await MeasureAsync(force: false);
 	}
@@ -69,6 +76,80 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	/// <summary>Shortens the 64 hex digits of an anonymous volume to the 12 docker shows for ids; its title keeps them all.</summary>
 	private static string ShownName(DockerVolume volume) =>
 		volume.IsAnonymous && volume.Name.Length > 12 ? volume.Name[..12] + "\u2026" : volume.Name;
+
+	// The session's backup or restore, running or the last one until dismissed.
+	private DockerLiveRun? VolumeRun => LiveRuns?.Current is { Owner: DockerLivePlan.VolumesOwner } run ? run : null;
+
+	private IReadOnlyList<string> VolumeNames => [.. _volumes.Select(volume => volume.Name)];
+
+	private string ArchiveTitle => _archiveMode switch
+	{
+		DockerVolumeArchiveView.BackupMode => $"Back up {_archiveVolume}",
+		DockerVolumeArchiveView.RestoreMode => _archiveVolume is { } volume ? $"Restore into {volume}" : "Restore a backup",
+		_ => VolumeRun?.Title ?? "Backup and restore",
+	};
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing && _watchedRuns is { } watched)
+		{
+			watched.Changed -= OnRunsChanged;
+			_watchedRuns = null;
+		}
+
+		base.Dispose(disposing);
+	}
+
+	// docker cp names the volume inside --mount, which only a name this app passes to docker can sit in.
+	private static bool CanArchive(DockerVolume volume) => DockerNames.ExistingNameProblem(volume.Name, "volume") is null;
+
+	private void OpenArchive(string mode, string? volume)
+	{
+		_archiveMode = mode;
+		_archiveVolume = volume;
+		_archiveKey++;
+	}
+
+	private void CloseArchive() => _archiveMode = null;
+
+	private void OnArchiveOpenChanged(bool open)
+	{
+		if (!open)
+		{
+			CloseArchive();
+		}
+	}
+
+	// A restore that ended may have made a volume, so the list is read again.
+	private void WatchRuns()
+	{
+		_watchedRuns = LiveRuns;
+		if (_watchedRuns is not null)
+		{
+			_watchedRuns.Changed += OnRunsChanged;
+			_seenRun = VolumeRun;
+			_seenRunning = _seenRun?.IsRunning == true;
+		}
+	}
+
+	private void OnRunsChanged() => _ = InvokeAsync(async () =>
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+
+		DockerLiveRun? run = VolumeRun;
+		bool ended = run is not null && ReferenceEquals(run, _seenRun) && _seenRunning && !run.IsRunning;
+		_seenRun = run;
+		_seenRunning = run?.IsRunning == true;
+		if (ended)
+		{
+			await RefreshAsync();
+		}
+
+		StateHasChanged();
+	});
 
 	/// <summary>Unused, and named in a way this app passes to docker: a plugin driver may name its volumes otherwise.</summary>
 	private static bool CanRemove(DockerVolume volume) =>
@@ -104,6 +185,21 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 	private List<MokaContextMenuItem> MenuFor(DockerVolume volume) =>
 	[
 		new MokaContextMenuItem { Text = "Show details", Icon = MokaIcons.Toggle.Eye, OnClick = () => Select(volume) },
+		new MokaContextMenuItem
+		{
+			Text = "Back up",
+			Icon = DockerIcons.Backup,
+			Disabled = IsWorking || !CanArchive(volume),
+			DividerBefore = true,
+			OnClickSync = () => OpenArchive(DockerVolumeArchiveView.BackupMode, volume.Name),
+		},
+		new MokaContextMenuItem
+		{
+			Text = "Restore a backup into it",
+			Icon = DockerIcons.Restore,
+			Disabled = IsWorking || !CanArchive(volume),
+			OnClickSync = () => OpenArchive(DockerVolumeArchiveView.RestoreMode, volume.Name),
+		},
 		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, volume.Name, "name") },
 		new MokaContextMenuItem
 		{

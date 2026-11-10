@@ -76,6 +76,10 @@ internal sealed record DockerCall
 	/// </summary>
 	public SecretBuffer? Input { get; init; }
 
+	// What the health watch takes the call to touch, for a script of the module's own whose words DockerChangeScope
+	// cannot read; null leaves it to DockerChangeScope.
+	public DockerChangeScope? Touches { get; init; }
+
 	/// <summary>Hears the output while the call runs, for a build or a push shown live; see <see cref="CommandOutputHandler"/>.</summary>
 	public CommandOutputHandler? OnOutput { get; init; }
 

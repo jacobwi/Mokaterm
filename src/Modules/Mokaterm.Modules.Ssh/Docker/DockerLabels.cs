@@ -24,6 +24,13 @@ internal static class DockerLabels
 	/// </summary>
 	public const string ComposeEnvironmentFile = "com.docker.compose.project.environment_file";
 
+	// The hash compose worked out from the service's definition when it made the container: up compares it with the
+	// files' hash to decide whether to make the container again.
+	public const string ComposeConfigHash = "com.docker.compose.config-hash";
+
+	// The compose that made the container. 1.x and 2.x work the hash out differently, so their hashes never compare.
+	public const string ComposeVersion = "com.docker.compose.version";
+
 	public static IReadOnlyDictionary<string, string> Parse(string? text)
 	{
 		Dictionary<string, string> labels = new(StringComparer.Ordinal);

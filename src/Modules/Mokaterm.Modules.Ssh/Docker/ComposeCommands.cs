@@ -29,6 +29,15 @@ internal static class ComposeCommands
 	public static DockerCall ConfigJson(ComposeTarget target) =>
 		Compose(target, ["config", "--format", "json"]) with { OutputLimitBytes = 2 * 1024 * 1024 };
 
+	// One "service hash" line per service, the hash up compares with each container's config-hash label. Compose 2.x
+	// has it, and so do late 1.x releases; an older compose refuses the option, which the caller reads as "unknown".
+	public static DockerCall ConfigHashes(ComposeTarget target) => Compose(target, ["config", "--hash", "*"]);
+
+	// The services before variables are filled in, so a service that names a variable nothing sets can be told from one
+	// that does not. 2.x only.
+	public static DockerCall ConfigUninterpolated(ComposeTarget target) =>
+		Compose(target, ["config", "--no-interpolate", "--format", "json"]) with { OutputLimitBytes = 2 * 1024 * 1024 };
+
 	/// <summary>Checks the files and prints nothing but its warnings, such as a variable the files use and nothing sets.</summary>
 	public static DockerCall ConfigCheck(ComposeTarget target) => Compose(target, ["config", "--quiet"]);
 

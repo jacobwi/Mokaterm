@@ -73,6 +73,11 @@ public abstract partial class ComposePanelBase : DockerManagerPageBase
 					LastEdit = ProjectFileEdit.Failure(path, asRoot, createNew, result.Message ?? "It could not be opened.", offerRoot);
 					return false;
 				case RemoteTextEditOutcome.Saved:
+					if (ProjectContext?.Project.Name is { } project)
+					{
+						Feature?.ComposeDrift.Forget(project);
+					}
+
 					LastEdit = await CheckAsync(path, asRoot);
 					return true;
 				default:

@@ -56,6 +56,16 @@ internal sealed class DemoDockerContainer
 
 	public long MemoryBytes { get; init; } = 48L * 1024 * 1024;
 
+	// What docker update changes, as inspect's HostConfig holds it: 0 is no limit.
+	public long NanoCpus { get; set; }
+
+	public long MemoryLimit { get; set; }
+
+	public long MemorySwap { get; set; }
+
+	// The config-hash label compose put on the container when it made it; empty for one compose did not make.
+	public string ConfigHash { get; set; } = "";
+
 	public string? Project => Labels.TryGetValue("com.docker.compose.project", out string? project) ? project : null;
 
 	public string? Service => Labels.TryGetValue("com.docker.compose.service", out string? service) ? service : null;
