@@ -1,3 +1,17 @@
+## What's new in 0.3.11
+
+**Appearance**
+
+- A new Components section in Settings, Appearance: pick how buttons, menus and popups, field lists and toasts are drawn,
+  and whether several toasts pile up or stack one under another. Each choice is a picture card and applies at once.
+- Buttons keep their whole label in tight rows instead of cutting it off.
+
+**Fixes**
+
+- The Docker containers list no longer squeezes the image column to a couple of letters in a medium-sized window.
+- On the desktop, a plugin page that asks for a file now opens the app's own file picker, never the browser's dialog,
+  which could close the app.
+
 ## What's new in 0.3.10
 
 **Docker**
