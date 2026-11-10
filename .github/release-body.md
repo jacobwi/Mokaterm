@@ -1,3 +1,27 @@
+## What's new in 0.3.10
+
+**Docker**
+
+- Tick several containers, images, volumes or networks and start, stop, restart or remove them together.
+- Clearer tables: status as a tag, published ports as tags, and which containers use an image or a volume. Volumes show
+  their size.
+- Compose projects whose files changed since they were brought up are marked Changed, with Up right there.
+- A new Limits tab sets a container's CPU, memory and restart policy.
+- Back up a volume to a file on the server, download it, and restore it into a new or existing volume.
+
+**File browser**
+
+- A details pane shows what is selected, with a preview of text files and pictures.
+- A tile view, and the sort and view are remembered while the window is open.
+
+**Interface**
+
+- The window title shows the session you are working in.
+- A light theme now starts and closes light, with no dark flash.
+- Settings fit narrow windows: the page list folds into a dropdown.
+- The accent colors are Moka's own, tuned for both light and dark.
+- Chips no longer shout in capitals.
+
 ## What's new in 0.3.9
 
 **File browser**
