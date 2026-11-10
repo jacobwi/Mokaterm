@@ -1,116 +1,148 @@
-<div class="mt-settings">
-	<nav class="mt-settings-nav" aria-label="Settings">
-		<div class="mt-settings-header">
-			<span class="mt-settings-label">Settings</span>
-			<IconAction Icon="MokaIcons.Navigation.Close"
-						Title="Close settings"
-						Size="MokaSize.Xs"
-						OnClick="Shell.CloseSettings" />
-		</div>
-		@* The search box owns the keys while it has text: arrows move through the results, Enter opens one, Escape
-			clears the box. The results stay out of the tab order for that reason. *@
-		<div class="mt-settings-search">
-			<MokaSearchInput Value="@_query"
-							 ValueChanged="OnQueryChanged"
-							 Placeholder="Search settings"
-							 Size="MokaSize.Sm"
-							 Debounce="0"
-							 autocomplete="off"
-							 spellcheck="false"
-							 aria-label="Search settings"
-							 @onkeydown="OnSearchKeyDown" />
-		</div>
-		<div class="mt-settings-pages" @ref="_list">
-			@if (Searching)
+@{
+	RenderFragment PageOption(string id) =>
+		@<span class="mt-settings-option">
+			@if (PageOf(id) is { } page)
 			{
-				@if (_results.Count == 0)
+				<MokaIcon Icon="page.Icon" Size="MokaSize.Xs" />
+			}
+			<span class="mt-settings-option-text">@PageTitle(id)</span>
+		</span>;
+}
+
+<div class="mt-settings">
+	<div class="mt-settings-frame">
+		<nav class="@NavClass" aria-label="Settings">
+			<div class="mt-settings-header">
+				<span class="mt-settings-label">Settings</span>
+				<IconAction Icon="MokaIcons.Navigation.Close"
+							Title="Close settings"
+							Size="MokaSize.Xs"
+							OnClick="Shell.CloseSettings" />
+			</div>
+			<div class="mt-settings-tools">
+				@* The search box owns the keys while it has text: arrows move through the results, Enter opens one, Escape
+					clears the box. The results stay out of the tab order for that reason. *@
+				<div class="mt-settings-search">
+					<MokaSearchInput Value="@_query"
+									 ValueChanged="OnQueryChanged"
+									 Placeholder="Search settings"
+									 Size="MokaSize.Sm"
+									 Debounce="0"
+									 autocomplete="off"
+									 spellcheck="false"
+									 aria-label="Search settings"
+									 @onkeydown="OnSearchKeyDown" />
+				</div>
+				<div class="mt-settings-jump">
+					<MokaSelect TValue="string"
+								Items="_pageIds"
+								Value="@Selected?.Id"
+								ValueChanged="PickPage"
+								ValueSelector="PageTitle"
+								GroupBy="PageGroup"
+								Size="MokaSize.Sm"
+								aria-label="Settings page">
+						<ItemTemplate>
+							@PageOption(context)
+						</ItemTemplate>
+						<ValueTemplate>
+							@PageOption(context)
+						</ValueTemplate>
+					</MokaSelect>
+				</div>
+			</div>
+			<div class="mt-settings-pages" @ref="_list">
+				@if (Searching)
 				{
-					<MokaText Size="MokaSize.Xs" Style="@(TextStyles.Tertiary + ";padding:var(--moka-spacing-md)")">
-						No settings match.
-					</MokaText>
+					@if (_results.Count == 0)
+					{
+						<MokaText Size="MokaSize.Xs" Style="@(TextStyles.Tertiary + ";padding:var(--moka-spacing-md)")">
+							No settings match.
+						</MokaText>
+					}
+					else
+					{
+						<MokaList Dense aria-label="Settings that match">
+							@for (int index = 0; index < _results.Count; index++)
+							{
+								SettingsSearchResult result = _results[index];
+								int position = index;
+								if (result.Row is { } row)
+								{
+									<MokaListItem @key="@($"{result.Page.Id}#{row.Anchor}")"
+												  Active="position == _active"
+												  OnClick="() => Open(position)"
+												  tabindex="-1">
+										<span class="mt-settings-result">
+											<span class="mt-settings-result-label">
+												@* Where each word landed, so a row's label shows why it matched. *@
+												@foreach ((string piece, bool hit) in SettingsSearch.Mark(row.Label, _query))
+												{
+													<span class="@(hit ? "mt-settings-hit" : null)">@piece</span>
+												}
+											</span>
+											@* A label such as Style or Status needs its section to say where it is when nothing else does. *@
+											@if ((row.Description ?? row.Section) is { } detail)
+											{
+												<span class="mt-settings-result-detail">@detail</span>
+											}
+										</span>
+									</MokaListItem>
+								}
+								else
+								{
+									<MokaListItem @key="result.Page.Id"
+												  Icon="result.Page.Icon"
+												  Text="@result.Page.Title"
+												  Active="position == _active"
+												  OnClick="() => Open(position)"
+												  tabindex="-1" />
+								}
+							}
+						</MokaList>
+					}
 				}
 				else
 				{
-					<MokaList Dense aria-label="Settings that match">
-						@for (int index = 0; index < _results.Count; index++)
-						{
-							SettingsSearchResult result = _results[index];
-							int position = index;
-							if (result.Row is { } row)
+					@foreach (IGrouping<SettingsPageGroup, SettingsPageDescriptor> group in Contributions.SettingsPages.GroupBy(page => page.Group))
+					{
+						<div class="mt-settings-group">@GroupName(group.Key)</div>
+						<MokaList Dense>
+							@foreach (SettingsPageDescriptor settingsPage in group)
 							{
-								<MokaListItem @key="@($"{result.Page.Id}#{row.Anchor}")"
-											  Active="position == _active"
-											  OnClick="() => Open(position)"
-											  tabindex="-1">
-									<span class="mt-settings-result">
-										<span class="mt-settings-result-label">
-											@* Where each word landed, so a row's label shows why it matched. *@
-											@foreach ((string piece, bool hit) in SettingsSearch.Mark(row.Label, _query))
-											{
-												<span class="@(hit ? "mt-settings-hit" : null)">@piece</span>
-											}
-										</span>
-										@* A label such as Style or Status needs its section to say where it is when nothing else does. *@
-										@if ((row.Description ?? row.Section) is { } detail)
-										{
-											<span class="mt-settings-result-detail">@detail</span>
-										}
-									</span>
-								</MokaListItem>
+								bool current = settingsPage.Id == Selected?.Id;
+								<MokaListItem @key="settingsPage.Id"
+											  Icon="settingsPage.Icon"
+											  Text="@settingsPage.Title"
+											  Active="current"
+											  OnClick="() => Shell.SelectSettingsPage(settingsPage.Id)"
+											  aria-current="@(current ? "page" : null)" />
 							}
-							else
-							{
-								<MokaListItem @key="result.Page.Id"
-											  Icon="result.Page.Icon"
-											  Text="@result.Page.Title"
-											  Active="position == _active"
-											  OnClick="() => Open(position)"
-											  tabindex="-1" />
-							}
-						}
-					</MokaList>
+						</MokaList>
+					}
 				}
+			</div>
+		</nav>
+
+		<section class="mt-settings-content" @ref="_content">
+			@if (Selected is { } selected)
+			{
+				<div class="mt-settings-page-header">
+					<MokaText Element="h2" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
+					@if (!string.IsNullOrWhiteSpace(selected.Description))
+					{
+						<MokaText Size="MokaSize.Sm" Style="@TextStyles.Muted">@selected.Description</MokaText>
+					}
+				</div>
+				@* Module pages included: one that fails takes only itself down, and picking another page leaves the error behind. *@
+				<ViewBoundary @key="selected.Id" Name="@($"The {selected.Title} page")">
+					<DynamicComponent Type="selected.Component" />
+				</ViewBoundary>
 			}
 			else
 			{
-				@foreach (IGrouping<SettingsPageGroup, SettingsPageDescriptor> group in Contributions.SettingsPages.GroupBy(page => page.Group))
-				{
-					<div class="mt-settings-group">@GroupName(group.Key)</div>
-					<MokaList Dense>
-						@foreach (SettingsPageDescriptor settingsPage in group)
-						{
-							bool current = settingsPage.Id == Selected?.Id;
-							<MokaListItem @key="settingsPage.Id"
-										  Icon="settingsPage.Icon"
-										  Text="@settingsPage.Title"
-										  Active="current"
-										  OnClick="() => Shell.SelectSettingsPage(settingsPage.Id)"
-										  aria-current="@(current ? "page" : null)" />
-						}
-					</MokaList>
-				}
+				<MokaEmptyState Icon="MokatermIcons.Sliders" Title="No settings pages" Description="No module registered a settings page." />
 			}
-		</div>
-	</nav>
-
-	<section class="mt-settings-content" @ref="_content">
-		@if (Selected is { } selected)
-		{
-			<div class="mt-settings-page-header">
-				<MokaText Element="h2" Size="MokaSize.Md" Weight="MokaFontWeight.Semibold">@selected.Title</MokaText>
-				@if (!string.IsNullOrWhiteSpace(selected.Description))
-				{
-					<MokaText Size="MokaSize.Sm" Style="@TextStyles.Muted">@selected.Description</MokaText>
-				}
-			</div>
-			@* Module pages included: one that fails takes only itself down, and picking another page leaves the error behind. *@
-			<ViewBoundary @key="selected.Id" Name="@($"The {selected.Title} page")">
-				<DynamicComponent Type="selected.Component" />
-			</ViewBoundary>
-		}
-		else
-		{
-			<MokaEmptyState Icon="MokatermIcons.Sliders" Title="No settings pages" Description="No module registered a settings page." />
-		}
-	</section>
+		</section>
+	</div>
 </div>

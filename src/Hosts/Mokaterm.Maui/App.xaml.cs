@@ -7,28 +7,34 @@ public partial class App : Application
 {
 	private readonly DesktopSessions _sessions;
 	private readonly DesktopToolWindows _toolWindows;
+	private readonly DesktopWindowTitle _title;
+	private readonly DesktopAppearance _appearance;
 
-	public App(DesktopSessions sessions, DesktopToolWindows toolWindows)
+	public App(DesktopSessions sessions, DesktopToolWindows toolWindows, DesktopWindowTitle title, DesktopAppearance appearance)
 	{
 		_sessions = sessions;
 		_toolWindows = toolWindows;
+		_title = title;
+		_appearance = appearance;
 		InitializeComponent();
 
-		// The UI is dark-only by default; keep native parts (scrollbars, pickers) consistent with it. The window's own
-		// buttons follow the Moka theme instead (Platforms/Windows/WindowChrome).
-		UserAppTheme = AppTheme.Dark;
+		// Native parts (the window's background before the page, scrollbars, pickers) start in the app's own mode, which
+		// is in settings.json, not the system's. A change while running applies at the next start: by then the page
+		// covers everything native. The window's own buttons follow the Moka theme (Platforms/Windows/WindowChrome).
+		UserAppTheme = appearance.IsLight ? AppTheme.Light : AppTheme.Dark;
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
 		// No TitleBar here: on Windows the page's own top bar is the title bar (Platforms/Windows/WindowChrome).
-		Window window = new(new MainPage())
+		Window window = new(new MainPage(_appearance))
 		{
-			Title = "Mokaterm",
+			Title = DesktopWindowTitle.AppName,
 			MinimumWidth = 960,
 			MinimumHeight = 600,
 		};
 
+		_title.Attach(window);
 		window.Destroying += OnWindowDestroying;
 		StartupTrace.Mark("Window created");
 		return window;

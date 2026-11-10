@@ -53,6 +53,7 @@ public sealed class ToolPageServicesTests
 	[InlineData(typeof(IRemoteTextEditor))]
 	[InlineData(typeof(IFileBrowserDialog))]
 	[InlineData(typeof(IUrlOpener))]
+	[InlineData(typeof(IWindowTitle))]
 	public void ServicesBuiltOverThePage_AreTheToolWindowsOwnToo(Type service) => Assert.True(Classified().IsPerPage(service), service.Name);
 
 	[Theory]

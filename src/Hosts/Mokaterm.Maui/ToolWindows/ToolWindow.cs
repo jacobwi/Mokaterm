@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebView;
 using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
+using Mokaterm.Maui.Services;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Tools;
@@ -64,12 +65,13 @@ internal sealed class ToolWindow : Window
 			ComponentType = typeof(ToolWindowView),
 			Parameters = new Dictionary<string, object?> { [nameof(ToolWindowView.Target)] = request.Target },
 		});
-		view.BlazorWebViewInitialized += OnWebViewInitialized;
+		DesktopAppearance appearance = borrowed.GetRequiredService<DesktopAppearance>();
+		view.BlazorWebViewInitialized += (_, e) => OnWebViewInitialized(e, appearance);
 		view.UrlLoading += OnUrlLoading;
 
 		Page = new ContentPage
 		{
-			BackgroundColor = Color.FromArgb("#060608"),
+			BackgroundColor = Color.FromArgb(appearance.Background),
 			Content = view,
 		};
 	}
@@ -96,10 +98,10 @@ internal sealed class ToolWindow : Window
 
 	private static void OnUrlLoading(object? sender, UrlLoadingEventArgs e) => UrlLoadingPolicy.Apply(e);
 
-	private static void OnWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
+	private static void OnWebViewInitialized(BlazorWebViewInitializedEventArgs e, DesktopAppearance appearance)
 	{
 #if WINDOWS
-		Platforms.Windows.WebView2Setup.Configure(e.WebView);
+		Platforms.Windows.WebView2Setup.Configure(e.WebView, appearance);
 #endif
 	}
 }

@@ -1,7 +1,7 @@
 // Page-side plumbing shared by every view that owns one instance per element (the terminal, the VNC and RDP screens)
 // and by the shell and the file browser: the instance map, calls back to .NET, listeners that come back as disposables,
-// the bounded queues that carry input to .NET, the attach-once marker, and opening web links (from the terminal's links
-// and from .NET through IUrlOpener).
+// the bounded queues that carry input to .NET, the attach-once marker, opening web links (from the terminal's links
+// and from .NET through IUrlOpener) and the document title (IWindowTitle).
 //
 // Served as _content/Mokaterm.UI.Common/js/interop.js. Views import it with a relative path
 // (../../Mokaterm.UI.Common/js/interop.js) so a host under a path base resolves it too, and every importer shares the
@@ -83,6 +83,15 @@ export function openWebLink(address) {
 
 	window.open(url.href, '_blank', 'noopener');
 	return true;
+}
+
+// The title the host page wrote ("Mokaterm", "Mokaterm DevHost"), read before the first change so it stays in front.
+let baseTitle = null;
+
+/** Puts the active session after the page's own title, or the page's title alone for null (IWindowTitle). */
+export function setWindowTitle(subject) {
+	baseTitle ??= document.title;
+	document.title = subject ? `${baseTitle} \u00b7 ${subject}` : baseTitle;
 }
 
 /** Disposes what a view collected without letting one broken subscription stop the rest of its teardown. */

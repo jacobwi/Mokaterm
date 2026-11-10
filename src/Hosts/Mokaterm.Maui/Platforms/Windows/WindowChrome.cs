@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Maui.Platform;
@@ -7,14 +6,12 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Moka.Red.Core.Theming;
-using Mokaterm.Abstractions.Settings;
+using Mokaterm.Maui.Services;
 using Mokaterm.UI.Common.Platform;
 using Windows.Graphics;
 using Windows.UI.ViewManagement;
-using ColorHelper = Microsoft.UI.ColorHelper;
 using MauiWindow = Microsoft.Maui.Controls.Window;
 using WebView2 = Microsoft.UI.Xaml.Controls.WebView2;
-using WinColor = Windows.UI.Color;
 using WinPoint = Windows.Foundation.Point;
 using WinUIWindow = Microsoft.UI.Xaml.Window;
 
@@ -32,7 +29,7 @@ internal sealed class WindowChrome : IWindowChrome
 	private const int DwmUseImmersiveDarkMode = 20;
 	private const int DwmCaptionColor = 35;
 
-	private readonly ISettingsService _settings;
+	private readonly DesktopAppearance _appearance;
 
 	// The event only fires while this object is alive.
 	private readonly UISettings _systemColors = new();
@@ -52,7 +49,7 @@ internal sealed class WindowChrome : IWindowChrome
 	private CaptionRect[] _caption = [];
 	private WindowChromeInsets _insets;
 
-	public WindowChrome(ISettingsService settings) => _settings = settings;
+	public WindowChrome(DesktopAppearance appearance) => _appearance = appearance;
 
 	public event Action? InsetsChanged;
 
@@ -97,18 +94,6 @@ internal sealed class WindowChrome : IWindowChrome
 		}
 	}
 
-	private static WinColor? FromHex(string value)
-	{
-		// The palette entries used here are #rrggbb; anything else leaves the system colour in place.
-		if (value.Length == 7 && value[0] == '#'
-			&& uint.TryParse(value.AsSpan(1), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint rgb))
-		{
-			return ColorHelper.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
-		}
-
-		return null;
-	}
-
 	private static CaptionRect[] FromWindow(RectInt32[] rects) =>
 		[.. rects.Select(rect => new CaptionRect(rect.X, rect.Y, rect.Width, rect.Height))];
 
@@ -135,12 +120,11 @@ internal sealed class WindowChrome : IWindowChrome
 		window.Activated += OnWindowActivated;
 		window.Closed += OnWindowClosed;
 		_systemColors.ColorValuesChanged += OnSystemColorsChanged;
-		_settings.Changed += OnSettingsChanged;
+		_appearance.Changed += OnAppearanceChanged;
 
 		ApplyColors();
 		UpdateInsets();
 		ApplyCaption(force: true);
-		_ = ApplyColorsOnceSettingsLoadAsync();
 	}
 
 	private void AttachWebView(WebView2 webView)
@@ -229,7 +213,7 @@ internal sealed class WindowChrome : IWindowChrome
 			return;
 		}
 
-		bool light = _settings.Get<AppearanceSettings>().Mode == ThemeMode.Light;
+		bool light = _appearance.IsLight;
 		MokaPalette palette = light ? MokaPalette.Light : MokaPalette.Dark;
 		AppWindowTitleBar bar = _appWindow.TitleBar;
 
@@ -238,7 +222,7 @@ internal sealed class WindowChrome : IWindowChrome
 		// instead of showing as a light line. Both attributes fail quietly on Windows versions without them.
 		int darkMode = light ? 0 : 1;
 		_ = DwmSetWindowAttribute(_hwnd, DwmUseImmersiveDarkMode, ref darkMode, sizeof(int));
-		if (FromHex(palette.Surface) is { } surface)
+		if (WindowColors.FromHex(palette.Surface) is { } surface)
 		{
 			int captionColor = surface.R | (surface.G << 8) | (surface.B << 16);
 			_ = DwmSetWindowAttribute(_hwnd, DwmCaptionColor, ref captionColor, sizeof(int));
@@ -247,28 +231,12 @@ internal sealed class WindowChrome : IWindowChrome
 		// Transparent lets the page's bar show behind the buttons.
 		bar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
 		bar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
-		bar.ButtonForegroundColor = FromHex(palette.OnSurface);
-		bar.ButtonHoverForegroundColor = FromHex(palette.OnSurface);
-		bar.ButtonHoverBackgroundColor = FromHex(palette.SurfaceHover);
-		bar.ButtonPressedForegroundColor = FromHex(palette.OnSurface);
-		bar.ButtonPressedBackgroundColor = FromHex(palette.Surface3);
-		bar.ButtonInactiveForegroundColor = FromHex(palette.OnSurfaceTertiary);
-	}
-
-	// The page loads the settings too; until they are read the default theme's colours stay.
-	private async Task ApplyColorsOnceSettingsLoadAsync()
-	{
-		try
-		{
-			await _settings.LoadAsync();
-		}
-		catch (Exception)
-		{
-			// The page reports a settings file it cannot read; the default colours are right for its fallback.
-			return;
-		}
-
-		RunOnWindowThread(ApplyColors);
+		bar.ButtonForegroundColor = WindowColors.FromHex(palette.OnSurface);
+		bar.ButtonHoverForegroundColor = WindowColors.FromHex(palette.OnSurface);
+		bar.ButtonHoverBackgroundColor = WindowColors.FromHex(palette.SurfaceHover);
+		bar.ButtonPressedForegroundColor = WindowColors.FromHex(palette.OnSurface);
+		bar.ButtonPressedBackgroundColor = WindowColors.FromHex(palette.Surface3);
+		bar.ButtonInactiveForegroundColor = WindowColors.FromHex(palette.OnSurfaceTertiary);
 	}
 
 	private void RunOnWindowThread(Action action)
@@ -284,13 +252,7 @@ internal sealed class WindowChrome : IWindowChrome
 		}
 	}
 
-	private void OnSettingsChanged(string sectionKey)
-	{
-		if (sectionKey == AppearanceSettings.SectionKey)
-		{
-			RunOnWindowThread(ApplyColors);
-		}
-	}
+	private void OnAppearanceChanged() => RunOnWindowThread(ApplyColors);
 
 	// MAUI puts its own caption colours back when the system colours change (on .NET 9 the foreground too) and queues that
 	// on the window's thread. Queued as well, this runs after it.
@@ -349,7 +311,7 @@ internal sealed class WindowChrome : IWindowChrome
 
 	private void OnWindowClosed(object sender, WindowEventArgs args)
 	{
-		_settings.Changed -= OnSettingsChanged;
+		_appearance.Changed -= OnAppearanceChanged;
 		_systemColors.ColorValuesChanged -= OnSystemColorsChanged;
 		if (_appWindow is not null)
 		{

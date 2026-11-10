@@ -69,13 +69,11 @@ internal static class WebView2Setup
 		}
 	}
 
-	public static void Configure(Microsoft.UI.Xaml.Controls.WebView2 webView)
+	public static void Configure(Microsoft.UI.Xaml.Controls.WebView2 webView, DesktopAppearance appearance)
 	{
-		// Matches the Moka background so resizing and startup never flash white.
-		webView.DefaultBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 6, 6, 8);
-
 		CoreWebView2 core = webView.CoreWebView2;
 		StartupTrace.Mark("WebView2 ready");
+		FollowAppearance(webView, appearance);
 		core.DOMContentLoaded += (_, _) => StartupTrace.Mark("Page loaded");
 
 		// The terminal zooms itself with Ctrl+wheel and Ctrl+=; page zoom would scale the whole window instead.
@@ -95,5 +93,30 @@ internal static class WebView2Setup
 				args.State = CoreWebView2PermissionState.Allow;
 			}
 		};
+	}
+
+	// The page's background, so resizing and startup never flash another colour, and the app's mode as the page's
+	// prefers-color-scheme, which is what the boot and closing screens in index.html follow. This runs before the first
+	// navigation, so the boot screen starts in it. The scheme belongs to the profile every window shares.
+	private static void FollowAppearance(Microsoft.UI.Xaml.Controls.WebView2 webView, DesktopAppearance appearance)
+	{
+		void Apply()
+		{
+			if (WindowColors.FromHex(appearance.Background) is { } background)
+			{
+				webView.DefaultBackgroundColor = background;
+			}
+
+			if (webView.CoreWebView2 is { } core)
+			{
+				core.Profile.PreferredColorScheme = appearance.IsLight ? CoreWebView2PreferredColorScheme.Light : CoreWebView2PreferredColorScheme.Dark;
+			}
+		}
+
+		void OnChanged() => _ = webView.DispatcherQueue.TryEnqueue(Apply);
+
+		Apply();
+		appearance.Changed += OnChanged;
+		webView.Unloaded += (_, _) => appearance.Changed -= OnChanged;
 	}
 }

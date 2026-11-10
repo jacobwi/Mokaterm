@@ -1,10 +1,21 @@
-/* The page list gives up width before the page does, so settings stay usable in a narrow window. */
+/* The settings area measures itself, because the connections panel takes its share of the window first: the queries
+   at the end fold the page list into a dropdown above the page when the area has no room for both. */
 .mt-settings {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	background: var(--moka-color-background);
+	container-type: inline-size;
+	container-name: mt-settings;
+}
+
+/* The page list gives up width before the page does. */
+.mt-settings-frame {
 	display: grid;
 	flex: 1;
 	grid-template-columns: clamp(170px, 26%, 240px) minmax(0, 1fr);
 	min-height: 0;
-	background: var(--moka-color-background);
 }
 
 .mt-settings-nav {
@@ -38,6 +49,24 @@
 
 .mt-settings-search {
 	padding: var(--moka-spacing-sm);
+}
+
+.mt-settings-jump {
+	display: none;
+	min-width: 0;
+}
+
+.mt-settings-option {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-settings-option-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .mt-settings-pages {
@@ -95,4 +124,58 @@
 	background: color-mix(in srgb, var(--moka-color-primary) 14%, transparent);
 	color: var(--moka-color-primary);
 	font-weight: var(--moka-font-weight-medium);
+}
+
+/* No room for the list beside the page: the search box and a dropdown of the pages sit above it, and search results
+   take the list's place under them only while there is a query. */
+@container mt-settings (max-width: 639px) {
+	.mt-settings-frame {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.mt-settings-nav {
+		flex: none;
+		max-height: 60%;
+		border-right: 0;
+		border-bottom: 1px solid var(--moka-color-outline-variant);
+	}
+
+	.mt-settings-tools {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: var(--moka-spacing-sm);
+		padding: var(--moka-spacing-sm);
+	}
+
+	.mt-settings-search {
+		padding: 0;
+	}
+
+	.mt-settings-jump {
+		display: block;
+	}
+
+	.mt-settings-nav:not(.mt-settings-nav--searching) .mt-settings-pages {
+		display: none;
+	}
+
+	.mt-settings-pages {
+		border-top: 1px solid var(--moka-color-outline-variant);
+	}
+
+	.mt-settings-content {
+		flex: 1;
+		padding: var(--moka-spacing-lg);
+	}
+}
+
+@container mt-settings (max-width: 419px) {
+	.mt-settings-tools {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.mt-settings-content {
+		padding: var(--moka-spacing-md);
+	}
 }

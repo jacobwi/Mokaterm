@@ -75,6 +75,9 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 
 	protected override void OnInitialized()
 	{
+		// A host that read the settings before the page started (the desktop does, and the web hosts for their splash) gets
+		// its boot screen in the user's theme from the first frame; otherwise this is the default until they load.
+		_theme = ThemeFactory.Create(Settings.Get<AppearanceSettings>());
 		Settings.Changed += OnSettingsChanged;
 		Vault.StatusChanged += OnVaultStatusChanged;
 		DamagedDocuments.Start();

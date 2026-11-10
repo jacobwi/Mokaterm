@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
@@ -37,6 +38,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IAppEnvironment, MauiAppEnvironment>();
 		builder.Services.AddSingleton<DesktopDropCoordinator>();
 		builder.Services.AddSingleton<DesktopSessions>();
+		builder.Services.AddSingleton<DesktopAppearance>();
 		builder.Services.AddSingleton<NotificationClicks>();
 		builder.Services.AddScoped<ILocalFileAccess, MauiLocalFileAccess>();
 
@@ -66,6 +68,10 @@ public static class MauiProgram
 		builder.Services.AddMokatermSessions();
 		builder.Services.AddMokatermUI();
 
+		// The main window's title in place of the page's document title, which nothing outside the WebView shows.
+		builder.Services.AddSingleton<DesktopWindowTitle>();
+		builder.Services.Replace(ServiceDescriptor.Singleton<IWindowTitle>(services => services.GetRequiredService<DesktopWindowTitle>()));
+
 		AddPlatformServices(builder);
 
 #if DEBUG
@@ -76,6 +82,7 @@ public static class MauiProgram
 		StartupTrace.Mark("Services registered");
 		MauiApp app = builder.Build();
 		StartupTrace.Mark("Container built");
+		_ = PreloadSettingsAsync(app.Services.GetRequiredService<Abstractions.Settings.ISettingsService>());
 		toolWindows.Prepare(
 			builder.Services,
 			MokatermUiServiceCollectionExtensions.PageServices,
@@ -85,12 +92,26 @@ public static class MauiProgram
 		return app;
 	}
 
+	// The page's first render takes its theme from whatever the settings hold by then, so reading them while WinUI and
+	// WebView2 start keeps its boot screen from drawing the default dark theme first. The page waits for this same load
+	// and reports a file it cannot read, which a failed load here leaves to it: the next LoadAsync tries again.
+	private static async Task PreloadSettingsAsync(Abstractions.Settings.ISettingsService settings)
+	{
+		try
+		{
+			await settings.LoadAsync();
+		}
+		catch (Exception)
+		{
+		}
+	}
+
 	// Every tool window draws its own title bar like the main window, through a chrome of its own: the main window's
 	// is bound to the main window and would move that one's drag regions.
 	private static Func<IServiceProvider, IWindowChrome>? ToolWindowChrome()
 	{
 #if WINDOWS
-		return services => new Platforms.Windows.WindowChrome(services.GetRequiredService<Abstractions.Settings.ISettingsService>());
+		return services => new Platforms.Windows.WindowChrome(services.GetRequiredService<DesktopAppearance>());
 #else
 		return null;
 #endif
@@ -162,6 +183,9 @@ public static class MauiProgram
 				DesktopToolWindows.ApplyKeepOnTop(tool);
 				return;
 			}
+
+			// Until the page's own background is drawn, so a light theme does not open on a black window.
+			Platforms.Windows.WindowReveal.HoldUntilDrawn(window);
 
 			IServiceProvider? services = window.GetWindow()?.Handler?.MauiContext?.Services;
 			services?.GetService<Platforms.Windows.WindowChrome>()?.Attach(window);

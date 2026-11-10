@@ -122,7 +122,9 @@ public sealed class AppearanceSettingsPageTests
 	}
 
 	[Theory]
-	[InlineData("blue", "#42a5f5")]
+	[InlineData("blue", "#6E92FF")]
+	[InlineData("orchid", "#D57CF2")]
+	[InlineData("silver", "#B5BFD0")]
 	[InlineData("red", AppearanceSettings.DefaultAccentColor)]
 	[InlineData(null, AppearanceSettings.DefaultAccentColor)]
 	public void Choice_APickedAccent_StoresItsColor(string? id, string stored)
@@ -165,8 +167,10 @@ public sealed class AppearanceSettingsPageTests
 	}
 
 	[Theory]
-	[InlineData("#42a5f5", "blue")]
-	[InlineData("#42A5F5", "blue")]
+	[InlineData("#6E92FF", "blue")]
+	[InlineData("#6e92ff", "blue")]
+	[InlineData("#2F58D6", "blue")]
+	[InlineData("#C62828", "red")]
 	[InlineData("#abc", "custom")]
 	public void Choice_AnyOtherAccent_IsPickedInTheList(string stored, string id)
 	{
@@ -174,6 +178,46 @@ public sealed class AppearanceSettingsPageTests
 
 		Assert.Equal(id, AppearanceChoice.ValueFor(settings).Accent);
 		Assert.Contains(AppearanceChoice.AccentsFor(settings), accent => accent.Id == id);
+	}
+
+	// Moka's presets are tuned for contrast in both modes, where the old list went through FromColor and came out muddy.
+	// Each is stored as a colour ThemeFactory turns back into exactly that preset, in dark and in light.
+	[Fact]
+	public void Choice_OffersMokasOwnPresets_AndEachStoredColorDrawsThatPreset()
+	{
+		AppearanceSettings settings = new();
+		IReadOnlyList<MokaAccent> offered = AppearanceChoice.AccentsFor(settings);
+
+		string[] expected = ["red", .. MokaAccent.Presets.Where(accent => accent.Id != "red").Select(accent => accent.Id)];
+		Assert.Equal(expected, offered.Select(accent => accent.Id));
+		Assert.Equal("Moka red", offered[0].Name);
+		foreach (MokaAccent preset in offered.Skip(1))
+		{
+			AppearanceSettings picked = AppearanceChoice.Apply(settings, AppearanceChoice.ValueFor(settings) with { Accent = preset.Id });
+
+			Assert.Equal(preset.Dark.Color, picked.AccentColor);
+			Assert.Equal(preset.Id, AppearanceChoice.ValueFor(picked).Accent);
+			Assert.Equal(AccentOf(MokaTheme.Red.WithAccent(preset)), AccentOf(ThemeOf(picked)));
+			Assert.Equal(AccentOf(MokaTheme.RedLight.WithAccent(preset)), AccentOf(ThemeOf(picked with { Mode = ThemeMode.Light })));
+		}
+	}
+
+	// A colour from the swatches before Moka's presets keeps working as it was: it becomes the custom swatch.
+	[Theory]
+	[InlineData("#42a5f5")]
+	[InlineData("#00e676")]
+	[InlineData("#ffab40")]
+	[InlineData("#ce93d8")]
+	[InlineData("#ffd54f")]
+	public void Choice_AColorFromTheOldSwatches_IsTheCustomSwatch_AndStays(string stored)
+	{
+		AppearanceSettings settings = new() { AccentColor = stored };
+
+		MokaAppearance value = AppearanceChoice.ValueFor(settings);
+
+		Assert.Equal("custom", value.Accent);
+		Assert.Contains(AppearanceChoice.AccentsFor(settings), accent => accent.Id == "custom" && accent.Name == stored);
+		Assert.Equal(stored, AppearanceChoice.Apply(settings, value).AccentColor);
 	}
 
 	[Fact]
@@ -288,6 +332,11 @@ public sealed class AppearanceSettingsPageTests
 		Assert.True(read.RememberToolWindowPlaces);
 		Assert.False(read.ShowToolDescriptions);
 	}
+
+	private static MokaTheme ThemeOf(AppearanceSettings settings) => Mokaterm.UI.Presentation.ThemeFactory.Create(settings);
+
+	private static (string Color, string Soft, string Background) AccentOf(MokaTheme theme) =>
+		(theme.Palette.Primary, theme.Palette.PrimaryLight, theme.Palette.PrimaryBg);
 
 	private static Task<string> RenderAsync(AppearanceSettings settings, HostKind host = HostKind.Web) =>
 		StaticRender.RenderAsync<AppearanceSettingsPage>(

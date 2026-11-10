@@ -19,6 +19,7 @@ public static class UiCommonServiceCollectionExtensions
 		services.TryAddScoped<IPendingClipboardClear>(provider => provider.GetRequiredService<ClipboardClearSchedule>());
 		services.TryAddScoped<IClipboardService, JsClipboardService>();
 		services.TryAddScoped<IUrlOpener, JsUrlOpener>();
+		services.TryAddScoped<IWindowTitle, JsWindowTitle>();
 		services.TryAddScoped<FormInterop>();
 		return services;
 	}

@@ -1,5 +1,6 @@
+@inject Mokaterm.Abstractions.Settings.ISettingsService Settings
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mt-mode="@_mode">
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -43,4 +44,9 @@
 @code {
 	// No prerendering: the vault has to unlock inside the circuit before the shell can render anything.
 	private static readonly IComponentRenderMode _renderMode = new InteractiveServerRenderMode(prerender: false);
+
+	private string _mode = "dark";
+
+	// Read on the server, so the splash below is in the user's mode without a script in the page.
+	protected override async Task OnInitializedAsync() => _mode = await Mokaterm.UI.Presentation.BootTheme.ModeAsync(Settings);
 }

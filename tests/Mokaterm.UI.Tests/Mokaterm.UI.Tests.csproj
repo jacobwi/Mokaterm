@@ -54,6 +54,14 @@
 	</ItemGroup>
 
 	<!--
+		SettingsFileMode: the theme mode the desktop host reads from settings.json before any window exists, so the window
+		and the boot screen start in it. Plain JSON, checked here against the forms the settings service itself accepts.
+	-->
+	<ItemGroup>
+		<Compile Include="..\..\src\Hosts\Mokaterm.Maui\Services\SettingsFileMode.cs" LinkBase="Shared" />
+	</ItemGroup>
+
+	<!--
 		WebAuthnInterop: the desktop host's webauthn.dll structures and HRESULT grouping. Plain data with no Windows call,
 		here so their layout is checked against webauthn.h without a security key.
 	-->

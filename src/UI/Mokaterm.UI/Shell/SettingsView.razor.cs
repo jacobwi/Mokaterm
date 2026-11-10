@@ -18,6 +18,7 @@ public sealed partial class SettingsView : ComponentBase, IDisposable
 	private (bool Pending, string? Anchor) _reveal;
 	private ElementReference _list;
 	private ElementReference _content;
+	private IReadOnlyList<string> _pageIds = [];
 
 	[Inject]
 	private IUiContributions Contributions { get; set; } = default!;
@@ -35,9 +36,17 @@ public sealed partial class SettingsView : ComponentBase, IDisposable
 
 	private bool Searching => _query.Trim().Length > 0;
 
+	// Where the page list folds into the dropdown, the results still need a place: they show under the search box only
+	// while there is a query.
+	private string NavClass => Searching ? "mt-settings-nav mt-settings-nav--searching" : "mt-settings-nav";
+
 	public void Dispose() => Shell.Changed -= OnShellChanged;
 
-	protected override void OnInitialized() => Shell.Changed += OnShellChanged;
+	protected override void OnInitialized()
+	{
+		_pageIds = [.. Contributions.SettingsPages.Select(page => page.Id)];
+		Shell.Changed += OnShellChanged;
+	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
@@ -63,6 +72,21 @@ public sealed partial class SettingsView : ComponentBase, IDisposable
 		SettingsPageGroup.Plugins => "Plugins",
 		_ => "About",
 	};
+
+	private SettingsPageDescriptor? PageOf(string? id) =>
+		Contributions.SettingsPages.FirstOrDefault(page => string.Equals(page.Id, id, StringComparison.OrdinalIgnoreCase));
+
+	private string PageTitle(string id) => PageOf(id)?.Title ?? id;
+
+	private string? PageGroup(string id) => PageOf(id) is { } page ? GroupName(page.Group) : null;
+
+	private void PickPage(string? id)
+	{
+		if (id is not null)
+		{
+			Shell.SelectSettingsPage(id);
+		}
+	}
 
 	private void OnQueryChanged(string query)
 	{

@@ -10,18 +10,11 @@ internal static class AppearanceChoice
 {
 	private const string CustomAccentId = "custom";
 
-	private static readonly (string Id, string Name, string Color)[] AccentPresets =
-	[
-		("red", "Moka red", AppearanceSettings.DefaultAccentColor),
-		("blue", "Blue", "#42a5f5"),
-		("green", "Green", "#00e676"),
-		("orange", "Orange", "#ffab40"),
-		("purple", "Purple", "#ce93d8"),
-		("yellow", "Yellow", "#ffd54f"),
-	];
-
+	// Moka's own presets, tuned for contrast in both modes, with its red first under our name for it. A preset is stored as
+	// its dark colour, which MokaTheme.WithAccent maps back to that exact preset; red is stored as our default, which
+	// ThemeFactory leaves to the Red theme's own accent.
 	private static readonly IReadOnlyList<MokaAccent> PresetAccents =
-		[.. AccentPresets.Select(preset => MokaAccent.FromColor(preset.Color) with { Id = preset.Id, Name = preset.Name })];
+		[MokaAccent.Red with { Name = "Moka red" }, .. MokaAccent.Presets.Where(accent => accent.Id != MokaAccent.Red.Id)];
 
 	// Only the design ThemeFactory builds, so the pictures show what the app will look like.
 	public static IReadOnlyList<MokaAppearancePalette> Palettes { get; } = [MokaAppearancePalette.Red];
@@ -77,13 +70,20 @@ internal static class AppearanceChoice
 		_ => current,
 	};
 
+	// Either of a preset's colours is that preset, because WithAccent draws either as the preset itself.
 	private static string AccentIdFor(string color)
 	{
-		foreach ((string id, _, string preset) in AccentPresets)
+		if (string.Equals(color, AppearanceSettings.DefaultAccentColor, StringComparison.OrdinalIgnoreCase))
 		{
-			if (string.Equals(color, preset, StringComparison.OrdinalIgnoreCase))
+			return MokaAccent.Red.Id;
+		}
+
+		foreach (MokaAccent preset in PresetAccents)
+		{
+			if (string.Equals(color, preset.Dark.Color, StringComparison.OrdinalIgnoreCase)
+				|| string.Equals(color, preset.Light.Color, StringComparison.OrdinalIgnoreCase))
 			{
-				return id;
+				return preset.Id;
 			}
 		}
 
@@ -98,11 +98,16 @@ internal static class AppearanceChoice
 			return AppearanceSettings.DefaultAccentColor;
 		}
 
-		foreach ((string presetId, _, string color) in AccentPresets)
+		if (id == MokaAccent.Red.Id)
 		{
-			if (presetId == id)
+			return AppearanceSettings.DefaultAccentColor;
+		}
+
+		foreach (MokaAccent preset in PresetAccents)
+		{
+			if (preset.Id == id)
 			{
-				return color;
+				return preset.Dark.Color;
 			}
 		}
 

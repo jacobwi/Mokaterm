@@ -19,7 +19,28 @@ public sealed partial class SettingsViewTests
 	[Fact]
 	public async Task Render_EveryPageInTheList_CanBeReachedWithTheKeyboard()
 	{
-		string html = await StaticRender.RenderAsync<SettingsView>(
+		string html = await RenderAsync();
+
+		Assert.Equal(3, ListItemTabStop().Count(html));
+
+		// Nothing was picked, so the first page shows and is the one marked as current.
+		Match current = Assert.Single(CurrentPage().Matches(html));
+		Assert.Contains("General", current.Value, StringComparison.Ordinal);
+	}
+
+	// Where the settings area has no room for the list beside the page, CSS shows this dropdown in its place, so it is
+	// always there, named, and showing the page on screen.
+	[Fact]
+	public async Task Render_ThePagesAreAlsoADropdown_ShowingTheCurrentPage()
+	{
+		string html = await RenderAsync();
+
+		Match dropdown = Assert.Single(PageDropdown().Matches(html));
+		Assert.Equal("General", dropdown.Groups["page"].Value);
+	}
+
+	private static Task<string> RenderAsync() =>
+		StaticRender.RenderAsync<SettingsView>(
 			services =>
 			{
 				services.AddMokaRed();
@@ -33,14 +54,8 @@ public sealed partial class SettingsViewTests
 				services.AddScoped<ShellState>();
 				services.AddScoped<ShellInterop>();
 			},
-			new Dictionary<string, object?>(StringComparer.Ordinal));
-
-		Assert.Equal(3, ListItemTabStop().Count(html));
-
-		// Nothing was picked, so the first page shows and is the one marked as current.
-		Match current = Assert.Single(CurrentPage().Matches(html));
-		Assert.Contains("General", current.Value, StringComparison.Ordinal);
-	}
+			new Dictionary<string, object?>(StringComparer.Ordinal))
+			.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
 	private static SettingsPageDescriptor Page(string id, string title, SettingsPageGroup group) => new()
 	{
@@ -56,6 +71,9 @@ public sealed partial class SettingsViewTests
 
 	[GeneratedRegex("<div class=\"moka-list-item[^>]*aria-current=\"page\"[^>]*>.*?</div>", RegexOptions.Singleline)]
 	private static partial Regex CurrentPage();
+
+	[GeneratedRegex("role=\"combobox\"[^>]*aria-label=\"Settings page\"[^>]*>.*?mt-settings-option-text[^>]*>(?<page>[^<]*)<", RegexOptions.Singleline)]
+	private static partial Regex PageDropdown();
 
 	/// <summary>A settings page with nothing on it.</summary>
 	private sealed class EmptyPage : ComponentBase
