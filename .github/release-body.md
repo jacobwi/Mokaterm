@@ -1,3 +1,18 @@
+## What's new in 0.3.12
+
+**Appearance**
+
+- A new Tooltips section in Settings, Appearance: pick how hints are drawn (Standard, Flat, Glass, Terminal and more),
+  and turn on arrows, another motion or a smaller or larger size.
+
+**Fixes**
+
+- Copy buttons now work in Safari, on iPhone and iPad, and in Firefox when you use the web version. A copied password
+  that the browser would not let Mokaterm clear on time is cleared at your next click or key press.
+- Text fields no longer lose letters when you type quickly, which mostly showed on the web version.
+- Command output keeps its blank lines, and long values in detail lists wrap instead of running off the panel.
+- An idle container's CPU line in Docker stats sits at the bottom instead of halfway up.
+
 ## What's new in 0.3.11
 
 **Appearance**
