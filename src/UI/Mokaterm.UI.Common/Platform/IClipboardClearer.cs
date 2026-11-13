@@ -4,13 +4,14 @@ namespace Mokaterm.UI.Common.Platform;
 internal interface IClipboardClearer
 {
 	/// <summary>
-	/// Clears the clipboard for copy number <paramref name="copy"/>, or as soon as the page is focused again when it is in
-	/// the background. A page that has already heard of a newer copy leaves the clipboard alone, and so does a page that
-	/// wrote anything after <paramref name="write"/>, its own number for the copy's write, null when another page made it.
+	/// Clears the clipboard for copy number <paramref name="copy"/>, or at the page's next focus, press or key when the
+	/// browser refuses the write now. A page that has already heard of a newer copy leaves the clipboard alone, and so does
+	/// a page that wrote anything after <paramref name="write"/>, its own number for the copy's write, null when another
+	/// page made it.
 	/// </summary>
 	/// <returns>
-	/// False while the page holds the clear until it is focused again, so the secret is still on the clipboard; true once
-	/// nothing of this copy is left for the page to do.
+	/// False while the page holds the clear for its next focus, press or key, so the secret is still on the clipboard; true
+	/// once nothing of this copy is left for the page to do.
 	/// </returns>
 	ValueTask<bool> ClearAsync(long copy, long? write, CancellationToken cancellationToken);
 

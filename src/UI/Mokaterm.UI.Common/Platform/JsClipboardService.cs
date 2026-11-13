@@ -52,7 +52,8 @@ internal sealed class JsClipboardService : IClipboardService, IClipboardClearer,
 		_schedule.SecretCopied(this, write);
 	}
 
-	// A plain writeText here is refused whenever the window is in the background; the script waits for focus and says so.
+	// A plain writeText here is refused whenever the window is in the background, and in Safari and Firefox always; the
+	// script then waits for the page's next focus, press or key and says so.
 	ValueTask<bool> IClipboardClearer.ClearAsync(long copy, long? write, CancellationToken cancellationToken) =>
 		_module.InvokeAsync<bool>("clearClipboard", cancellationToken, copy, write);
 

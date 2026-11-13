@@ -8,12 +8,13 @@
 // handler use copyText, or expectCopy when .NET supplies the text.
 //
 // Clears: browsers and WebView2 refuse clipboard writes while the page is not focused, which is exactly when a copied
-// password is being pasted into another window, so a page in the background clears as soon as it is focused again
+// password is being pasted into another window, and Safari and Firefox refuse the timed clear even in a focused page,
+// since no press or key asked for it. So a clear the browser refuses waits for the page's next focus, press or key
 // instead of leaving the secret behind.
 //
 // The deadline lives in .NET (ClipboardClearSchedule) and is shared by a window and its tool windows, so the clear for
 // one copy can reach this page after a newer copy was made in another window. Every copy is numbered: a clear for a copy
-// older than the newest this page has heard of does nothing, whether it is still waiting for focus or arrives late.
+// older than the newest this page has heard of does nothing, whether it is still waiting or arrives late.
 //
 // .NET numbers a copy only once its handler ran, which for a write made inside the click is a round trip after the
 // clipboard changed. So this page numbers its own successful writes as well, .NET hands a secret's number back with its
@@ -26,6 +27,8 @@ const AskClass = 'mt-copy-click';
 // Below ClipboardClearSchedule.PageAnswerLimit (5 s): a clear waits for unfilled writes, and .NET stops waiting for a page
 // after that limit.
 const AskLimitMs = 4000;
+// The events that let a page write the clipboard in every browser, Safari's mouse events among them.
+const GestureEvents = ['pointerdown', 'mousedown', 'mouseup', 'click', 'keydown', 'touchend'];
 
 function state() {
 	document[StateKey] ??= {
@@ -197,38 +200,69 @@ function copyWithCommand(s, text) {
 
 function stopWaiting(s) {
 	if (s.waiting) {
-		window.removeEventListener('focus', s.waiting.listener);
+		s.waiting.stop();
 		s.waiting = null;
 	}
 }
 
-function waitForFocus(s, copy) {
-	// A refused write gets here after a promise, by which time a newer copy may have been made.
-	if (copy < s.newestCopy) {
+// A refused clear waits for the page's next chance to write: focus for Chromium and WebView2, which refuse only a page in
+// the background, and the user's next press or key for Safari and Firefox, which refuse any write outside one, focus
+// included. The window's capture phase comes before the document's, so a click that also copies clears first.
+function waitForChance(s, copy) {
+	// A refused write gets here after a promise, by which time a newer copy may have been made. Over plain HTTP there is
+	// no clipboard API, and no press would change that.
+	if (copy < s.newestCopy || typeof navigator.clipboard?.writeText !== 'function') {
 		return;
 	}
 
 	stopWaiting(s);
 	const writtenBefore = s.written;
-	const listener = () => {
-		s.waiting = null;
+	let trying = false;
+	const waiting = { copy, stop: null };
+	const attempt = () => {
 		if (s.written !== writtenBefore) {
+			// The page wrote something after the secret, so the secret is gone already.
+			stopWaiting(s);
 			return;
 		}
 
-		navigator.clipboard.writeText('').catch(() => {
-			// Still refused (no permission at all); nothing more a page can do.
+		// A write under way is newer than the secret; once it settles the check above decides.
+		if (trying || s.pending.size > 0) {
+			return;
+		}
+
+		trying = true;
+		navigator.clipboard.writeText('').then(() => {
+			if (s.waiting === waiting) {
+				stopWaiting(s);
+			}
+		}, () => {
+			// Refused again; the next press or key tries once more.
+		}).finally(() => {
+			trying = false;
 		});
 	};
-	s.waiting = { copy, listener };
-	window.addEventListener('focus', listener, { once: true });
+
+	window.addEventListener('focus', attempt);
+	for (const type of GestureEvents) {
+		window.addEventListener(type, attempt, true);
+	}
+
+	waiting.stop = () => {
+		window.removeEventListener('focus', attempt);
+		for (const type of GestureEvents) {
+			window.removeEventListener(type, attempt, true);
+		}
+	};
+	s.waiting = waiting;
 }
 
 /**
  * Clears the clipboard for copy number copy. write is this page's number for that copy's write, or null when another page
  * made it.
- * @returns {Promise<boolean>} False while the clear waits for focus, so .NET knows the secret is still there and can clear
- *   it another way if the app goes away first; true once there is nothing of this copy left to clear.
+ * @returns {Promise<boolean>} False while the clear waits for the page's next focus, press or key, so .NET knows the secret
+ *   is still there and can clear it another way if the app goes away first; true once there is nothing of this copy left
+ *   to clear.
  */
 export async function clearClipboard(copy, write) {
 	const s = state();
@@ -252,11 +286,11 @@ export async function clearClipboard(copy, write) {
 			return true;
 		}
 		catch {
-			// Refused after all; the focus is the next chance.
+			// Refused after all: Safari and Firefox refuse a write outside a press or key.
 		}
 	}
 
-	waitForFocus(s, copy);
+	waitForChance(s, copy);
 	return false;
 }
 
