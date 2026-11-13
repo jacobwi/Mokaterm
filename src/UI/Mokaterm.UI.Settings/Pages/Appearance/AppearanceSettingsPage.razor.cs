@@ -27,6 +27,21 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		new(UiDensity.Comfortable, "Comfortable"),
 	];
 
+	private static readonly IReadOnlyList<EnumOption<TooltipMotion>> TooltipMotionOptions =
+	[
+		new(TooltipMotion.Fade, "Fade"),
+		new(TooltipMotion.Slide, "Slide"),
+		new(TooltipMotion.Grow, "Grow"),
+		new(TooltipMotion.Instant, "Instant"),
+	];
+
+	private static readonly IReadOnlyList<EnumOption<TooltipSize>> TooltipSizeOptions =
+	[
+		new(TooltipSize.Compact, "Compact"),
+		new(TooltipSize.Standard, "Standard"),
+		new(TooltipSize.Roomy, "Roomy"),
+	];
+
 	private static readonly IReadOnlyList<EnumOption<SessionToolbarLayout>> ToolbarLayoutOptions =
 	[
 		new(SessionToolbarLayout.Grouped, "Grouped", MokatermIcons.Tools),

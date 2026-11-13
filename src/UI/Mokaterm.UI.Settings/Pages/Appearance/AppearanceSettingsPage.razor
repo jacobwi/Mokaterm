@@ -26,7 +26,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale, status bar, component styles, host figures, session toolbar and tool windows back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, font scale, status bar, component styles, tooltips, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms." Stacked>
 			@Panel(MokaAppearanceRows.ColorMode)
@@ -106,6 +106,31 @@
 		</SettingsRow>
 		<SettingsRow Label="Toast stack" Description="Several toasts at once, one under another or piled up and fanned out when pointed at." Stacked>
 			@Panel(MokaAppearanceRows.ToastStacking)
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection Title="Tooltips" Description="The hints that name a button or explain a figure when the pointer rests on it.">
+		<SettingsRow Label="Tooltip look" Description="The box a hint is drawn in." Stacked>
+			@Panel(MokaAppearanceRows.Tooltips)
+		</SettingsRow>
+		<SettingsRow Label="Tooltip arrows" Description="A small arrow from the hint to what it explains.">
+			<MokaSwitch Value="settings.TooltipArrows"
+						ValueChanged="value => UpdateAsync(s => s with { TooltipArrows = value })"
+						aria-label="Tooltip arrows" />
+		</SettingsRow>
+		<SettingsRow Label="Tooltip motion" Description="How a hint comes into view.">
+			<EnumSegmentedControl TEnum="TooltipMotion"
+								  Value="settings.TooltipMotion"
+								  ValueChanged="value => UpdateAsync(s => s with { TooltipMotion = value })"
+								  Options="TooltipMotionOptions"
+								  AriaLabel="Tooltip motion" />
+		</SettingsRow>
+		<SettingsRow Label="Tooltip size" Description="How large a hint's text is. Compact suits a dense screen, Roomy longer sentences.">
+			<EnumSegmentedControl TEnum="TooltipSize"
+								  Value="settings.TooltipSize"
+								  ValueChanged="value => UpdateAsync(s => s with { TooltipSize = value })"
+								  Options="TooltipSizeOptions"
+								  AriaLabel="Tooltip size" />
 		</SettingsRow>
 	</SettingsSection>
 

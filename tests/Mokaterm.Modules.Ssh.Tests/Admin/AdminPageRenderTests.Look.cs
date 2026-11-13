@@ -192,6 +192,6 @@ public sealed partial class AdminPageRenderTests
 			parameters)
 			.WaitAsync(Wait, Ct);
 
-	[GeneratedRegex("""<div class="moka-meter[^"]*"[^>]*aria-label="/srv/data"[^>]*>""")]
+	[GeneratedRegex("""<span class="moka-meter[^"]*"[^>]*aria-label="/srv/data"[^>]*>""")]
 	private static partial Regex SrvDataMeter();
 }

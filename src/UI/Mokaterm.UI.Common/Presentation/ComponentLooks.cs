@@ -24,6 +24,15 @@ public static class ComponentLooks
 	/// <summary>The button look for <paramref name="style"/>.</summary>
 	public static MokaButtonLook Of(ButtonStyle style) => Convert(style, MokaButtonLook.Standard);
 
+	/// <summary>The tooltip look for <paramref name="style"/>.</summary>
+	public static MokaTooltipLook Of(TooltipStyle style) => Convert(style, MokaTooltipLook.Standard);
+
+	/// <summary>The tooltip motion for <paramref name="motion"/>.</summary>
+	public static MokaTooltipMotion Of(TooltipMotion motion) => Convert(motion, MokaTooltipMotion.Fade);
+
+	/// <summary>The tooltip size for <paramref name="size"/>.</summary>
+	public static MokaTooltipSize Of(TooltipSize size) => Convert(size, MokaTooltipSize.Standard);
+
 	/// <summary>The stored style for a toast look.</summary>
 	public static ToastStyle From(MokaToastLook look) => Convert(look, ToastStyle.Standard);
 
@@ -38,6 +47,15 @@ public static class ComponentLooks
 
 	/// <summary>The stored style for a button look.</summary>
 	public static ButtonStyle From(MokaButtonLook look) => Convert(look, ButtonStyle.Standard);
+
+	/// <summary>The stored style for a tooltip look.</summary>
+	public static TooltipStyle From(MokaTooltipLook look) => Convert(look, TooltipStyle.Standard);
+
+	/// <summary>The stored motion for a tooltip motion.</summary>
+	public static TooltipMotion From(MokaTooltipMotion motion) => Convert(motion, TooltipMotion.Fade);
+
+	/// <summary>The stored size for a tooltip size.</summary>
+	public static TooltipSize From(MokaTooltipSize size) => Convert(size, TooltipSize.Standard);
 
 	private static TTo Convert<TFrom, TTo>(TFrom value, TTo fallback)
 		where TFrom : struct, Enum

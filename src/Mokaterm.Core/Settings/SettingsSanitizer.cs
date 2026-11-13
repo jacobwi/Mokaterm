@@ -45,6 +45,9 @@ internal static class SettingsSanitizer
 			PopupStyle = Defined(settings.PopupStyle, defaults.PopupStyle),
 			ListStyle = Defined(settings.ListStyle, defaults.ListStyle),
 			ButtonStyle = Defined(settings.ButtonStyle, defaults.ButtonStyle),
+			TooltipStyle = Defined(settings.TooltipStyle, defaults.TooltipStyle),
+			TooltipMotion = Defined(settings.TooltipMotion, defaults.TooltipMotion),
+			TooltipSize = Defined(settings.TooltipSize, defaults.TooltipSize),
 			HiddenToolbarButtons = ToolbarButtonIds(settings.HiddenToolbarButtons),
 		};
 	}

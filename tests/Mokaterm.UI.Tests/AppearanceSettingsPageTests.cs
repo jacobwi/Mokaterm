@@ -122,6 +122,9 @@ public sealed class AppearanceSettingsPageTests
 		RoundTrip<PopupStyle, MokaPopupLook>(ComponentLooks.Of, ComponentLooks.From);
 		RoundTrip<ListStyle, MokaListLook>(ComponentLooks.Of, ComponentLooks.From);
 		RoundTrip<ButtonStyle, MokaButtonLook>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<TooltipStyle, MokaTooltipLook>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<TooltipMotion, MokaTooltipMotion>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<TooltipSize, MokaTooltipSize>(ComponentLooks.Of, ComponentLooks.From);
 
 		static void RoundTrip<TStored, TLook>(Func<TStored, TLook> of, Func<TLook, TStored> from)
 			where TStored : struct, Enum
@@ -150,6 +153,10 @@ public sealed class AppearanceSettingsPageTests
 			Popups = MokaPopupLook.Glass,
 			Lists = MokaListLook.Check,
 			Buttons = MokaButtonLook.Soft,
+			Tooltips = MokaTooltipLook.Terminal,
+			TooltipArrows = true,
+			TooltipMotion = MokaTooltipMotion.Slide,
+			TooltipSize = MokaTooltipSize.Roomy,
 		};
 
 		AppearanceSettings next = AppearanceChoice.Apply(settings, picked);
@@ -161,6 +168,10 @@ public sealed class AppearanceSettingsPageTests
 			PopupStyle = PopupStyle.Glass,
 			ListStyle = ListStyle.Check,
 			ButtonStyle = ButtonStyle.Soft,
+			TooltipStyle = TooltipStyle.Terminal,
+			TooltipArrows = true,
+			TooltipMotion = TooltipMotion.Slide,
+			TooltipSize = TooltipSize.Roomy,
 		}, next);
 	}
 
@@ -174,17 +185,30 @@ public sealed class AppearanceSettingsPageTests
 			ListStyle = ListStyle.Radio,
 			ToastStyle = ToastStyle.Snackbar,
 			ToastStack = ToastStack.Pile,
+			TooltipStyle = TooltipStyle.Glass,
+			TooltipArrows = true,
+			TooltipMotion = TooltipMotion.Grow,
+			TooltipSize = TooltipSize.Compact,
 		});
 
-		foreach (string anchor in new[] { "buttons", "menus-and-popups", "field-lists", "toasts", "toast-stack" })
+		foreach (string anchor in new[] { "buttons", "menus-and-popups", "field-lists", "toasts", "toast-stack", "tooltip-look", "tooltip-arrows", "tooltip-motion", "tooltip-size" })
 		{
 			Assert.Contains($"data-setting=\"{anchor}\"", html, StringComparison.Ordinal);
 		}
 
-		foreach (string picked in new[] { "Ghost", "Contrast", "Radio", "Snackbar", "Pile" })
+		foreach (string picked in new[] { "Ghost", "Contrast", "Radio", "Snackbar", "Pile", "Glass" })
 		{
 			Assert.Matches($"<input[^>]*value=\"{picked}\"[^>]*checked", html);
 		}
+
+		foreach (string picked in new[] { "Grow", "Compact" })
+		{
+			Assert.Matches($"moka-segment--active\"[^>]*><input[^>]*>(?:<span[^>]*>)*{picked}<", html);
+		}
+
+		int arrows = html.IndexOf("data-setting=\"tooltip-arrows\"", StringComparison.Ordinal);
+		string arrowsRow = html[arrows..html.IndexOf("data-setting=", arrows + 1, StringComparison.Ordinal)];
+		Assert.Matches("<input(?=[^>]*role=\"switch\")(?=[^>]*\\schecked)[^>]*>", arrowsRow);
 	}
 
 	[Theory]

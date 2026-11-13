@@ -74,6 +74,18 @@ public sealed record AppearanceSettings : ISettingsSection
 	/// <summary>How buttons are drawn.</summary>
 	public ButtonStyle ButtonStyle { get; init; } = ButtonStyle.Standard;
 
+	/// <summary>How tooltips are drawn.</summary>
+	public TooltipStyle TooltipStyle { get; init; } = TooltipStyle.Standard;
+
+	/// <summary>Whether a tooltip points at what it explains.</summary>
+	public bool TooltipArrows { get; init; }
+
+	/// <summary>How a tooltip comes into view.</summary>
+	public TooltipMotion TooltipMotion { get; init; } = TooltipMotion.Fade;
+
+	/// <summary>How much room a tooltip's text takes.</summary>
+	public TooltipSize TooltipSize { get; init; } = TooltipSize.Standard;
+
 	/// <summary>
 	/// Shows the CPU, memory and root disk use of the active session's machine in the status bar, for sessions that can
 	/// read them. Reading them runs a short command on that machine every <see cref="HostFiguresSeconds"/>.

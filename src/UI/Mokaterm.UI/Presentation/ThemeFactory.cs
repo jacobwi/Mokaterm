@@ -35,6 +35,10 @@ internal static class ThemeFactory
 			.WithPopups(ComponentLooks.Of(usable.PopupStyle))
 			.WithLists(ComponentLooks.Of(usable.ListStyle))
 			.WithButtons(ComponentLooks.Of(usable.ButtonStyle))
+			.WithTooltips(ComponentLooks.Of(usable.TooltipStyle))
+			.WithTooltipArrows(usable.TooltipArrows)
+			.WithTooltipMotion(ComponentLooks.Of(usable.TooltipMotion))
+			.WithTooltipSize(ComponentLooks.Of(usable.TooltipSize))
 			.WithFontScale(usable.FontScale);
 	}
 }

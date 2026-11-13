@@ -55,6 +55,10 @@ internal static class AppearanceChoice
 			Popups = ComponentLooks.Of(usable.PopupStyle),
 			Lists = ComponentLooks.Of(usable.ListStyle),
 			Buttons = ComponentLooks.Of(usable.ButtonStyle),
+			Tooltips = ComponentLooks.Of(usable.TooltipStyle),
+			TooltipArrows = usable.TooltipArrows,
+			TooltipMotion = ComponentLooks.Of(usable.TooltipMotion),
+			TooltipSize = ComponentLooks.Of(usable.TooltipSize),
 		};
 	}
 
@@ -72,6 +76,10 @@ internal static class AppearanceChoice
 			PopupStyle = picked.Popups is { } popups ? ComponentLooks.From(popups) : settings.PopupStyle,
 			ListStyle = picked.Lists is { } lists ? ComponentLooks.From(lists) : settings.ListStyle,
 			ButtonStyle = picked.Buttons is { } buttons ? ComponentLooks.From(buttons) : settings.ButtonStyle,
+			TooltipStyle = picked.Tooltips is { } tooltips ? ComponentLooks.From(tooltips) : settings.TooltipStyle,
+			TooltipArrows = picked.TooltipArrows ?? settings.TooltipArrows,
+			TooltipMotion = picked.TooltipMotion is { } motion ? ComponentLooks.From(motion) : settings.TooltipMotion,
+			TooltipSize = picked.TooltipSize is { } size ? ComponentLooks.From(size) : settings.TooltipSize,
 		};
 	}
 
