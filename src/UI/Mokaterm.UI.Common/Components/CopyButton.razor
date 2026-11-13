@@ -1,6 +1,9 @@
+@using Mokaterm.UI.Common.Platform
+
 <IconButton Icon="@(_copied ? MokaIcons.Status.Check : MokaIcons.Content.Copy)"
 			Label="@Label"
 			Color="MokaColor.Primary"
 			Size="MokaSize.Xs"
 			Position="Position"
+			ButtonClass="@CopyClick.Class"
 			OnClick="CopyAsync" />

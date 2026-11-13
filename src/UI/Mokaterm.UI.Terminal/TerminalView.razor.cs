@@ -411,7 +411,7 @@ public partial class TerminalView : ComponentBase, IAsyncDisposable
 
 		List<MokaContextMenuItem> items =
 		[
-			new() { Text = "Copy", Icon = MokaIcons.Content.Copy, Shortcut = "Ctrl+Shift+C", Disabled = !hasSelection, OnClick = () => ThenFocusAsync(CopySelectionAsync) },
+			new() { Text = "Copy", Icon = MokaIcons.Content.Copy, Shortcut = "Ctrl+Shift+C", Disabled = !hasSelection, CssClass = CopyClick.Class, OnClick = () => ThenFocusAsync(CopySelectionAsync) },
 			new() { Text = "Paste", Icon = MokaIcons.Content.Paste, Shortcut = "Ctrl+Shift+V", OnClick = () => ThenFocusAsync(PasteAsync) },
 			new() { Text = "Select all", Icon = MokatermIcons.Maximize, OnClick = () => ThenFocusAsync(SelectAllAsync) },
 			new() { Text = "Find", Icon = MokaIcons.Action.Search, Shortcut = "Ctrl+Shift+F", OnClick = () => OpenFindAsync().AsTask() },

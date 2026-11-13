@@ -7,6 +7,7 @@ import { FitAddon } from '../lib/xterm/addon-fit.js';
 import { SearchAddon } from '../lib/xterm/addon-search.js';
 import { Unicode11Addon } from '../lib/xterm/addon-unicode11.js';
 import { WebLinksAddon } from '../lib/xterm/addon-web-links.js';
+import { copyText } from '../../Mokaterm.UI.Common/js/clipboard.js';
 import { createInstances, disposeQuietly, invoke, listen, openWebLink } from '../../Mokaterm.UI.Common/js/interop.js';
 import { compileTriggers, matchRanges, MaxLineLength, safeEnd, SlowMatchMs } from './triggers.js';
 
@@ -921,9 +922,7 @@ function handleClipboardSequence(state, data) {
 
 	// No textarea fallback here: it would take the focus from whatever the user is typing in, and its blur can close an
 	// edit in progress. Without a user gesture that fallback is refused anyway.
-	if (navigator.clipboard?.writeText) {
-		navigator.clipboard.writeText(text).catch(() => { });
-	}
+	copyText(text, { command: false });
 
 	return true;
 }
@@ -946,38 +945,7 @@ function copySelection(state, clearAfter) {
 	}
 
 	if (text) {
-		writeClipboard(text);
-	}
-}
-
-function writeClipboard(text) {
-	if (navigator.clipboard?.writeText) {
-		navigator.clipboard.writeText(text).catch(() => copyWithCommand(text));
-	}
-	else {
-		copyWithCommand(text);
-	}
-}
-
-// navigator.clipboard only exists in secure contexts, and a web host served over plain HTTP is not one.
-function copyWithCommand(text) {
-	const focused = document.activeElement;
-	const textarea = document.createElement('textarea');
-	textarea.value = text;
-	textarea.setAttribute('readonly', '');
-	textarea.style.position = 'fixed';
-	textarea.style.opacity = '0';
-	document.body.appendChild(textarea);
-	textarea.select();
-	try {
-		document.execCommand('copy');
-	}
-	catch {
-		// Clipboard access is blocked.
-	}
-	finally {
-		textarea.remove();
-		focused?.focus?.({ preventScroll: true });
+		copyText(text);
 	}
 }
 
@@ -995,7 +963,7 @@ function handleMouseDown(state, event) {
 	window.addEventListener('mouseup', () => setTimeout(() => {
 		state.pointerDown = false;
 		if (!state.disposed && state.copyOnSelect && state.term.hasSelection()) {
-			writeClipboard(state.term.getSelection());
+			copyText(state.term.getSelection());
 		}
 	}), { once: true });
 }

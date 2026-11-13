@@ -1,4 +1,5 @@
 @namespace Mokaterm.Modules.Mqtt.Components
+@using Mokaterm.UI.Common.Platform
 
 <div class="mt-mqtt-messages">
 	@if (Topic is null)
@@ -18,6 +19,7 @@
 			<IconButton Size="MokaSize.Xs"
 						Icon="MokaIcons.Content.Copy"
 						OnClick="CopyTopicAsync"
+						ButtonClass="@CopyClick.Class"
 						Label="Copy the topic" />
 		</div>
 

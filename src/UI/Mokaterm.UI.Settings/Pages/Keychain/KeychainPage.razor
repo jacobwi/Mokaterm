@@ -1,4 +1,5 @@
 @using Mokaterm.Abstractions.Credentials
+@using Mokaterm.UI.Common.Platform
 @inherits VaultListPageBase<CredentialInfo>
 
 <VaultListFrame Title="Keychain"
@@ -80,6 +81,7 @@
 							Icon="MokaIcons.Content.Copy"
 							Color="MokaColor.Primary"
 							OnClick="() => CopyPasswordAsync(credential)"
+							ButtonClass="@CopyClick.Class"
 							Label="Copy password"
 							AriaLabel="@($"Copy the password of {credential.Name}")" />
 			}
@@ -89,6 +91,7 @@
 							Icon="MokatermIcons.ShieldCheck"
 							Color="MokaColor.Primary"
 							OnClick="() => CopyPublicKeyAsync(credential)"
+							ButtonClass="@CopyClick.Class"
 							Label="Copy public key"
 							AriaLabel="@($"Copy the public key of {credential.Name}")" />
 			}

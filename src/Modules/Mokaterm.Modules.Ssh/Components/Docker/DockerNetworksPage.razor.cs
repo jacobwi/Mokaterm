@@ -41,8 +41,8 @@ public sealed partial class DockerNetworksPage : DockerManagerPageBase
 	/// <summary>The row's menu, from its button or a right-click.</summary>
 	private List<MokaContextMenuItem> MenuFor(DockerNetwork network) =>
 	[
-		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, network.Name, "name") },
-		new MokaContextMenuItem { Text = $"Copy id {network.ShortId}", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, network.Id, "id") },
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, network.Name, "name") },
+		new MokaContextMenuItem { Text = $"Copy id {network.ShortId}", Icon = MokaIcons.Content.Copy, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, network.Id, "id") },
 		new MokaContextMenuItem { Text = RemoveTitle(network), Icon = MokaIcons.Action.Delete, Disabled = IsBusy || !network.IsRemovable, DividerBefore = true, OnClick = () => RemoveAsync(network) },
 	];
 

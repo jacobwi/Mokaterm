@@ -1,5 +1,9 @@
 namespace Mokaterm.UI.Common.Platform;
 
+/// <summary>
+/// The page's clipboard. A copy the user clicks for needs <see cref="CopyClick.Class"/> on the clicked element, or Safari,
+/// iOS and Firefox refuse it on the web host: the write starts inside the click and the text written next fills it.
+/// </summary>
 public interface IClipboardService
 {
 	ValueTask WriteTextAsync(string text, CancellationToken cancellationToken = default);

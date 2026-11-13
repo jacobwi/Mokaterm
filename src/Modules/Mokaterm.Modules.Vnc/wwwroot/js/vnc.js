@@ -13,6 +13,7 @@
 // and from then on the bytes are the session itself, relayed unchanged in both directions.
 import RFB from '../lib/novnc/core/rfb.js';
 import KeyTable from '../lib/novnc/core/input/keysym.js';
+import { copyText, writeText } from '../../Mokaterm.UI.Common/js/clipboard.js';
 import { byteQueue, createInstances, drain, invoke, listen } from '../../Mokaterm.UI.Common/js/interop.js';
 
 // Messages to .NET count against SignalR's receive limit on Blazor Server (32 KB by default). Clipboard text from
@@ -184,7 +185,10 @@ export function sendClipboard(id, text) {
 	return false;
 }
 
-/** Puts the text the session last copied on this machine's clipboard. Returns its length, or -1 when it failed. */
+/**
+ * Puts the text the session last copied on this machine's clipboard, filling the write the menu click started. Returns
+ * its length, or -1 when it failed.
+ */
 export async function receiveClipboard(id) {
 	const state = instances.get(id);
 	const text = state?.remoteClipboard ?? '';
@@ -193,12 +197,11 @@ export async function receiveClipboard(id) {
 	}
 
 	try {
-		await navigator.clipboard.writeText(text);
+		await writeText(text);
 		return text.length;
 	}
 	catch {
-		// navigator.clipboard only exists in secure contexts, and a web host served over plain HTTP is not one.
-		return copyWithCommand(text) ? text.length : -1;
+		return await copyText(text) ? text.length : -1;
 	}
 }
 
@@ -350,27 +353,6 @@ function reportSize(state) {
 
 function isFullscreen(state) {
 	return document.fullscreenElement !== null && document.fullscreenElement.contains(state.screen);
-}
-
-function copyWithCommand(text) {
-	const focused = document.activeElement;
-	const textarea = document.createElement('textarea');
-	textarea.value = text;
-	textarea.setAttribute('readonly', '');
-	textarea.style.position = 'fixed';
-	textarea.style.opacity = '0';
-	document.body.appendChild(textarea);
-	textarea.select();
-	try {
-		return document.execCommand('copy');
-	}
-	catch {
-		return false;
-	}
-	finally {
-		textarea.remove();
-		focused?.focus?.({ preventScroll: true });
-	}
 }
 
 function level(value, fallback) {

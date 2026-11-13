@@ -14,6 +14,9 @@ public sealed class ClipboardClearScheduleTests
 {
 	private static readonly TimeSpan ClearTime = TimeSpan.FromSeconds(30);
 
+	// The page's own number for its write, which has nothing to do with the schedule's copy numbers.
+	private const long Write = 7;
+
 	private readonly FakeTimeProvider _time = new();
 	private readonly FakeSettingsService _settings = new();
 
@@ -29,7 +32,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage tool = Open(schedule, new FakePage());
 		FakePage newest = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime - TimeSpan.FromSeconds(1));
 		await Eventually.StaysTrueAsync(() => tool.Clears.Length == 0, "nothing is cleared before the deadline");
 
@@ -46,7 +49,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		schedule.Unregister(tool);
 		_time.Advance(ClearTime);
 
@@ -62,7 +65,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage copier = Open(schedule, new FakePage());
 		FakePage other = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(copier);
+		schedule.SecretCopied(copier, Write);
 		schedule.Unregister(copier);
 		_time.Advance(ClearTime);
 
@@ -77,7 +80,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime / 2);
 		schedule.TextCopied();
 		_time.Advance(ClearTime * 2);
@@ -91,9 +94,9 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule();
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(TimeSpan.FromSeconds(20));
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(TimeSpan.FromSeconds(10));
 		await Eventually.StaysTrueAsync(() => main.Clears.Length == 0, "the first deadline is gone");
 
@@ -112,7 +115,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(ClearTime);
 		await Eventually.TrueAsync(() => main.Clears.SequenceEqual([1L]), "the main window clears");
 
@@ -122,6 +125,42 @@ public sealed class ClipboardClearScheduleTests
 		Assert.Empty(tool.Forgets);
 	}
 
+	// A copy made inside a click reaches the clipboard before .NET hears of it, so only the page that wrote the secret can
+	// tell whether it wrote anything since, and it needs its own number for that write to tell.
+	[Fact]
+	public async Task TheCopyingPage_GetsItsWriteNumberBack_AndAnotherPageNone()
+	{
+		using ClipboardClearSchedule schedule = Schedule();
+		FakePage main = Open(schedule, new FakePage());
+		FakePage tool = Open(schedule, new FakePage { Hangs = true });
+
+		schedule.SecretCopied(tool, Write);
+		_time.Advance(ClearTime);
+		await Eventually.TrueAsync(() => tool.Writes.SequenceEqual([(long?)Write]), "the tool window gets its number back");
+
+		_time.Advance(ClipboardClearSchedule.PageAnswerLimit);
+
+		await Eventually.TrueAsync(() => main.Writes.SequenceEqual([(long?)null]), "the main window clears without one");
+	}
+
+	// Whoever wrote since (a copy inside a click that .NET has not heard of yet, or another program), what the clipboard
+	// holds now is not the secret.
+	[Fact]
+	public async Task AClipboardWhoseNumberMoved_IsLeftAlone_AtTheDeadline()
+	{
+		FakeSystemClipboard system = new();
+		using ClipboardClearSchedule schedule = Schedule(system);
+		FakePage main = Open(schedule, new FakePage());
+
+		schedule.SecretCopied(main, Write);
+		system.WrittenElsewhere();
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(() => schedule.Pending is null, "the clear is over");
+		Assert.Empty(main.Clears);
+		Assert.Equal(0, system.Empties);
+	}
+
 	[Fact]
 	public async Task AClearForAnOlderCopy_NeverRunsOnceANewerCopyIsMade()
 	{
@@ -129,7 +168,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage { Hangs = true });
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime);
 		await Eventually.TrueAsync(() => tool.Clears.SequenceEqual([1L]), "the tool window is asked to clear");
 
@@ -148,7 +187,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule();
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		schedule.Unregister(tool);
 		_time.Advance(ClearTime);
 		FakePage later = Open(schedule, new FakePage());
@@ -164,7 +203,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule();
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(TimeSpan.FromSeconds(SecuritySettings.MaxClipboardClearSeconds + 1));
 
 		await Eventually.StaysTrueAsync(() => main.Clears.Length == 0, "nothing is cleared");
@@ -180,7 +219,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage { Failure = (Exception)Activator.CreateInstance(failure, "The page is closing.")! });
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime);
 
 		await Eventually.TrueAsync(() => main.Clears.SequenceEqual([1L]), "the main window clears");
@@ -194,7 +233,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage { Hangs = true });
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime);
 		await Eventually.TrueAsync(() => tool.Clears.Length == 1, "the tool window is asked first");
 		Assert.Empty(main.Clears);
@@ -217,9 +256,29 @@ public sealed class ClipboardClearScheduleTests
 		await tool.DisposeAsync();
 		_time.Advance(ClearTime);
 
-		await Eventually.TrueAsync(() => mainPage.Module.Calls.SequenceEqual([("clearClipboard", 1L)]), "the main window clears");
-		Assert.Equal(["correct horse"], toolPage.Written);
-		Assert.Empty(toolPage.Module.Calls);
+		await Eventually.TrueAsync(() => mainPage.Module.Clears.SequenceEqual([(1L, (long?)null)]), "the main window clears");
+		Assert.Equal(["correct horse"], toolPage.Module.Written);
+		Assert.Empty(toolPage.Module.Clears);
+	}
+
+	[Fact]
+	public async Task ASecretsClear_CarriesTheNumberTheCopyingPageGaveItsWrite()
+	{
+		using ClipboardClearSchedule schedule = Schedule();
+		ScriptedPage mainPage = new();
+		ScriptedPage toolPage = new();
+		await using JsClipboardService main = new(mainPage, schedule);
+		await using JsClipboardService tool = new(toolPage, schedule);
+
+		await Eventually.CompletesAsync(main.WriteTextAsync("db01.example.com", Ct).AsTask());
+		await Eventually.CompletesAsync(tool.WriteTextAsync("db02.example.com", Ct).AsTask());
+		await Eventually.CompletesAsync(tool.WriteSecretAsync("correct horse", Ct).AsTask());
+		_time.Advance(ClearTime);
+
+		await Eventually.TrueAsync(
+			() => toolPage.Module.Clears.SequenceEqual([(3L, (long?)2L)]),
+			"copy 3 is cleared with the tool window's number for it, its second write");
+		Assert.Empty(mainPage.Module.Clears);
 	}
 
 	[Fact]
@@ -236,7 +295,7 @@ public sealed class ClipboardClearScheduleTests
 		_time.Advance(ClearTime * 2);
 
 		await Eventually.StaysTrueAsync(
-			() => mainPage.Module.Calls.Length == 0 && toolPage.Module.Calls.Length == 0,
+			() => mainPage.Module.Clears.Length == 0 && toolPage.Module.Clears.Length == 0,
 			"neither window clears");
 	}
 
@@ -245,7 +304,7 @@ public sealed class ClipboardClearScheduleTests
 	public async Task APlainCopyThePageRefused_KeepsTheClear()
 	{
 		using ClipboardClearSchedule schedule = Schedule();
-		ScriptedPage mainPage = new() { RefusesWrites = true };
+		ScriptedPage mainPage = new(refusesWrites: true);
 		ScriptedPage toolPage = new();
 		await using JsClipboardService main = new(mainPage, schedule);
 		await using JsClipboardService tool = new(toolPage, schedule);
@@ -254,7 +313,7 @@ public sealed class ClipboardClearScheduleTests
 		await Assert.ThrowsAsync<JSException>(() => Eventually.CompletesAsync(main.WriteTextAsync("db01.example.com", Ct).AsTask()));
 		_time.Advance(ClearTime);
 
-		await Eventually.TrueAsync(() => toolPage.Module.Calls.SequenceEqual([("clearClipboard", 1L)]), "the tool window clears");
+		await Eventually.TrueAsync(() => toolPage.Module.Clears.SequenceEqual([(1L, (long?)1L)]), "the tool window clears");
 	}
 
 	[Fact]
@@ -265,7 +324,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 
 		Assert.Null(schedule.Pending);
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Equal(new PendingClipboardClear(1, 41, WaitsForFocus: false), schedule.Pending);
 	}
@@ -277,7 +336,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Equal(SystemClipboardClear.Cleared, schedule.ClearNow(TimeSpan.FromSeconds(1)));
 		Assert.Equal(1, system.Empties);
@@ -292,7 +351,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		system.WrittenElsewhere();
 
 		Assert.Equal(SystemClipboardClear.Changed, schedule.ClearNow(TimeSpan.FromSeconds(1)));
@@ -307,7 +366,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		schedule.TextCopied();
 
 		Assert.Null(schedule.Pending);
@@ -322,7 +381,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(ClearTime);
 		await Eventually.TrueAsync(() => main.Clears.SequenceEqual([1L]), "the main window clears");
 
@@ -339,7 +398,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Null(schedule.Pending);
 		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
@@ -355,7 +414,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Equal(new PendingClipboardClear(1, null, WaitsForFocus: false), schedule.Pending);
 		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
@@ -368,7 +427,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule();
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Equal(new PendingClipboardClear(1, null, WaitsForFocus: false), schedule.Pending);
 		Assert.Null(schedule.ClearNow(TimeSpan.FromSeconds(1)));
@@ -381,9 +440,9 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		system.WrittenElsewhere();
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 
 		Assert.Equal(new PendingClipboardClear(2, 42, WaitsForFocus: false), schedule.Pending);
 		Assert.Equal(SystemClipboardClear.Cleared, schedule.ClearNow(TimeSpan.FromSeconds(1)));
@@ -397,7 +456,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage main = Open(schedule, new FakePage { WaitsForFocus = true });
 
-		schedule.SecretCopied(main);
+		schedule.SecretCopied(main, Write);
 		_time.Advance(ClearTime);
 
 		await Eventually.TrueAsync(() => system.Empties == 1, "the system clipboard is cleared at the deadline");
@@ -413,7 +472,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage { WaitsForFocus = true });
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime);
 
 		await Eventually.TrueAsync(
@@ -430,7 +489,7 @@ public sealed class ClipboardClearScheduleTests
 		FakePage main = Open(schedule, new FakePage());
 		FakePage tool = Open(schedule, new FakePage { WaitsForFocus = true });
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		_time.Advance(ClearTime);
 		await Eventually.TrueAsync(() => schedule.Pending is { WaitsForFocus: true }, "the clear waits in the tool window");
 
@@ -447,7 +506,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		schedule.Unregister(tool);
 		_time.Advance(ClearTime);
 
@@ -462,7 +521,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		schedule.Unregister(tool);
 		system.WrittenElsewhere();
 		_time.Advance(ClearTime);
@@ -480,7 +539,7 @@ public sealed class ClipboardClearScheduleTests
 		using ClipboardClearSchedule schedule = Schedule(system);
 		FakePage tool = Open(schedule, new FakePage());
 
-		schedule.SecretCopied(tool);
+		schedule.SecretCopied(tool, Write);
 		schedule.Unregister(tool);
 		_time.Advance(ClearTime);
 		await Eventually.StaysTrueAsync(() => schedule.Pending is not null, "the clear stays due");
@@ -585,6 +644,7 @@ public sealed class ClipboardClearScheduleTests
 	{
 		private readonly Lock _lock = new();
 		private readonly List<long> _clears = [];
+		private readonly List<long?> _writes = [];
 		private readonly List<long> _forgets = [];
 		private int _gaveUp;
 
@@ -606,6 +666,18 @@ public sealed class ClipboardClearScheduleTests
 			}
 		}
 
+		/// <summary>The page's own write number each clear came with, null where another page made the copy.</summary>
+		public long?[] Writes
+		{
+			get
+			{
+				lock (_lock)
+				{
+					return [.. _writes];
+				}
+			}
+		}
+
 		public long[] Forgets
 		{
 			get
@@ -619,11 +691,12 @@ public sealed class ClipboardClearScheduleTests
 
 		public int GaveUp => Volatile.Read(ref _gaveUp);
 
-		public async ValueTask<bool> ClearAsync(long copy, CancellationToken cancellationToken)
+		public async ValueTask<bool> ClearAsync(long copy, long? write, CancellationToken cancellationToken)
 		{
 			lock (_lock)
 			{
 				_clears.Add(copy);
+				_writes.Add(write);
 			}
 
 			if (Failure is not null)
@@ -657,15 +730,29 @@ public sealed class ClipboardClearScheduleTests
 		}
 	}
 
-	/// <summary>A page whose clipboard writes are recorded, as is every call into its clipboard script.</summary>
-	private sealed class ScriptedPage : IJSRuntime
+	/// <summary>A page whose clipboard script is <see cref="ScriptedModule"/>.</summary>
+	private sealed class ScriptedPage(bool refusesWrites = false) : IJSRuntime
+	{
+		public ScriptedModule Module { get; } = new(refusesWrites);
+
+		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>
+			InvokeAsync<TValue>(identifier, CancellationToken.None, args);
+
+		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) =>
+			identifier == "import"
+				? ValueTask.FromResult((TValue)(object)Module)
+				: throw new InvalidOperationException("Unexpected call " + identifier);
+	}
+
+	/// <summary>
+	/// clipboard.js as the service sees it: writes are recorded and numbered from 1, the way the page numbers its own, and
+	/// every clear is recorded with the copy and write numbers it came with.
+	/// </summary>
+	private sealed class ScriptedModule(bool refusesWrites) : IJSObjectReference
 	{
 		private readonly Lock _lock = new();
 		private readonly List<string> _written = [];
-
-		public ScriptedModule Module { get; } = new();
-
-		public bool RefusesWrites { get; init; }
+		private readonly List<(long Copy, long? Write)> _clears = [];
 
 		public string[] Written
 		{
@@ -678,42 +765,13 @@ public sealed class ClipboardClearScheduleTests
 			}
 		}
 
-		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>
-			InvokeAsync<TValue>(identifier, CancellationToken.None, args);
-
-		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
-		{
-			switch (identifier)
-			{
-				case "import":
-					return ValueTask.FromResult((TValue)(object)Module);
-				case "navigator.clipboard.writeText" when RefusesWrites:
-					return ValueTask.FromException<TValue>(new JSException("Document is not focused."));
-				case "navigator.clipboard.writeText":
-					lock (_lock)
-					{
-						_written.Add((string)args![0]!);
-					}
-
-					return ValueTask.FromResult(default(TValue)!);
-				default:
-					throw new InvalidOperationException("Unexpected call " + identifier);
-			}
-		}
-	}
-
-	private sealed class ScriptedModule : IJSObjectReference
-	{
-		private readonly Lock _lock = new();
-		private readonly List<(string Function, long Copy)> _calls = [];
-
-		public (string Function, long Copy)[] Calls
+		public (long Copy, long? Write)[] Clears
 		{
 			get
 			{
 				lock (_lock)
 				{
-					return [.. _calls];
+					return [.. _clears];
 				}
 			}
 		}
@@ -723,13 +781,32 @@ public sealed class ClipboardClearScheduleTests
 
 		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
 		{
-			lock (_lock)
+			switch (identifier)
 			{
-				_calls.Add((identifier, (long)args![0]!));
-			}
+				case "writeText" when refusesWrites:
+					return ValueTask.FromException<TValue>(new JSException("Document is not focused."));
+				case "writeText":
+					long number;
+					lock (_lock)
+					{
+						_written.Add((string)args![0]!);
+						number = _written.Count;
+					}
 
-			// clearClipboard answers whether it cleared at once, which a focused page does.
-			return ValueTask.FromResult(typeof(TValue) == typeof(bool) ? (TValue)(object)true : default(TValue)!);
+					return ValueTask.FromResult((TValue)(object)number);
+				case "clearClipboard":
+					lock (_lock)
+					{
+						_clears.Add(((long)args![0]!, (long?)args[1]));
+					}
+
+					// A focused page clears at once.
+					return ValueTask.FromResult((TValue)(object)true);
+				case "forgetClearsBefore":
+					return ValueTask.FromResult(default(TValue)!);
+				default:
+					throw new InvalidOperationException("Unexpected call " + identifier);
+			}
 		}
 
 		public ValueTask DisposeAsync() => ValueTask.CompletedTask;

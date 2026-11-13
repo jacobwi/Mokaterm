@@ -1,4 +1,5 @@
 @namespace Mokaterm.Modules.Ssh.Components.Docker
+@using Mokaterm.UI.Common.Platform
 
 @* Every action on one container, in one menu: the row and the panel show only the ones used most. A right-click on
    the row opens the same items. *@
@@ -83,6 +84,7 @@
 		Icon = icon,
 		Disabled = disabled,
 		DividerBefore = dividerBefore,
+		CssClass = action is "copy-name" or "copy-id" ? CopyClick.Class : null,
 		OnClick = () => act(action),
 	};
 

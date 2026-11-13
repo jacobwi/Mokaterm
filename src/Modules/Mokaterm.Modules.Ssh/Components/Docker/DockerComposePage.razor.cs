@@ -136,7 +136,7 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 
 		if (project.WorkingDirectory is { } folder)
 		{
-			items.Add(new MokaContextMenuItem { Text = "Copy the folder", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, folder, "folder") });
+			items.Add(new MokaContextMenuItem { Text = "Copy the folder", Icon = MokaIcons.Content.Copy, DividerBefore = true, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, folder, "folder") });
 		}
 
 		return items;

@@ -563,6 +563,7 @@ public sealed partial class VncSessionView : SessionViewBase, IAsyncDisposable
 				Text = "Copy what the session copied",
 				Icon = MokaIcons.Content.Copy,
 				Disabled = _clipboardLength == 0,
+				CssClass = CopyClick.Class,
 				OnClick = ReceiveClipboardAsync,
 			},
 			new MokaContextMenuItem

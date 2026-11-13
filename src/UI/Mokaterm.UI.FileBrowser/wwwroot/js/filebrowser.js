@@ -1,5 +1,6 @@
 // Browser side of RemoteFileBrowser: the keys MokaFileBrowser leaves to it, width steps for the responsive layout, focus helpers, Enter handling for the browser's dialogs, and the file editor's gutter, indenting,
 // Ctrl+S and the coloured layer under its text (tokens come from syntax.js).
+import { expectCopy } from '../../Mokaterm.UI.Common/js/clipboard.js';
 import { invoke } from '../../Mokaterm.UI.Common/js/interop.js';
 import { canHighlight, createHighlightModel } from './syntax.js';
 export { bindDialog } from '../../Mokaterm.UI.Common/js/forms.js';
@@ -157,6 +158,11 @@ export function attachBrowser(root, dotNetRef, initiallyActive, widthSteps) {
 			if (command !== 'clear') {
 				event.preventDefault();
 				event.stopPropagation();
+			}
+
+			// The paths come from .NET, so the write starts here, inside the key press, and their text fills it.
+			if (command === 'copyPath') {
+				expectCopy();
 			}
 
 			invoke(state, 'OnKeyCommand', command, cursor());

@@ -4,9 +4,10 @@ using Mokaterm.UI.Common.Interop;
 namespace Mokaterm.UI.Common.Platform;
 
 /// <summary>
-/// Clipboard through <c>navigator.clipboard</c>, which both the browser and WebView2 provide. One per page; the clear
-/// after a secret copy belongs to the window's <see cref="ClipboardClearSchedule"/>, which every page of that window
-/// registers with, so closing the page that copied does not leave the secret behind.
+/// Clipboard through <c>clipboard.js</c> over <c>navigator.clipboard</c>, which both the browser and WebView2 provide. One
+/// per page; the clear after a secret copy belongs to the window's <see cref="ClipboardClearSchedule"/>, which every page
+/// of that window registers with, so closing the page that copied does not leave the secret behind. A write fills the one
+/// a click on a <see cref="CopyClick.Class"/> element started, where there is one.
 /// </summary>
 internal sealed class JsClipboardService : IClipboardService, IClipboardClearer, IDisposable, IAsyncDisposable
 {
@@ -26,7 +27,7 @@ internal sealed class JsClipboardService : IClipboardService, IClipboardClearer,
 
 	public async ValueTask WriteTextAsync(string text, CancellationToken cancellationToken = default)
 	{
-		await WriteAsync(text, cancellationToken);
+		_ = await WriteAsync(text, cancellationToken);
 
 		// Only after the write: one the page refused leaves the secret there, and its clear has to stay.
 		_schedule.TextCopied();
@@ -47,13 +48,13 @@ internal sealed class JsClipboardService : IClipboardService, IClipboardClearer,
 
 	public async ValueTask WriteSecretAsync(string secret, CancellationToken cancellationToken = default)
 	{
-		await WriteAsync(secret, cancellationToken);
-		_schedule.SecretCopied(this);
+		long write = await WriteAsync(secret, cancellationToken);
+		_schedule.SecretCopied(this, write);
 	}
 
 	// A plain writeText here is refused whenever the window is in the background; the script waits for focus and says so.
-	ValueTask<bool> IClipboardClearer.ClearAsync(long copy, CancellationToken cancellationToken) =>
-		_module.InvokeAsync<bool>("clearClipboard", cancellationToken, copy);
+	ValueTask<bool> IClipboardClearer.ClearAsync(long copy, long? write, CancellationToken cancellationToken) =>
+		_module.InvokeAsync<bool>("clearClipboard", cancellationToken, copy, write);
 
 	ValueTask IClipboardClearer.ForgetClearsBeforeAsync(long copy, CancellationToken cancellationToken) =>
 		_module.InvokeVoidAsync("forgetClearsBefore", cancellationToken, copy);
@@ -67,6 +68,7 @@ internal sealed class JsClipboardService : IClipboardService, IClipboardClearer,
 		await _module.DisposeAsync();
 	}
 
-	private ValueTask WriteAsync(string text, CancellationToken cancellationToken) =>
-		_jsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", cancellationToken, text);
+	/// <returns>The page's own number for the write, which a later clear hands back.</returns>
+	private ValueTask<long> WriteAsync(string text, CancellationToken cancellationToken) =>
+		_module.InvokeAsync<long>("writeText", cancellationToken, text);
 }

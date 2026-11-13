@@ -298,7 +298,7 @@ public sealed partial class DockerComposeProjectView : DockerManagerPageBase
 			OnClick = () => ShellAsync(container.Name),
 		},
 		new MokaContextMenuItem { Text = "Browse files", Icon = MokatermIcons.FolderOpen, Disabled = !container.IsRunning, OnClick = () => BrowseFilesAsync(container.Name) },
-		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, container.Name, "name") },
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, container.Name, "name") },
 	];
 
 	/// <summary>The ports of a service's running containers: a scaled service may publish one per replica.</summary>

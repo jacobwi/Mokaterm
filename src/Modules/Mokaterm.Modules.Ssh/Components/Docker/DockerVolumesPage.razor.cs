@@ -200,12 +200,13 @@ public sealed partial class DockerVolumesPage : DockerManagerPageBase
 			Disabled = IsWorking || !CanArchive(volume),
 			OnClickSync = () => OpenArchive(DockerVolumeArchiveView.RestoreMode, volume.Name),
 		},
-		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, volume.Name, "name") },
+		new MokaContextMenuItem { Text = "Copy name", Icon = MokaIcons.Content.Copy, DividerBefore = true, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, volume.Name, "name") },
 		new MokaContextMenuItem
 		{
 			Text = "Copy the host path",
 			Icon = MokaIcons.Content.Copy,
 			Disabled = volume.Mountpoint.Length == 0,
+			CssClass = CopyClick.Class,
 			OnClick = () => CopyTextAsync(Clipboard, volume.Mountpoint, "host path"),
 		},
 		new MokaContextMenuItem { Text = "Remove", Icon = MokaIcons.Action.Delete, Disabled = IsBusy || !CanRemove(volume), DividerBefore = true, OnClick = () => RemoveAsync(volume) },

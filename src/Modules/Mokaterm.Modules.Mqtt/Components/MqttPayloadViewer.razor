@@ -1,4 +1,5 @@
 @namespace Mokaterm.Modules.Mqtt.Components
+@using Mokaterm.UI.Common.Platform
 
 <div class="mt-mqtt-payload">
 	@if (Message is null)
@@ -35,6 +36,7 @@
 			<IconButton Size="MokaSize.Xs"
 						Icon="MokaIcons.Content.Copy"
 						OnClick="CopyAsync"
+						ButtonClass="@CopyClick.Class"
 						Label="Copy what this panel shows"
 						AriaLabel="Copy the payload" />
 		</div>

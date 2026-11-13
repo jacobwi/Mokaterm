@@ -1,4 +1,5 @@
 @using Mokaterm.Abstractions.Terminal
+@using Mokaterm.UI.Common.Platform
 @using Mokaterm.UI.Terminal
 @inherits SettingsSectionBase<TerminalSettings>
 
@@ -49,6 +50,7 @@
 										Icon="MokaIcons.Action.Download"
 										Color="MokaColor.Primary"
 										OnClick="() => CopyThemeAsync(theme)"
+										ButtonClass="@CopyClick.Class"
 										Label="Copy as a Windows Terminal scheme"
 										AriaLabel="@($"Copy {theme.Name} as a Windows Terminal scheme")" />
 							@if (theme.IsCustom)

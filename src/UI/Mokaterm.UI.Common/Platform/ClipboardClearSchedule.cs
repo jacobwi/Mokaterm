@@ -16,10 +16,15 @@ namespace Mokaterm.UI.Common.Platform;
 /// copied later in another.
 /// </para>
 /// <para>
+/// A copy made inside a click reaches the clipboard before .NET hears of it, so the page that copied a secret gets its own
+/// number for that write back with the clear, and leaves the clipboard alone if it wrote anything since.
+/// </para>
+/// <para>
 /// Where the host has an <see cref="ISystemClipboard"/> (the desktop), the clipboard's number is recorded with each
-/// secret copy, and a clear that no page can carry out goes through the system instead, but only while that number is
-/// unchanged: when the app shuts down before the deadline (<see cref="ClearNow"/>), when a page put the clear off until
-/// it is focused again, and when no page of the window is left at all.
+/// secret copy. A clear finds nothing to do once that number has moved, whoever wrote, and a clear that no page can carry
+/// out goes through the system instead, but only while that number is unchanged: when the app shuts down before the
+/// deadline (<see cref="ClearNow"/>), when a page put the clear off until it is focused again, and when no page of the
+/// window is left at all.
 /// </para>
 /// </summary>
 internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposable
@@ -39,6 +44,7 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 	private readonly HashSet<IClipboardClearer> _asked = [];
 	private ITimer? _timer;
 	private IClipboardClearer? _copiedBy;
+	private long _copiedWrite;
 	private IClipboardClearer? _heldBy;
 	private uint? _contentNumber;
 	private bool _owed;
@@ -110,10 +116,11 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 	}
 
 	/// <summary>
-	/// A secret was written through <paramref name="page"/>. It is cleared after <c>SecuritySettings.ClipboardClearSeconds</c>,
-	/// or never when that is 0, and either way a clear still pending for an earlier copy is dropped.
+	/// A secret was written through <paramref name="page"/>, as that page's write number <paramref name="write"/>. It is
+	/// cleared after <c>SecuritySettings.ClipboardClearSeconds</c>, or never when that is 0, and either way a clear still
+	/// pending for an earlier copy is dropped.
 	/// </summary>
-	public void SecretCopied(IClipboardClearer page)
+	public void SecretCopied(IClipboardClearer page, long write)
 	{
 		ArgumentNullException.ThrowIfNull(page);
 		int seconds = _settings.Get<SecuritySettings>().ClipboardClearSeconds;
@@ -133,6 +140,7 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 			if (seconds > 0)
 			{
 				_copiedBy = page;
+				_copiedWrite = write;
 				_owed = true;
 				_contentNumber = contentNumber;
 				_timer = _time.CreateTimer(OnDeadline, copy, TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
@@ -199,7 +207,9 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 		List<IClipboardClearer> passedOver = [];
 		while (true)
 		{
+			uint? contentNumber = _system?.ContentNumber;
 			IClipboardClearer? page;
+			long? write = null;
 			lock (_lock)
 			{
 				// Checked before every page, because a copy made while one page was being asked has a clear of its own.
@@ -208,10 +218,19 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 					return;
 				}
 
+				// Something replaced the secret: a copy made inside a click that .NET has not heard of yet, or another
+				// program. Whatever the clipboard holds now is not ours to clear.
+				if (_contentNumber is { } recorded && contentNumber is { } current && current != recorded)
+				{
+					EndClear();
+					return;
+				}
+
 				page = NextPage(passedOver);
 				if (page is not null)
 				{
 					_ = _asked.Add(page);
+					write = ReferenceEquals(page, _copiedBy) ? _copiedWrite : null;
 				}
 			}
 
@@ -221,7 +240,7 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 				return;
 			}
 
-			PageAnswer answer = await TryClearAsync(page, copy);
+			PageAnswer answer = await TryClearAsync(page, copy, write);
 			if (answer == PageAnswer.Cleared)
 			{
 				lock (_lock)
@@ -341,12 +360,12 @@ internal sealed class ClipboardClearSchedule : IPendingClipboardClear, IDisposab
 		return result;
 	}
 
-	private async Task<PageAnswer> TryClearAsync(IClipboardClearer page, long copy)
+	private async Task<PageAnswer> TryClearAsync(IClipboardClearer page, long copy, long? write)
 	{
 		using CancellationTokenSource limit = new(PageAnswerLimit, _time);
 		try
 		{
-			return await page.ClearAsync(copy, limit.Token) ? PageAnswer.Cleared : PageAnswer.WaitsForFocus;
+			return await page.ClearAsync(copy, write, limit.Token) ? PageAnswer.Cleared : PageAnswer.WaitsForFocus;
 		}
 		catch (Exception ex) when (JsModule.IsTeardown(ex))
 		{

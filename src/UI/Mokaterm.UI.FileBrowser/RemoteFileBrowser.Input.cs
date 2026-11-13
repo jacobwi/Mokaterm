@@ -4,6 +4,7 @@ using Moka.Red.Data.FileBrowser;
 using Moka.Red.Icons;
 using Mokaterm.Abstractions.FileSystem;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.FileBrowser.Browsing;
 using Mokaterm.UI.FileBrowser.Properties;
 
@@ -226,12 +227,14 @@ public partial class RemoteFileBrowser
 			Icon = MokaIcons.Content.Copy,
 			Shortcut = "Ctrl+Shift+C",
 			DividerBefore = true,
+			CssClass = CopyClick.Class,
 			OnClick = () => CopyPathsAsync(selected),
 		});
 		items.Add(new MokaContextMenuItem
 		{
 			Text = single ? "Copy name" : "Copy names",
 			Icon = MokaIcons.Content.Copy,
+			CssClass = CopyClick.Class,
 			OnClick = () => CopyAsync(string.Join('\n', selected.Select(item => item.Name)), single ? "Name copied" : "Names copied"),
 		});
 		if (single && !entry.IsDirectoryLike && _fileSystem?.ServerChecksum is { } algorithm)
@@ -240,6 +243,7 @@ public partial class RemoteFileBrowser
 			{
 				Text = "Copy " + FileChecksums.Name(algorithm),
 				Icon = MokaIcons.Content.Copy,
+				CssClass = CopyClick.Class,
 				OnClick = () => CopyChecksumAsync(entry),
 			});
 		}
@@ -318,6 +322,7 @@ public partial class RemoteFileBrowser
 			Icon = MokaIcons.Content.Copy,
 			Shortcut = "Ctrl+Shift+C",
 			DividerBefore = true,
+			CssClass = CopyClick.Class,
 			OnClick = () => CopyPathsAsync([]),
 		});
 		if (CanBookmark)

@@ -137,8 +137,8 @@ public sealed partial class DockerImagesPage : DockerManagerPageBase
 		items.Add(new MokaContextMenuItem { Text = "Tag or push", Icon = DockerIcons.Push, OnClickSync = () => Select(image) });
 		items.Add(new MokaContextMenuItem { Text = "Remove", Icon = MokaIcons.Action.Delete, Disabled = IsBusy, DividerBefore = true, OnClick = () => RemoveAsync(image, force: false) });
 		items.Add(new MokaContextMenuItem { Text = "Remove even if used (--force)", Icon = MokaIcons.Action.Delete, Disabled = IsBusy, OnClick = () => RemoveAsync(image, force: true) });
-		items.Add(new MokaContextMenuItem { Text = $"Copy id {image.ShortId}", Icon = MokaIcons.Content.Copy, DividerBefore = true, OnClick = () => CopyTextAsync(Clipboard, image.Id, "id") });
-		items.Add(new MokaContextMenuItem { Text = "Copy the reference", Icon = MokaIcons.Content.Copy, OnClick = () => CopyTextAsync(Clipboard, image.Reference, "reference") });
+		items.Add(new MokaContextMenuItem { Text = $"Copy id {image.ShortId}", Icon = MokaIcons.Content.Copy, DividerBefore = true, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, image.Id, "id") });
+		items.Add(new MokaContextMenuItem { Text = "Copy the reference", Icon = MokaIcons.Content.Copy, CssClass = CopyClick.Class, OnClick = () => CopyTextAsync(Clipboard, image.Reference, "reference") });
 		return items;
 	}
 

@@ -106,7 +106,7 @@ internal sealed class ConnectionActions
 			new() { Text = "New login", Icon = MokatermIcons.User, OnClickSync = () => NewLogin(host.Id) },
 			new() { Text = "Edit host", Icon = MokaIcons.Action.Edit, DividerBefore = true, OnClickSync = () => EditHost(host.Id) },
 			new() { Text = "Duplicate host", Icon = MokaIcons.Content.Copy, OnClick = () => DuplicateHostAsync(host) },
-			new() { Text = "Copy address", Icon = MokaIcons.Content.Link, OnClick = () => CopyAsync(host.Address) },
+			new() { Text = "Copy address", Icon = MokaIcons.Content.Link, CssClass = CopyClick.Class, OnClick = () => CopyAsync(host.Address) },
 			new() { Text = "Move to folder", Icon = MokatermIcons.Folder, Children = MoveItems(host, catalog) },
 			new() { Text = "Delete host", Icon = MokaIcons.Action.Delete, DividerBefore = true, OnClick = () => DeleteHostAsync(host) },
 			.. RunCommandItems(catalog.ConnectionsOf(host.Id)),
@@ -133,7 +133,7 @@ internal sealed class ConnectionActions
 
 		items.Add(new MokaContextMenuItem { Text = "Edit", Icon = MokaIcons.Action.Edit, DividerBefore = true, OnClickSync = () => EditLogin(login.Id) });
 		items.Add(new MokaContextMenuItem { Text = "Duplicate", Icon = MokaIcons.Content.Copy, OnClick = () => DuplicateLoginAsync(login) });
-		items.Add(new MokaContextMenuItem { Text = "Copy user@host", Icon = MokaIcons.Content.Link, OnClick = () => CopyAsync(UserAtHost(host, login)) });
+		items.Add(new MokaContextMenuItem { Text = "Copy user@host", Icon = MokaIcons.Content.Link, CssClass = CopyClick.Class, OnClick = () => CopyAsync(UserAtHost(host, login)) });
 		items.Add(new MokaContextMenuItem { Text = "Favorite", Checked = login.IsFavorite, OnClick = () => ToggleFavoriteAsync(login) });
 		items.Add(new MokaContextMenuItem { Text = "Delete", Icon = MokaIcons.Action.Delete, DividerBefore = true, OnClick = () => DeleteLoginAsync(host, login) });
 		items.AddRange(RunCommandItems([login]));
