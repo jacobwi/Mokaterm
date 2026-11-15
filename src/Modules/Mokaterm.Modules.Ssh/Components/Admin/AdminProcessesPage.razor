@@ -202,8 +202,7 @@
 					<div class="mta-inline">
 						<div class="mta-nice">
 							<MokaNumericField TValue="int"
-											  Value="_nice"
-											  ValueChanged="@(value => _nice = Math.Clamp(value, ProcessCommands.MinNice, ProcessCommands.MaxNice))"
+											  @bind-Value="_nice"
 											  Min="ProcessCommands.MinNice"
 											  Max="ProcessCommands.MaxNice"
 											  Step="1"

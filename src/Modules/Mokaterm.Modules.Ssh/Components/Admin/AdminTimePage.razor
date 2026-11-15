@@ -56,6 +56,7 @@
 	private bool _zonesLoading;
 	private string? _zonesError;
 	private string? _zone;
+	private bool _switchingNtp;
 
 	[Inject]
 	private TimeProvider Time { get; set; } = default!;
@@ -140,7 +141,8 @@
 						<MokaSwitch Value="ntp"
 									ValueChanged="SetNtpAsync"
 									Label="@(ntp ? "On" : "Off")"
-									Disabled="@(Busy || Context.RootChangeBlocked is not null)"
+									Loading="_switchingNtp"
+									Disabled="@((Busy && !_switchingNtp) || Context.RootChangeBlocked is not null)"
 									aria-label="Time synchronisation" />
 					</Hint>
 				}
@@ -196,9 +198,19 @@
 
 	private async Task SetNtpAsync(bool enabled)
 	{
-		if (Capabilities.Clock.CanSwitchNtp)
+		if (!Capabilities.Clock.CanSwitchNtp)
+		{
+			return;
+		}
+
+		_switchingNtp = true;
+		try
 		{
 			await RunAsync(Capabilities.Clock.SetNtp(enabled));
+		}
+		finally
+		{
+			_switchingNtp = false;
 		}
 	}
 }

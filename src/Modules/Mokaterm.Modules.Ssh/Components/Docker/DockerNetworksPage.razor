@@ -41,10 +41,13 @@
 								   Size="MokaSize.Sm"
 								   spellcheck="false"
 								   autocomplete="off"
-								   aria-label="New network name" />
+								   aria-label="New network name">
+						<Actions>
+							<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
+							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="ToggleCreate">Cancel</MokaButton>
+						</Actions>
+					</MokaTextField>
 				</div>
-				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="ToggleCreate">Cancel</MokaButton>
 			</form>
 		}
 		@ChangePanel
@@ -79,18 +82,16 @@
 							Position="MokaTooltipPosition.BottomEnd" />
 			</RowActions>
 			<ChildContent>
-				<MokaColumn TItem="DockerNetwork" Title="" Sortable="false" Resizable="false" Class="mt-col-dot" Fixed>
-					<CellTemplate Context="network">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@(network.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="network.InUse" />
-					</CellTemplate>
-				</MokaColumn>
 				<MokaColumn TItem="DockerNetwork" Title="Network" Field="@(network => network.Name)" SortComparer="ByName" Mono Fixed>
 					<CellTemplate Context="network">
-						<span class="mt-dk-name mt-dk-clip" title="@network.Name">@network.Name</span>
-						@if (KindText(network) is { Length: > 0 } kind)
-						{
-							<span class="mt-dk-flag mt-dk-after">@kind</span>
-						}
+						<span class="mt-dk-name-cell">
+							<MokaIcon Icon="DockerIcons.Network" Size="MokaSize.Sm" Color="@(network.InUse ? MokaColor.Success : null)" />
+							<span class="mt-dk-name" title="@network.Name">@network.Name</span>
+							@if (KindText(network) is { Length: > 0 } kind)
+							{
+								<span class="mt-dk-flag">@kind</span>
+							}
+						</span>
 					</CellTemplate>
 				</MokaColumn>
 				<MokaColumn TItem="DockerNetwork" Title="Driver" Field="@(network => network.Driver)" Mono>

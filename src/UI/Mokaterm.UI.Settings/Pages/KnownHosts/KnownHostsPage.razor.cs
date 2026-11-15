@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Moka.Red.Core.Icons;
+using Moka.Red.Data.Table;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.UI.Common.Formatting;
@@ -12,6 +13,12 @@ namespace Mokaterm.UI.Settings.Pages.KnownHosts;
 /// <summary>Trusted server identities from <see cref="IKnownHostsStore"/>, with filtering, copying and removal.</summary>
 public sealed partial class KnownHostsPage : VaultListPageBase<KnownHost>
 {
+	private static readonly MokaTableText TableWords = MokaTableText.Default with
+	{
+		SearchPlaceholder = "Filter by host, algorithm or fingerprint",
+		Actions = "",
+	};
+
 	[Inject]
 	private IKnownHostsStore KnownHosts { get; set; } = default!;
 

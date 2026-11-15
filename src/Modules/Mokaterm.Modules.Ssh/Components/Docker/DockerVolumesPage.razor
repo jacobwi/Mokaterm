@@ -48,10 +48,13 @@
 								   Size="MokaSize.Sm"
 								   spellcheck="false"
 								   autocomplete="off"
-								   aria-label="New volume name" />
+								   aria-label="New volume name">
+						<Actions>
+							<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
+							<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="ToggleCreate">Cancel</MokaButton>
+						</Actions>
+					</MokaTextField>
 				</div>
-				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="MokaIcons.Action.Add" Disabled="IsBusy">Create</MokaButton>
-				<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs" OnClick="ToggleCreate">Cancel</MokaButton>
 			</form>
 		}
 		@ChangePanel
@@ -89,18 +92,16 @@
 							Position="MokaTooltipPosition.BottomEnd" />
 			</RowActions>
 			<ChildContent>
-				<MokaColumn TItem="DockerVolume" Title="" Sortable="false" Resizable="false" Class="mt-col-dot" Fixed>
-					<CellTemplate Context="volume">
-						<MokaStatusDot Size="MokaSize.Xs" Color="@(volume.InUse ? MokaColor.Success : MokaColor.Surface)" Glow="volume.InUse" />
-					</CellTemplate>
-				</MokaColumn>
 				<MokaColumn TItem="DockerVolume" Title="Volume" Field="@(volume => volume.Name)" SortComparer="ByName" Mono Class="mt-col-main" Fixed>
 					<CellTemplate Context="volume">
-						<span class="mt-dk-name" title="@volume.Name">@ShownName(volume)</span>
-						@if (volume.IsAnonymous)
-						{
-							<span class="mt-dk-flag mt-dk-after">anonymous</span>
-						}
+						<span class="mt-dk-name-cell">
+							<MokaIcon Icon="DockerIcons.Volume" Size="MokaSize.Sm" Color="@(volume.InUse ? MokaColor.Success : null)" />
+							<span class="mt-dk-name" title="@volume.Name">@ShownName(volume)</span>
+							@if (volume.IsAnonymous)
+							{
+								<span class="mt-dk-flag">anonymous</span>
+							}
+						</span>
 					</CellTemplate>
 				</MokaColumn>
 				<MokaColumn TItem="DockerVolume" Title="Used by" Field="@(volume => volume.InUse)" SortComparer="ByUse" Mono Class="mt-col-wider">

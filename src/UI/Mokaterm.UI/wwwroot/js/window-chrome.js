@@ -13,10 +13,9 @@ const interactive = [
 	'[data-mt-no-drag]',
 ].join(',');
 
-// What floats over the bar from elsewhere in the page: an open dialog, a panel undocked from its dock. The stretch under
-// one is not empty, or the window would take the clicks meant for it. Dialogs keep below the bar on the desktop
-// (mokaterm.css); a floating panel can be dragged up to the top of the window.
-const overBar = ['[aria-modal="true"]', '.moka-dock-panel--floating'].join(',');
+// What floats over the bar from elsewhere in the page: an open dialog. The stretch under one is not empty, or the window
+// would take the clicks meant for it. Dialogs keep below the bar on the desktop (mokaterm.css).
+const overBar = '[aria-modal="true"]';
 
 // A narrower gap between two controls stays with the page.
 const minimumWidth = 8;

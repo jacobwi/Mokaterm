@@ -59,6 +59,8 @@
 		<MokaNumericField TValue="int"
 						  Label="Keep-alive (seconds)"
 						  Value="@Current.KeepAliveSeconds"
+						  Min="MqttConnectionOptions.MinKeepAliveSeconds"
+						  Max="MqttConnectionOptions.MaxKeepAliveSeconds"
 						  ValueChanged="OnKeepAliveChangedAsync"
 						  HelperText="@KeepAliveHelp"
 						  Disabled="Disabled" />

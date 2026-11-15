@@ -102,7 +102,8 @@
 						 Description="Unlock without typing the master password while you are signed in to this device.">
 				<MokaSwitch Value="Vault.IsDeviceUnlockEnabled"
 							ValueChanged="SetDeviceUnlockAsync"
-							Disabled="_deviceUnlockBusy || !IsUnlocked"
+							Loading="_deviceUnlockBusy"
+							Disabled="!IsUnlocked"
 							aria-label="@DeviceUnlockLabel" />
 			</SettingsRow>
 		}

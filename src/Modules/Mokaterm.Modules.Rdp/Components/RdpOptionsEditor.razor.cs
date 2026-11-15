@@ -56,9 +56,9 @@ public partial class RdpOptionsEditor : ConnectionOptionsEditorBase<RdpConnectio
 			? ChangeAsync(Current with { DesktopSize = mode })
 			: Task.CompletedTask;
 
-	private Task OnWidthChangedAsync(int value) => ChangeAsync(Current with { Width = Clamp(value) });
+	private Task OnWidthChangedAsync(int value) => ChangeAsync(Current with { Width = value });
 
-	private Task OnHeightChangedAsync(int value) => ChangeAsync(Current with { Height = Clamp(value) });
+	private Task OnHeightChangedAsync(int value) => ChangeAsync(Current with { Height = value });
 
 	private Task OnScalingChangedAsync(string value) =>
 		Enum.TryParse(value, out RdpScalingMode scaling) && Enum.IsDefined(scaling)
@@ -81,7 +81,4 @@ public partial class RdpOptionsEditor : ConnectionOptionsEditorBase<RdpConnectio
 
 	private Task OnFullWindowDragChangedAsync(bool value) =>
 		ChangeAsync(Current with { Performance = Current.Performance with { FullWindowDrag = value } });
-
-	// MokaNumericField does not apply Min and Max, so the size is kept in range here.
-	private static int Clamp(int value) => Math.Clamp(value, RdpConnectionOptions.MinDesktopSize, RdpConnectionOptions.MaxDesktopSize);
 }

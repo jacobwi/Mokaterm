@@ -176,11 +176,9 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 	private MokaDockPosition CommandsDock =>
 		_placement == FileBrowserPlacement.Right ? MokaDockPosition.Left : MokaDockPosition.Right;
 
-	private string CommandsPanelSize =>
-		string.Create(CultureInfo.InvariantCulture, $"{Math.Round(UiState.Current.CommandsPanelWidth ?? 280)}px");
+	private string CommandsPanelSize => DockSize.Css(UiState.Current.CommandsPanelWidth ?? 280);
 
-	private string FilesPanelSize =>
-		string.Create(CultureInfo.InvariantCulture, $"{Math.Round(UiState.Current.FilesPanelWidth ?? 340)}px");
+	private string FilesPanelSize => DockSize.Css(UiState.Current.FilesPanelWidth ?? 340);
 
 	private Dictionary<string, object> ModuleParameters => new()
 	{
@@ -709,7 +707,13 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		_ = InvokeAsync(StateHasChanged);
 	}
 
-	private void OnFilesPanelResized(double width) => UiState.Update(state => state with { FilesPanelWidth = width });
+	private void OnFilesPanelResized(string size)
+	{
+		if (DockSize.TryPixels(size, out double width))
+		{
+			UiState.Update(state => state with { FilesPanelWidth = width });
+		}
+	}
 
 	// The terminal and the file browser live in libraries that do not know each other, so the folder passes through here.
 	private void SetFollowTerminalFolder(bool follow) => _viewState.FollowTerminalFolder = follow;
@@ -760,7 +764,13 @@ public sealed partial class SessionView : ComponentBase, IDisposable
 		}
 	}
 
-	private void OnCommandsPanelResized(double width) => UiState.Update(state => state with { CommandsPanelWidth = width });
+	private void OnCommandsPanelResized(string size)
+	{
+		if (DockSize.TryPixels(size, out double width))
+		{
+			UiState.Update(state => state with { CommandsPanelWidth = width });
+		}
+	}
 
 	private void OnTerminalFocusRequested(Guid sessionId)
 	{

@@ -77,7 +77,10 @@ public sealed class DockerPageRenderTests
 		string html = await RenderAsync<DockerImagesPage>();
 
 		Assert.Contains("aria-label=\"Images\"", html, StringComparison.Ordinal);
-		Assert.Contains(">nginx:1.27-alpine<", html, StringComparison.Ordinal);
+		// The name is cut when the column runs short and the tag beside it never is, so it is a chip of its own.
+		Assert.Contains("title=\"nginx:1.27-alpine\"", html, StringComparison.Ordinal);
+		Assert.Contains(">nginx<", html, StringComparison.Ordinal);
+		Assert.Contains(">1.27-alpine<", html, StringComparison.Ordinal);
 		Assert.Contains(">dangling<", html, StringComparison.Ordinal);
 		Assert.Contains("3 images, 1 tagged, 1 dangling", html, StringComparison.Ordinal);
 

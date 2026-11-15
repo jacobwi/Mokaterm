@@ -56,7 +56,11 @@
 			{
 				case SessionLayout.Split:
 				case SessionLayout.Terminal:
-					<MokaDockLayout @key="_placement" Class="@SplitClass">
+					<MokaDockLayout @key="_placement"
+									Class="@SplitClass"
+									Controls="MokaDockControls.Floating | MokaDockControls.Collapse"
+									AllowDragging="false"
+									NarrowBelow="@((string?)null)">
 						@if (Layout == SessionLayout.Split)
 						{
 							<MokaDockPanel Dock="@(_placement == FileBrowserPlacement.Right ? MokaDockPosition.Right : MokaDockPosition.Left)"

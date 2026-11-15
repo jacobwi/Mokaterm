@@ -4,10 +4,12 @@ using Moka.Red.ContextMenu;
 using Moka.Red.Core.Theming;
 using Moka.Red.Feedback.CommandPalette;
 using Moka.Red.Feedback.Dialog;
+using Moka.Red.Feedback.Notification;
 using Moka.Red.Feedback.Toast;
 using Mokaterm.Abstractions.Security;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.UI.Common.Platform;
+using Mokaterm.UI.Interaction;
 using Mokaterm.UI.Presentation;
 using Mokaterm.UI.Shell;
 using Mokaterm.UI.Vault;
@@ -43,6 +45,12 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 	private IMokaToastService Toasts { get; set; } = default!;
 
 	[Inject]
+	private IMokaNotificationService Notifications { get; set; } = default!;
+
+	[Inject]
+	private NoticeRelay NoticeRelay { get; set; } = default!;
+
+	[Inject]
 	private IMokaContextMenuService ContextMenu { get; set; } = default!;
 
 	[Inject]
@@ -69,6 +77,7 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 	{
 		Settings.Changed -= OnSettingsChanged;
 		Vault.StatusChanged -= OnVaultStatusChanged;
+		NoticeRelay.Kept -= OnNoticeKept;
 		_disposeCts.Cancel();
 		_disposeCts.Dispose();
 	}
@@ -80,6 +89,10 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 		_theme = ThemeFactory.Create(Settings.Get<AppearanceSettings>());
 		Settings.Changed += OnSettingsChanged;
 		Vault.StatusChanged += OnVaultStatusChanged;
+
+		// Here rather than beside the bell, which mounts with the shell after unlock: notices shown the moment the vault
+		// opens would reach the toasts and miss the bell.
+		NoticeRelay.Kept += OnNoticeKept;
 		DamagedDocuments.Start();
 		PluginNotices.Show();
 	}
@@ -149,14 +162,18 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 		});
 	}
 
+	private void OnNoticeKept(PendingNotice notice) => _ = InvokeAsync(() => NoticeHistory.Keep(Notifications, notice));
+
 	private void OnVaultStatusChanged(VaultStatus status) => _ = InvokeAsync(() =>
 	{
 		if (status != VaultStatus.Unlocked)
 		{
-			// Menus, the palette, toasts and editors can all show hostnames; none of them may outlive the unlocked shell.
+			// Menus, the palette, toasts, the notification center and editors can all show hostnames; none of them may
+			// outlive the unlocked shell.
 			ContextMenu.Close();
 			CommandPalette.Close();
 			Toasts.Clear();
+			Notifications.Clear();
 
 			// Service dialogs render above the shell: the file browser's delete and properties dialogs would stay on the
 			// lock screen with remote paths in them, and could still be confirmed there.

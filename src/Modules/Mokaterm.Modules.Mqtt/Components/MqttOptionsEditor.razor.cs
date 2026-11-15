@@ -104,8 +104,7 @@ public partial class MqttOptionsEditor : ConnectionOptionsEditorBase<MqttConnect
 		return ChangeAsync(Current with { ClientId = clientId });
 	}
 
-	private Task OnKeepAliveChangedAsync(int value) =>
-		ChangeAsync(Current with { KeepAliveSeconds = Math.Clamp(value, 0, MqttConnectionOptions.MaxKeepAliveSeconds) });
+	private Task OnKeepAliveChangedAsync(int value) => ChangeAsync(Current with { KeepAliveSeconds = value });
 
 	private Task OnSubscriptionsChangedAsync(IReadOnlyList<MqttSubscription> subscriptions) =>
 		ChangeAsync(Current with { Subscriptions = subscriptions });

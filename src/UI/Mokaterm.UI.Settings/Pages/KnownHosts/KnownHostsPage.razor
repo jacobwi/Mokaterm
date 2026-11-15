@@ -11,14 +11,11 @@
 			   ItemKey="IdentityKey"
 			   Title="Trusted servers"
 			   Searchable
-			   SearchPlaceholder="Filter by host, algorithm or fingerprint"
+			   Text="TableWords"
 			   ShowPagination="false"
-			   SortColumn="Host"
-			   SortDirection="MokaSortDirection.Ascending"
-			   ActionsColumnTitle=""
 			   ActionsColumnWidth="40px">
 		<ChildContent>
-			<MokaColumn Title="Host" Field="host => Endpoint(host)">
+			<MokaColumn Title="Host" Field="host => Endpoint(host)" DefaultSort="MokaSortDirection.Ascending">
 				<CellTemplate Context="host">
 					<MokaText Element="span" Size="MokaSize.Xs" Mono>@Endpoint(host)</MokaText>
 				</CellTemplate>

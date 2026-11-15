@@ -66,21 +66,6 @@ internal sealed record NotificationClick(Guid? SessionId, Guid? ConnectionId)
 		return new NotificationClick(session, connection);
 	}
 
-	/// <summary>
-	/// The session the click selects: the one the notification was about while it is open, else an open session of the
-	/// same saved login, else none, and the window only comes to the front.
-	/// </summary>
-	public Guid? SessionToShow(IEnumerable<ISessionHandle> sessions)
-	{
-		ArgumentNullException.ThrowIfNull(sessions);
-		ISessionHandle[] open = [.. sessions];
-		if (SessionId is { } id && open.Any(session => session.Id == id))
-		{
-			return id;
-		}
-
-		return ConnectionId is { } connection
-			? open.FirstOrDefault(session => !session.IsTransient && session.Connection.Id == connection)?.Id
-			: null;
-	}
+	/// <summary>The session the click selects, by <see cref="SystemNotification.SessionToShow"/>.</summary>
+	public Guid? SessionToShow(IEnumerable<ISessionHandle> sessions) => SystemNotification.SessionToShow(SessionId, ConnectionId, sessions);
 }

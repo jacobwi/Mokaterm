@@ -45,9 +45,12 @@
 								   spellcheck="false"
 								   autocomplete="off"
 								   aria-label="New tag"
-								   data-autofocus />
+								   data-autofocus>
+						<Actions>
+							<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Tag" Disabled="IsWorking">Tag</MokaButton>
+						</Actions>
+					</MokaTextField>
 				</div>
-				<MokaButton Type="submit" Variant="MokaVariant.Outlined" Size="MokaSize.Xs" StartIcon="DockerIcons.Tag" Disabled="IsWorking">Tag</MokaButton>
 			</form>
 		}
 

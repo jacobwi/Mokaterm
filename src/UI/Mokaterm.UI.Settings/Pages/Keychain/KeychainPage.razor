@@ -12,12 +12,9 @@
 			   ItemKey="credential => credential.Id"
 			   Title="Shared credentials"
 			   Searchable
-			   SearchPlaceholder="Filter credentials"
+			   Text="TableWords"
 			   ShowPagination="false"
-			   SortColumn="Name"
-			   SortDirection="MokaSortDirection.Ascending"
 			   OnRowClick="EditCredential"
-			   ActionsColumnTitle=""
 			   ActionsColumnWidth="96px">
 		<ToolbarContent>
 			<MokaButton Variant="MokaVariant.Outlined"
@@ -40,7 +37,7 @@
 			</MokaButton>
 		</ToolbarContent>
 		<ChildContent>
-			<MokaColumn Title="Name" Field="credential => credential.Name" />
+			<MokaColumn Title="Name" Field="credential => credential.Name" DefaultSort="MokaSortDirection.Ascending" />
 			<MokaColumn Title="Kind" Field="credential => KindText(credential)">
 				<CellTemplate Context="credential">
 					<MokaTag Text="@KindText(credential)" Icon="KindIcon(credential)" Size="MokaSize.Xs" />

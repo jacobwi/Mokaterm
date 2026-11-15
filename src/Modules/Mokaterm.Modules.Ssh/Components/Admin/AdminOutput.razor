@@ -23,7 +23,7 @@
 	}
 	else
 	{
-		<MokaCodeBlock Code="@Text" Id="@CodeId" ShowCopyButton="false" ShowLineNumbers="false" Wrap="Wrap" MaxHeight="@(Fill ? null : MaxHeight)" Class="mta-output-code" />
+		<MokaCodeBlock Code="@Text" Id="@CodeId" ShowCopyButton="false" ShowLineNumbers="false" Wrap="Wrap" MaxHeight="@(Fill ? null : MaxHeight)" Highlighter="@(Commands ? MokaCodeHighlighters.Shell : null)" Class="mta-output-code" />
 	}
 </section>
 

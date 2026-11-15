@@ -20,6 +20,8 @@
 		<MokaNumericField TValue="int"
 						  Label="Picture quality"
 						  Value="@Current.Quality"
+						  Min="VncConnectionOptions.MinLevel"
+						  Max="VncConnectionOptions.MaxLevel"
 						  ValueChanged="OnQualityChangedAsync"
 						  HelperText="@QualityHelp"
 						  Disabled="Disabled" />
@@ -27,6 +29,8 @@
 		<MokaNumericField TValue="int"
 						  Label="Compression"
 						  Value="@Current.Compression"
+						  Min="VncConnectionOptions.MinLevel"
+						  Max="VncConnectionOptions.MaxLevel"
 						  ValueChanged="OnCompressionChangedAsync"
 						  HelperText="@CompressionHelp"
 						  Disabled="Disabled" />

@@ -38,6 +38,8 @@
 			<MokaNumericField TValue="int"
 							  Label="Width"
 							  Value="@Current.Width"
+							  Min="RdpConnectionOptions.MinDesktopSize"
+							  Max="RdpConnectionOptions.MaxDesktopSize"
 							  ValueChanged="OnWidthChangedAsync"
 							  HelperText="@SizeHelp"
 							  Disabled="Disabled" />
@@ -45,6 +47,8 @@
 			<MokaNumericField TValue="int"
 							  Label="Height"
 							  Value="@Current.Height"
+							  Min="RdpConnectionOptions.MinDesktopSize"
+							  Max="RdpConnectionOptions.MaxDesktopSize"
 							  ValueChanged="OnHeightChangedAsync"
 							  HelperText="@SizeHelp"
 							  Disabled="Disabled" />

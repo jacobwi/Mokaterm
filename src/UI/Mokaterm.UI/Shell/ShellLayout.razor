@@ -4,10 +4,13 @@
 		<ShellAppBar />
 	</WindowChromeBar>
 
-	<MokaDockLayout Class="mt-shell-body">
+	<MokaDockLayout Class="mt-shell-body"
+					Controls="MokaDockControls.Floating | MokaDockControls.Collapse"
+					AllowDragging="false"
+					NarrowBelow="@((string?)null)">
 		<MokaDockPanel Dock="MokaDockPosition.Left"
 					   Title="Connections"
-					   Size="@Px(UiState.Current.ConnectionsPanelWidth ?? 280)"
+					   Size="@DockSize.Css(UiState.Current.ConnectionsPanelWidth ?? 280)"
 					   MinSize="200px"
 					   MaxSize="640px"
 					   Collapsible
@@ -42,7 +45,7 @@
 
 		<MokaDockPanel Dock="MokaDockPosition.Bottom"
 					   Title="Transfers"
-					   Size="@Px(UiState.Current.TransfersPanelHeight ?? 270)"
+					   Size="@DockSize.Css(UiState.Current.TransfersPanelHeight ?? 270)"
 					   MinSize="96px"
 					   MaxSize="640px"
 					   Collapsible

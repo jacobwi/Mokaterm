@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moka.Red.Core.Theming;
 using Moka.Red.Extensions;
+using Moka.Red.Feedback.Extensions;
 using Moka.Red.Navigation.Extensions;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Sessions;
@@ -8,6 +10,7 @@ using Mokaterm.UI.Commands;
 using Mokaterm.UI.Common.Contributions;
 using Mokaterm.UI.Common.Extensions;
 using Mokaterm.UI.Common.Icons;
+using Mokaterm.UI.Common.Platform;
 using Mokaterm.UI.Connections;
 using Mokaterm.UI.FileBrowser.Extensions;
 using Mokaterm.UI.Fleet;
@@ -55,6 +58,7 @@ public static class MokatermUiServiceCollectionExtensions
 		services.AddScoped<ISettingsNavigator, ShellSettingsNavigator>();
 		services.AddScoped<ShellInterop>();
 		services.AddScoped<PageVisibility>();
+		services.AddScoped<NoticeRelay>();
 		services.AddScoped<TabDrag>();
 		services.AddScoped<ShellInputBridge>();
 		services.AddScoped<ShellCommandRegistry>();
@@ -94,6 +98,21 @@ public static class MokatermUiServiceCollectionExtensions
 			Keywords = "shortcut shortcuts keys keyboard binding gesture hotkey",
 		});
 
+		return services;
+	}
+
+	/// <summary>
+	/// Shows trigger notices as the browser's own notifications as well, for a web host, where the page asks the user
+	/// first. The desktop host registers Windows notifications of its own instead.
+	/// </summary>
+	public static IServiceCollection AddBrowserNotifications(this IServiceCollection services)
+	{
+		ArgumentNullException.ThrowIfNull(services);
+
+		services.AddMokaSystemNotifier();
+		services.TryAddScoped<BrowserNotifications>();
+		services.TryAddScoped<ISystemNotifications>(provider => provider.GetRequiredService<BrowserNotifications>());
+		services.TryAddScoped<ISystemNotificationConsent>(provider => provider.GetRequiredService<BrowserNotifications>());
 		return services;
 	}
 }

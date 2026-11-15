@@ -42,14 +42,11 @@ public partial class VncOptionsEditor : ConnectionOptionsEditorBase<VncConnectio
 			? ChangeAsync(Current with { Scaling = scaling })
 			: Task.CompletedTask;
 
-	private Task OnQualityChangedAsync(int value) => ChangeAsync(Current with { Quality = Clamp(value) });
+	private Task OnQualityChangedAsync(int value) => ChangeAsync(Current with { Quality = value });
 
-	private Task OnCompressionChangedAsync(int value) => ChangeAsync(Current with { Compression = Clamp(value) });
+	private Task OnCompressionChangedAsync(int value) => ChangeAsync(Current with { Compression = value });
 
 	private Task OnSharedChangedAsync(bool value) => ChangeAsync(Current with { Shared = value });
 
 	private Task OnViewOnlyChangedAsync(bool value) => ChangeAsync(Current with { ViewOnly = value });
-
-	// MokaNumericField does not apply Min and Max, so the levels are kept in range here.
-	private static int Clamp(int level) => Math.Clamp(level, VncConnectionOptions.MinLevel, VncConnectionOptions.MaxLevel);
 }

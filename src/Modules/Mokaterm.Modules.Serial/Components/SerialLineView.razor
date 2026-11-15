@@ -18,7 +18,7 @@
 			<IconButton Variant="MokaVariant.Outlined"
 						Size="MokaSize.Xs"
 						Icon="MokaIcons.Action.Refresh"
-						Disabled="@(_busy || !status.IsOpen)"
+						Disabled="@(Busy || !status.IsOpen)"
 						OnClick="RefreshAsync"
 						Label="Read the pins again" />
 		</div>
@@ -53,20 +53,22 @@
 						Value="@status.Signals.Dtr"
 						ValueChanged="SetDtrAsync"
 						HelperText="Lowering it is the reset line on boards that wire it that way."
-						Disabled="@(_busy || !status.IsOpen)" />
+						Loading="@(_running == SerialLineAction.Dtr)"
+						Disabled="@((Busy && _running != SerialLineAction.Dtr) || !status.IsOpen)" />
 
 			<MokaSwitch Label="RTS"
 						Value="@status.Signals.Rts"
 						ValueChanged="SetRtsAsync"
 						HelperText="@RtsHelp(status)"
-						Disabled="@(_busy || !status.IsOpen || !status.CanSetRts)" />
+						Loading="@(_running == SerialLineAction.Rts)"
+						Disabled="@((Busy && _running != SerialLineAction.Rts) || !status.IsOpen || !status.CanSetRts)" />
 		</div>
 
 		<div class="mt-serial-row">
 			<MokaButton Variant="MokaVariant.Outlined"
 						Color="MokaColor.Surface"
 						Size="MokaSize.Xs"
-						Disabled="@(_busy || !status.IsOpen)"
+						Disabled="@(Busy || !status.IsOpen)"
 						OnClick="SendBreakAsync">
 				Send break
 			</MokaButton>

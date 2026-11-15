@@ -25,6 +25,8 @@ public sealed partial class TriggerSettingsPage : SettingsSectionBase<TerminalTr
 	private string? _testedSample;
 	private IReadOnlyList<TriggerTestResult>? _results;
 	private bool _testing;
+	private SystemNotificationConsent? _consent;
+	private bool _asking;
 
 	[Inject]
 	private TerminalTriggerTester Tester { get; set; } = default!;
@@ -46,7 +48,22 @@ public sealed partial class TriggerSettingsPage : SettingsSectionBase<TerminalTr
 		CultureInfo.CurrentCulture,
 		$"When a rule that shows a notice matches while Mokaterm is minimized or behind another window, Windows shows it as well, at most once every {TerminalTriggerSettings.NotifyIntervalSeconds} seconds for each rule and session. Clicking it brings that session's tab to the front.");
 
+	private static string BrowserBackgroundDescription => string.Create(
+		CultureInfo.CurrentCulture,
+		$"When a rule that shows a notice matches while this tab is in the background, the browser shows it as well, at most once every {TerminalTriggerSettings.NotifyIntervalSeconds} seconds for each rule and session. Clicking it brings that session's tab to the front.");
+
 	private bool HasSystemNotifications => Services.GetService<ISystemNotifications>() is not null;
+
+	private ISystemNotificationConsent? Consent => Services.GetService<ISystemNotificationConsent>();
+
+	private string ConsentDescription => _consent switch
+	{
+		SystemNotificationConsent.Granted => "Allowed. The browser's site settings can take it back.",
+		SystemNotificationConsent.Denied => "Refused. Only the browser's site settings for this page can allow them again.",
+		SystemNotificationConsent.Unsupported => "This browser shows no notifications for this page.",
+		SystemNotificationConsent.NotAsked => "The browser asks once, and nothing shows until it is allowed.",
+		_ => "Asking the browser where this stands.",
+	};
 
 	/// <summary>What a rule does, in a few words: <c>Colors it red, shows a notice, any case</c>.</summary>
 	internal static string Describe(TerminalTrigger rule)
@@ -100,7 +117,41 @@ public sealed partial class TriggerSettingsPage : SettingsSectionBase<TerminalTr
 		return rule.Notify ? count + " and shows a notice" : count;
 	}
 
-	protected override Task OnAfterRenderAsync(bool firstRender) => TestAsync();
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender && Consent is { } consent)
+		{
+			try
+			{
+				_consent = await consent.GetAsync();
+				StateHasChanged();
+			}
+			catch (Exception ex) when (JsModule.IsTeardown(ex))
+			{
+				return;
+			}
+		}
+
+		await TestAsync();
+	}
+
+	private async Task AskForConsentAsync()
+	{
+		if (Consent is not { } consent)
+		{
+			return;
+		}
+
+		_asking = true;
+		try
+		{
+			_consent = await consent.RequestAsync();
+		}
+		finally
+		{
+			_asking = false;
+		}
+	}
 
 	private static bool IsFirst(IReadOnlyList<TerminalTrigger> rules, TerminalTrigger rule) =>
 		rules.Count > 0 && ReferenceEquals(rules[0], rule);

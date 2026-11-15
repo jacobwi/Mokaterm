@@ -12,6 +12,22 @@
 		}
 	</text>;
 
+	/// <summary>
+	/// An image reference as a list shows it: the name as written, cut when it runs long, and the tag beside it as a chip
+	/// that is never cut, since the tag is what tells two lines of the same image apart.
+	/// </summary>
+	private protected static RenderFragment ImageReference(string reference) => @<span class="mt-dk-ref" title="@reference">
+		@if (TagOf(reference) is { } tag)
+		{
+			<span class="mt-dk-ref-name">@reference[..^(tag.Length + 1)]</span>
+			<MokaTag Text="@tag" Size="MokaSize.Xs" Color="MokaColor.Surface" Mono />
+		}
+		else
+		{
+			<span class="mt-dk-ref-name">@reference</span>
+		}
+	</span>;
+
 	private protected static RenderFragment LoopChip(DockerRestartRecord? loop) => @<text>
 		@if (loop is { IsLooping: true })
 		{

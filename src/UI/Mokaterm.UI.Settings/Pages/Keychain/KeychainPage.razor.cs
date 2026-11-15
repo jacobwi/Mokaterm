@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Moka.Red.Core.Icons;
+using Moka.Red.Data.Table;
 using Mokaterm.Abstractions.Connections;
 using Mokaterm.Abstractions.Credentials;
 using Mokaterm.Abstractions.Interaction;
@@ -16,6 +17,12 @@ namespace Mokaterm.UI.Settings.Pages.Keychain;
 /// <summary>Shared credentials from <see cref="ICredentialStore"/>: add, edit, copy a password and delete.</summary>
 public sealed partial class KeychainPage : VaultListPageBase<CredentialInfo>
 {
+	private static readonly MokaTableText TableWords = MokaTableText.Default with
+	{
+		SearchPlaceholder = "Filter credentials",
+		Actions = "",
+	};
+
 	private bool _editorOpen;
 	private bool _generateOpen;
 	private CredentialInfo? _editing;

@@ -1,3 +1,4 @@
+@using Mokaterm.UI.Common.Platform
 @using Mokaterm.UI.Terminal.Triggers
 @inherits SettingsSectionBase<TerminalTriggerSettings>
 
@@ -127,8 +128,32 @@
 		</SettingsRow>
 	</SettingsSection>
 
-	@* Only where the host can show one, which is the desktop: a browser keeps its toasts and nothing else. *@
-	@if (HasSystemNotifications)
+	@* A browser shows them only once the user allowed it there, so the web hosts ask first. *@
+	@if (Consent is not null)
+	{
+		<SettingsSection Title="Browser notifications"
+						 Description="For a rule that shows a notice, while this tab is in the background.">
+			<SettingsRow Label="Allow notifications in this browser" Description="@ConsentDescription">
+				@if (_consent == SystemNotificationConsent.NotAsked)
+				{
+					<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Sm" Loading="_asking" LoadingText="Asking" OnClick="AskForConsentAsync">Allow</MokaButton>
+				}
+			</SettingsRow>
+			<SettingsRow Label="Show a browser notification in the background" Description="@BrowserBackgroundDescription">
+				<MokaSwitch Value="Settings.SystemNotifications"
+							ValueChanged="value => UpdateAsync(settings => settings with { SystemNotifications = value })"
+							aria-label="Show a browser notification when a trigger fires while this tab is in the background" />
+			</SettingsRow>
+			<SettingsRow Label="Include the matched line in browser notifications"
+						 Description="Off, a notification names only the session and the rule. The system can keep notifications after the tab closes, and a line from a server can hold a password or a token.">
+				<MokaSwitch Value="Settings.SystemNotificationShowsLine"
+							Disabled="!Settings.SystemNotifications"
+							ValueChanged="value => UpdateAsync(settings => settings with { SystemNotificationShowsLine = value })"
+							aria-label="Include the matched line in browser notifications" />
+			</SettingsRow>
+		</SettingsSection>
+	}
+	else if (HasSystemNotifications)
 	{
 		<SettingsSection Title="Windows notifications"
 						 Description="For a rule that shows a notice, while you are working in another window.">

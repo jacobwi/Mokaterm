@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Moka.Red.Core.Icons;
 using Moka.Red.Core.Interactions;
 using Moka.Red.Data.Table;
+using Mokaterm.UI.Common.Components;
 
 namespace Mokaterm.UI.Common.ToolPages;
 
@@ -32,9 +33,32 @@ public partial class ToolTable<TItem>
 	// can follow (the Docker manager shows a row's quick actions on it).
 	private const string OpenRowClass = "moka-table-row--selected mt-tool-row--open";
 
+	// GroupBy is a key function, and Moka groups by a column: a hidden one that is never offered in the column toggle
+	// carries the key, under a title no page gives a column of its own.
+	private const string GroupColumn = "mt-group";
+
+	private static readonly MokaTableText Words = MokaTableText.Default with { Actions = "" };
+
+	private readonly Func<MokaTableState, Task> _stateChanged;
 	private HashSet<TItem>? _selected;
 	private HashSet<TItem> _picked = [];
 	private Func<TItem, string?>? _openRowClass;
+
+	// The table's state as last raised, with what the page handed in since put over it. The page's sort and layout are
+	// starting values: they go in only when the page passes a new one, so a refresh never undoes the user's own sort.
+	private MokaTableState? _state;
+	private bool _seeded;
+	private string? _seededSortColumn;
+	private MokaSortDirection _seededSortDirection;
+	private IReadOnlyList<MokaTableColumnState>? _seededLayout;
+	private string? _sortColumn;
+	private MokaSortDirection _sortDirection;
+
+	public ToolTable()
+	{
+		// Nothing this component draws depends on the state, so taking it in costs no render of its own.
+		_stateChanged = EventUtil.AsNonRenderingEventHandler<MokaTableState>(OnStateChangedAsync);
+	}
 
 	/// <summary>The rows, already filtered, in the page's own order until the user sorts by a column.</summary>
 	[Parameter, EditorRequired]
@@ -76,7 +100,7 @@ public partial class ToolTable<TItem>
 	[Parameter]
 	public Func<TItem, string?>? RowClass { get; set; }
 
-	/// <summary>Groups rows under a header per key, such as containers by compose project.</summary>
+	/// <summary>Groups rows under a header per key, such as containers by compose project. Grouping turns <see cref="Virtualize"/> off.</summary>
 	[Parameter]
 	public Func<TItem, string>? GroupBy { get; set; }
 
@@ -147,11 +171,11 @@ public partial class ToolTable<TItem>
 
 	/// <summary>The columns someone hid or resized, to put back, such as what <see cref="LayoutChanged"/> gave the last time the page showed.</summary>
 	[Parameter]
-	public MokaTableLayout? Layout { get; set; }
+	public IReadOnlyList<MokaTableColumnState>? Layout { get; set; }
 
 	/// <summary>Raised when someone hides, shows or resizes a column, so a page can keep the choice while it is away.</summary>
 	[Parameter]
-	public EventCallback<MokaTableLayout> LayoutChanged { get; set; }
+	public EventCallback<IReadOnlyList<MokaTableColumnState>> LayoutChanged { get; set; }
 
 	/// <summary>A muted line under the rows, such as a total: its parts sit apart, the first at the start and the last at the end.</summary>
 	[Parameter]
@@ -166,6 +190,8 @@ public partial class ToolTable<TItem>
 	public string? EmptyText { get; set; }
 
 	private bool IsPickable => BulkActions is not null;
+
+	private string? GroupColumnTitle => GroupBy is null ? null : GroupColumn;
 
 	private HashSet<TItem>? SelectedSet => IsPickable ? _picked : _selected;
 
@@ -184,6 +210,8 @@ public partial class ToolTable<TItem>
 
 	protected override void OnParametersSet()
 	{
+		SeedState();
+
 		// Rebuilt from the rows handed in each time, because a refresh replaces every item and a set kept from the last
 		// read would hold instances the table no longer has.
 		_selected = !IsPickable && IsSelected is { } isSelected && Items.FirstOrDefault(isSelected) is { } selected ? [selected] : null;
@@ -218,6 +246,63 @@ public partial class ToolTable<TItem>
 	}
 
 	private object KeyOf(TItem item) => ItemKey is { } key ? key(item) : item!;
+
+	private void SeedState()
+	{
+		bool sortGiven = !_seeded || SortColumn != _seededSortColumn || SortDirection != _seededSortDirection;
+		bool layoutGiven = !_seeded || !ReferenceEquals(Layout, _seededLayout);
+		if (!sortGiven && !layoutGiven)
+		{
+			return;
+		}
+
+		// The table applies a state whole, collapsed groups included, so the first one carries the groups that start
+		// collapsed and every later one starts from what the table raised.
+		MokaTableState state = _state ?? new MokaTableState { CollapsedGroups = [.. CollapsedGroups ?? []] };
+		if (sortGiven)
+		{
+			_seededSortColumn = SortColumn;
+			_seededSortDirection = SortDirection;
+			bool sorted = SortColumn is not null && SortDirection != MokaSortDirection.None;
+			_sortColumn = sorted ? SortColumn : null;
+			_sortDirection = sorted ? SortDirection : MokaSortDirection.None;
+			state = state with { Sorts = sorted ? [new MokaTableSort(SortColumn!, SortDirection)] : null };
+		}
+
+		if (layoutGiven)
+		{
+			_seededLayout = Layout;
+			state = state with { Columns = Layout ?? [] };
+		}
+
+		_seeded = true;
+		_state = state;
+	}
+
+	private async Task OnStateChangedAsync(MokaTableState state)
+	{
+		IReadOnlyList<MokaTableColumnState> columnsBefore = _state?.Columns ?? [];
+		_state = state;
+
+		MokaTableSort? sort = state.Sorts is [var first, ..] ? first : null;
+		if (sort?.Column != _sortColumn)
+		{
+			_sortColumn = sort?.Column;
+			await SortColumnChanged.InvokeAsync(_sortColumn);
+		}
+
+		MokaSortDirection direction = sort?.Direction ?? MokaSortDirection.None;
+		if (direction != _sortDirection)
+		{
+			_sortDirection = direction;
+			await SortDirectionChanged.InvokeAsync(direction);
+		}
+
+		if (!state.Columns.SequenceEqual(columnsBefore))
+		{
+			await LayoutChanged.InvokeAsync(state.Columns);
+		}
+	}
 
 	private void OnPicked(HashSet<TItem> picked) => _picked = picked;
 

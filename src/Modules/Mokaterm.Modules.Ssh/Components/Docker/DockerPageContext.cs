@@ -16,7 +16,7 @@ internal sealed class DockerPageContext : IDockerPageContext
 {
 	private readonly Action<string> _show;
 	private readonly Func<DockerSessionFeature?> _feature;
-	private readonly Dictionary<string, MokaTableLayout> _layouts = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, IReadOnlyList<MokaTableColumnState>> _layouts = new(StringComparer.Ordinal);
 	private string? _newContainerImage;
 	private bool _buildImage;
 	private bool _restartLoops;
@@ -123,13 +123,13 @@ internal sealed class DockerPageContext : IDockerPageContext
 	}
 
 	/// <summary>The columns the user hid or resized on a page, kept while the manager is open so the page comes back the same.</summary>
-	public MokaTableLayout? LayoutOf(string pageId)
+	public IReadOnlyList<MokaTableColumnState>? LayoutOf(string pageId)
 	{
 		ArgumentNullException.ThrowIfNull(pageId);
 		return _layouts.GetValueOrDefault(pageId);
 	}
 
-	public void KeepLayout(string pageId, MokaTableLayout layout)
+	public void KeepLayout(string pageId, IReadOnlyList<MokaTableColumnState> layout)
 	{
 		ArgumentNullException.ThrowIfNull(pageId);
 		ArgumentNullException.ThrowIfNull(layout);

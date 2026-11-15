@@ -97,7 +97,12 @@
 				<ChildContent>
 					<MokaColumn TItem="DockerContainer" Title="Name" Field="ShortName" SortComparer="ByName" Fixed>
 						<CellTemplate Context="container">
-							<span class="mt-dk-name" title="@container.Name">@ShortName(container)</span>
+							<span class="mt-dk-name-cell">
+								<MokaIcon Icon="DockerIcons.Container" Size="MokaSize.Sm" Color="@DockerStateDisplay.IconColor(container.State, container.Health)" />
+								<span class="mt-dk-name" title="@container.Name">@ShortName(container)</span>
+								@LoopChip(LoopOf(container.Id, container.Name))
+								@UpdateChip(container.Image)
+							</span>
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Status" Field="@(container => DockerStateDisplay.Rank(container))" SortComparer="ByStatus">
@@ -115,15 +120,7 @@
 					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Image" Field="@(container => container.Image)" SortComparer="ByImage" Mono Class="mt-col-main">
 						<CellTemplate Context="container">
-							<span class="mt-dk-dim" title="@container.Image">@container.Image</span>
-						</CellTemplate>
-					</MokaColumn>
-					<MokaColumn TItem="DockerContainer" Title="" Sortable="false" Resizable="false" Fixed>
-						<CellTemplate Context="container">
-							<span class="mt-dk-chips">
-								@LoopChip(LoopOf(container.Id, container.Name))
-								@UpdateChip(container.Image)
-							</span>
+							<span class="mt-dk-dim">@ImageReference(container.Image)</span>
 						</CellTemplate>
 					</MokaColumn>
 					<MokaColumn TItem="DockerContainer" Title="Ports" Field="Ports" SortComparer="ByPorts" Mono Class="mt-col-wider">
@@ -200,6 +197,7 @@
 	</text>;
 
 	private RenderFragment<MokaTableGroup<DockerContainer>> GroupHeader => group => @<text>
+		<MokaIcon Icon="@(group.Key.Length == 0 ? DockerIcons.Container : DockerIcons.Compose)" Size="MokaSize.Xs" Class="mt-dk-group-icon" />
 		<span class="mt-dk-group-name">@(group.Key.Length == 0 ? "Standalone" : group.Key)</span>
 		<span class="mt-dk-group-count">@group.Items.Count(container => container.IsRunning).ToString(CultureInfo.InvariantCulture)/@group.Count.ToString(CultureInfo.InvariantCulture)</span>
 	</text>;

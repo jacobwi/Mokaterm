@@ -97,13 +97,10 @@
 					   ItemKey="file => file.Name"
 					   Title="Written so far"
 					   Searchable
-					   SearchPlaceholder="Filter by file name"
+					   Text="TableWords"
 					   ShowPagination="false"
-					   SortColumn="Written"
-					   SortDirection="MokaSortDirection.Descending"
 					   Selectable
 					   @bind-SelectedItems="_selected"
-					   ActionsColumnTitle=""
 					   ActionsColumnWidth="104px">
 				<ChildContent>
 					<MokaColumn Title="File" Field="file => file.Name">
@@ -116,7 +113,7 @@
 							<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Bytes(file.Length)</MokaText>
 						</CellTemplate>
 					</MokaColumn>
-					<MokaColumn Title="Written" Field="file => file.WrittenAt">
+					<MokaColumn Title="Written" Field="file => file.WrittenAt" DefaultSort="MokaSortDirection.Descending">
 						<CellTemplate Context="file">
 							<Hint Text="@DisplayFormat.Timestamp(file.WrittenAt)" Position="MokaTooltipPosition.BottomStart">
 								<MokaText Element="span" Size="MokaSize.Xs" Mono>@DisplayFormat.Relative(file.WrittenAt, Time.GetUtcNow())</MokaText>

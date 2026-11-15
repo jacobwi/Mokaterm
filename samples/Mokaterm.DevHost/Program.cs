@@ -61,6 +61,7 @@ PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
 builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddSerial().AddLocal().AddModule(new DemoModule()).AddPlugins(plugins));
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
+builder.Services.AddBrowserNotifications();
 
 // The Browse tab reads a demo gallery that never leaves this machine: signed at start with a key made for this run and
 // served from memory (Mokaterm:Gallery:Packages names a folder of .mokaplugin files to list; the default is the sample

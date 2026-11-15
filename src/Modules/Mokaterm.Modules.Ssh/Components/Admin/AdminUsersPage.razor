@@ -281,12 +281,11 @@
 					@if (Capabilities.Accounts.CanSetPasswords && Feature.SupportsInput)
 					{
 						<MokaText Element="span" Size="MokaSize.Xs" Weight="MokaFontWeight.Semibold" Class="mta-label">Set a new password</MokaText>
-						<div class="mta-inline">
-							<div class="mta-grow">
-								<MokaPasswordField @bind-Value="_password" Placeholder="New password" autocomplete="new-password" Size="MokaSize.Sm" aria-label="New password" />
-							</div>
-							<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="@(blocked || AdminNames.CheckPassword(_password) is not null)" OnClick="@(() => SetPasswordAsync(user))">Set</MokaButton>
-						</div>
+						<MokaPasswordField @bind-Value="_password" Placeholder="New password" autocomplete="new-password" Size="MokaSize.Sm" aria-label="New password">
+							<Actions>
+								<MokaButton Variant="MokaVariant.Outlined" Size="MokaSize.Xs" Disabled="@(blocked || AdminNames.CheckPassword(_password) is not null)" OnClick="@(() => SetPasswordAsync(user))">Set</MokaButton>
+							</Actions>
+						</MokaPasswordField>
 					}
 				}
 				else

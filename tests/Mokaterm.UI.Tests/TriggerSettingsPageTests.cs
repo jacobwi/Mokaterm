@@ -61,7 +61,20 @@ public sealed class TriggerSettingsPageTests
 		Assert.Contains("at most once every 5 seconds", html, StringComparison.Ordinal);
 	}
 
-	// The web host and the DevHost register none, and a row there would change nothing.
+	// A browser asks the user first, so the web hosts offer that, in a browser's words.
+	[Fact]
+	public async Task Render_WhereTheBrowserShowsThem_OffersToAsk()
+	{
+		BrowserStandIn browser = new();
+		string html = await RenderAsync(new TerminalTriggerSettings(), browser, browser);
+
+		Assert.Contains("Allow notifications in this browser", html, StringComparison.Ordinal);
+		Assert.Contains("Show a browser notification in the background", html, StringComparison.Ordinal);
+		Assert.Contains("Include the matched line in browser notifications", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("Windows notification", html, StringComparison.Ordinal);
+	}
+
+	// A host that shows none leaves the section out, since a row there would change nothing.
 	[Fact]
 	public async Task Render_WithoutSystemNotifications_LeavesThemOut()
 	{
@@ -70,7 +83,10 @@ public sealed class TriggerSettingsPageTests
 		Assert.DoesNotContain("Windows notification", html, StringComparison.Ordinal);
 	}
 
-	private static Task<string> RenderAsync(TerminalTriggerSettings settings, ISystemNotifications? notifications = null) =>
+	private static Task<string> RenderAsync(
+		TerminalTriggerSettings settings,
+		ISystemNotifications? notifications = null,
+		ISystemNotificationConsent? consent = null) =>
 		StaticRender.RenderAsync<TriggerSettingsPage>(
 			services =>
 			{
@@ -83,6 +99,11 @@ public sealed class TriggerSettingsPageTests
 				{
 					services.AddSingleton(notifications);
 				}
+
+				if (consent is not null)
+				{
+					services.AddSingleton(consent);
+				}
 			},
 			new Dictionary<string, object?>(StringComparer.Ordinal))
 			.WaitAsync(TimeSpan.FromSeconds(5), Ct);
@@ -92,5 +113,18 @@ public sealed class TriggerSettingsPageTests
 		public bool IsSessionWindowInForeground => true;
 
 		public bool Show(SystemNotification notification) => false;
+	}
+
+	private sealed class BrowserStandIn : ISystemNotifications, ISystemNotificationConsent
+	{
+		public bool IsSessionWindowInForeground => true;
+
+		public bool Show(SystemNotification notification) => false;
+
+		public ValueTask<SystemNotificationConsent> GetAsync(CancellationToken cancellationToken = default) =>
+			ValueTask.FromResult(SystemNotificationConsent.NotAsked);
+
+		public ValueTask<SystemNotificationConsent> RequestAsync(CancellationToken cancellationToken = default) =>
+			ValueTask.FromResult(SystemNotificationConsent.Granted);
 	}
 }

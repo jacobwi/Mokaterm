@@ -10,7 +10,7 @@
 			   ShowToolbar="ShowColumnToggle"
 			   ShowColumnToggle="ShowColumnToggle"
 			   ShowPagination="false"
-			   Dense="true"
+			   Density="MokaTableDensity.Compact"
 			   FixedHeader="true"
 			   Height="100%"
 			   Virtualize="Virtualize"
@@ -26,23 +26,23 @@
 			   OnRowContextMenu="OnRowMenu"
 			   RowClass="RowClassFor"
 			   RowActions="RowActions"
-			   ActionsColumnTitle=""
+			   Text="Words"
 			   ActionsColumnWidth="@ActionsWidth"
-			   GroupBy="GroupBy"
+			   GroupBy="@GroupColumnTitle"
 			   GroupHeaderTemplate="GroupHeader"
 			   InitiallyCollapsedGroups="CollapsedGroups"
 			   OnGroupToggled="GroupToggled"
-			   SortColumn="@SortColumn"
-			   SortColumnChanged="SortColumnChanged"
-			   SortDirection="SortDirection"
-			   SortDirectionChanged="SortDirectionChanged"
-			   Layout="Layout"
-			   LayoutChanged="LayoutChanged"
+			   State="_state"
+			   StateChanged="_stateChanged"
 			   Loading="Loading"
 			   EmptyIcon="EmptyIcon"
 			   EmptyTitle="@EmptyTitle"
 			   EmptyText="@EmptyText"
 			   FootContent="FootContent">
+		@if (GroupBy is not null)
+		{
+			<MokaColumn TItem="TItem" Title="@GroupColumn" GroupKey="GroupBy" Visible="false" Fixed="true" Sortable="false" Resizable="false" />
+		}
 		@ChildContent
 	</MokaTable>
 </div>

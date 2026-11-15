@@ -17,7 +17,7 @@ public sealed partial class SerialLineView : SessionViewBase, IDisposable
 	private ISerialPortFeature? _feature;
 	private SerialPortStatus? _status;
 	private string? _error;
-	private bool _busy;
+	private SerialLineAction? _running;
 
 	public void Dispose()
 	{
@@ -126,22 +126,24 @@ public sealed partial class SerialLineView : SessionViewBase, IDisposable
 		StateHasChanged();
 	});
 
-	private Task SetDtrAsync(bool on) => RunAsync(feature => feature.SetDtrAsync(on));
+	private bool Busy => _running is not null;
 
-	private Task SetRtsAsync(bool on) => RunAsync(feature => feature.SetRtsAsync(on));
+	private Task SetDtrAsync(bool on) => RunAsync(SerialLineAction.Dtr, feature => feature.SetDtrAsync(on));
 
-	private Task SendBreakAsync() => RunAsync(feature => feature.SendBreakAsync());
+	private Task SetRtsAsync(bool on) => RunAsync(SerialLineAction.Rts, feature => feature.SetRtsAsync(on));
 
-	private Task RefreshAsync() => RunAsync(feature => feature.RefreshAsync());
+	private Task SendBreakAsync() => RunAsync(SerialLineAction.Break, feature => feature.SendBreakAsync());
 
-	private async Task RunAsync(Func<ISerialPortFeature, Task> action)
+	private Task RefreshAsync() => RunAsync(SerialLineAction.Refresh, feature => feature.RefreshAsync());
+
+	private async Task RunAsync(SerialLineAction running, Func<ISerialPortFeature, Task> action)
 	{
 		if (_feature is not { } feature)
 		{
 			return;
 		}
 
-		_busy = true;
+		_running = running;
 		_error = null;
 		try
 		{
@@ -153,7 +155,7 @@ public sealed partial class SerialLineView : SessionViewBase, IDisposable
 		}
 		finally
 		{
-			_busy = false;
+			_running = null;
 			_status = feature.Status;
 		}
 	}

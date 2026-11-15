@@ -44,6 +44,9 @@ public sealed record MqttConnectionOptions
 
 	public const int MaxPathLength = 256;
 
+	/// <summary>0 turns keep-alives off.</summary>
+	public const int MinKeepAliveSeconds = 0;
+
 	/// <summary>The CONNECT keep-alive field is a 16-bit count of seconds.</summary>
 	public const int MaxKeepAliveSeconds = 65535;
 
@@ -182,7 +185,7 @@ public sealed record MqttConnectionOptions
 		return hash.ToHashCode();
 	}
 
-	private static int ClampKeepAlive(int seconds) => Math.Clamp(seconds, 0, MaxKeepAliveSeconds);
+	private static int ClampKeepAlive(int seconds) => Math.Clamp(seconds, MinKeepAliveSeconds, MaxKeepAliveSeconds);
 
 	private static string SubscriptionKey(int index) =>
 		SubscriptionKeyPrefix + index.ToString("D2", CultureInfo.InvariantCulture);

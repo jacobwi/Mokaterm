@@ -21,6 +21,12 @@ namespace Mokaterm.Modules.Ssh.Components.Docker;
 /// </summary>
 public abstract partial class DockerManagerPageBase : DockerPageBase
 {
+	/// <summary>The tag written at the end of <paramref name="reference"/>, or null when it names none or pins a digest.</summary>
+	private protected static string? TagOf(string reference) =>
+		DockerImageName.Parse(reference) is { Tag: { } tag, Digest: null } && reference.EndsWith(":" + tag, StringComparison.Ordinal)
+			? tag
+			: null;
+
 	private DockerRestartLoops? _followedLoops;
 	private Action? _onLoopsChanged;
 	private bool _refreshingByHand;

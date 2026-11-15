@@ -63,9 +63,12 @@
 							   Disabled="IsBusy"
 							   Size="MokaSize.Sm"
 							   spellcheck="false"
-							   autocomplete="off" />
+							   autocomplete="off">
+					<Actions>
+						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="IsBusy" OnClick="PickBackupFolderAsync">Browse</MokaButton>
+					</Actions>
+				</MokaTextField>
 			</div>
-			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="IsBusy" OnClick="PickBackupFolderAsync">Browse</MokaButton>
 		</div>
 		<div class="mt-dk-form">
 			<div class="mt-dk-form-field">
@@ -147,9 +150,12 @@
 							   Size="MokaSize.Sm"
 							   spellcheck="false"
 							   autocomplete="off"
-							   data-autofocus />
+							   data-autofocus>
+					<Actions>
+						<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="@(IsBusy || _listing)" OnClick="PickArchiveFolderAsync">Browse</MokaButton>
+					</Actions>
+				</MokaTextField>
 			</div>
-			<MokaButton Variant="MokaVariant.Outlined" Color="MokaColor.Surface" Size="MokaSize.Xs" StartIcon="MokatermIcons.FolderOpen" Disabled="@(IsBusy || _listing)" OnClick="PickArchiveFolderAsync">Browse</MokaButton>
 		</div>
 		<span class="mt-dk-note">To restore a file from this computer, upload it into a folder in the browser first, then use that folder.</span>
 

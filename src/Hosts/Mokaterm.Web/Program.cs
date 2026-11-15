@@ -67,6 +67,7 @@ PluginCatalog plugins = PluginCatalog.Open(new PluginCatalogOptions
 builder.Services.AddMokaterm(modules => modules.AddSsh().AddFtp().AddVnc().AddRdp().AddTelnet().AddMqtt().AddPlugins(plugins));
 builder.Services.AddMokatermSessions();
 builder.Services.AddMokatermUI();
+builder.Services.AddBrowserNotifications();
 
 WebApplication app = builder.Build();
 AllowedHostsCheck.WarnIfOpen(app);

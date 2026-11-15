@@ -17,6 +17,10 @@ internal static class DockerStateDisplay
 		_ => MokaColor.Surface,
 	};
 
+	/// <summary>The color of a container's icon in a list: its state's, and the plain icon color for one that is not up.</summary>
+	public static MokaColor? IconColor(string state, DockerHealth health = DockerHealth.None) =>
+		Color(state, health) is var color && color != MokaColor.Surface ? color : null;
+
 	public static string Label(string state) => state.Length == 0 ? "UNKNOWN" : state.ToUpperInvariant();
 
 	public static string HealthLabel(DockerHealth health) => health switch

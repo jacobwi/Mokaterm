@@ -542,6 +542,54 @@
 	font-family: var(--moka-font-family-mono);
 }
 
+/* A row's icon and its name: the icon keeps its size, the name takes the rest and is cut. */
+.mt-dk ::deep .mt-dk-name-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--moka-spacing-sm);
+	min-width: 0;
+}
+
+.mt-dk ::deep .mt-dk-name-cell > .mt-dk-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mt-dk ::deep .mt-dk-name-cell > .moka-icon,
+.mt-dk ::deep .mt-dk-name-cell > .moka-tag,
+.mt-dk ::deep .mt-dk-name-cell > .moka-tooltip-trigger,
+.mt-dk ::deep .mt-dk-name-cell > .mt-dk-flag {
+	flex-shrink: 0;
+}
+
+.mt-dk ::deep .mt-dk-row--down .mt-dk-name-cell > .moka-icon {
+	opacity: 0.6;
+}
+
+/* An image reference: the name is cut when the column runs short, the tag chip beside it never is. */
+.mt-dk ::deep .mt-dk-ref {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--moka-spacing-xs);
+	min-width: 0;
+	max-width: 100%;
+	vertical-align: middle;
+}
+
+.mt-dk ::deep .mt-dk-ref-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--moka-font-family-mono);
+}
+
+.mt-dk ::deep .mt-dk-ref > .moka-tag {
+	flex-shrink: 0;
+}
+
 .mt-dk ::deep .mt-dk-clip {
 	display: inline-block;
 	max-width: 28ch;
@@ -669,6 +717,12 @@
 	margin-right: 4px;
 	color: var(--moka-color-on-surface-tertiary);
 	vertical-align: -1px;
+}
+
+.mt-dk ::deep .mt-dk-group-icon {
+	color: var(--moka-color-on-surface-variant);
+	vertical-align: middle;
+	margin-inline-end: var(--moka-spacing-xxs);
 }
 
 .mt-dk ::deep .mt-dk-group-name {

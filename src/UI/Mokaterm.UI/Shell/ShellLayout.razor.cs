@@ -1,8 +1,9 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using Mokaterm.Abstractions.Settings;
 using Mokaterm.Abstractions.Transfers;
 using Mokaterm.UI.Connections;
+using Mokaterm.UI.Presentation;
 
 namespace Mokaterm.UI.Shell;
 
@@ -14,6 +15,7 @@ public sealed partial class ShellLayout : ComponentBase, IAsyncDisposable
 {
 	private bool _showStatusBar;
 	private int _lastActiveTransfers;
+	private IDisposable? _browserNotifications;
 
 	[Inject]
 	private ShellState Shell { get; set; } = default!;
@@ -36,12 +38,16 @@ public sealed partial class ShellLayout : ComponentBase, IAsyncDisposable
 	[Inject]
 	private ITransferQueue Transfers { get; set; } = default!;
 
+	[Inject]
+	private IServiceProvider Services { get; set; } = default!;
+
 	public async ValueTask DisposeAsync()
 	{
 		Shell.Changed -= OnShellChanged;
 		Settings.Changed -= OnSettingsChanged;
 		Transfers.Changed -= OnTransfersChanged;
 		Commands.Unregister();
+		_browserNotifications?.Dispose();
 		await InputBridge.DetachAsync();
 	}
 
@@ -53,6 +59,9 @@ public sealed partial class ShellLayout : ComponentBase, IAsyncDisposable
 		Settings.Changed += OnSettingsChanged;
 		Transfers.Changed += OnTransfersChanged;
 		Commands.Register();
+
+		// Only the web hosts register the browser's notifications, and they reach the page through the shell's renderer.
+		_browserNotifications = Services.GetService<BrowserNotifications>()?.Attach(InvokeAsync);
 	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -63,13 +72,21 @@ public sealed partial class ShellLayout : ComponentBase, IAsyncDisposable
 		}
 	}
 
-	private static string Px(double value) => string.Create(CultureInfo.InvariantCulture, $"{Math.Round(value)}px");
+	private void OnConnectionsPanelResized(string size)
+	{
+		if (DockSize.TryPixels(size, out double width))
+		{
+			UiState.Update(state => state with { ConnectionsPanelWidth = width });
+		}
+	}
 
-	private void OnConnectionsPanelResized(double width) =>
-		UiState.Update(state => state with { ConnectionsPanelWidth = width });
-
-	private void OnTransfersPanelResized(double height) =>
-		UiState.Update(state => state with { TransfersPanelHeight = height });
+	private void OnTransfersPanelResized(string size)
+	{
+		if (DockSize.TryPixels(size, out double height))
+		{
+			UiState.Update(state => state with { TransfersPanelHeight = height });
+		}
+	}
 
 	private void OnShellChanged() => _ = InvokeAsync(StateHasChanged);
 

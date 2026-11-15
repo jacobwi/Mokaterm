@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Mokaterm.Abstractions.Credentials;
+using Mokaterm.Abstractions.Sessions;
 
 namespace Mokaterm.UI.Common.Platform;
 
@@ -27,6 +28,24 @@ public sealed record SystemNotification
 	/// new id. Null for a session that was never saved.
 	/// </summary>
 	public Guid? ConnectionId { get; init; }
+
+	/// <summary>
+	/// The session a click on a notification selects: the one it was about while it is open, else an open session of the
+	/// same saved login, else none, and the window only comes to the front.
+	/// </summary>
+	public static Guid? SessionToShow(Guid? sessionId, Guid? connectionId, IEnumerable<ISessionHandle> sessions)
+	{
+		ArgumentNullException.ThrowIfNull(sessions);
+		ISessionHandle[] open = [.. sessions];
+		if (sessionId is { } id && open.Any(session => session.Id == id))
+		{
+			return id;
+		}
+
+		return connectionId is { } connection
+			? open.FirstOrDefault(session => !session.IsTransient && session.Connection.Id == connection)?.Id
+			: null;
+	}
 
 	private bool PrintMembers(StringBuilder builder)
 	{

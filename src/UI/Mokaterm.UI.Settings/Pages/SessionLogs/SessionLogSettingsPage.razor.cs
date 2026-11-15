@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moka.Red.Data.Table;
 using Mokaterm.Abstractions.Diagnostics;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Platform;
@@ -19,6 +20,12 @@ namespace Mokaterm.UI.Settings.Pages.SessionLogs;
 public sealed partial class SessionLogSettingsPage : SettingsSectionBase<SessionLogSettings>
 {
 	private const string PageTitle = "Session logs";
+
+	private static readonly MokaTableText TableWords = MokaTableText.Default with
+	{
+		SearchPlaceholder = "Filter by file name",
+		Actions = "",
+	};
 
 	private const string FolderDescription =
 		"Where the files go. Leave it empty to keep them under the app's data folder, next to the crash logs.";

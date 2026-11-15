@@ -113,6 +113,9 @@ public sealed partial class DockerComposePage : DockerManagerPageBase
 		_ => MokaColor.Surface,
 	};
 
+	// A project that is down keeps the plain icon color, where a bar takes the quiet surface fill.
+	private static MokaColor? ProjectIconColor(ComposeProject project) => ProjectColor(project) is var color && color != MokaColor.Surface ? color : null;
+
 	private static int ByName(ComposeProject left, ComposeProject right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
 
 	/// <summary>How many of a project's containers are in each state, the ones that run first.</summary>
