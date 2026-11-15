@@ -1,3 +1,25 @@
+## What's new in 0.3.13
+
+**Notifications**
+
+- A bell in the top bar keeps the warnings and errors you were shown, from every window, tool windows included, so a
+  toast you missed can still be read.
+- In the web version, trigger notices can also show as the browser's own notifications while the tab is in the
+  background. Turn them on in Settings, Triggers.
+- A toast that repeats an identical one counts it instead of piling up.
+
+**Docker and System**
+
+- Every row in the Docker lists starts with an icon coloured by its state, keeps its chips beside the name, and shows an
+  image's tag as a chip.
+- Command boxes in the System view and Docker's inspect output are coloured.
+
+**Fixes**
+
+- Switches that wait for something (unlock with this device, network time, a serial line's pins) show that they are
+  busy instead of flipping back and forth.
+- Number fields keep to their range: a value past a limit becomes that limit.
+
 ## What's new in 0.3.12
 
 **Appearance**
