@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moka.Red.Core.Theming;
 using Moka.Red.Extensions;
 using Moka.Red.Feedback.Extensions;
+using Moka.Red.Feedback.Toast;
 using Moka.Red.Navigation.Extensions;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.Abstractions.Sessions;
@@ -27,6 +28,11 @@ namespace Mokaterm.UI.Extensions;
 
 public static class MokatermUiServiceCollectionExtensions
 {
+	// The bell keeps the newest warnings and errors; Moka lets the oldest read ones go first past this.
+	private const int KeptNotices = 100;
+
+	private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(8);
+
 	/// <summary>
 	/// The scoped services of the shell that belong to one page rather than to the window's state. A second page that
 	/// borrows a window's services, such as a tool's own window on the desktop, gets its own of these and the window's
@@ -45,6 +51,11 @@ public static class MokatermUiServiceCollectionExtensions
 		ArgumentNullException.ThrowIfNull(services);
 
 		services.AddMokaRed(options => options.Theme = MokaTheme.Red);
+		services.Configure<MokaFeedbackOptions>(feedback =>
+		{
+			feedback.NotificationLimit = KeptNotices;
+			feedback.ToastDefaults = ApplyToastDefaults;
+		});
 		services.AddMokaTabs<Guid>();
 		services.AddMokatermUiCommon();
 		services.AddMokatermTerminal();
@@ -99,6 +110,16 @@ public static class MokatermUiServiceCollectionExtensions
 		});
 
 		return services;
+	}
+
+	// A toast that repeats an identical one counts it instead of stacking, and an error stays long enough to read.
+	private static void ApplyToastDefaults(MokaToastOptions toast)
+	{
+		toast.Repeats = MokaToastRepeats.Count;
+		if (toast.Severity == MokaToastSeverity.Error)
+		{
+			toast.Duration = ErrorToastDuration;
+		}
 	}
 
 	/// <summary>

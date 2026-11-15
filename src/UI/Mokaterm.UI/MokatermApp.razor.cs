@@ -162,7 +162,7 @@ public sealed partial class MokatermApp : ComponentBase, IDisposable
 		});
 	}
 
-	private void OnNoticeKept(PendingNotice notice) => _ = InvokeAsync(() => NoticeHistory.Keep(Notifications, notice));
+	private void OnNoticeKept(PendingNotice notice) => _ = InvokeAsync(() => Notifications.Push(notice.KeptTitle, notice.Message, notice.ToastSeverity));
 
 	private void OnVaultStatusChanged(VaultStatus status) => _ = InvokeAsync(() =>
 	{

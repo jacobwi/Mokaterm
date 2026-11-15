@@ -11,8 +11,6 @@ namespace Mokaterm.UI.Interaction;
 /// </summary>
 public sealed partial class InteractionHost : ComponentBase, IDisposable
 {
-	private static readonly TimeSpan ErrorNoticeDuration = TimeSpan.FromSeconds(8);
-
 	private InteractionRequest? _request;
 
 	[Inject]
@@ -59,15 +57,7 @@ public sealed partial class InteractionHost : ComponentBase, IDisposable
 
 		foreach (PendingNotice notice in Service.TakeNotices())
 		{
-			Toasts.Show(notice.Message, notice.ToastSeverity, options =>
-			{
-				options.Title = notice.Title;
-				options.Repeats = MokaToastRepeats.Count;
-				if (notice.Severity == NoticeSeverity.Error)
-				{
-					options.Duration = ErrorNoticeDuration;
-				}
-			});
+			Toasts.Show(notice.Message, notice.ToastSeverity, options => options.Title = notice.Title);
 
 			if (notice.IsKept)
 			{
