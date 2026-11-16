@@ -59,6 +59,7 @@ internal static class AppearanceChoice
 			TooltipArrows = usable.TooltipArrows,
 			TooltipMotion = ComponentLooks.Of(usable.TooltipMotion),
 			TooltipSize = ComponentLooks.Of(usable.TooltipSize),
+			ControlHeights = ComponentLooks.Of(usable.ControlHeights),
 		};
 	}
 
@@ -80,6 +81,7 @@ internal static class AppearanceChoice
 			TooltipArrows = picked.TooltipArrows ?? settings.TooltipArrows,
 			TooltipMotion = picked.TooltipMotion is { } motion ? ComponentLooks.From(motion) : settings.TooltipMotion,
 			TooltipSize = picked.TooltipSize is { } size ? ComponentLooks.From(size) : settings.TooltipSize,
+			ControlHeights = picked.ControlHeights is { } heights ? ComponentLooks.From(heights) : settings.ControlHeights,
 		};
 	}
 

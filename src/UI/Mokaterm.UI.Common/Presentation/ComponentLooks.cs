@@ -33,6 +33,9 @@ public static class ComponentLooks
 	/// <summary>The tooltip size for <paramref name="size"/>.</summary>
 	public static MokaTooltipSize Of(TooltipSize size) => Convert(size, MokaTooltipSize.Standard);
 
+	/// <summary>The control heights for <paramref name="heights"/>.</summary>
+	public static MokaControlHeights Of(ControlHeights heights) => Convert(heights, MokaControlHeights.Standard);
+
 	/// <summary>The stored style for a toast look.</summary>
 	public static ToastStyle From(MokaToastLook look) => Convert(look, ToastStyle.Standard);
 
@@ -56,6 +59,9 @@ public static class ComponentLooks
 
 	/// <summary>The stored size for a tooltip size.</summary>
 	public static TooltipSize From(MokaTooltipSize size) => Convert(size, TooltipSize.Standard);
+
+	/// <summary>The stored control heights for Moka's.</summary>
+	public static ControlHeights From(MokaControlHeights heights) => Convert(heights, ControlHeights.Standard);
 
 	private static TTo Convert<TFrom, TTo>(TFrom value, TTo fallback)
 		where TFrom : struct, Enum

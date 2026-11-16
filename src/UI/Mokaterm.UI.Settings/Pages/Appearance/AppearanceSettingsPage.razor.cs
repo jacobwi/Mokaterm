@@ -27,6 +27,12 @@ public sealed partial class AppearanceSettingsPage : SettingsSectionBase<Appeara
 		new(UiDensity.Comfortable, "Comfortable"),
 	];
 
+	private static readonly IReadOnlyList<EnumOption<ControlHeights>> ControlHeightsOptions =
+	[
+		new(ControlHeights.Standard, "Standard"),
+		new(ControlHeights.Matched, "Match fields"),
+	];
+
 	private static readonly IReadOnlyList<EnumOption<TooltipMotion>> TooltipMotionOptions =
 	[
 		new(TooltipMotion.Fade, "Fade"),

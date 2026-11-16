@@ -26,7 +26,7 @@
 
 <SettingsPage Title="Appearance"
 			  OnReset="ResetAsync"
-			  ResetMessage="Put the theme, accent color, density, font scale, status bar, component styles, tooltips, host figures, session toolbar and tool windows back to their defaults?">
+			  ResetMessage="Put the theme, accent color, density, control heights, font scale, status bar, component styles, tooltips, host figures, session toolbar and tool windows back to their defaults?">
 	<SettingsSection Title="Theme">
 		<SettingsRow Label="Mode" Description="Dark suits long terminal sessions. Light reads better in bright rooms." Stacked>
 			@Panel(MokaAppearanceRows.ColorMode)
@@ -51,6 +51,13 @@
 								  ValueChanged="value => UpdateAsync(s => s with { Density = value })"
 								  Options="DensityOptions"
 								  AriaLabel="Density" />
+		</SettingsRow>
+		<SettingsRow Label="Control heights" Description="Buttons and toggles as tall as the text fields beside them, so a row of mixed controls lines up.">
+			<EnumSegmentedControl TEnum="ControlHeights"
+								  Value="settings.ControlHeights"
+								  ValueChanged="value => UpdateAsync(s => s with { ControlHeights = value })"
+								  Options="ControlHeightsOptions"
+								  AriaLabel="Control heights" />
 		</SettingsRow>
 		<SettingsRow Label="Font scale" Description="Scales every font in the app. 100% is the Moka default." ControlWidth="@SettingWidths.Standard">
 			<MokaSlider Value="settings.FontScale"

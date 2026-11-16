@@ -39,6 +39,7 @@ internal static class ThemeFactory
 			.WithTooltipArrows(usable.TooltipArrows)
 			.WithTooltipMotion(ComponentLooks.Of(usable.TooltipMotion))
 			.WithTooltipSize(ComponentLooks.Of(usable.TooltipSize))
+			.WithControlHeights(ComponentLooks.Of(usable.ControlHeights))
 			.WithFontScale(usable.FontScale);
 	}
 }

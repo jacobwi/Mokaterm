@@ -51,6 +51,9 @@ public sealed record AppearanceSettings : ISettingsSection
 
 	public UiDensity Density { get; init; } = UiDensity.Cozy;
 
+	/// <summary>Whether buttons and toggles take the height of the text fields beside them.</summary>
+	public ControlHeights ControlHeights { get; init; } = ControlHeights.Standard;
+
 	/// <summary>Multiplies every UI font size. 1.0 is the Moka default.</summary>
 	public double FontScale { get; init; } = DefaultFontScale;
 

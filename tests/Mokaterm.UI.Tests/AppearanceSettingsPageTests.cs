@@ -125,6 +125,7 @@ public sealed class AppearanceSettingsPageTests
 		RoundTrip<TooltipStyle, MokaTooltipLook>(ComponentLooks.Of, ComponentLooks.From);
 		RoundTrip<TooltipMotion, MokaTooltipMotion>(ComponentLooks.Of, ComponentLooks.From);
 		RoundTrip<TooltipSize, MokaTooltipSize>(ComponentLooks.Of, ComponentLooks.From);
+		RoundTrip<ControlHeights, MokaControlHeights>(ComponentLooks.Of, ComponentLooks.From);
 
 		static void RoundTrip<TStored, TLook>(Func<TStored, TLook> of, Func<TLook, TStored> from)
 			where TStored : struct, Enum
@@ -157,6 +158,7 @@ public sealed class AppearanceSettingsPageTests
 			TooltipArrows = true,
 			TooltipMotion = MokaTooltipMotion.Slide,
 			TooltipSize = MokaTooltipSize.Roomy,
+			ControlHeights = MokaControlHeights.Matched,
 		};
 
 		AppearanceSettings next = AppearanceChoice.Apply(settings, picked);
@@ -172,6 +174,7 @@ public sealed class AppearanceSettingsPageTests
 			TooltipArrows = true,
 			TooltipMotion = TooltipMotion.Slide,
 			TooltipSize = TooltipSize.Roomy,
+			ControlHeights = ControlHeights.Matched,
 		}, next);
 	}
 
@@ -433,6 +436,23 @@ public sealed class AppearanceSettingsPageTests
 		Assert.True(read.ReopenToolWindows);
 		Assert.True(read.RememberToolWindowPlaces);
 		Assert.False(read.ShowToolDescriptions);
+	}
+
+	[Theory]
+	[InlineData(ControlHeights.Standard, MokaControlHeights.Standard)]
+	[InlineData(ControlHeights.Matched, MokaControlHeights.Matched)]
+	public void ControlHeights_ReachTheTheme(ControlHeights stored, MokaControlHeights expected) =>
+		Assert.Equal(expected, ThemeOf(new AppearanceSettings { ControlHeights = stored }).ControlHeights);
+
+	[Fact]
+	public async Task Render_TheControlHeightsRowShowsTheStoredChoice()
+	{
+		string html = await RenderAsync(new AppearanceSettings { ControlHeights = ControlHeights.Matched });
+
+		int start = html.IndexOf("data-setting=\"control-heights\"", StringComparison.Ordinal);
+		Assert.True(start >= 0);
+		string row = html[start..html.IndexOf("data-setting=", start + 1, StringComparison.Ordinal)];
+		Assert.Matches("moka-segment--active\"[^>]*><input[^>]*>(?:<span[^>]*>)*Match fields<", row);
 	}
 
 	private static MokaTheme ThemeOf(AppearanceSettings settings) => Mokaterm.UI.Presentation.ThemeFactory.Create(settings);

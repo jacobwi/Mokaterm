@@ -38,6 +38,7 @@ internal static class SettingsSanitizer
 		{
 			Mode = Defined(settings.Mode, defaults.Mode),
 			Density = Defined(settings.Density, defaults.Density),
+			ControlHeights = Defined(settings.ControlHeights, defaults.ControlHeights),
 			ToolbarLayout = Defined(settings.ToolbarLayout, defaults.ToolbarLayout),
 			StatusBarStyle = Defined(settings.StatusBarStyle, defaults.StatusBarStyle),
 			ToastStyle = Defined(settings.ToastStyle, defaults.ToastStyle),
