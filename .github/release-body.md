@@ -1,3 +1,16 @@
+## What's new in 0.3.14
+
+**Appearance**
+
+- A new Control heights choice in Settings, Appearance, Layout: Match fields makes buttons, toggles and segmented
+  controls as tall as the text fields beside them, so a row of controls lines up.
+
+**Fixes**
+
+- Keyboard focus is easier to see: the focused control gets a solid ring in the accent color instead of a faint glow,
+  and Windows High Contrast now shows it too.
+- Menus, lists and dialogs no longer draw a second focus ring around themselves.
+
 ## What's new in 0.3.13
 
 **Notifications**
