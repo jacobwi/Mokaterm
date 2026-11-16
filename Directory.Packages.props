@@ -29,7 +29,7 @@
 
 	<!-- UI -->
 	<ItemGroup>
-		<PackageVersion Include="Moka.Red" Version="0.8.0" />
+		<PackageVersion Include="Moka.Red" Version="0.8.1" />
 	</ItemGroup>
 
 	<!-- Protocols -->
