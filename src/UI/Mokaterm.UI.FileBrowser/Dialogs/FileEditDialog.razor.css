@@ -64,7 +64,8 @@
 /* The ring is on the frame, not the box inside it, so the gutter is inside what the focus marks. */
 .mt-edit-frame:focus-within {
 	border-color: var(--moka-color-primary-border);
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow);
+	box-shadow: var(--moka-focus-ring);
+	outline: var(--moka-focus-width) solid transparent;
 }
 
 /* Unsaved edits get an edge of their own, which outlives the focus ring instead of competing for the border colour. */
@@ -303,9 +304,9 @@
 }
 
 .mt-diff-body:focus-visible {
-	outline: none;
+	outline: var(--moka-focus-width) solid transparent;
 	border-color: var(--moka-color-primary-border);
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+	box-shadow: var(--moka-focus-ring);
 }
 
 /* As wide as the longest line, so a tinted row still reaches the end of its text when the body scrolls sideways. */

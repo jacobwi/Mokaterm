@@ -20,7 +20,7 @@
 
 .mt-dialog-head-button:focus-visible {
 	opacity: 1;
-	outline: none;
+	outline: var(--moka-focus-width) solid transparent;
 	box-shadow: var(--moka-focus-ring);
 }
 

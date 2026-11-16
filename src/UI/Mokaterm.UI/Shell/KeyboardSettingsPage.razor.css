@@ -23,7 +23,7 @@
 }
 
 .mt-shortcut:focus-visible {
-	outline: none;
+	outline: var(--moka-focus-width) solid transparent;
 	border-color: var(--moka-color-primary);
 	box-shadow: var(--moka-focus-ring);
 }

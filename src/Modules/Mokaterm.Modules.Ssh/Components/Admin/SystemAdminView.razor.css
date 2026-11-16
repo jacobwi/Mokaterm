@@ -144,8 +144,8 @@
 
 .mta-run-button:focus-visible,
 .mta-plain-button:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--moka-color-primary-glow), inset 0 0 12px var(--moka-color-primary-glow);
+	outline: var(--moka-focus-width) solid transparent;
+	box-shadow: var(--moka-focus-ring);
 }
 
 .mta-result {
