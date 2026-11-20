@@ -1,3 +1,15 @@
+## What's new in 0.4.0
+
+**Plugins**
+
+- Plugins made for Mokaterm 0.3 need their 0.4 update, because 0.4 is built on a new version of its component library.
+  Settings, Plugins marks the ones that wait for it, and the gallery's own plugins come back on Browse as their 0.4
+  builds are published.
+
+**Faster pages**
+
+- The component library now ships minified stylesheets, so every window loads about a third less CSS.
+
 ## What's new in 0.3.14
 
 **Appearance**
