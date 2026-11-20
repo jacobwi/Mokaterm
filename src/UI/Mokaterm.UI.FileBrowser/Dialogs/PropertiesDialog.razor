@@ -193,10 +193,10 @@
 						@if (_form.PermissionsRecursive)
 						{
 							<div class="props-inside">
-								<MokaSegmentedControl Size="MokaSize.Xs" Value="@TargetsValue" ValueChanged="OnTargetsChanged" AriaLabel="Entries to change">
-									<MokaSegment Value="@AllTargets" Text="Folders and files" />
-									<MokaSegment Value="@FolderTargets" Text="Folders only" />
-									<MokaSegment Value="@FileTargets" Text="Files only" />
+								<MokaSegmentedControl TValue="PermissionTargets" Size="MokaSize.Xs" @bind-Value="_form.Targets" AriaLabel="Entries to change">
+									<MokaSegment Value="PermissionTargets.All" Text="Folders and files" />
+									<MokaSegment Value="PermissionTargets.Folders" Text="Folders only" />
+									<MokaSegment Value="PermissionTargets.Files" Text="Files only" />
 								</MokaSegmentedControl>
 								<MokaCheckbox Label="Execute only for folders and files that already have it"
 											  Value="@_form.ConditionalExecute"
@@ -214,9 +214,9 @@
 				<DialogSection Title="Run as">
 					@if (_form.CanElevate && !_form.IsRootUser)
 					{
-						<MokaSegmentedControl Size="MokaSize.Sm" Value="@RunAsValue" ValueChanged="OnRunAsChanged" AriaLabel="Run as">
-							<MokaSegment Value="@UserValue" Text="@UserName" Icon="MokatermIcons.User" />
-							<MokaSegment Value="@RootValue" Text="root" Icon="MokatermIcons.Root" />
+						<MokaSegmentedControl TValue="bool" Size="MokaSize.Sm" Value="_form.AsRoot" ValueChanged="OnRunAsChanged" AriaLabel="Run as">
+							<MokaSegment Value="false" Text="@UserName" Icon="MokatermIcons.User" />
+							<MokaSegment Value="true" Text="root" Icon="MokatermIcons.Root" />
 						</MokaSegmentedControl>
 					}
 					else

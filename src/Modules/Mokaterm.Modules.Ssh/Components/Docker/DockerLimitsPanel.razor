@@ -66,11 +66,11 @@
 
 		<span class="mt-dk-label">Restart policy</span>
 		<div class="mt-dk-toolbar">
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_restart.ToString()" ValueChanged="OnRestartChanged" AriaLabel="Restart policy">
-				<MokaSegment Value="@nameof(DockerRestartPolicy.No)" Text="no" />
-				<MokaSegment Value="@nameof(DockerRestartPolicy.OnFailure)" Text="on-failure" />
-				<MokaSegment Value="@nameof(DockerRestartPolicy.Always)" Text="always" />
-				<MokaSegment Value="@nameof(DockerRestartPolicy.UnlessStopped)" Text="unless-stopped" />
+			<MokaSegmentedControl TValue="DockerRestartPolicy" Size="MokaSize.Xs" Value="_restart" ValueChanged="OnRestartChanged" AriaLabel="Restart policy">
+				<MokaSegment Value="DockerRestartPolicy.No" Text="no" />
+				<MokaSegment Value="DockerRestartPolicy.OnFailure" Text="on-failure" />
+				<MokaSegment Value="DockerRestartPolicy.Always" Text="always" />
+				<MokaSegment Value="DockerRestartPolicy.UnlessStopped" Text="unless-stopped" />
 			</MokaSegmentedControl>
 			@if (_restart == DockerRestartPolicy.OnFailure)
 			{

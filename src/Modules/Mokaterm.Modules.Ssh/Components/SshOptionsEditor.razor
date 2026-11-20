@@ -44,9 +44,9 @@
 				   Size="MokaSize.Sm" />
 
 	<MokaFieldWrapper Label="Run as root" HelperText="Offer sudo for files the login cannot change." Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Run as root" Value="@Current.Elevation.ToString()" ValueChanged="SetElevationAsync" Disabled="Disabled" Size="MokaSize.Sm">
-			<MokaSegment Value="@nameof(SshElevationMode.Auto)" Text="With sudo" />
-			<MokaSegment Value="@nameof(SshElevationMode.None)" Text="Never" />
+		<MokaSegmentedControl TValue="SshElevationMode" AriaLabel="Run as root" Value="Current.Elevation" ValueChanged="SetElevationAsync" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegment Value="SshElevationMode.Auto" Text="With sudo" />
+			<MokaSegment Value="SshElevationMode.None" Text="Never" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 </MokaGrid>

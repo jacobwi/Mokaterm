@@ -110,9 +110,9 @@ public sealed partial class DockerVolumeArchiveView : DockerManagerPageBase
 	}
 
 	// Picking the other kind swaps the name's ending, so the name always says what the file holds.
-	private void OnCompressionChanged(string? value)
+	private void OnCompressionChanged(bool gzip)
 	{
-		_gzip = value == "gzip";
+		_gzip = gzip;
 		string name = _name.Trim();
 		string stem = name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) ? name[..^7]
 			: name.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase) ? name[..^4]
@@ -121,7 +121,7 @@ public sealed partial class DockerVolumeArchiveView : DockerManagerPageBase
 		_name = stem + (_gzip ? ".tar.gz" : ".tar");
 	}
 
-	private void OnTargetChanged(string? value) => _newVolume = value == "new";
+	private void OnTargetChanged(bool newVolume) => _newVolume = newVolume;
 
 	private void PickArchive(RemoteFileEntry entry) => Set(ref _archive, entry.Path, ArchiveField);
 

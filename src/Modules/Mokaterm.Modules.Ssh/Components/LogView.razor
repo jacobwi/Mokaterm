@@ -11,10 +11,10 @@
 		@Controls
 		@if (LineChoices is { Count: > 0 } choices)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@LineCount.ToString(CultureInfo.InvariantCulture)" ValueChanged="OnLineCountChangedAsync" AriaLabel="Lines from the end">
+			<MokaSegmentedControl TValue="int" Size="MokaSize.Xs" Value="LineCount" ValueChanged="OnLineCountChangedAsync" AriaLabel="Lines from the end">
 				@foreach (int count in choices)
 				{
-					<MokaSegment @key="count" Value="@count.ToString(CultureInfo.InvariantCulture)" Text="@count.ToString("N0", CultureInfo.CurrentCulture)" />
+					<MokaSegment @key="count" Value="count" Text="@count.ToString("N0", CultureInfo.CurrentCulture)" />
 				}
 			</MokaSegmentedControl>
 		}

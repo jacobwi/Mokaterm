@@ -4,7 +4,7 @@
 @if (ProjectContext is { } context)
 {
 	<div class="mt-dk-toolbar">
-		<MokaSegmentedControl Size="MokaSize.Xs" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Which configuration">
+		<MokaSegmentedControl TValue="string" Size="MokaSize.Xs" Value="@_view" ValueChanged="OnViewChangedAsync" AriaLabel="Which configuration">
 			<MokaSegment Value="@ResolvedView" Text="Resolved" />
 			@foreach (string file in context.Project.ConfigFiles)
 			{
@@ -51,9 +51,9 @@
 	protected override Task OnParametersSetAsync() =>
 		ProjectContext is { } context && context.Project.Name != _loadedFor ? LoadViewAsync() : Task.CompletedTask;
 
-	private Task OnViewChangedAsync(string? value)
+	private Task OnViewChangedAsync(string view)
 	{
-		_view = value ?? ResolvedView;
+		_view = view;
 		return LoadViewAsync();
 	}
 

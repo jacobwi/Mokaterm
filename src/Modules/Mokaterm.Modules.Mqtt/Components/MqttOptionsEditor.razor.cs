@@ -50,15 +50,9 @@ public partial class MqttOptionsEditor : ConnectionOptionsEditorBase<MqttConnect
 	protected override void OnCurrentChanged() =>
 		ReportDefaultPort(Current.DefaultPort == MqttConnectionOptions.PlainPort ? null : Current.DefaultPort);
 
-	private Task OnTransportChangedAsync(string value) =>
-		Enum.TryParse(value, out MqttTransport transport) && Enum.IsDefined(transport)
-			? ChangeAsync(Current with { Transport = transport })
-			: Task.CompletedTask;
+	private Task OnTransportChangedAsync(MqttTransport transport) => ChangeAsync(Current with { Transport = transport });
 
-	private Task OnProtocolChangedAsync(string value) =>
-		Enum.TryParse(value, out MqttProtocolLevel protocol) && Enum.IsDefined(protocol)
-			? ChangeAsync(Current with { Protocol = protocol })
-			: Task.CompletedTask;
+	private Task OnProtocolChangedAsync(MqttProtocolLevel protocol) => ChangeAsync(Current with { Protocol = protocol });
 
 	private Task OnTlsChangedAsync(bool value) => ChangeAsync(Current with { UseTls = value });
 

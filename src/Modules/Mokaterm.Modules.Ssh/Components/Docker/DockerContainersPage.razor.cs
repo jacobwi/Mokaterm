@@ -169,9 +169,9 @@ public sealed partial class DockerContainersPage : DockerManagerPageBase
 		ApplyFilter();
 	}
 
-	private void OnFilterChanged(string? value)
+	private void OnFilterChanged(string filter)
 	{
-		_filter = value ?? "all";
+		_filter = filter;
 		ApplyFilter();
 	}
 

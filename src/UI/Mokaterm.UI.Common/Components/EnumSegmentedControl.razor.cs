@@ -20,16 +20,4 @@ public sealed partial class EnumSegmentedControl<TEnum> : ComponentBase
 
 	[Parameter]
 	public bool Disabled { get; set; }
-
-	private async Task OnSelectedAsync(string? name)
-	{
-		foreach (EnumOption<TEnum> option in Options)
-		{
-			if (option.Value.ToString() == name)
-			{
-				await ValueChanged.InvokeAsync(option.Value);
-				return;
-			}
-		}
-	}
 }

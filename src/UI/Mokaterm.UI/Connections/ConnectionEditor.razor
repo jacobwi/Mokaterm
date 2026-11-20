@@ -27,9 +27,9 @@
 					<h3 class="mt-section" id="ce-host">Host</h3>
 					@if (_hosts.Count > 0)
 					{
-						<MokaSegmentedControl AriaLabel="Host" Value="@(_newHost ? NewHostMode : SavedHostMode)" ValueChanged="OnHostModeChanged" Size="MokaSize.Sm">
-							<MokaSegment Value="@SavedHostMode" Text="Saved host" Icon="MokatermIcons.Server" Disabled="_saving" />
-							<MokaSegment Value="@NewHostMode" Text="New host" Icon="MokaIcons.Action.Add" Disabled="_saving" />
+						<MokaSegmentedControl TValue="bool" AriaLabel="Host" Value="_newHost" ValueChanged="OnHostModeChanged" Size="MokaSize.Sm">
+							<MokaSegment Value="false" Text="Saved host" Icon="MokatermIcons.Server" Disabled="_saving" />
+							<MokaSegment Value="true" Text="New host" Icon="MokaIcons.Action.Add" Disabled="_saving" />
 						</MokaSegmentedControl>
 					}
 
@@ -85,10 +85,10 @@
 
 					<h3 class="mt-section" id="ce-login">Login</h3>
 					<MokaFieldWrapper Label="Protocol" HelperText="@Protocol?.Description" Disabled="_saving">
-						<MokaSegmentedControl AriaLabel="Protocol" Value="@_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
+						<MokaSegmentedControl TValue="string" AriaLabel="Protocol" Value="_protocolId" ValueChanged="OnProtocolChanged" Size="MokaSize.Sm">
 							@foreach (ProtocolDescriptor protocol in Protocols.Protocols)
 							{
-								<MokaSegment Value="@protocol.Id" Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" Disabled="_saving" />
+								<MokaSegment Value="protocol.Id"Text="@protocol.DisplayName" Icon="@Contributions.GetProtocolIcon(protocol.Id)" Disabled="_saving" />
 							}
 						</MokaSegmentedControl>
 					</MokaFieldWrapper>
@@ -130,10 +130,10 @@
 					@if (Protocol is { AuthenticationMethods.Count: > 1 } protocolWithChoices)
 					{
 						<MokaFieldWrapper Label="Authentication" HelperText="@MethodHelp" Disabled="_saving">
-							<MokaSegmentedControl AriaLabel="Authentication" Value="@_method.ToString()" ValueChanged="OnMethodChanged" Size="MokaSize.Sm">
+							<MokaSegmentedControl TValue="AuthenticationMethod" AriaLabel="Authentication" Value="_method" ValueChanged="SetMethod" Size="MokaSize.Sm">
 								@foreach (AuthenticationMethod method in protocolWithChoices.AuthenticationMethods)
 								{
-									<MokaSegment Value="@method.ToString()" Text="@MethodName(method)" Disabled="_saving" />
+									<MokaSegment Value="method"Text="@MethodName(method)" Disabled="_saving" />
 								}
 							</MokaSegmentedControl>
 						</MokaFieldWrapper>
@@ -143,11 +143,11 @@
 					{
 						<h3 class="mt-section" id="ce-credential">@CredentialTitle(kind)</h3>
 						<MokaFieldWrapper Label="Source" HelperText="@CredentialSourceHelp" Disabled="_saving">
-							<MokaSegmentedControl AriaLabel="@CredentialTitle(kind)" Value="@(_useKeychain ? KeychainSource : LoginSource)" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
-								<MokaSegment Value="@LoginSource"
+							<MokaSegmentedControl TValue="bool" AriaLabel="@CredentialTitle(kind)" Value="_useKeychain" ValueChanged="OnCredentialSourceChanged" Size="MokaSize.Sm">
+								<MokaSegment Value="false"
 											 Text="With this login"
 											 Disabled="_saving" />
-								<MokaSegment Value="@KeychainSource"
+								<MokaSegment Value="true"
 											 Text="In the keychain"
 											 Icon="MokatermIcons.Key"
 											 Disabled="@(_saving || KeychainOptions(kind).Count == 0)" />

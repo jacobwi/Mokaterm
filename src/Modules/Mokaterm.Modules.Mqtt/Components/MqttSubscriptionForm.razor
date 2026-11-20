@@ -12,20 +12,21 @@
 				   spellcheck="false" />
 
 	<MokaFieldWrapper Label="Quality of service" HelperText="@QosHelp" Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Quality of service"
-							  Value="@Subscription.QualityOfService.ToString()"
+		<MokaSegmentedControl TValue="MqttQos"
+							  AriaLabel="Quality of service"
+							  Value="Subscription.QualityOfService"
 							  ValueChanged="SetQosAsync"
 							  Disabled="Disabled"
 							  Size="MokaSize.Sm"
 							  FullWidth>
 			<Hint Text="At most once" Style="flex: 1">
-				<MokaSegment Value="@nameof(MqttQos.AtMostOnce)" Text="0" Disabled="Disabled" />
+				<MokaSegment Value="MqttQos.AtMostOnce" Text="0" Disabled="Disabled" />
 			</Hint>
 			<Hint Text="At least once" Style="flex: 1">
-				<MokaSegment Value="@nameof(MqttQos.AtLeastOnce)" Text="1" Disabled="Disabled" />
+				<MokaSegment Value="MqttQos.AtLeastOnce" Text="1" Disabled="Disabled" />
 			</Hint>
 			<Hint Text="Exactly once" Style="flex: 1">
-				<MokaSegment Value="@nameof(MqttQos.ExactlyOnce)" Text="2" Disabled="Disabled" />
+				<MokaSegment Value="MqttQos.ExactlyOnce" Text="2" Disabled="Disabled" />
 			</Hint>
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>

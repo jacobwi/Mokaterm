@@ -25,7 +25,7 @@ public partial class RemoteFileBrowser
 	// Dialog-driven operations run one at a time; a second Delete press must not queue a second dialog.
 	private bool _operationRunning;
 
-	private async Task OnModeChangedAsync(string value) => await SwitchModeAsync(value == RootMode);
+	private async Task OnModeChangedAsync(bool elevated) => await SwitchModeAsync(elevated);
 
 	/// <summary>
 	/// Switches the browser between the user and root file systems and lists the same folder again. Returns the file

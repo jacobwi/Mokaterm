@@ -26,9 +26,9 @@
 	}
 
 	<MokaFieldWrapper Label="Desktop size" HelperText="@DesktopSizeHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Desktop size" Value="@Current.DesktopSize.ToString()" ValueChanged="OnDesktopSizeChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(RdpDesktopSizeMode.Automatic)" Text="From the view" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(RdpDesktopSizeMode.Fixed)" Text="Fixed" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="RdpDesktopSizeMode" AriaLabel="Desktop size" Value="Current.DesktopSize" ValueChanged="OnDesktopSizeChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="RdpDesktopSizeMode.Automatic" Text="From the view" Disabled="Disabled" />
+			<MokaSegment Value="RdpDesktopSizeMode.Fixed" Text="Fixed" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 
@@ -56,10 +56,10 @@
 	}
 
 	<MokaFieldWrapper Label="Scaling" HelperText="@ScalingHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Scaling" Value="@Current.Scaling.ToString()" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(RdpScalingMode.Fit)" Text="Fit to view" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(RdpScalingMode.Actual)" Text="1:1" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(RdpScalingMode.Remote)" Text="Resize the server" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="RdpScalingMode" AriaLabel="Scaling" Value="Current.Scaling" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="RdpScalingMode.Fit" Text="Fit to view" Disabled="Disabled" />
+			<MokaSegment Value="RdpScalingMode.Actual" Text="1:1" Disabled="Disabled" />
+			<MokaSegment Value="RdpScalingMode.Remote" Text="Resize the server" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

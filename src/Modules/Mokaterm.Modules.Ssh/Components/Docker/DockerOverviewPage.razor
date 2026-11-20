@@ -78,10 +78,10 @@
 						<MokaDataList Items="ComposeFacts(status)" Orientation="MokaDirection.Row" Dense Class="mt-dk-facts" />
 						<div class="mt-dk-toolbar">
 							<span class="mt-dk-note">Compose commands use</span>
-							<MokaSegmentedControl Size="MokaSize.Xs" Value="@Feature.ComposePreference.ToString()" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
-								<MokaSegment Value="@nameof(ComposePreference.Auto)" Text="Auto" />
-								<MokaSegment Value="@nameof(ComposePreference.Plugin)" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
-								<MokaSegment Value="@nameof(ComposePreference.Standalone)" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
+							<MokaSegmentedControl TValue="ComposePreference" Size="MokaSize.Xs" Value="Feature.ComposePreference" ValueChanged="OnPreferenceChanged" AriaLabel="Which compose to use">
+								<MokaSegment Value="ComposePreference.Auto" Text="Auto" />
+								<MokaSegment Value="ComposePreference.Plugin" Text="docker compose" Disabled="@(status.Compose.Plugin is null)" />
+								<MokaSegment Value="ComposePreference.Standalone" Text="docker-compose" Disabled="@(status.Compose.Standalone is null)" />
 							</MokaSegmentedControl>
 						</div>
 						<span class="mt-dk-note">Auto prefers the plugin. The choice lasts for this session.</span>

@@ -193,11 +193,11 @@
 									Position="@(CanElevate ? MokaTooltipPosition.Bottom : MokaTooltipPosition.BottomEnd)" />
 						@if (CanElevate)
 						{
-							<IconButton Variant="@(ModeValue == RootMode ? MokaVariant.Soft : MokaVariant.Text)"
-										Color="@(ModeValue == RootMode ? MokaColor.Error : MokaColor.Surface)"
+							<IconButton Variant="@(RootModeShown ? MokaVariant.Soft : MokaVariant.Text)"
+										Color="@(RootModeShown ? MokaColor.Error : MokaColor.Surface)"
 										Icon="MokatermIcons.Root"
 										Disabled="@(_switchingMode || _fileSystem is null)"
-										OnClick="() => OnModeChangedAsync(IsElevated ? UserMode : RootMode)"
+										OnClick="() => OnModeChangedAsync(!IsElevated)"
 										Label="Run as root"
 										Pressed="IsElevated"
 										Position="MokaTooltipPosition.BottomEnd" />
@@ -208,9 +208,9 @@
 				{
 					<MokaSpacer />
 					<MokaToolbarGroup Priority="2">
-						<MokaSegmentedControl Size="MokaSize.Xs" Value="@ModeValue" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
-							<MokaSegment Value="@UserMode" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
-							<MokaSegment Value="@RootMode" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
+						<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="RootModeShown" ValueChanged="OnModeChangedAsync" AriaLabel="Run as">
+							<MokaSegment Value="false" Text="User" Icon="MokatermIcons.User" Disabled="@(_switchingMode || _fileSystem is null)" />
+							<MokaSegment Value="true" Text="Root" Icon="MokatermIcons.Root" Disabled="@(_switchingMode || _fileSystem is null)" />
 						</MokaSegmentedControl>
 					</MokaToolbarGroup>
 				}

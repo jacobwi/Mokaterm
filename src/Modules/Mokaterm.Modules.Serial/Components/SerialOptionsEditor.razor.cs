@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Mokaterm.Abstractions.Protocols;
 using Mokaterm.Abstractions.Settings;
@@ -31,8 +30,6 @@ public partial class SerialOptionsEditor : ConnectionOptionsEditorBase<SerialCon
 	private ISettingsService SettingsService { get; set; } = default!;
 
 	private string PortPlaceholder => _typingPort ? "COM3 or /dev/ttyUSB0" : "The host's address";
-
-	private string DataBitsValue => Current.Line.DataBits.ToString(CultureInfo.InvariantCulture);
 
 	/// <summary>RTS is shown as asserted while the driver owns it, because that is what the driver does with it.</summary>
 	private bool RtsValue => !Current.Line.CanSetRts || Current.Rts;
@@ -152,31 +149,16 @@ public partial class SerialOptionsEditor : ConnectionOptionsEditorBase<SerialCon
 			? UpdateLineAsync(Current.Line with { BaudRate = value })
 			: Task.CompletedTask;
 
-	private Task OnDataBitsChangedAsync(string value) =>
-		int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int dataBits)
-		&& dataBits is >= SerialLineSettings.MinDataBits and <= SerialLineSettings.MaxDataBits
-			? UpdateLineAsync(Current.Line with { DataBits = dataBits })
-			: Task.CompletedTask;
+	private Task OnDataBitsChangedAsync(int dataBits) => UpdateLineAsync(Current.Line with { DataBits = dataBits });
 
-	private Task OnParityChangedAsync(string value) =>
-		Enum.TryParse(value, out SerialParity parity) && Enum.IsDefined(parity)
-			? UpdateLineAsync(Current.Line with { Parity = parity })
-			: Task.CompletedTask;
+	private Task OnParityChangedAsync(SerialParity parity) => UpdateLineAsync(Current.Line with { Parity = parity });
 
-	private Task OnStopBitsChangedAsync(string value) =>
-		Enum.TryParse(value, out SerialStopBits stopBits) && Enum.IsDefined(stopBits)
-			? UpdateLineAsync(Current.Line with { StopBits = stopBits })
-			: Task.CompletedTask;
+	private Task OnStopBitsChangedAsync(SerialStopBits stopBits) => UpdateLineAsync(Current.Line with { StopBits = stopBits });
 
-	private Task OnFlowControlChangedAsync(string value) =>
-		Enum.TryParse(value, out SerialFlowControl flowControl) && Enum.IsDefined(flowControl)
-			? UpdateLineAsync(Current.Line with { FlowControl = flowControl })
-			: Task.CompletedTask;
+	private Task OnFlowControlChangedAsync(SerialFlowControl flowControl) =>
+		UpdateLineAsync(Current.Line with { FlowControl = flowControl });
 
-	private Task OnLineEndingChangedAsync(string value) =>
-		Enum.TryParse(value, out SerialLineEnding lineEnding) && Enum.IsDefined(lineEnding)
-			? ChangeAsync(Current with { LineEnding = lineEnding })
-			: Task.CompletedTask;
+	private Task OnLineEndingChangedAsync(SerialLineEnding lineEnding) => ChangeAsync(Current with { LineEnding = lineEnding });
 
 	private Task OnLocalEchoChangedAsync(bool value) => ChangeAsync(Current with { LocalEcho = value });
 

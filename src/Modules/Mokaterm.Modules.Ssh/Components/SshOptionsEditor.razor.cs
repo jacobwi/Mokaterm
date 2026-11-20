@@ -193,10 +193,7 @@ public partial class SshOptionsEditor : ConnectionOptionsEditorBase<SshConnectio
 		return ChangeAsync(Current with { KeepAliveSeconds = seconds });
 	}
 
-	private Task SetElevationAsync(string value) =>
-		Enum.TryParse(value, out SshElevationMode mode) && Enum.IsDefined(mode)
-			? ChangeAsync(Current with { Elevation = mode })
-			: Task.CompletedTask;
+	private Task SetElevationAsync(SshElevationMode mode) => ChangeAsync(Current with { Elevation = mode });
 
 	private Task SetTunnelsAsync(IReadOnlyList<SshTunnelDefinition> tunnels) => ChangeAsync(Current with { Tunnels = tunnels });
 

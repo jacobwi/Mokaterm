@@ -14,10 +14,6 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 /// </summary>
 public sealed partial class FileSearchDialog : ComponentBase, IDisposable
 {
-	private const string AllKinds = "all";
-	private const string FileKinds = "files";
-	private const string FolderKinds = "folders";
-
 	// Beyond this many rows the table renders only the rows on screen.
 	private const int VirtualizeThreshold = 200;
 
@@ -70,13 +66,6 @@ public sealed partial class FileSearchDialog : ComponentBase, IDisposable
 	public Func<string, RemoteSearchQuery, IProgress<RemoteSearchProgress>, CancellationToken, IAsyncEnumerable<RemoteFileEntry>>? Search { get; set; }
 
 	private bool CanFind => !_running && _pattern.Trim().Length > 0 && ResolveFolder is not null && Search is not null;
-
-	private string KindsValue => _kinds switch
-	{
-		RemoteSearchKinds.Files => FileKinds,
-		RemoteSearchKinds.Folders => FolderKinds,
-		_ => AllKinds,
-	};
 
 	private string StatusText
 	{
@@ -137,13 +126,6 @@ public sealed partial class FileSearchDialog : ComponentBase, IDisposable
 	private void OnPatternChanged(string value) => _pattern = value;
 
 	private void OnFolderChanged(string value) => _folder = value;
-
-	private void OnKindsChanged(string value) => _kinds = value switch
-	{
-		FileKinds => RemoteSearchKinds.Files,
-		FolderKinds => RemoteSearchKinds.Folders,
-		_ => RemoteSearchKinds.All,
-	};
 
 	private async Task FindAsync()
 	{

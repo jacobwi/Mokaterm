@@ -1,4 +1,3 @@
-using System.Globalization;
 using Mokaterm.UI.Common.Components;
 
 namespace Mokaterm.Modules.Serial.Components;
@@ -40,16 +39,8 @@ public partial class SerialSettingsPage : SettingsSectionBase<SerialSettings>
 		new(SerialLineEnding.Lf, "LF"),
 	];
 
-	private string DataBitsValue => Settings.DataBits.ToString(CultureInfo.InvariantCulture);
-
 	/// <summary>The whole line as a device sees it, corrected to a frame a UART can do.</summary>
 	private string FrameDescription => Settings.Clamped().Line.Describe();
-
-	// Data bits are a plain number rather than an enum, so the segments carry their own strings.
-	private Task OnDataBitsChangedAsync(string value) =>
-		int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int dataBits)
-			? SaveAsync(settings => settings with { DataBits = dataBits })
-			: Task.CompletedTask;
 
 	private Task SaveAsync(Func<SerialSettings, SerialSettings> change) => UpdateAsync(settings => change(settings).Clamped());
 }

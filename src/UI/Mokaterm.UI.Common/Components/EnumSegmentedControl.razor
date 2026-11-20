@@ -1,11 +1,12 @@
 @using Moka.Red.Primitives.SegmentedControl
 @typeparam TEnum where TEnum : struct, Enum
 
-<MokaSegmentedControl Size="MokaSize.Sm" Value="@Value.ToString()" ValueChanged="OnSelectedAsync" AriaLabel="@AriaLabel">
+<MokaSegmentedControl TValue="TEnum" Size="MokaSize.Sm" Value="Value" ValueChanged="ValueChanged" AriaLabel="@AriaLabel">
 	@foreach (EnumOption<TEnum> option in Options)
 	{
-		<MokaSegment @key="option.Value"
-					 Value="@option.Value.ToString()"
+		<MokaSegment TValue="TEnum"
+					 @key="option.Value"
+					 Value="option.Value"
 					 Text="@option.Text"
 					 Icon="option.Icon"
 					 Disabled="Disabled" />

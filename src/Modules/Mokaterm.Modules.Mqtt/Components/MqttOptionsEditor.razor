@@ -3,25 +3,27 @@
 <MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 	<MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Md">
 		<MokaFieldWrapper Label="Transport" HelperText="@TransportHelp" Disabled="Disabled">
-			<MokaSegmentedControl AriaLabel="Transport"
-								  Value="@Current.Transport.ToString()"
+			<MokaSegmentedControl TValue="MqttTransport"
+								  AriaLabel="Transport"
+								  Value="Current.Transport"
 								  ValueChanged="OnTransportChangedAsync"
 								  Disabled="Disabled"
 								  FullWidth>
-				<MokaSegment Value="@nameof(MqttTransport.Tcp)" Text="TCP" Disabled="Disabled" />
-				<MokaSegment Value="@nameof(MqttTransport.WebSocket)" Text="WebSocket" Disabled="Disabled" />
+				<MokaSegment Value="MqttTransport.Tcp" Text="TCP" Disabled="Disabled" />
+				<MokaSegment Value="MqttTransport.WebSocket" Text="WebSocket" Disabled="Disabled" />
 			</MokaSegmentedControl>
 		</MokaFieldWrapper>
 
 		<MokaFieldWrapper Label="MQTT version" HelperText="@ProtocolHelp" Disabled="Disabled">
-			<MokaSegmentedControl AriaLabel="MQTT version"
-								  Value="@Current.Protocol.ToString()"
+			<MokaSegmentedControl TValue="MqttProtocolLevel"
+								  AriaLabel="MQTT version"
+								  Value="Current.Protocol"
 								  ValueChanged="OnProtocolChangedAsync"
 								  Disabled="Disabled"
 								  FullWidth>
-				<MokaSegment Value="@nameof(MqttProtocolLevel.V500)" Text="5.0" Disabled="Disabled" />
-				<MokaSegment Value="@nameof(MqttProtocolLevel.V311)" Text="3.1.1" Disabled="Disabled" />
-				<MokaSegment Value="@nameof(MqttProtocolLevel.V310)" Text="3.1" Disabled="Disabled" />
+				<MokaSegment Value="MqttProtocolLevel.V500" Text="5.0" Disabled="Disabled" />
+				<MokaSegment Value="MqttProtocolLevel.V311" Text="3.1.1" Disabled="Disabled" />
+				<MokaSegment Value="MqttProtocolLevel.V310" Text="3.1" Disabled="Disabled" />
 			</MokaSegmentedControl>
 		</MokaFieldWrapper>
 	</MokaGrid>

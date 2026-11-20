@@ -20,10 +20,10 @@
 	<Chips>
 		@if (ShowsList)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_filter" ValueChanged="OnFilterChanged" AriaLabel="Which containers">
-				<MokaSegment Value="all" Text="@($"All {_containers.Count.ToString(CultureInfo.CurrentCulture)}")" />
-				<MokaSegment Value="running" Text="@($"Up {RunningCount.ToString(CultureInfo.CurrentCulture)}")" />
-				<MokaSegment Value="stopped" Text="@($"Down {(_containers.Count - RunningCount).ToString(CultureInfo.CurrentCulture)}")" />
+			<MokaSegmentedControl TValue="string" Size="MokaSize.Xs" Value="@_filter" ValueChanged="OnFilterChanged" AriaLabel="Which containers">
+				<MokaSegment Value="@("all")" Text="@($"All {_containers.Count.ToString(CultureInfo.CurrentCulture)}")" />
+				<MokaSegment Value="@("running")" Text="@($"Up {RunningCount.ToString(CultureInfo.CurrentCulture)}")" />
+				<MokaSegment Value="@("stopped")" Text="@($"Down {(_containers.Count - RunningCount).ToString(CultureInfo.CurrentCulture)}")" />
 				@if (LoopingCount > 0 || _filter == LoopsFilter)
 				{
 					<MokaSegment Value="@LoopsFilter" Text="@($"Looping {LoopingCount.ToString(CultureInfo.CurrentCulture)}")" />

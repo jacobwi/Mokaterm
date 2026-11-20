@@ -49,10 +49,10 @@
 
 				<div>
 					<MokaFieldWrapper Label="Where it applies" HelperText="@ScopeHelp">
-						<MokaSegmentedControl AriaLabel="Where it applies" Value="@_scope.ToString()" ValueChanged="OnScopeChanged" Size="MokaSize.Sm" FullWidth>
-							<MokaSegment Value="@nameof(CommandSnippetScope.Connection)" Text="This login" Disabled="@(_saving || ConnectionLabel is null)" />
-							<MokaSegment Value="@nameof(CommandSnippetScope.Host)" Text="This machine" Disabled="@(_saving || HostLabel is null)" />
-							<MokaSegment Value="@nameof(CommandSnippetScope.Global)" Text="Everywhere" Disabled="_saving" />
+						<MokaSegmentedControl TValue="CommandSnippetScope" AriaLabel="Where it applies" @bind-Value="_scope" Size="MokaSize.Sm" FullWidth>
+							<MokaSegment Value="CommandSnippetScope.Connection" Text="This login" Disabled="@(_saving || ConnectionLabel is null)" />
+							<MokaSegment Value="CommandSnippetScope.Host" Text="This machine" Disabled="@(_saving || HostLabel is null)" />
+							<MokaSegment Value="CommandSnippetScope.Global" Text="Everywhere" Disabled="_saving" />
 						</MokaSegmentedControl>
 					</MokaFieldWrapper>
 				</div>

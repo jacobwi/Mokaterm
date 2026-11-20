@@ -21,11 +21,6 @@ public sealed partial class PropertiesDialog : ComponentBase, IDisposable
 	private const string LabelWidth = "84px";
 	private const string MutedStyle = "color:var(--moka-color-on-surface-variant)";
 	private const string MicroLabelStyle = "letter-spacing:0.08em;color:var(--moka-color-on-surface-tertiary)";
-	private const string UserValue = "user";
-	private const string RootValue = "root";
-	private const string AllTargets = "all";
-	private const string FolderTargets = "folders";
-	private const string FileTargets = "files";
 
 	// Progress arrives after every folder listed; rendering each one would flood a slow connection with render batches.
 	private const long ProgressRenderMilliseconds = 150;
@@ -95,15 +90,6 @@ public sealed partial class PropertiesDialog : ComponentBase, IDisposable
 	private bool HasSelectedFiles => _form.Entries.Any(entry => entry.Kind == RemoteEntryKind.File);
 
 	private bool ApplyAsRoot => _form.RunsAsRoot && !_form.IsRootUser;
-
-	private string RunAsValue => _form.AsRoot ? RootValue : UserValue;
-
-	private string TargetsValue => _form.Targets switch
-	{
-		PermissionTargets.Folders => FolderTargets,
-		PermissionTargets.Files => FileTargets,
-		_ => AllTargets,
-	};
 
 	private string SizeText
 	{
@@ -300,14 +286,7 @@ public sealed partial class PropertiesDialog : ComponentBase, IDisposable
 
 	private void StopSize() => _measurement?.Cancel();
 
-	private void OnTargetsChanged(string value) => _form.Targets = value switch
-	{
-		FolderTargets => PermissionTargets.Folders,
-		FileTargets => PermissionTargets.Files,
-		_ => PermissionTargets.All,
-	};
-
-	private void OnRunAsChanged(string value) => _form.AsRoot = _form.CanElevate && value == RootValue;
+	private void OnRunAsChanged(bool asRoot) => _form.AsRoot = _form.CanElevate && asRoot;
 
 	private void OnKeyDown(KeyboardEventArgs args)
 	{

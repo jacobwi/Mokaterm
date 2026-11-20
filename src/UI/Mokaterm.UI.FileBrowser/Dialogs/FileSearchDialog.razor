@@ -28,10 +28,10 @@
 			</div>
 
 			<div class="fs-options">
-				<MokaSegmentedControl Size="MokaSize.Xs" Value="@KindsValue" ValueChanged="OnKindsChanged" AriaLabel="Find">
-					<MokaSegment Value="@AllKinds" Text="Files and folders" />
-					<MokaSegment Value="@FileKinds" Text="Files" />
-					<MokaSegment Value="@FolderKinds" Text="Folders" />
+				<MokaSegmentedControl TValue="RemoteSearchKinds" Size="MokaSize.Xs" @bind-Value="_kinds" AriaLabel="Find">
+					<MokaSegment Value="RemoteSearchKinds.All" Text="Files and folders" />
+					<MokaSegment Value="RemoteSearchKinds.Files" Text="Files" />
+					<MokaSegment Value="RemoteSearchKinds.Folders" Text="Folders" />
 				</MokaSegmentedControl>
 				<MokaCheckbox Label="Match case" Value="@_matchCase" ValueChanged="@(value => _matchCase = value)" Size="MokaSize.Sm" />
 				<MokaCheckbox Label="Include hidden" Value="@_includeHidden" ValueChanged="@(value => _includeHidden = value)" Size="MokaSize.Sm" />

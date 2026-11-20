@@ -19,9 +19,9 @@
 			<MokaKeyValue Label="Upload as" Orientation="MokaDirection.Column">
 				@if (SupportsElevation)
 				{
-					<MokaSegmentedControl AriaLabel="Upload as" Size="MokaSize.Sm" Value="@RunAsValue" ValueChanged="OnRunAsChanged">
-						<MokaSegment Value="@UserValue" Text="@UserName" Icon="MokatermIcons.User" />
-						<MokaSegment Value="@RootValue" Text="root" Icon="MokatermIcons.Root" />
+					<MokaSegmentedControl TValue="bool" AriaLabel="Upload as" Size="MokaSize.Sm" Value="_asRoot" ValueChanged="OnRunAsChanged">
+						<MokaSegment Value="false" Text="@UserName" Icon="MokatermIcons.User" />
+						<MokaSegment Value="true" Text="root" Icon="MokatermIcons.Root" />
 					</MokaSegmentedControl>
 				}
 				else

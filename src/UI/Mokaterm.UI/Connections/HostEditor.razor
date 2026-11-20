@@ -71,10 +71,10 @@
 				<h3 class="mt-section" id="he-appearance">Appearance</h3>
 				<MokaFieldWrapper Label="Environment" HelperText="@EnvironmentHelp" Disabled="_saving">
 					<div class="mt-env">
-						<MokaSegmentedControl AriaLabel="Environment" Value="@_environment.ToString()" ValueChanged="OnEnvironmentChanged" Size="MokaSize.Sm">
+						<MokaSegmentedControl TValue="HostEnvironment" AriaLabel="Environment" @bind-Value="_environment" Size="MokaSize.Sm">
 							@foreach (HostEnvironment environment in HostEnvironmentDisplay.All)
 							{
-								<MokaSegment Value="@environment.ToString()"
+								<MokaSegment Value="environment"
 											 Text="@HostEnvironmentDisplay.Name(environment)"
 											 Class="mt-env-segment"
 											 Style="@($"--mt-env:{HostEnvironmentDisplay.Accent(environment)}")"

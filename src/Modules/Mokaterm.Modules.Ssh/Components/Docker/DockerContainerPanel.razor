@@ -91,9 +91,9 @@
 @code {
 	private RenderFragment InspectContent(DockerContainerDetails details) => @<text>
 		<div class="mt-dk-toolbar">
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_raw ? "raw" : "summary")" ValueChanged="OnInspectViewChanged" AriaLabel="Inspect view">
-				<MokaSegment Value="summary" Text="Summary" />
-				<MokaSegment Value="raw" Text="Raw JSON" />
+			<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="_raw" ValueChanged="OnInspectViewChanged" AriaLabel="Inspect view">
+				<MokaSegment Value="false" Text="Summary" />
+				<MokaSegment Value="true" Text="Raw JSON" />
 			</MokaSegmentedControl>
 			@if (_raw)
 			{

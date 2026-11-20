@@ -50,9 +50,6 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 
 	private static readonly IReadOnlySet<string> NothingSelected = new HashSet<string>(StringComparer.Ordinal);
 
-	private const string UserMode = "user";
-	private const string RootMode = "root";
-
 	private static readonly string[] InitialDirectoryOptions = ["ssh.initialDirectory", "ftp.initialDirectory"];
 
 	private readonly CancellationTokenSource _lifetime = new();
@@ -202,7 +199,7 @@ public partial class RemoteFileBrowser : ComponentBase, IAsyncDisposable
 	private bool ShowHidden => Settings.Get<FileTransferSettings>().ShowHiddenFiles;
 
 	// While root is being opened (and the sudo prompt may be up) the control already shows the requested mode.
-	private string ModeValue => IsElevated || _switchingMode ? RootMode : UserMode;
+	private bool RootModeShown => IsElevated || _switchingMode;
 
 	private TransferOrigin Origin => new(Source.Group, Source.Location);
 

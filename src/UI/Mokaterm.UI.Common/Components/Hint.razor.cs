@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using Moka.Red.Feedback.Tooltip;
+using Moka.Red.Primitives.Tooltip;
 
 namespace Mokaterm.UI.Common.Components;
 

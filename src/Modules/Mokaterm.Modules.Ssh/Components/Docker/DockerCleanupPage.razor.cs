@@ -130,17 +130,17 @@ public sealed partial class DockerCleanupPage : DockerManagerPageBase
 		_cache = DockerCleanupPlans.BuildCache(usage);
 	}
 
-	private void OnKindChanged(string? value) => _kind = value ?? ContainersKind;
+	private void OnKindChanged(string kind) => _kind = kind;
 
-	private void OnImageScopeChanged(string? value)
+	private void OnImageScopeChanged(bool tagged)
 	{
-		_taggedImages = value == "unused";
+		_taggedImages = tagged;
 		Select();
 	}
 
-	private void OnVolumeScopeChanged(string? value)
+	private void OnVolumeScopeChanged(bool named)
 	{
-		_namedVolumes = value == "all";
+		_namedVolumes = named;
 		Select();
 	}
 

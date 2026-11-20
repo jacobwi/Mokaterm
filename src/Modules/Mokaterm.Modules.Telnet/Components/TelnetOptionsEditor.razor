@@ -24,18 +24,18 @@
 	</MokaGrid>
 
 	<MokaFieldWrapper Label="Enter sends" HelperText="@LineEndingHelp" Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Enter sends" Value="@Current.LineEnding.ToString()" ValueChanged="OnLineEndingChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
-			<MokaSegment Value="@nameof(TelnetLineEnding.CrLf)" Text="CR LF" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(TelnetLineEnding.CrNul)" Text="CR NUL" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(TelnetLineEnding.Lf)" Text="LF" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="TelnetLineEnding" AriaLabel="Enter sends" Value="Current.LineEnding" ValueChanged="OnLineEndingChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="TelnetLineEnding.CrLf" Text="CR LF" Disabled="Disabled" />
+			<MokaSegment Value="TelnetLineEnding.CrNul" Text="CR NUL" Disabled="Disabled" />
+			<MokaSegment Value="TelnetLineEnding.Lf" Text="LF" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 
 	<MokaFieldWrapper Label="Local echo" HelperText="@EchoHelp" Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Local echo" Value="@Current.Echo.ToString()" ValueChanged="OnEchoChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
-			<MokaSegment Value="@nameof(TelnetEchoMode.Auto)" Text="Follow the server" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(TelnetEchoMode.On)" Text="Always" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(TelnetEchoMode.Off)" Text="Never" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="TelnetEchoMode" AriaLabel="Local echo" Value="Current.Echo" ValueChanged="OnEchoChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="TelnetEchoMode.Auto" Text="Follow the server" Disabled="Disabled" />
+			<MokaSegment Value="TelnetEchoMode.On" Text="Always" Disabled="Disabled" />
+			<MokaSegment Value="TelnetEchoMode.Off" Text="Never" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

@@ -92,13 +92,7 @@ public sealed partial class DockerLimitsPanel : DockerManagerPageBase
 		}
 	}
 
-	private void OnRestartChanged(string? value)
-	{
-		if (Enum.TryParse(value, out DockerRestartPolicy policy))
-		{
-			_restart = policy;
-		}
-	}
+	private void OnRestartChanged(DockerRestartPolicy policy) => _restart = policy;
 
 	private DockerUpdateSpec? Spec(DockerContainerDetails details)
 	{

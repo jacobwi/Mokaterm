@@ -3,18 +3,18 @@
 
 <MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 	<MokaFieldWrapper Label="Encryption" HelperText="@EncryptionHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Encryption" Value="@Current.Encryption.ToString()" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(FtpEncryption.None)" Text="None" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(FtpEncryption.Explicit)" Text="Explicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(FtpEncryption.Implicit)" Text="Implicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="FtpEncryption" AriaLabel="Encryption" Value="Current.Encryption" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="FtpEncryption.None" Text="None" Disabled="Disabled" />
+			<MokaSegment Value="FtpEncryption.Explicit" Text="Explicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+			<MokaSegment Value="FtpEncryption.Implicit" Text="Implicit TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 
 	<MokaFieldWrapper Label="Data connection" HelperText="@DataConnectionHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Data connection" Value="@Current.DataConnection.ToString()" ValueChanged="OnDataConnectionChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(FtpDataConnectionMode.Passive)" Text="Passive" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(FtpDataConnectionMode.ExtendedPassive)" Text="Extended passive" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(FtpDataConnectionMode.Active)" Text="Active" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="FtpDataConnectionMode" AriaLabel="Data connection" Value="Current.DataConnection" ValueChanged="OnDataConnectionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="FtpDataConnectionMode.Passive" Text="Passive" Disabled="Disabled" />
+			<MokaSegment Value="FtpDataConnectionMode.ExtendedPassive" Text="Extended passive" Disabled="Disabled" />
+			<MokaSegment Value="FtpDataConnectionMode.Active" Text="Active" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

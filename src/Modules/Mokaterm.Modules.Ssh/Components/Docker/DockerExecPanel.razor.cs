@@ -64,8 +64,7 @@ public sealed partial class DockerExecPanel : DockerManagerPageBase
 
 	private void OnEnvironmentChanged(string? value) => _environment = value ?? "";
 
-	private void OnShellChanged(string? value) =>
-		_shell = Enum.TryParse(value, out DockerExecShell shell) ? shell : DockerExecShell.Sh;
+	private void OnShellChanged(DockerExecShell shell) => _shell = shell;
 
 	private void ToggleOptions() => _options = !_options;
 

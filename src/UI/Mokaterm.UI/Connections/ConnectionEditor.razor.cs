@@ -22,10 +22,6 @@ namespace Mokaterm.UI.Connections;
 /// </summary>
 public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorRequest>
 {
-	private const string SavedHostMode = "saved";
-	private const string NewHostMode = "new";
-	private const string LoginSource = "login";
-	private const string KeychainSource = "keychain";
 	private const int MinPort = 1;
 	private const int MaxPort = 65535;
 
@@ -483,9 +479,9 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		_proxyPassword = "";
 	}
 
-	private void OnHostModeChanged(string mode)
+	private void OnHostModeChanged(bool newHost)
 	{
-		_newHost = mode == NewHostMode;
+		_newHost = newHost;
 		_hostError = null;
 		UpdateDuplicate();
 	}
@@ -549,14 +545,6 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		UpdateDuplicate();
 	}
 
-	private void OnMethodChanged(string value)
-	{
-		if (Enum.TryParse(value, out AuthenticationMethod method))
-		{
-			SetMethod(method);
-		}
-	}
-
 	private void SetMethod(AuthenticationMethod method)
 	{
 		_method = method;
@@ -577,9 +565,9 @@ public sealed partial class ConnectionEditor : ShellEditorBase<ConnectionEditorR
 		}
 	}
 
-	private void OnCredentialSourceChanged(string source)
+	private void OnCredentialSourceChanged(bool useKeychain)
 	{
-		_useKeychain = source == KeychainSource;
+		_useKeychain = useKeychain;
 		_credentialError = null;
 	}
 

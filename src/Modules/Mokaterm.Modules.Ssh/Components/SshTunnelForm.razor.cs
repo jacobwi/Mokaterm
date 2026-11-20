@@ -52,9 +52,9 @@ public partial class SshTunnelForm : ComponentBase
 
 	private static string PortText(int port) => port.ToString(CultureInfo.InvariantCulture);
 
-	private Task SetKindAsync(string value)
+	private Task SetKindAsync(SshTunnelKind kind)
 	{
-		if (!Enum.TryParse(value, out SshTunnelKind kind) || !Enum.IsDefined(kind) || kind == Tunnel.Kind)
+		if (kind == Tunnel.Kind)
 		{
 			return Task.CompletedTask;
 		}

@@ -46,10 +46,7 @@ public partial class MqttSubscriptionForm : ComponentBase
 		return ChangeAsync(Subscription with { TopicFilter = value });
 	}
 
-	private Task SetQosAsync(string value) =>
-		Enum.TryParse(value, out MqttQos qos) && Enum.IsDefined(qos)
-			? ChangeAsync(Subscription with { QualityOfService = qos })
-			: Task.CompletedTask;
+	private Task SetQosAsync(MqttQos qos) => ChangeAsync(Subscription with { QualityOfService = qos });
 
 	private Task SetSubscribeWithSessionAsync(bool value) =>
 		ChangeAsync(Subscription with { SubscribeWithSession = value });

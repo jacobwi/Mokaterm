@@ -201,9 +201,6 @@ public sealed partial class HostEditor : ShellEditorBase<HostEditorRequest>
 		UpdateClash();
 	}
 
-	private void OnEnvironmentChanged(string value) =>
-		_environment = Enum.TryParse(value, out HostEnvironment environment) ? environment : HostEnvironment.None;
-
 	/// <summary>Validates while the address is typed, so an empty or malformed one is reported where it is entered.</summary>
 	private void OnAddressChanged()
 	{

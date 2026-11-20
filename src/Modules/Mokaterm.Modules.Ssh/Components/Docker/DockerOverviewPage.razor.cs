@@ -93,13 +93,7 @@ public sealed partial class DockerOverviewPage : DockerManagerPageBase
 	};
 
 	/// <summary>The session's compose choice; the manager remounts its pages for it, so every compose command follows.</summary>
-	private void OnPreferenceChanged(string? value)
-	{
-		if (Feature is { } feature && Enum.TryParse(value, out ComposePreference preference))
-		{
-			feature.SetComposePreference(preference);
-		}
-	}
+	private void OnPreferenceChanged(ComposePreference preference) => Feature?.SetComposePreference(preference);
 
 	private Task RefreshAsync() => LoadAsync(async (client, token) =>
 	{

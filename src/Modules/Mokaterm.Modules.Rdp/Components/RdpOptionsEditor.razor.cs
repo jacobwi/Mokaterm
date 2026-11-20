@@ -51,19 +51,13 @@ public partial class RdpOptionsEditor : ConnectionOptionsEditorBase<RdpConnectio
 
 	private Task OnDomainChangedAsync(string value) => ChangeAsync(Current with { Domain = value ?? "" });
 
-	private Task OnDesktopSizeChangedAsync(string value) =>
-		Enum.TryParse(value, out RdpDesktopSizeMode mode) && Enum.IsDefined(mode)
-			? ChangeAsync(Current with { DesktopSize = mode })
-			: Task.CompletedTask;
+	private Task OnDesktopSizeChangedAsync(RdpDesktopSizeMode mode) => ChangeAsync(Current with { DesktopSize = mode });
 
 	private Task OnWidthChangedAsync(int value) => ChangeAsync(Current with { Width = value });
 
 	private Task OnHeightChangedAsync(int value) => ChangeAsync(Current with { Height = value });
 
-	private Task OnScalingChangedAsync(string value) =>
-		Enum.TryParse(value, out RdpScalingMode scaling) && Enum.IsDefined(scaling)
-			? ChangeAsync(Current with { Scaling = scaling })
-			: Task.CompletedTask;
+	private Task OnScalingChangedAsync(RdpScalingMode scaling) => ChangeAsync(Current with { Scaling = scaling });
 
 	private Task OnLayoutChangedAsync(RdpKeyboardLayout? layout) =>
 		ChangeAsync(Current with { KeyboardLayout = layout?.Id ?? RdpKeyboardLayout.ServerDefault });

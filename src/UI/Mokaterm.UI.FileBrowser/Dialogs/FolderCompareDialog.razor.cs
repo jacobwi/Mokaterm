@@ -18,9 +18,6 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 /// </summary>
 public sealed partial class FolderCompareDialog : ComponentBase, IDisposable
 {
-	private const string DifferencesFilter = "differences";
-	private const string AllFilter = "all";
-
 	// Beyond this many rows the table renders only the rows on screen.
 	private const int VirtualizeThreshold = 200;
 
@@ -116,8 +113,6 @@ public sealed partial class FolderCompareDialog : ComponentBase, IDisposable
 	private string ContentButtonText => _contentChecking
 		? string.Create(CultureInfo.CurrentCulture, $"Checking {_contentDone:N0} of {_contentTotal:N0}")
 		: "Check contents of " + EntryVisuals.Count(_contentCandidates, "file", "files");
-
-	private string FilterValue => _showAll ? AllFilter : DifferencesFilter;
 
 	private string ReadingText
 	{
@@ -302,9 +297,9 @@ public sealed partial class FolderCompareDialog : ComponentBase, IDisposable
 	private void ApplyFilter() =>
 		_shown = _showAll ? _rows : [.. _rows.Where(row => row.Status != FolderCompareStatus.Same)];
 
-	private void OnFilterChanged(string value)
+	private void OnShowAllChanged(bool showAll)
 	{
-		_showAll = value == AllFilter;
+		_showAll = showAll;
 		ApplyFilter();
 	}
 

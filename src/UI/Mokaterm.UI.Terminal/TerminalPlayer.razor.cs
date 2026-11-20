@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
@@ -17,7 +16,7 @@ namespace Mokaterm.UI.Terminal;
 /// </summary>
 public sealed partial class TerminalPlayer : ComponentBase, IAsyncDisposable
 {
-	private static readonly int[] Speeds = [1, 2, 4];
+	private static readonly double[] Speeds = [1, 2, 4];
 
 	// The clock is checked this often while playing. The screen moves only when an event falls due, so a quiet stretch
 	// costs a comparison per tick and no call into the page.
@@ -74,8 +73,6 @@ public sealed partial class TerminalPlayer : ComponentBase, IAsyncDisposable
 	private double DurationSeconds => Math.Max(0.1, Math.Round(Recording.Duration.TotalSeconds, 1, MidpointRounding.ToPositiveInfinity));
 
 	private string PlayLabel => IsPlaying ? "Pause" : "Play";
-
-	private string SpeedValue => Clock.Speed.ToString(CultureInfo.InvariantCulture);
 
 	public async ValueTask DisposeAsync()
 	{
@@ -215,9 +212,9 @@ public sealed partial class TerminalPlayer : ComponentBase, IAsyncDisposable
 		await ShowPositionAsync();
 	}
 
-	private void SetSpeed(string? value)
+	private void SetSpeed(double speed)
 	{
-		if (int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int speed) && Speeds.Contains(speed))
+		if (Speeds.Contains(speed))
 		{
 			Clock.SetSpeed(speed);
 		}

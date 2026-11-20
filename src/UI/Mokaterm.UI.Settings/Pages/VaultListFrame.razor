@@ -1,7 +1,7 @@
 @* The frame the vault list pages share: the locked state instead of the list, and a load failure above it. A page that
    forgets the alert would show an empty list where the document could not be read. *@
 
-@using Moka.Red.Feedback.Loading
+@using Moka.Red.Primitives.Skeleton
 <SettingsPage Title="@Title">
 	@if (IsUnlocked)
 	{

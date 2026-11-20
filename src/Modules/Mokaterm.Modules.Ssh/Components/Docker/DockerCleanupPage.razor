@@ -15,7 +15,7 @@
 	<Chips>
 		@if (_usage is not null)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_kind" ValueChanged="OnKindChanged" AriaLabel="What to clean up">
+			<MokaSegmentedControl TValue="string" Size="MokaSize.Xs" Value="@_kind" ValueChanged="OnKindChanged" AriaLabel="What to clean up">
 				<MokaSegment Value="@ContainersKind" Text="@($"Stopped containers {_containers.Count.ToString(CultureInfo.CurrentCulture)}")" />
 				<MokaSegment Value="@ImagesKind" Text="@($"Images {_images.Count.ToString(CultureInfo.CurrentCulture)}")" />
 				<MokaSegment Value="@VolumesKind" Text="@($"Volumes {_volumes.Count.ToString(CultureInfo.CurrentCulture)}")" />
@@ -26,16 +26,16 @@
 	<ChipsEnd>
 		@if (_usage is not null && _kind == ImagesKind)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_taggedImages ? "unused" : "dangling")" ValueChanged="OnImageScopeChanged" AriaLabel="Which images">
-				<MokaSegment Value="dangling" Text="@($"Dangling {DanglingCount.ToString(CultureInfo.CurrentCulture)}")" />
-				<MokaSegment Value="unused" Text="@($"Unused {UnusedImageCount.ToString(CultureInfo.CurrentCulture)}")" />
+			<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="_taggedImages" ValueChanged="OnImageScopeChanged" AriaLabel="Which images">
+				<MokaSegment Value="false" Text="@($"Dangling {DanglingCount.ToString(CultureInfo.CurrentCulture)}")" />
+				<MokaSegment Value="true" Text="@($"Unused {UnusedImageCount.ToString(CultureInfo.CurrentCulture)}")" />
 			</MokaSegmentedControl>
 		}
 		else if (_usage is not null && _kind == VolumesKind)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_namedVolumes ? "all" : "anonymous")" ValueChanged="OnVolumeScopeChanged" AriaLabel="Which volumes">
-				<MokaSegment Value="anonymous" Text="@($"Anonymous {AnonymousCount.ToString(CultureInfo.CurrentCulture)}")" />
-				<MokaSegment Value="all" Text="@($"All unused {UnusedVolumeCount.ToString(CultureInfo.CurrentCulture)}")" />
+			<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="_namedVolumes" ValueChanged="OnVolumeScopeChanged" AriaLabel="Which volumes">
+				<MokaSegment Value="false" Text="@($"Anonymous {AnonymousCount.ToString(CultureInfo.CurrentCulture)}")" />
+				<MokaSegment Value="true" Text="@($"All unused {UnusedVolumeCount.ToString(CultureInfo.CurrentCulture)}")" />
 			</MokaSegmentedControl>
 		}
 	</ChipsEnd>

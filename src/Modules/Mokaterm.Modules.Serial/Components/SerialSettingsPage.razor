@@ -18,7 +18,11 @@
 						   AriaLabel="Baud rate" />
 		</SettingsRow>
 		<SettingsRow Label="Data bits">
-			<MokaSegmentedControl AriaLabel="Data bits" Size="MokaSize.Sm" Value="@DataBitsValue" ValueChanged="OnDataBitsChangedAsync">
+			<MokaSegmentedControl TValue="int"
+								  AriaLabel="Data bits"
+								  Size="MokaSize.Sm"
+								  Value="settings.DataBits"
+								  ValueChanged="value => SaveAsync(s => s with { DataBits = value })">
 				<MokaSegment Value="5" Text="5" />
 				<MokaSegment Value="6" Text="6" />
 				<MokaSegment Value="7" Text="7" />

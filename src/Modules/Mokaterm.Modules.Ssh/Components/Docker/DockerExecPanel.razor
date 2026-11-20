@@ -18,10 +18,10 @@ else
 					  spellcheck="false"
 					  @onkeydown="OnCommandKeyDown" />
 		<div class="mt-dk-toolbar">
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@_shell.ToString()" ValueChanged="OnShellChanged" AriaLabel="Run it with">
-				<MokaSegment Value="@nameof(DockerExecShell.Sh)" Text="sh -c" />
-				<MokaSegment Value="@nameof(DockerExecShell.Bash)" Text="bash -c" />
-				<MokaSegment Value="@nameof(DockerExecShell.None)" Text="No shell" />
+			<MokaSegmentedControl TValue="DockerExecShell" Size="MokaSize.Xs" Value="_shell" ValueChanged="OnShellChanged" AriaLabel="Run it with">
+				<MokaSegment Value="DockerExecShell.Sh" Text="sh -c" />
+				<MokaSegment Value="DockerExecShell.Bash" Text="bash -c" />
+				<MokaSegment Value="DockerExecShell.None" Text="No shell" />
 			</MokaSegmentedControl>
 			<MokaButton Variant="MokaVariant.Text" Color="MokaColor.Surface" Size="MokaSize.Xs"
 						StartIcon="@(_options ? MokaIcons.Navigation.ChevronUp : MokaIcons.Navigation.ChevronDown)"

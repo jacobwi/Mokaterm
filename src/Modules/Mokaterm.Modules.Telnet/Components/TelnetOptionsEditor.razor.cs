@@ -60,15 +60,9 @@ public partial class TelnetOptionsEditor : ConnectionOptionsEditorBase<TelnetCon
 
 	private Task OnEncodingChangedAsync(string value) => ChangeAsync(Current with { EncodingName = value });
 
-	private Task OnLineEndingChangedAsync(string value) =>
-		Enum.TryParse(value, out TelnetLineEnding lineEnding) && Enum.IsDefined(lineEnding)
-			? ChangeAsync(Current with { LineEnding = lineEnding })
-			: Task.CompletedTask;
+	private Task OnLineEndingChangedAsync(TelnetLineEnding lineEnding) => ChangeAsync(Current with { LineEnding = lineEnding });
 
-	private Task OnEchoChangedAsync(string value) =>
-		Enum.TryParse(value, out TelnetEchoMode echo) && Enum.IsDefined(echo)
-			? ChangeAsync(Current with { Echo = echo })
-			: Task.CompletedTask;
+	private Task OnEchoChangedAsync(TelnetEchoMode echo) => ChangeAsync(Current with { Echo = echo });
 
 	private Task OnAutoLoginChangedAsync(bool value) => ChangeAsync(Current with { AutoLogin = value });
 }

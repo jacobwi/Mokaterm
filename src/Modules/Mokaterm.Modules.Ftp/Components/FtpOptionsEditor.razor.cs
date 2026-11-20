@@ -29,15 +29,9 @@ public partial class FtpOptionsEditor : ConnectionOptionsEditorBase<FtpConnectio
 	protected override void OnCurrentChanged() =>
 		ReportDefaultPort(Current.Encryption == FtpEncryption.Implicit ? FtpConnectionOptions.ImplicitTlsPort : null);
 
-	private Task OnEncryptionChangedAsync(string value) =>
-		Enum.TryParse(value, out FtpEncryption encryption) && Enum.IsDefined(encryption)
-			? ChangeAsync(Current with { Encryption = encryption })
-			: Task.CompletedTask;
+	private Task OnEncryptionChangedAsync(FtpEncryption encryption) => ChangeAsync(Current with { Encryption = encryption });
 
-	private Task OnDataConnectionChangedAsync(string value) =>
-		Enum.TryParse(value, out FtpDataConnectionMode mode) && Enum.IsDefined(mode)
-			? ChangeAsync(Current with { DataConnection = mode })
-			: Task.CompletedTask;
+	private Task OnDataConnectionChangedAsync(FtpDataConnectionMode mode) => ChangeAsync(Current with { DataConnection = mode });
 
 	private Task OnEncodingChangedAsync(string value) => ChangeAsync(Current with { EncodingName = value });
 

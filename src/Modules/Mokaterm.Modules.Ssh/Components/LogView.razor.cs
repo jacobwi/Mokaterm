@@ -195,10 +195,8 @@ public sealed partial class LogView : ComponentBase
 
 	private void OnShowTimestampsChanged(bool value) => _showTimestamps = value;
 
-	private Task OnLineCountChangedAsync(string? value) =>
-		int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int count) && LineChoices?.Contains(count) == true
-			? LineCountChanged.InvokeAsync(count)
-			: Task.CompletedTask;
+	private Task OnLineCountChangedAsync(int count) =>
+		LineChoices?.Contains(count) == true ? LineCountChanged.InvokeAsync(count) : Task.CompletedTask;
 
 	private Task ToggleFollowingAsync() => FollowingChanged.InvokeAsync(!Following);
 

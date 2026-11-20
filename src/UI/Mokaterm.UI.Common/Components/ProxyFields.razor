@@ -9,11 +9,11 @@
 
 <MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 	<MokaFieldWrapper Label="Proxy" HelperText="@KindHelp" Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Proxy" Value="@Proxy.Kind.ToString()" ValueChanged="OnKindChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
-			<MokaSegment Value="@nameof(ProxyKind.None)" Text="Direct" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(ProxyKind.Http)" Text="HTTP CONNECT" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(ProxyKind.Socks4)" Text="SOCKS4" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(ProxyKind.Socks5)" Text="SOCKS5" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="ProxyKind" AriaLabel="Proxy" Value="Proxy.Kind" ValueChanged="OnKindChangedAsync" Disabled="Disabled" Size="MokaSize.Sm" FullWidth>
+			<MokaSegment Value="ProxyKind.None" Text="Direct" Disabled="Disabled" />
+			<MokaSegment Value="ProxyKind.Http" Text="HTTP CONNECT" Disabled="Disabled" />
+			<MokaSegment Value="ProxyKind.Socks4" Text="SOCKS4" Disabled="Disabled" />
+			<MokaSegment Value="ProxyKind.Socks5" Text="SOCKS5" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

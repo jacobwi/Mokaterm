@@ -2,10 +2,10 @@
 
 <MokaGrid Columns="1" ColumnsMd="2" Gap="MokaSpacingScale.Sm">
 	<MokaFieldWrapper Label="Direction" HelperText="@KindHelp" Disabled="Disabled" Size="MokaSize.Sm">
-		<MokaSegmentedControl AriaLabel="Direction" Value="@Tunnel.Kind.ToString()" ValueChanged="SetKindAsync" Disabled="Disabled" Size="MokaSize.Sm">
-			<MokaSegment Value="@nameof(SshTunnelKind.Local)" Text="Local" />
-			<MokaSegment Value="@nameof(SshTunnelKind.Remote)" Text="Remote" />
-			<MokaSegment Value="@nameof(SshTunnelKind.Dynamic)" Text="SOCKS" />
+		<MokaSegmentedControl TValue="SshTunnelKind" AriaLabel="Direction" Value="Tunnel.Kind" ValueChanged="SetKindAsync" Disabled="Disabled" Size="MokaSize.Sm">
+			<MokaSegment Value="SshTunnelKind.Local" Text="Local" />
+			<MokaSegment Value="SshTunnelKind.Remote" Text="Remote" />
+			<MokaSegment Value="SshTunnelKind.Dynamic" Text="SOCKS" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

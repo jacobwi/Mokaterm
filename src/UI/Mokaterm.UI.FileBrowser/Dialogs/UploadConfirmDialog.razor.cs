@@ -12,9 +12,6 @@ namespace Mokaterm.UI.FileBrowser.Dialogs;
 /// </summary>
 public sealed partial class UploadConfirmDialog : ComponentBase
 {
-	private const string UserValue = "user";
-	private const string RootValue = "root";
-
 	private bool _asRoot;
 	private bool _stopAsking;
 
@@ -58,8 +55,6 @@ public sealed partial class UploadConfirmDialog : ComponentBase
 
 	private bool ShowOptOut => OfferOptOut && !_asRoot;
 
-	private string RunAsValue => _asRoot ? RootValue : UserValue;
-
 	private string Destination => TransferOrigin.Format(_asRoot ? "root" : UserName, Host, Directory);
 
 	private string CountText => (FileCount, FolderCount) switch
@@ -74,7 +69,7 @@ public sealed partial class UploadConfirmDialog : ComponentBase
 
 	protected override void OnInitialized() => _asRoot = SupportsElevation && AsRoot;
 
-	private void OnRunAsChanged(string value) => _asRoot = SupportsElevation && value == RootValue;
+	private void OnRunAsChanged(bool asRoot) => _asRoot = SupportsElevation && asRoot;
 
 	// Only a confirmed upload reports the check box, so a question that was cancelled cannot also turn itself off.
 	private void Confirm() => Dialog?.Close(new UploadConfirmation(_asRoot ? UploadRunAs.Root : UploadRunAs.User, ShowOptOut && _stopAsking));

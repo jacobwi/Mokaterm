@@ -114,7 +114,7 @@ public sealed partial class DockerContainerPanel : DockerManagerPageBase
 
 	private Task OnTabChangedAsync(string tab) => TabChanged.InvokeAsync(tab);
 
-	private void OnInspectViewChanged(string? value) => _raw = value == "raw";
+	private void OnInspectViewChanged(bool raw) => _raw = raw;
 
 	private void OnRevealRawChanged(bool value) => _revealRaw = value;
 

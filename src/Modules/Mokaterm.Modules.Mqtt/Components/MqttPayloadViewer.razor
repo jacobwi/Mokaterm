@@ -13,10 +13,10 @@
 	else
 	{
 		<div class="mt-mqtt-payload-head">
-			<MokaSegmentedControl AriaLabel="Payload format" Value="@_format.ToString()" ValueChanged="OnFormatChanged" Size="MokaSize.Xs">
-				<MokaSegment Value="@nameof(MqttPayloadFormat.Text)" Text="Text" />
-				<MokaSegment Value="@nameof(MqttPayloadFormat.Json)" Text="JSON" Disabled="@(!HasJson)" />
-				<MokaSegment Value="@nameof(MqttPayloadFormat.Hex)" Text="Hex" />
+			<MokaSegmentedControl TValue="MqttPayloadFormat" AriaLabel="Payload format" Value="_format" ValueChanged="OnFormatChanged" Size="MokaSize.Xs">
+				<MokaSegment Value="MqttPayloadFormat.Text" Text="Text" />
+				<MokaSegment Value="MqttPayloadFormat.Json" Text="JSON" Disabled="@(!HasJson)" />
+				<MokaSegment Value="MqttPayloadFormat.Hex" Text="Hex" />
 			</MokaSegmentedControl>
 
 			<span class="mt-mqtt-payload-spacer"></span>

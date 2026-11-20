@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
-using Moka.Red.Feedback.Tooltip;
+using Moka.Red.Primitives.Tooltip;
 using Mokaterm.Abstractions.Interaction;
 using Mokaterm.UI.Common.Platform;
 

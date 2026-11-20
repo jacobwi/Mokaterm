@@ -101,13 +101,7 @@ public sealed partial class MqttPublishForm : ComponentBase
 		_result = null;
 	}
 
-	private void OnQosChanged(string value)
-	{
-		if (Enum.TryParse(value, out MqttQos qos) && Enum.IsDefined(qos))
-		{
-			_qos = qos;
-		}
-	}
+	private void OnQosChanged(MqttQos qos) => _qos = qos;
 
 	private void OnRetainChanged(bool value) => _retain = value;
 

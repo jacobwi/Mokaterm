@@ -2,17 +2,17 @@
 
 <MokaFlexbox Direction="MokaDirection.Column" Gap="MokaSpacingScale.Md">
 	<MokaFieldWrapper Label="Encryption" HelperText="@EncryptionHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Encryption" Value="@Current.Encryption.ToString()" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(VncEncryptionMode.Preferred)" Text="Prefer TLS" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(VncEncryptionMode.Required)" Text="Require TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="VncEncryptionMode" AriaLabel="Encryption" Value="Current.Encryption" ValueChanged="OnEncryptionChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="VncEncryptionMode.Preferred" Text="Prefer TLS" Disabled="Disabled" />
+			<MokaSegment Value="VncEncryptionMode.Required" Text="Require TLS" Icon="MokatermIcons.Lock" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 
 	<MokaFieldWrapper Label="Scaling" HelperText="@ScalingHelp" Disabled="Disabled">
-		<MokaSegmentedControl AriaLabel="Scaling" Value="@Current.Scaling.ToString()" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
-			<MokaSegment Value="@nameof(VncScalingMode.Fit)" Text="Fit to view" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(VncScalingMode.Actual)" Text="1:1" Disabled="Disabled" />
-			<MokaSegment Value="@nameof(VncScalingMode.Remote)" Text="Resize the server" Disabled="Disabled" />
+		<MokaSegmentedControl TValue="VncScalingMode" AriaLabel="Scaling" Value="Current.Scaling" ValueChanged="OnScalingChangedAsync" Disabled="Disabled" FullWidth>
+			<MokaSegment Value="VncScalingMode.Fit" Text="Fit to view" Disabled="Disabled" />
+			<MokaSegment Value="VncScalingMode.Actual" Text="1:1" Disabled="Disabled" />
+			<MokaSegment Value="VncScalingMode.Remote" Text="Resize the server" Disabled="Disabled" />
 		</MokaSegmentedControl>
 	</MokaFieldWrapper>
 

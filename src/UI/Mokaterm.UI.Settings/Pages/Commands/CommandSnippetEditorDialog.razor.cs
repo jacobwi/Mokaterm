@@ -114,14 +114,6 @@ public sealed partial class CommandSnippetEditorDialog : DraftDialogBase
 		_commandError = null;
 	}
 
-	private void OnScopeChanged(string value)
-	{
-		if (Enum.TryParse(value, out CommandSnippetScope scope))
-		{
-			_scope = scope;
-		}
-	}
-
 	private void OnRunChanged(bool run) => _run = run;
 
 	private async Task SaveAsync()

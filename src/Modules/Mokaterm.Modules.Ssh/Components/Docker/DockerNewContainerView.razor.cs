@@ -107,9 +107,9 @@ public sealed partial class DockerNewContainerView : DockerManagerPageBase
 		_problems = new Dictionary<string, string>();
 	}
 
-	private void OnRestartChanged(string? value)
+	private void OnRestartChanged(DockerRestartPolicy policy)
 	{
-		_restart = Enum.TryParse(value, out DockerRestartPolicy policy) ? policy : DockerRestartPolicy.No;
+		_restart = policy;
 		Forget(DockerRunSpec.RestartField);
 	}
 

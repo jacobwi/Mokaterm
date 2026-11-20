@@ -90,13 +90,10 @@ public sealed partial class MqttPayloadViewer : ComponentBase
 		_renderedFormat = _format;
 	}
 
-	private void OnFormatChanged(string value)
+	private void OnFormatChanged(MqttPayloadFormat format)
 	{
-		if (Enum.TryParse(value, out MqttPayloadFormat format) && Enum.IsDefined(format))
-		{
-			_format = format;
-			_formatChosen = true;
-		}
+		_format = format;
+		_formatChosen = true;
 	}
 
 	private async Task CopyAsync()

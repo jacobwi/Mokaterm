@@ -83,9 +83,9 @@
 							   autocomplete="off"
 							   data-autofocus />
 			</div>
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_gzip ? "gzip" : "tar")" ValueChanged="OnCompressionChanged" AriaLabel="Compression">
-				<MokaSegment Value="gzip" Text="tar.gz" />
-				<MokaSegment Value="tar" Text="tar" />
+			<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="_gzip" ValueChanged="OnCompressionChanged" AriaLabel="Compression">
+				<MokaSegment Value="true" Text="tar.gz" />
+				<MokaSegment Value="false" Text="tar" />
 			</MokaSegmentedControl>
 		</div>
 		<span class="mt-dk-note">The file is written readable by you alone and never replaces one that is there. Once it is done it can be downloaded from here.</span>
@@ -101,9 +101,9 @@
 	private RenderFragment RestoreForm => @<form class="mt-dkva-form" @onsubmit="RestoreAsync" @onsubmit:preventDefault="true">
 		@if (Volume is { } existing)
 		{
-			<MokaSegmentedControl Size="MokaSize.Xs" Value="@(_newVolume ? "new" : "existing")" ValueChanged="OnTargetChanged" AriaLabel="Restore into">
-				<MokaSegment Value="existing" Text="@($"Into {existing}")" />
-				<MokaSegment Value="new" Text="Into a new volume" />
+			<MokaSegmentedControl TValue="bool" Size="MokaSize.Xs" Value="_newVolume" ValueChanged="OnTargetChanged" AriaLabel="Restore into">
+				<MokaSegment Value="false" Text="@($"Into {existing}")" />
+				<MokaSegment Value="true" Text="Into a new volume" />
 			</MokaSegmentedControl>
 		}
 

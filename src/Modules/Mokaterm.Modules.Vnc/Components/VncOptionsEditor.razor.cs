@@ -32,15 +32,9 @@ public partial class VncOptionsEditor : ConnectionOptionsEditorBase<VncConnectio
 
 	protected override ProtocolOptions ApplyTo(VncConnectionOptions current, ProtocolOptions options) => current.ApplyTo(options);
 
-	private Task OnEncryptionChangedAsync(string value) =>
-		Enum.TryParse(value, out VncEncryptionMode encryption) && Enum.IsDefined(encryption)
-			? ChangeAsync(Current with { Encryption = encryption })
-			: Task.CompletedTask;
+	private Task OnEncryptionChangedAsync(VncEncryptionMode encryption) => ChangeAsync(Current with { Encryption = encryption });
 
-	private Task OnScalingChangedAsync(string value) =>
-		Enum.TryParse(value, out VncScalingMode scaling) && Enum.IsDefined(scaling)
-			? ChangeAsync(Current with { Scaling = scaling })
-			: Task.CompletedTask;
+	private Task OnScalingChangedAsync(VncScalingMode scaling) => ChangeAsync(Current with { Scaling = scaling });
 
 	private Task OnQualityChangedAsync(int value) => ChangeAsync(Current with { Quality = value });
 

@@ -66,9 +66,9 @@ public partial class ProxyFields : ComponentBase
 
 	private string? UserError => IsOn ? ProxyOptions.ValidateUser(Proxy.User) : null;
 
-	private Task OnKindChangedAsync(string value)
+	private Task OnKindChangedAsync(ProxyKind kind)
 	{
-		if (!Enum.TryParse(value, out ProxyKind kind) || !Enum.IsDefined(kind) || kind == Proxy.Kind)
+		if (kind == Proxy.Kind)
 		{
 			return Task.CompletedTask;
 		}
