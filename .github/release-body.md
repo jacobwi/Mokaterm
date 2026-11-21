@@ -1,3 +1,9 @@
+## What's new in 0.4.1
+
+- The command palette (Ctrl+K) works better with a screen reader: its search box and list are named, and Tab stays
+  inside it while it is open.
+- Plugins made for 0.4.0 keep working.
+
 ## What's new in 0.4.0
 
 **Plugins**
